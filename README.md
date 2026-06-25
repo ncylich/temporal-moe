@@ -1,5 +1,13 @@
 # FLAME-MoE :fire:​: A Transparent End-to-End Research Platform for Mixture-of-Experts Language Models
 
+> **Note — personal playground fork.** This is a private, personal copy of
+> [cmu-flame/FLAME-MoE](https://github.com/cmu-flame/FLAME-MoE), maintained by
+> [@ncylich](https://github.com/ncylich) purely for my own experimentation and
+> learning. It is **not** affiliated with or endorsed by the original FLAME-MoE
+> authors — all credit for the platform and research goes to them
+> ([paper](https://www.arxiv.org/abs/2505.20225)). Expect ad-hoc, possibly-broken
+> changes; this is a playground, not a maintained release.
+
 **FLAME-MoE** is a transparent, end-to-end research platform for Mixture-of-Experts (MoE) language models. It is designed to facilitate scalable training, evaluation, and experimentation with MoE architectures. [arXiv](https://www.arxiv.org/abs/2505.20225)
 
 ## 🔗 Model Checkpoints
