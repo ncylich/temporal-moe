@@ -105,3 +105,18 @@ Acceptance bars in BPB: **≤1.645 @1e17, ≤2.149 @1e16** (law L*: 1.578 @1e17,
 
 **s2@1e16 result (16k, 392 iters, no NaN):** final val CE **5.019 → BPB 1.821** — passes the ≤2.149
 @1e16 bar. (50k bring-up was CE 5.28 → BPB 1.773; the 16k vocab costs ~+0.05 BPB for 1.69× speed.)
+
+### v16k_s2_1e16_lr1e-3  (2026-06-25 23:04)
+Config: shape=s2 flops=1e16 peak_lr=1e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY v16k_s2_1e16_lr1e-3: final_val_CE=4.9355 (BPB 1.7903)  val@iters/10=4.9252 (BPB 1.7866)@it392  nan=False  evals=3
+{"run": "v16k_s2_1e16_lr1e-3", "total_iters": 392, "iters_1e16": 39, "final_val_loss": 4.935485, "final_val_bpb": 1.7903, "final_val_ppl": 139.1, "val_at_1e16": {"iter": 392, "loss": 4.925189}, "val_at_1e16_bpb": 1.7866, "last_train_loss": 4.923153, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_s2_1e16_lr6e-3  (2026-06-25 23:22)
+Config: shape=s2 flops=1e16 peak_lr=6e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY v16k_s2_1e16_lr6e-3: final_val_CE=5.6725 (BPB 2.0576)  val@iters/10=5.6657 (BPB 2.0552)@it392  nan=False  evals=3
+{"run": "v16k_s2_1e16_lr6e-3", "total_iters": 392, "iters_1e16": 39, "final_val_loss": 5.672459, "final_val_bpb": 2.0576, "final_val_ppl": 290.7, "val_at_1e16": {"iter": 392, "loss": 5.665736}, "val_at_1e16_bpb": 2.0552, "last_train_loss": 5.665376, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_s2_1e16_lr1e-2  (2026-06-25 23:25)
+Config: shape=s2 flops=1e16 peak_lr=1e-2 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY v16k_s2_1e16_lr1e-2: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "v16k_s2_1e16_lr1e-2", "total_iters": 392, "iters_1e16": 39, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": 7.02244, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}

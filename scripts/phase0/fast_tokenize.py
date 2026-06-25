@@ -17,7 +17,9 @@ os.environ.setdefault("RAYON_NUM_THREADS", "2")
 
 ROOT = "/workspace/FLAME-MoE"
 sys.path.insert(0, f"{ROOT}/Megatron-LM")
-PARTS = sorted(glob.glob(os.environ.get("PARTS_GLOB", f"{ROOT}/data/dclm_parts/part*.jsonl")))
+# PARTS_GLOB may contain multiple whitespace-separated glob patterns.
+_pat = os.environ.get("PARTS_GLOB", f"{ROOT}/data/dclm_parts/part*.jsonl")
+PARTS = sorted({p for g in _pat.split() for p in glob.glob(g)})
 OUTDIR = os.environ.get("OUT_DIR", f"{ROOT}/data/dclm_tokenized")
 os.makedirs(OUTDIR, exist_ok=True)
 BATCH = 2000
