@@ -35,7 +35,13 @@ SHARED_INT=$((2 * MOE_FFN))
 read N TRAIN_ITERS < <(.venv/bin/python scripts/phase0/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
 WARMUP_ITERS=$(.venv/bin/python -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
 MIN_LR=$(.venv/bin/python -c "print($PEAK_LR*0.1)")
-EVAL_INTERVAL=$(.venv/bin/python -c "print(max(1,round($TRAIN_ITERS/10)))")   # 1e16 point = iters/10
+# Sweep runs (0c/0d) need eval@iters/10 to read the 1e16 point from the 1e17 run; HP runs only
+# need the final val loss -> EVAL_AT_END=1 evaluates once at the end (saves ~9 intermediate evals).
+if [ "${EVAL_AT_END:-0}" = "1" ]; then
+  EVAL_INTERVAL=$TRAIN_ITERS
+else
+  EVAL_INTERVAL=$(.venv/bin/python -c "print(max(1,round($TRAIN_ITERS/10)))")   # 1e16 point = iters/10
+fi
 SAVE_INTERVAL=$EVAL_INTERVAL
 
 OUT=$ROOT/results/phase0/runs/$RUN_NAME
@@ -72,13 +78,14 @@ MODEL_ARGS=(
   --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
   --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
   --hidden-dropout 0.0 --attention-dropout 0.0 --init-method-std 0.02
-  --tokenizer-type HuggingFaceTokenizer --tokenizer-model EleutherAI/pythia-12b
+  --tokenizer-type HuggingFaceTokenizer --tokenizer-model ${TOKENIZER_MODEL:-EleutherAI/pythia-12b}
   # FLAME's native TransformerEngine path (faithful to FLAME). Single-GPU adaptations:
   #   --moe-grouped-gemm: batch the 64 local experts (EP=1) into one grouped GEMM
   #     (numerically equivalent to FLAME's EP=8 sequential-per-GPU experts; required for
   #     practical throughput with 64 experts on one GPU).
   #   --no-gradient-accumulation-fusion: that fusion needs apex (absent); perf-only, no math change.
   --transformer-impl transformer_engine --moe-grouped-gemm --no-gradient-accumulation-fusion
+  ${CE_FUSION:+--cross-entropy-loss-fusion}
 )
 INFRA_ARGS=(
   --pipeline-model-parallel-size 1 --expert-model-parallel-size 1
@@ -95,7 +102,7 @@ DATA_ARGS=( --seq-length 2048 --data-path $DATA_PATH --split 90,5,5 )
 LOG_ARGS=(
   --log-interval 10 --log-throughput
   --save "$CKPT" --save-interval $SAVE_INTERVAL --load "$CKPT"
-  --eval-interval $EVAL_INTERVAL --eval-iters 50
+  --eval-interval $EVAL_INTERVAL --eval-iters 20
   --moe-per-layer-logging
 )
 

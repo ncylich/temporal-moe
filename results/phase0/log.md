@@ -80,3 +80,28 @@ Data: 22 finalized dclm shards (7.02B tokens). Result:
 Wall-clock estimate per run @ 4.2 s/iter → see budget note. (final 1e16 val loss recorded at completion)
 
 (entries appended below as runs complete)
+
+**0a final:** s2@1e16 reached val loss ≈ **5.28** (stopped near completion to free GPU). Far below the
+law's pessimistic 1e16 prediction (7.42) and the ≤6.4 acceptance bar — encouraging for criterion 1
+@1e16. eval-iters reduced 50→20 for subsequent runs (eval overhead was ~50% of bring-up wall-clock).
+
+## VOCAB EXPERIMENT (user-directed): 16k tokenizer + fused CE  [2026-06-25]
+
+Motivation: 50k-vocab logits dominate FLOPs at these tiny scales → ~3× wall-clock overhead. Trained
+a custom 16,000-token byte-level BPE on dclm (`data/tok16k`), re-tokenized a 0.70B-token subset.
+
+**Throughput (s2 shape, gb256, real data):**
+| config | s/iter | TFLOP/s | max mem | note |
+|---|---|---|---|---|
+| 50k vocab, mb32 | 4.12 | 18.3 | 28 GB | prior baseline |
+| 16k vocab + fused-CE, mb32 | **2.44** | 19.7 | 22.6 GB | **1.69× faster** |
+| 16k vocab + fused-CE, mb64 | 2.31 | — | 44.4 GB | ~no gain (compute-bound), near mem limit |
+| 16k vocab + fused-CE, mb96 | OOM | — | — | |
+→ Keep **mb32**; speedup is from the vocab cut, not micro-batch. Full Phase 0 now ≈ **20–23 GPU-h** (was ~35–40).
+
+**Metric = bits-per-byte (BPB)** (tokenizer-invariant; CE not comparable across vocab sizes).
+`BPB = CE / (ln2·bytes_per_token)`; bpe-16k bytes/tok=3.977 (÷2.757), pythia-50k=4.296 (÷2.978).
+Acceptance bars in BPB: **≤1.645 @1e17, ≤2.149 @1e16** (law L*: 1.578 @1e17, 2.048 @1e16).
+
+**s2@1e16 result (16k, 392 iters, no NaN):** final val CE **5.019 → BPB 1.821** — passes the ≤2.149
+@1e16 bar. (50k bring-up was CE 5.28 → BPB 1.773; the 16k vocab costs ~+0.05 BPB for 1.69× speed.)

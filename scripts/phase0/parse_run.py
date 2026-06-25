@@ -6,6 +6,12 @@ Usage: parse_run.py <run_dir>
 """
 import sys, re, json, os, math
 
+# BPB = CE_nats / (ln2 * bytes_per_token). Divisor depends on the tokenizer of the run.
+# Measured on held-out dclm: bpe-16k -> 2.7568, pythia-50k -> 2.9780.
+BPB_DIVISOR = float(os.environ.get("BPB_DIVISOR", "2.7568"))
+def bpb(ce):
+    return round(ce / BPB_DIVISOR, 4) if ce is not None else None
+
 def main():
     run = sys.argv[1]
     log = os.path.join(run, "train.log")
@@ -44,13 +50,16 @@ def main():
 
     out = dict(run=os.path.basename(run), total_iters=total_iters,
                iters_1e16=iters_1e16, final_val_loss=final_val,
+               final_val_bpb=bpb(final_val),
                final_val_ppl=(round(math.exp(min(20, final_val)),1) if final_val else None),
-               val_at_1e16=val_1e16, last_train_loss=last_train,
-               nan=nan, n_val_evals=len(vals))
+               val_at_1e16=val_1e16,
+               val_at_1e16_bpb=(bpb(val_1e16["loss"]) if val_1e16 else None),
+               last_train_loss=last_train,
+               nan=nan, n_val_evals=len(vals), bpb_divisor=BPB_DIVISOR)
     print(json.dumps(out))
-    fv = f"{final_val:.4f}" if final_val else "NA"
-    v16 = f"{val_1e16['loss']:.4f}@it{val_1e16['iter']}" if val_1e16 else "NA"
-    print(f"SUMMARY {out['run']}: val@1e17={fv}  val@1e16={v16}  nan={nan}  evals={len(vals)}")
+    fv = f"{final_val:.4f} (BPB {bpb(final_val):.4f})" if final_val else "NA"
+    v16 = f"{val_1e16['loss']:.4f} (BPB {bpb(val_1e16['loss']):.4f})@it{val_1e16['iter']}" if val_1e16 else "NA"
+    print(f"SUMMARY {out['run']}: final_val_CE={fv}  val@iters/10={v16}  nan={nan}  evals={len(vals)}")
 
 if __name__ == "__main__":
     main()

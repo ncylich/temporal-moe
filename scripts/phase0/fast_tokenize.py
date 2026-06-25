@@ -21,13 +21,14 @@ PARTS = sorted(glob.glob(os.environ.get("PARTS_GLOB", f"{ROOT}/data/dclm_parts/p
 OUTDIR = os.environ.get("OUT_DIR", f"{ROOT}/data/dclm_tokenized")
 os.makedirs(OUTDIR, exist_ok=True)
 BATCH = 2000
-EOD = 0
+EOD = int(os.environ.get("EOD", "0"))
+TOKENIZER_MODEL = os.environ.get("TOKENIZER_MODEL", "EleutherAI/pythia-12b")
 
 # --- imported ONCE in parent; forked workers inherit ---
 import numpy
 from transformers import AutoTokenizer
 from megatron.core.datasets import indexed_dataset
-TOK = AutoTokenizer.from_pretrained("EleutherAI/pythia-12b")
+TOK = AutoTokenizer.from_pretrained(TOKENIZER_MODEL)
 
 def tokenize_part(part_path):
     name = os.path.basename(part_path)[:-6]
