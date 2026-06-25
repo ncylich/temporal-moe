@@ -70,4 +70,13 @@ on the serial Python split of the 45 GB file → replaced with shell split + par
 
 ## Run log
 
+### 0a — bring-up s2@1e16 (real dclm data)  [PASS end-to-end]
+Config: s2 (h256/L6), 1e16 FLOPs, peak_LR 3e-3, warmup 5%, gb256, mb32, seed1234, iters=392.
+Data: 22 finalized dclm shards (7.02B tokens). Result:
+- Trains end-to-end, **no NaN** (0 nan-iterations), loss 10.17→8.02→7.33→6.83 (smooth).
+- **Val loss logged** (iter39 = 7.005), **checkpoint saved** (iter_0000039), eval+save@39 work.
+- **Throughput: ~4.2 s/iter (0.24 it/s), 18.4 TFLOP/s/GPU** (Megatron's count incl. embeddings).
+- Pipeline (TE impl + grouped-gemm + mb32 + 22-shard blend) confirmed on real data.
+Wall-clock estimate per run @ 4.2 s/iter → see budget note. (final 1e16 val loss recorded at completion)
+
 (entries appended below as runs complete)

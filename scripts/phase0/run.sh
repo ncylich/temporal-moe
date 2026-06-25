@@ -47,7 +47,7 @@ echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN gb=$GLOBAL_BATCH mb
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
 DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
-  -exec sh -c 'printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
+  -exec sh -c '[ -f "${1%.bin}.idx" ] && printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
 if [ -z "$DATA_PATH" ]; then echo "ERROR: no tokenized part*_text_document.bin in $DATA_DIR"; exit 1; fi
 
 export OMP_NUM_THREADS=16
