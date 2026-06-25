@@ -9,6 +9,10 @@ WPJ=${1:-2}
 NV=/usr/local/lib/python3.11/dist-packages/nvidia
 export PATH=$ROOT/.venv/bin:$PATH CUDNN_PATH=$NV/cudnn \
   LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-} HF_TOKEN=${HF_TOKEN:-}
+# Cap BLAS/OMP threads: 32 jobs x 64 OpenBLAS threads exhausts the cgroup thread limit.
+# The HF tokenizer is Rust-based and doesn't need BLAS; per-doc parallelism comes from --workers.
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 \
+  RAYON_NUM_THREADS=1 TOKENIZERS_PARALLELISM=false
 mkdir -p data/dclm_tokenized
 LOGD=$ROOT/results/phase0/tok_logs; mkdir -p "$LOGD"
 S=$(date +%s)

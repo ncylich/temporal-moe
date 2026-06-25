@@ -46,7 +46,7 @@ echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN gb=$GLOBAL_BATCH mb
 
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
-DATA_PATH=$(find "$DATA_DIR" -type f -name 'part*_text_document.bin' \
+DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
   -exec sh -c 'printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
 if [ -z "$DATA_PATH" ]; then echo "ERROR: no tokenized part*_text_document.bin in $DATA_DIR"; exit 1; fi
 
@@ -100,6 +100,16 @@ LOG_ARGS=(
 )
 
 cd Megatron-LM
-$ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} pretrain_gpt.py \
-  "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
-  2>&1 | tee "$OUT/train.log"
+if [ "${EVAL_ONLY:-0}" = "1" ]; then
+  # criterion-4 per-expert load: load CKPT, skip training, eval-only with router hook
+  export EXPERT_LOAD_OUT=$OUT/expert_load.json
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/scripts/phase0/expert_load.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --skip-train $EXTRA_ARGS \
+    2>&1 | tee "$OUT/expert_load.log"
+else
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} pretrain_gpt.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
+    2>&1 | tee "$OUT/train.log"
+fi
