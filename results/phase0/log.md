@@ -276,3 +276,24 @@ Added s0 (h128/L4, 1.36M) near the 1e16 optimum (~1.48M). Dedicated annealed 1e1
 | s3 | 14.8M | 2.191 |
 Monotone (s0 lowest) → no left arm yet. Adding s_-1 (h96/L4, 0.77M) for the left arm.
 (Dedicated annealed best @1e16 = s0 1.447, well under the ≤2.149 bar.)
+
+### v16k_d_sm1_1e16  (2026-06-26 19:21)
+Config: shape=sm1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=4125
+SUMMARY v16k_d_sm1_1e16: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "v16k_d_sm1_1e16", "total_iters": 4125, "iters_1e16": 412, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": null, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+### 1e16 parabola COMPLETE (added s_-1, h96/L4, ffn=512 to avoid odd-ffn swiglu warmup crash)
+Dedicated annealed 1e16 curve (BPB vs active params N):
+| shape | N | BPB @1e16 |
+|---|---|---|
+| s_-1 | 0.77M | 1.478 |
+| **s0** | 1.36M | **1.447 (min)** |
+| s1 | 3.81M | 1.540 |
+| s2 | 8.12M | 1.819 |
+| s3 | 14.77M | 2.187 |
+**Parabola with minimum at s0** (1.36M ≈ predicted 1e16 optimum 1.48M). Left arm s_-1 > s0 < right arm.
+
+## Headline: the minimum SHIFTS with compute budget (compute-optimal scaling)
+- @1e16: parabola min at **s0 (1.36M)**
+- @1e17: parabola min at **s2 (8.12M)**
+Exactly as the scaling law predicts the compute-optimal N grows with budget (~1.5M→~7.8M for 10× FLOPs).

@@ -8,7 +8,7 @@ no biases, RoPE, RMSNorm. Norm params negligible but included.
 """
 SEQ = 2048
 SHAPES = {
-    "sm1": dict(h=96,  L=4, ffn=513,  moe_ffn=66),   # s_-1: ~0.77M, left arm of 1e16 parabola
+    "sm1": dict(h=96,  L=4, ffn=512,  moe_ffn=66),   # s_-1: ~0.77M, left arm of 1e16 parabola
     "s0":  dict(h=128, L=4, ffn=684,  moe_ffn=88),   # ~1.36M, near the 1e16 optimum (min)
     "s1": dict(h=192, L=5,  ffn=1026, moe_ffn=132),
     "s2": dict(h=256, L=6,  ffn=1368, moe_ffn=176),
