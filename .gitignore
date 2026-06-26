@@ -1,9 +1,10 @@
+*.bin
+*.idx
 .venv/
-data/dclm_raw/
+data/
 data/dclm_jsonl/
 data/dclm_parts/
+data/dclm_raw/
 data/dclm_tokenized/
 results/phase0/runs/
 results/phase0/tok_logs/
-*.bin
-*.idx
