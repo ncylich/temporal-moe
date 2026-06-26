@@ -1,0 +1,5 @@
+# Min-region parabola trio @1e17 (locked HP). Stop after these to reassess s4-s6.
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+v16k_sweep_s2_1e17 s2 1e17 3e-3 0.05 256 1234
+v16k_sweep_s1_1e17 s1 1e17 3e-3 0.05 256 1234
+v16k_sweep_s3_1e17 s3 1e17 3e-3 0.05 256 1234
