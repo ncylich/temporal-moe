@@ -302,3 +302,7 @@ Exactly as the scaling law predicts the compute-optimal N grows with budget (~1.
 Config: shape=sm1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=4127
 SUMMARY v16k_d_sm1_1e16: final_val_CE=4.0706 (BPB 1.4766)  val@iters/10=4.0706 (BPB 1.4766)@it4127  nan=False  evals=3
 {"run": "v16k_d_sm1_1e16", "total_iters": 4127, "iters_1e16": 413, "final_val_loss": 4.07063, "final_val_bpb": 1.4766, "final_val_ppl": 58.6, "val_at_1e16": {"iter": 4127, "loss": 4.07063}, "val_at_1e16_bpb": 1.4766, "last_train_loss": 4.084741, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## Criterion 4 — per-expert load (s2@1e17 trained checkpoint, router hook over forward passes)
+Per-MoE-layer max-expert/mean-expert load: layer2 1.63, layer3 2.07, layer4 1.44, layer5 1.44, layer6 1.70.
+**Worst = 2.07× ≪ 8× threshold → PASS.** Balanced routing (no collapse) ⇒ aux-loss converged. PASS.

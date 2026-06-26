@@ -7,7 +7,8 @@ Writes per-layer max/mean load ratio to $EXPERT_LOAD_OUT.
 
 Invoked by run.sh with EVAL_ONLY=1 (same model args as the training run). Run from Megatron-LM/.
 """
-import os, json
+import os, sys, json
+sys.path.insert(0, os.getcwd())   # run.sh cd's to Megatron-LM; put it on the path for `import megatron`
 import torch
 from megatron.core.transformer.moe.router import TopKRouter
 
