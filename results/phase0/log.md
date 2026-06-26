@@ -223,3 +223,19 @@ SUMMARY v16k_sweep_s1_1e17: final_val_CE=3.5296 (BPB 1.2803)  val@iters/10=4.101
 SUMMARY v16k_sweep_s1_1e17: final_val_CE=3.5296 (BPB 1.2803)  val@iters/10=4.1014 (BPB 1.4877)@it834  nan=False  evals=11
 - s1 @1e17 = BPB 1.284 (> s2 1.269 → s2 is the min, parabola left arm). 1e16 (eval@834) = BPB 1.488.
 - Trio so far: @1e17 s1 1.284 / s2 1.269 (min); @1e16 s1 1.488 < s2 1.627 (monotone). Both as predicted.
+
+### s3@1e17 result (right arm) — TRIO COMPLETE
+v16k_sweep_s3_1e17: final_val_CE=3.5677 (BPB 1.294); 1e16 (eval@215) CE 5.107 (BPB 1.852)
+
+## Min-region parabola (s1,s2,s3) — criteria 1 & 2 check
+| shape | @1e17 BPB | @1e16 BPB |
+|---|---|---|
+| s1 | 1.284 | 1.488 |
+| **s2** | **1.269 (min)** | 1.627 |
+| s3 | 1.294 | 1.852 |
+
+- **Criterion 1:** best @1e17 = s2 **1.269** ≤ 1.645 PASS;  best @1e16 = s1 **1.488** ≤ 2.149 PASS.
+- **Criterion 2:** @1e17 parabola with min at **s2** (in s1–s3) PASS; @1e16 monotone increasing
+  (s1<s2<s3) PASS.
+- Matches law-predicted shape (min at s2; s1≈s3 arms). Remaining for full acceptance: s4–s6 @1e17
+  (rising branch), criterion 3 (2nd seed at s2), criterion 4 (per-expert load).
