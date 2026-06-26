@@ -120,3 +120,24 @@ SUMMARY v16k_s2_1e16_lr6e-3: final_val_CE=5.6725 (BPB 2.0576)  val@iters/10=5.66
 Config: shape=s2 flops=1e16 peak_lr=1e-2 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
 SUMMARY v16k_s2_1e16_lr1e-2: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
 {"run": "v16k_s2_1e16_lr1e-2", "total_iters": 392, "iters_1e16": 39, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": 7.02244, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+### v16k_s2_3e16_lr1e-3  (2026-06-26 00:21)
+Config: shape=s2 flops=3e16 peak_lr=1e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=1175
+SUMMARY v16k_s2_3e16_lr1e-3: final_val_CE=3.9897 (BPB 1.4472)  val@iters/10=3.9784 (BPB 1.4431)@it1175  nan=False  evals=3
+{"run": "v16k_s2_3e16_lr1e-3", "total_iters": 1175, "iters_1e16": 118, "final_val_loss": 3.989705, "final_val_bpb": 1.4472, "final_val_ppl": 54.0, "val_at_1e16": {"iter": 1175, "loss": 3.978405}, "val_at_1e16_bpb": 1.4431, "last_train_loss": 3.980207, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## 0b LR confirmation at 3e16 (s2, 16k) → LOCK peak-LR = 3e-3
+
+| budget | lr1e-3 BPB | lr3e-3 BPB | winner |
+|---|---|---|---|
+| 1e16 (392 steps) | 1.790 | 1.824 | lr1e-3 |
+| 3e16 (1175 steps) | 1.447 | **1.399** | **lr3e-3** |
+
+Budget-LR interaction confirmed: optimum shifts UP with budget. For the sweep's primary budget
+(1e17, longest), **lock peak-LR = 3e-3**. Both runs NaN-free, 19.6 TFLOP/s.
+
+### LOCKED HP CONFIG (all sweep runs)
+peak_LR=**3e-3**, warmup=**5%** of iters (fraction, auto-scales), cosine→10% (min_lr=3e-4),
+grad-clip=1.0, weight_decay=0.01, aux-loss=0.01, z-loss=0.001, gb=256, mb=32, bf16, seed=1234.
+Model: 16k-vocab BPE + fused-CE, TE impl + grouped-gemm, no-grad-accum-fusion. Metric=BPB.
+Bars: ≤1.645 @1e17, ≤2.149 @1e16.
