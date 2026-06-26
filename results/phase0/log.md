@@ -213,3 +213,13 @@ heads). Identical params/FLOPs → N and law unchanged. s2 already used head_dim
 Result: s1 → 2.90 s/iter, 9.5 TFLOP/s, 17.8 GB. (Still less efficient than s2's 19 TFLOP/s — tiny
 experts are overhead-bound — but unfused path eliminated.) Revised: s1@1e17 ~6.7 h.
 Re-running s1 + s3 with the fix; s2@1e17 result (BPB 1.269) stands.
+
+### v16k_sweep_s1_1e17  (2026-06-26 12:09)
+Config: shape=s1 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=8338
+SUMMARY v16k_sweep_s1_1e17: final_val_CE=3.5296 (BPB 1.2803)  val@iters/10=4.1014 (BPB 1.4877)@it834  nan=False  evals=11
+{"run": "v16k_sweep_s1_1e17", "total_iters": 8338, "iters_1e16": 834, "final_val_loss": 3.529552, "final_val_bpb": 1.2803, "final_val_ppl": 34.1, "val_at_1e16": {"iter": 834, "loss": 4.101428}, "val_at_1e16_bpb": 1.4877, "last_train_loss": 3.545887, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+### s1@1e17 result (left arm; head_dim-16 fixed)
+SUMMARY v16k_sweep_s1_1e17: final_val_CE=3.5296 (BPB 1.2803)  val@iters/10=4.1014 (BPB 1.4877)@it834  nan=False  evals=11
+- s1 @1e17 = BPB 1.284 (> s2 1.269 → s2 is the min, parabola left arm). 1e16 (eval@834) = BPB 1.488.
+- Trio so far: @1e17 s1 1.284 / s2 1.269 (min); @1e16 s1 1.488 < s2 1.627 (monotone). Both as predicted.
