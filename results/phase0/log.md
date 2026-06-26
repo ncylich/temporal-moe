@@ -192,3 +192,13 @@ Per user: run the parabola trio (min + one point each side) first, then adapt s4
 tok16k_full (5.55B tokens, 16 shards). Order: s2 (min) → s1 → s3.
 NB: first launch hit EADDRINUSE from an orphaned process of a cancelled full-sweep; killed cleanly
 and relaunched. s2@1e17 training: loss 8.92→…, no NaN, 19.6 TFLOP/s.
+
+### v16k_sweep_s2_1e17  (2026-06-26 05:27)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY v16k_sweep_s2_1e17: final_val_CE=3.4985 (BPB 1.2690)  val@iters/10=4.4862 (BPB 1.6273)@it392  nan=False  evals=11
+{"run": "v16k_sweep_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": 3.498498, "final_val_bpb": 1.269, "final_val_ppl": 33.1, "val_at_1e16": {"iter": 392, "loss": 4.48616}, "val_at_1e16_bpb": 1.6273, "last_train_loss": 3.501463, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+### s2@1e17 result (first trio point)
+SUMMARY v16k_sweep_s2_1e17: final_val_CE=3.4985 (BPB 1.2690)  val@iters/10=4.4862 (BPB 1.6273)@it392  nan=False  evals=11
+- s2 @1e17 = **BPB 1.274** (CE 3.513) vs bar ≤1.645 → PASS; law pred 1.572 (real beats law).
+- s2 @1e16 (eval@392, unannealed) = **BPB 1.627** (CE 4.486) vs bar ≤2.149 → PASS.
