@@ -1,0 +1,9 @@
+# Full B=1 IsoFLOP sweep @1e17, locked HP (peak-LR=3e-3, warmup5%, gb256, mb32, 16k+fusedCE).
+# eval@iters/10 (NOT eval-at-end) so each run's 1e16 point is read from its iters/10 checkpoint.
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+v16k_sweep_s1_1e17 s1 1e17 3e-3 0.05 256 1234
+v16k_sweep_s2_1e17 s2 1e17 3e-3 0.05 256 1234
+v16k_sweep_s3_1e17 s3 1e17 3e-3 0.05 256 1234
+v16k_sweep_s4_1e17 s4 1e17 3e-3 0.05 256 1234
+v16k_sweep_s5_1e17 s5 1e17 3e-3 0.05 256 1234
+v16k_sweep_s6_1e17 s6 1e17 3e-3 0.05 256 1234
