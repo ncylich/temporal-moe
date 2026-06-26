@@ -1,0 +1,6 @@
+# s=2 (two constant experts, FLOP-matched: shared 3x moe_ffn + top-5) parabola trio @1e17.
+# Run with SHARED_MULT=3 TOPK=5. N/iters identical to s=1 (FLOP-matched).
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+s2e_s2_1e17 s2 1e17 3e-3 0.05 256 1234
+s2e_s1_1e17 s1 1e17 3e-3 0.05 256 1234
+s2e_s3_1e17 s3 1e17 3e-3 0.05 256 1234

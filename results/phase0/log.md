@@ -306,3 +306,9 @@ SUMMARY v16k_d_sm1_1e16: final_val_CE=4.0706 (BPB 1.4766)  val@iters/10=4.0706 (
 ## Criterion 4 — per-expert load (s2@1e17 trained checkpoint, router hook over forward passes)
 Per-MoE-layer max-expert/mean-expert load: layer2 1.63, layer3 2.07, layer4 1.44, layer5 1.44, layer6 1.70.
 **Worst = 2.07× ≪ 8× threshold → PASS.** Balanced routing (no collapse) ⇒ aux-loss converged. PASS.
+
+## s=2 sweep (user-requested): two constant experts, FLOP-matched
+Config: SHARED_MULT=3 (shared intermediate 3·moe_ffn=528 for s2) + top-k 5. Active expert-FFN FLOPs
+identical to s=1 (shared 3 + routed 5 = 8 moe_ffn-units = s=1's shared 2 + routed 6). N & iters unchanged
+→ directly comparable. Trio s2/s1/s3 @1e17 launched (eval@iters/10 also gives 1e16 points).
+s=1 baseline for comparison @1e17 BPB: s1 1.284, s2 1.269, s3 1.289.
