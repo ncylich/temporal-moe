@@ -202,3 +202,14 @@ SUMMARY v16k_sweep_s2_1e17: final_val_CE=3.4985 (BPB 1.2690)  val@iters/10=4.486
 SUMMARY v16k_sweep_s2_1e17: final_val_CE=3.4985 (BPB 1.2690)  val@iters/10=4.4862 (BPB 1.6273)@it392  nan=False  evals=11
 - s2 @1e17 = **BPB 1.274** (CE 3.513) vs bar ≤1.645 → PASS; law pred 1.572 (real beats law).
 - s2 @1e16 (eval@392, unannealed) = **BPB 1.627** (CE 4.486) vs bar ≤2.149 → PASS.
+
+## PERF FIX during sweep: head_dim 16 for all shapes
+
+Discovered s1@1e17 running at 6.1 TFLOP/s / 4.55 s/iter (3× slower than s2) with 39.5 GB mem.
+Root cause: fixed 16 heads → head_dim = hidden/16 = 12 (s1), 20 (s3), 28 (s5) — not multiples of 8,
+so TE fused attention falls back to a slow path that materializes the full attention matrix.
+Fix: **heads = hidden/16 → head_dim = 16 for every shape** (s1:12, s2:16, s3:20, s4:24, s5:28, s6:32
+heads). Identical params/FLOPs → N and law unchanged. s2 already used head_dim 16 (valid, no re-run).
+Result: s1 → 2.90 s/iter, 9.5 TFLOP/s, 17.8 GB. (Still less efficient than s2's 19 TFLOP/s — tiny
+experts are overhead-bound — but unfused path eliminated.) Revised: s1@1e17 ~6.7 h.
+Re-running s1 + s3 with the fix; s2@1e17 result (BPB 1.269) stands.
