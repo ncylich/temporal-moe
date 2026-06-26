@@ -239,3 +239,40 @@ v16k_sweep_s3_1e17: final_val_CE=3.5677 (BPB 1.294); 1e16 (eval@215) CE 5.107 (B
   (s1<s2<s3) PASS.
 - Matches law-predicted shape (min at s2; s1≈s3 arms). Remaining for full acceptance: s4–s6 @1e17
   (rising branch), criterion 3 (2nd seed at s2), criterion 4 (per-expert load).
+
+### v16k_sweep_s3_1e17  (2026-06-26 14:22)
+Config: shape=s3 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2152
+SUMMARY v16k_sweep_s3_1e17: final_val_CE=3.5543 (BPB 1.2893)  val@iters/10=5.1068 (BPB 1.8524)@it215  nan=False  evals=12
+{"run": "v16k_sweep_s3_1e17", "total_iters": 2152, "iters_1e16": 215, "final_val_loss": 3.55433, "final_val_bpb": 1.2893, "final_val_ppl": 35.0, "val_at_1e16": {"iter": 215, "loss": 5.106762}, "val_at_1e16_bpb": 1.8524, "last_train_loss": 3.553522, "nan": false, "n_val_evals": 12, "bpb_divisor": 2.7568}
+
+### v16k_d_s0_1e16  (2026-06-26 18:16)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY v16k_d_s0_1e16: final_val_CE=3.9880 (BPB 1.4466)  val@iters/10=3.9880 (BPB 1.4466)@it2335  nan=False  evals=3
+{"run": "v16k_d_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 3.988008, "final_val_bpb": 1.4466, "final_val_ppl": 53.9, "val_at_1e16": {"iter": 2335, "loss": 3.988008}, "val_at_1e16_bpb": 1.4466, "last_train_loss": 3.978726, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_d_s1_1e16  (2026-06-26 18:45)
+Config: shape=s1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=834
+SUMMARY v16k_d_s1_1e16: final_val_CE=4.2449 (BPB 1.5398)  val@iters/10=4.2449 (BPB 1.5398)@it834  nan=False  evals=3
+{"run": "v16k_d_s1_1e16", "total_iters": 834, "iters_1e16": 83, "final_val_loss": 4.244912, "final_val_bpb": 1.5398, "final_val_ppl": 69.7, "val_at_1e16": {"iter": 834, "loss": 4.244912}, "val_at_1e16_bpb": 1.5398, "last_train_loss": 4.26538, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_d_s2_1e16  (2026-06-26 19:04)
+Config: shape=s2 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY v16k_d_s2_1e16: final_val_CE=5.0143 (BPB 1.8189)  val@iters/10=5.0143 (BPB 1.8189)@it392  nan=False  evals=3
+{"run": "v16k_d_s2_1e16", "total_iters": 392, "iters_1e16": 39, "final_val_loss": 5.014326, "final_val_bpb": 1.8189, "final_val_ppl": 150.6, "val_at_1e16": {"iter": 392, "loss": 5.014326}, "val_at_1e16_bpb": 1.8189, "last_train_loss": 5.02156, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_d_s3_1e16  (2026-06-26 19:20)
+Config: shape=s3 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=215
+SUMMARY v16k_d_s3_1e16: final_val_CE=6.0280 (BPB 2.1866)  val@iters/10=6.0280 (BPB 2.1866)@it215  nan=False  evals=3
+{"run": "v16k_d_s3_1e16", "total_iters": 215, "iters_1e16": 22, "final_val_loss": 6.028033, "final_val_bpb": 2.1866, "final_val_ppl": 414.9, "val_at_1e16": {"iter": 215, "loss": 6.028033}, "val_at_1e16_bpb": 2.1866, "last_train_loss": 6.040243, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## 1e16 parabola probe (user-requested): dedicated annealed runs + small shapes
+
+Added s0 (h128/L4, 1.36M) near the 1e16 optimum (~1.48M). Dedicated annealed 1e16 runs (consistent set):
+| shape | N | BPB @1e16 |
+|---|---|---|
+| s0 | 1.36M | 1.447 |
+| s1 | 3.81M | 1.540 |
+| s2 | 8.12M | 1.819 |
+| s3 | 14.8M | 2.191 |
+Monotone (s0 lowest) → no left arm yet. Adding s_-1 (h96/L4, 0.77M) for the left arm.
+(Dedicated annealed best @1e16 = s0 1.447, well under the ≤2.149 bar.)
