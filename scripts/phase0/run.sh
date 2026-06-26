@@ -30,6 +30,10 @@ case $SHAPE in
 esac
 MOE_LAYER_FREQ="[0]+[1]*$((L-1))"
 SHARED_INT=$((2 * MOE_FFN))
+# head_dim must be a multiple of 8 for TE fused attention. Fixed 16 heads gives head_dim
+# 12/20/28 for s1/s3/s5 -> unfused slow path (~3x slower). Use heads=hidden/16 -> head_dim=16
+# for every shape (identical params/FLOPs, so N and the law are unchanged; s2 already had 16).
+NHEADS=$((H / 16))
 
 # ---- compute iters so C = 6*N*D ----
 read N TRAIN_ITERS < <(.venv/bin/python scripts/phase0/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
@@ -70,7 +74,7 @@ export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_L
 export PATH=$ROOT/.venv/bin:$PATH
 
 MODEL_ARGS=(
-  --hidden-size $H --ffn-hidden-size $FFN --num-layers $L --num-attention-heads 16
+  --hidden-size $H --ffn-hidden-size $FFN --num-layers $L --num-attention-heads $NHEADS
   --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
   --untie-embeddings-and-output-weights --position-embedding-type rope --disable-bias-linear
   --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk 6
