@@ -31,7 +31,12 @@ case $SHAPE in
   *) echo "bad SHAPE $SHAPE"; exit 1;;
 esac
 MOE_LAYER_FREQ="[0]+[1]*$((L-1))"
-SHARED_INT=$((2 * MOE_FFN))
+# s-dimension (constant/shared experts). s=1 (default): SHARED_MULT=2, TOPK=6 (FLAME stock).
+# FLOP-matched s=2: SHARED_MULT=3, TOPK=5 -> active expert-FFN FLOPs identical (shared 3 + routed 5
+# = 8 moe_ffn-units, same as s=1's shared 2 + routed 6); N and iters unchanged.
+SHARED_MULT=${SHARED_MULT:-2}
+TOPK=${TOPK:-6}
+SHARED_INT=$((SHARED_MULT * MOE_FFN))
 # head_dim must be a multiple of 8 for TE fused attention. Fixed 16 heads gives head_dim
 # 12/20/28 for s1/s3/s5 -> unfused slow path (~3x slower). Use heads=hidden/16 -> head_dim=16
 # for every shape (identical params/FLOPs, so N and the law are unchanged; s2 already had 16).
@@ -54,7 +59,7 @@ OUT=$ROOT/results/phase0/runs/$RUN_NAME
 CKPT=$OUT/ckpt
 mkdir -p "$OUT"
 echo "[run] $RUN_NAME N=$N iters=$TRAIN_ITERS warmup=$WARMUP_ITERS min_lr=$MIN_LR eval@$EVAL_INTERVAL" | tee "$OUT/run.meta"
-echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR aux=$AUX_COEFF flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
+echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN shared_mult=$SHARED_MULT topk=$TOPK gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR aux=$AUX_COEFF flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
 
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
@@ -79,7 +84,7 @@ MODEL_ARGS=(
   --hidden-size $H --ffn-hidden-size $FFN --num-layers $L --num-attention-heads $NHEADS
   --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
   --untie-embeddings-and-output-weights --position-embedding-type rope --disable-bias-linear
-  --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk 6
+  --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk $TOPK
   --moe-shared-expert-intermediate-size $SHARED_INT --moe-layer-freq "$MOE_LAYER_FREQ"
   --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
   --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
