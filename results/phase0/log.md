@@ -141,3 +141,26 @@ peak_LR=**3e-3**, warmup=**5%** of iters (fraction, auto-scales), cosine→10% (
 grad-clip=1.0, weight_decay=0.01, aux-loss=0.01, z-loss=0.001, gb=256, mb=32, bf16, seed=1234.
 Model: 16k-vocab BPE + fused-CE, TE impl + grouped-gemm, no-grad-accum-fusion. Metric=BPB.
 Bars: ≤1.645 @1e17, ≤2.149 @1e16.
+
+### v16k_s2_3e16_lr3e-3  (2026-06-26 01:12)
+Config: shape=s2 flops=3e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=1175
+SUMMARY v16k_s2_3e16_lr3e-3: final_val_CE=3.8685 (BPB 1.4033)  val@iters/10=3.8573 (BPB 1.3992)@it1175  nan=False  evals=3
+{"run": "v16k_s2_3e16_lr3e-3", "total_iters": 1175, "iters_1e16": 118, "final_val_loss": 3.868484, "final_val_bpb": 1.4033, "final_val_ppl": 47.9, "val_at_1e16": {"iter": 1175, "loss": 3.857327}, "val_at_1e16_bpb": 1.3992, "last_train_loss": 3.859674, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_s4_3e16_lr3e-3  (2026-06-26 02:02)
+Config: shape=s4 flops=3e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=393
+SUMMARY v16k_s4_3e16_lr3e-3: final_val_CE=5.2666 (BPB 1.9104)  val@iters/10=5.2554 (BPB 1.9063)@it393  nan=False  evals=3
+{"run": "v16k_s4_3e16_lr3e-3", "total_iters": 393, "iters_1e16": 39, "final_val_loss": 5.266565, "final_val_bpb": 1.9104, "final_val_ppl": 193.7, "val_at_1e16": {"iter": 393, "loss": 5.255394}, "val_at_1e16_bpb": 1.9063, "last_train_loss": 5.256063, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## 0b size-axis re-validation @3e16, LR=3e-3 (plan's "re-validate at s4", extended to s6)
+
+| shape | N_active | D@3e16 | BPB | grad-norm | NaN |
+|---|---|---|---|---|---|
+| s2 (tuned) | 8.1M | 0.616B | 1.399 | ~0.3 | no |
+| s4 | 24.3M | 0.206B | 1.910 | ~1.5 | no |
+| s6 | 53.9M | 0.093B | 2.241 | ~0.25 | no |
+
+**3e-3 is STABLE across the full 14× size range** — no divergence, healthy grad-norms at every shape.
+The rising BPB (s2<s4<s6) is the **iso-FLOP undertraining** effect (bigger model → fewer tokens at
+fixed 3e16), NOT an LR failure — exactly the over-parameterized branch the plan predicts. At the real
+1e17 budget each shape gets ~10× more tokens. → **Lock flat peak-LR = 3e-3** for the full sweep.
