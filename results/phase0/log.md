@@ -164,3 +164,31 @@ SUMMARY v16k_s4_3e16_lr3e-3: final_val_CE=5.2666 (BPB 1.9104)  val@iters/10=5.25
 The rising BPB (s2<s4<s6) is the **iso-FLOP undertraining** effect (bigger model → fewer tokens at
 fixed 3e16), NOT an LR failure — exactly the over-parameterized branch the plan predicts. At the real
 1e17 budget each shape gets ~10× more tokens. → **Lock flat peak-LR = 3e-3** for the full sweep.
+
+### v16k_s6_3e16_lr3e-3  (2026-06-26 02:26)
+Config: shape=s6 flops=3e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=177
+SUMMARY v16k_s6_3e16_lr3e-3: final_val_CE=6.1813 (BPB 2.2422)  val@iters/10=6.1774 (BPB 2.2408)@it177  nan=False  evals=3
+{"run": "v16k_s6_3e16_lr3e-3", "total_iters": 177, "iters_1e16": 18, "final_val_loss": 6.181268, "final_val_bpb": 2.2422, "final_val_ppl": 483.6, "val_at_1e16": {"iter": 177, "loss": 6.177441}, "val_at_1e16_bpb": 2.2408, "last_train_loss": 6.18606, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### v16k_sweep_s2_1e17  (2026-06-26 02:33)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY v16k_sweep_s2_1e17: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "v16k_sweep_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": null, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+### v16k_sweep_s1_1e17  (2026-06-26 02:35)
+Config: shape=s1 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=8338
+SUMMARY v16k_sweep_s1_1e17: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "v16k_sweep_s1_1e17", "total_iters": 8338, "iters_1e16": 834, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": null, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+### v16k_sweep_s3_1e17  (2026-06-26 02:37)
+Config: shape=s3 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2152
+SUMMARY v16k_sweep_s3_1e17: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "v16k_sweep_s3_1e17", "total_iters": 2152, "iters_1e16": 215, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": null, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+## 0c/0d sweep — LAUNCHED min-region trio (s1,s2,s3) @1e17  [2026-06-26]
+
+Per user: run the parabola trio (min + one point each side) first, then adapt s4-s6. Locked HP
+(LR=3e-3, 16k+fusedCE, gb256/mb32, eval@iters/10 to capture each shape's 1e16 point). Corpus:
+tok16k_full (5.55B tokens, 16 shards). Order: s2 (min) → s1 → s3.
+NB: first launch hit EADDRINUSE from an orphaned process of a cancelled full-sweep; killed cleanly
+and relaunched. s2@1e17 training: loss 8.92→…, no NaN, 19.6 TFLOP/s.
