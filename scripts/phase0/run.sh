@@ -20,6 +20,8 @@ EXTRA_ARGS=${EXTRA_ARGS:-}
 
 # ---- shape geometry ----
 case $SHAPE in
+  sm1) H=96;  L=4; FFN=513;  MOE_FFN=66;;
+  s0)  H=128; L=4; FFN=684;  MOE_FFN=88;;
   s1) H=192; L=5;  FFN=1026; MOE_FFN=132;;
   s2) H=256; L=6;  FFN=1368; MOE_FFN=176;;
   s3) H=320; L=7;  FFN=1710; MOE_FFN=220;;

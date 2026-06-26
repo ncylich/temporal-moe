@@ -1,0 +1,6 @@
+# Dedicated annealed 1e16 runs for the 1e16 parabola (consistent set). EVAL_AT_END.
+# s0 (new) first; s1-s3 re-run dedicated/annealed on tok16k_full for consistency.
+v16k_d_s0_1e16 s0 1e16 3e-3 0.05 256 1234
+v16k_d_s1_1e16 s1 1e16 3e-3 0.05 256 1234
+v16k_d_s2_1e16 s2 1e16 3e-3 0.05 256 1234
+v16k_d_s3_1e16 s3 1e16 3e-3 0.05 256 1234
