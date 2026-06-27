@@ -324,3 +324,18 @@ SUMMARY s2e_s2_1e17: final_val_CE=3.5011 (BPB 1.2700)  val@iters/10=4.5143 (BPB 
 
 ### s=2 s1@1e17: BPB 1.285 (vs s=1 1.284 — identical). 1e16 (eval@834) BPB 1.487 (= s=1 1.488).
 s=2-vs-s=1 @1e17 so far: s1 1.285/1.284 (~same), s2 1.275/1.269 (+0.006). Penalty is small, shape-dependent.
+
+### s2e_s1_1e17  (2026-06-27 05:59)
+Config: shape=s1 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=8338
+SUMMARY s2e_s1_1e17: final_val_CE=3.5311 (BPB 1.2809)  val@iters/10=4.0983 (BPB 1.4866)@it834  nan=False  evals=11
+{"run": "s2e_s1_1e17", "total_iters": 8338, "iters_1e16": 834, "final_val_loss": 3.531107, "final_val_bpb": 1.2809, "final_val_ppl": 34.2, "val_at_1e16": {"iter": 834, "loss": 4.098255}, "val_at_1e16_bpb": 1.4866, "last_train_loss": 3.5467, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+## s=2 @1e17 trio COMPLETE — parabola clear, s=2≈s=1
+| shape | s=1 BPB | s=2 BPB | Δ(s2−s1) |
+|---|---|---|---|
+| s1 | 1.2803 | 1.2809 | +0.0006 |
+| s2 | 1.2690 | 1.2700 | +0.0010 |
+| s3 | 1.2893 | 1.2901 | +0.0008 |
+s=2 parabola: min at s2, below s1 by 0.0109, below s3 by 0.0201 BPB (clear, matches s=1 shape).
+**Temporal finding: 2nd constant expert (top-5 vs 6) costs ~0.001 BPB at B=1 — negligible.**
+Next: s=2 @1e16 dedicated parabola (sm1,s0,s1,s2,s3).
