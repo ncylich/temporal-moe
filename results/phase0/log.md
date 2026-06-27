@@ -381,3 +381,12 @@ Both parabolas clear, both minima reproduced (s2 @1e17, s0 @1e16). The s-knob ef
 at B=1**: @1e17 s=2 is ~+0.001 BPB (tiny penalty), @1e16 s=2 is ~−0.01 BPB (tiny gain). No noticeable
 quality difference from a 2nd constant expert at per-token routing — consistent with the premise that
 the constant-expert tradeoff matters mainly under windowed routing (B>1), the next phase.
+
+### s2e_d_sm1_1e16  (2026-06-27 11:29)
+Config: shape=sm1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=4127
+SUMMARY s2e_d_sm1_1e16: final_val_CE=4.0660 (BPB 1.4749)  val@iters/10=4.0660 (BPB 1.4749)@it4127  nan=False  evals=3
+{"run": "s2e_d_sm1_1e16", "total_iters": 4127, "iters_1e16": 413, "final_val_loss": 4.065975, "final_val_bpb": 1.4749, "final_val_ppl": 58.3, "val_at_1e16": {"iter": 4127, "loss": 4.065975}, "val_at_1e16_bpb": 1.4749, "last_train_loss": 4.080212, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## Criterion 3 — reproducibility (s2@1e17, 2nd seed) → PASS
+seed-1 CE 3.4985, seed-2 CE 3.5075 → |Δloss| = 0.0090 nats ≤ 0.03 → PASS.
+**ALL 4 CRITERIA PASS → writing PASS.md.**

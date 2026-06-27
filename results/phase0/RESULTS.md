@@ -52,14 +52,14 @@ stable across the 14× size range (s2/s4/s6 @3e16, no divergence).
 **The (B=1, s=1) temporal reference baselines** (best shape per budget): **1e17 → 1.269 BPB (s2),
 1e16 → 1.447 BPB (s0)**.
 
-## Acceptance criteria status
+## Acceptance criteria — ALL 4 PASS (see PASS.md)
 
 1. **Best-shape ≤ bar — PASS.** @1e17 s2 = 1.269 ≤ 1.645; @1e16 s0 = 1.447 ≤ 2.149. (Real models beat
    the law's pessimistic 1e16 extrapolation by ~0.8 BPB.)
 2. **Curve shape — PASS.** @1e17 parabola with min at s2 (within s1–s3); @1e16 parabola with min at s0
    (and monotone-increasing across s1–s6, the plan's original expectation).
-3. Reproducibility (2nd seed at min shape, |Δ|≤0.03) — **pending.**
-4. Per-expert load (no expert >8× mean, aux converged) — **pending** (`scripts/phase0/expert_load.py`).
+3. **Reproducibility — PASS.** s2@1e17 seed-2 CE 3.5075 vs seed-1 3.4985 → |Δ| = 0.0090 nats ≤ 0.03.
+4. **Healthy routing — PASS.** s2@1e17 per-MoE-layer max/mean 1.44–2.07× (worst 2.07× ≪ 8×); aux converged.
 
 ## Single-GPU adaptations (vs stock FLAME / the plan) — documented for fidelity
 
