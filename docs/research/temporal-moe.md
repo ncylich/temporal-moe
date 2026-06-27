@@ -43,9 +43,10 @@ layer may hold at once). Two rules:
    selection is *masked to the resident set* `S(m,ℓ)` (top-`k` of the `K` loaded experts).
    No behavioral change beyond the restriction to `K` experts.
 2. **At the window boundary**, a small **macro-router** predicts the *next* window's
-   resident set `S(m,ℓ)` from information available at token `m·B − 1`, and issues an async
-   SSD prefetch so the experts are in RAM before window `m` is processed. Window 0 is
-   bootstrapped from the BOS token.
+   resident set `S(m,ℓ)` from information available at the boundary, and issues an async
+   SSD prefetch so the experts are in RAM before window `m` is processed. The boundary
+   carrier is a dedicated `[ROUTE]` token (below); window 0 is bootstrapped from the
+   leading `[ROUTE]` token that precedes `[BOS]`.
 
 Experts are reused along the **time/sequence axis** — hence *temporal* MoE — as opposed to
 the per-token (spatial) reuse of ordinary routing.
@@ -69,6 +70,62 @@ per-layer head maps `h_ℓ → ` (a distribution over `E` experts, take top-`K`)
 for all layers fire at once; deeper layers naturally get more lead time. A cheap baseline
 with no new parameters: reuse the boundary token's own top-`k` per layer and **grow it to
 `K`** by expert co-activation priors (Section 5).
+
+### The `[ROUTE]` token: a dedicated carrier for macro-routing (experiment direction)
+
+The macro-router needs an input at each window boundary. The obvious choice — reuse the
+last real token's hidden state `h_ℓ` — **overloads that position with two conflicting
+jobs.** In training it receives gradients from (a) its own next-token loss and (b) the
+routing loss of *all `B` tokens* in the window its decision gated. These pull the
+representation in different directions: *be a good local predictor* vs. *be a good
+`B`-token-ahead routing query*. Mean-reducing the window's routing loss fixes the **scale**
+of that second gradient but not its **direction** — the boundary token still trains unlike
+every other token, and the routing objective (which governs `B` tokens) is the more
+important one to get right there.
+
+The clean fix is to stop overloading a prediction-bearing token: insert a dedicated
+**`[ROUTE]` token** at each window boundary whose *only* job is to emit `S(·,ℓ)` for every
+layer. It carries no next-token target, so its hidden state is free to specialize entirely
+for routing — no competing gradient — and the macro-router gets undivided priority at that
+position by construction.
+
+It also gives the macro-router a **better** input, not just a cleaner one. The `[ROUTE]`
+token attends over the preceding window, so each per-layer `h_ℓ` is an attention-pooled
+summary of the whole span rather than one token's features — in effect an **attention
+router** for expert prefetch, distributing the routing signal across the past instead of
+cramming it into a single token. (Ordinary MoE routers are linear on one token's state;
+this is strictly more expressive for a window-level decision.)
+
+**Sequence layout.** Place `[ROUTE]` *before* `[BOS]` at the very start, then one `[ROUTE]`
+at every window boundary:
+
+```
+[ROUTE] [BOS] t₁ … t_{B-1} | [ROUTE] t_B … t_{2B-1} | [ROUTE] t_{2B} …
+```
+
+The leading `[ROUTE]` bootstraps window 0; each later `[ROUTE]` opens window `m` and
+predicts `S(m,ℓ)`. Cost is one extra token per window (`≈1/B`, e.g. 1.6% at `B=64`).
+
+**Masking — make `[ROUTE]` a pure side-channel** (real-token behavior stays
+baseline-identical except through `S`; `[ROUTE]` is trained only by the window it routes):
+
+- **Loss:** keep `t_{B-1}→t_B` scored (override the label to skip the marker) and set
+  `[ROUTE]`'s own target to `ignore_index` — full token coverage, zero prediction-vs-routing
+  overload on `[ROUTE]`.
+- **Attention:** mask `[ROUTE]` out of real tokens' incoming attention (it keeps its own
+  causal view of the prefix) — routing flows through `S`, not the residual, so this removes
+  contamination without blocking the macro-router. *(Off the fused-causal fast path — use a
+  FlexAttention `mask_mod`.)*. Note: although this is mathematically sound, it should be
+  tested whether this makes a real difference as it will have a substantial performance slowdown.
+- **Positions:** give `[ROUTE]` a non-consuming `position_id` (e.g. shared with `t_B`) so it
+  doesn't shift real tokens' RoPE distances — the silent one; skipping it breaks the
+  baseline-identical guarantee even with the mask correct.
+
+> **Experiment — re-add router z-loss for the macro-router.** Baseline FLAME-MoE dropped
+> z-loss, but the macro-router solves a harder, noisier problem (predict a `B`-token-ahead
+> set from one carrier), so its logits are more prone to blow-up. Worth re-trialing
+> `--moe-z-loss-coeff` *on the macro-router specifically* to bound logit magnitude during the
+> noisy early/transition phases.
 
 ## 3. What it buys: footprint and the latency-hiding condition
 
