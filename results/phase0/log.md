@@ -339,3 +339,45 @@ SUMMARY s2e_s1_1e17: final_val_CE=3.5311 (BPB 1.2809)  val@iters/10=4.0983 (BPB 
 s=2 parabola: min at s2, below s1 by 0.0109, below s3 by 0.0201 BPB (clear, matches s=1 shape).
 **Temporal finding: 2nd constant expert (top-5 vs 6) costs ~0.001 BPB at B=1 — negligible.**
 Next: s=2 @1e16 dedicated parabola (sm1,s0,s1,s2,s3).
+
+### s2e_s3_1e17  (2026-06-27 08:11)
+Config: shape=s3 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2152
+SUMMARY s2e_s3_1e17: final_val_CE=3.5380 (BPB 1.2834)  val@iters/10=5.0384 (BPB 1.8276)@it215  nan=False  evals=12
+{"run": "s2e_s3_1e17", "total_iters": 2152, "iters_1e16": 215, "final_val_loss": 3.538002, "final_val_bpb": 1.2834, "final_val_ppl": 34.4, "val_at_1e16": {"iter": 215, "loss": 5.038368}, "val_at_1e16_bpb": 1.8276, "last_train_loss": 3.536916, "nan": false, "n_val_evals": 12, "bpb_divisor": 2.7568}
+
+### s2e_d_s0_1e16  (2026-06-27 08:59)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY s2e_d_s0_1e16: final_val_CE=3.9928 (BPB 1.4483)  val@iters/10=3.9928 (BPB 1.4483)@it2335  nan=False  evals=3
+{"run": "s2e_d_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 3.992806, "final_val_bpb": 1.4483, "final_val_ppl": 54.2, "val_at_1e16": {"iter": 2335, "loss": 3.992806}, "val_at_1e16_bpb": 1.4483, "last_train_loss": 3.983369, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### s2e_d_s1_1e16  (2026-06-27 09:27)
+Config: shape=s1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=834
+SUMMARY s2e_d_s1_1e16: final_val_CE=4.2148 (BPB 1.5289)  val@iters/10=4.2148 (BPB 1.5289)@it834  nan=False  evals=3
+{"run": "s2e_d_s1_1e16", "total_iters": 834, "iters_1e16": 83, "final_val_loss": 4.214789, "final_val_bpb": 1.5289, "final_val_ppl": 67.7, "val_at_1e16": {"iter": 834, "loss": 4.214789}, "val_at_1e16_bpb": 1.5289, "last_train_loss": 4.23286, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### s2e_d_s2_1e16  (2026-06-27 09:45)
+Config: shape=s2 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY s2e_d_s2_1e16: final_val_CE=4.9859 (BPB 1.8086)  val@iters/10=4.9859 (BPB 1.8086)@it392  nan=False  evals=3
+{"run": "s2e_d_s2_1e16", "total_iters": 392, "iters_1e16": 39, "final_val_loss": 4.985939, "final_val_bpb": 1.8086, "final_val_ppl": 146.3, "val_at_1e16": {"iter": 392, "loss": 4.985939}, "val_at_1e16_bpb": 1.8086, "last_train_loss": 4.994009, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### s2e_d_s3_1e16  (2026-06-27 10:00)
+Config: shape=s3 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=215
+SUMMARY s2e_d_s3_1e16: final_val_CE=5.9823 (BPB 2.1700)  val@iters/10=5.9823 (BPB 2.1700)@it215  nan=False  evals=3
+{"run": "s2e_d_s3_1e16", "total_iters": 215, "iters_1e16": 22, "final_val_loss": 5.982298, "final_val_bpb": 2.17, "final_val_ppl": 396.4, "val_at_1e16": {"iter": 215, "loss": 5.982298}, "val_at_1e16_bpb": 2.17, "last_train_loss": 5.995123, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## s=2 @1e16 parabola COMPLETE — clear, s=2≈s=1
+| shape | N | s=1 BPB | s=2 BPB |
+|---|---|---|---|
+| s_-1 | 0.77M | 1.478 | 1.477 |
+| **s0** | 1.36M | **1.447** | **1.448 (min)** |
+| s1 | 3.81M | 1.540 | 1.529 |
+| s2 | 8.12M | 1.819 | 1.809 |
+| s3 | 14.77M | 2.187 | 2.170 |
+s=2 @1e16 parabola: min at s0, margins sm1−s0=0.029, s1−s0=0.081 → CLEAR. s=2 marginally LOWER than
+s=1 at s1/s2/s3 (over-parameterized branch slightly likes more shared capacity), ~identical at s0/sm1.
+
+## CONCLUSION — s=2 (two constant experts) vs s=1, FLOP-matched, B=1
+Both parabolas clear, both minima reproduced (s2 @1e17, s0 @1e16). The s-knob effect is **negligible
+at B=1**: @1e17 s=2 is ~+0.001 BPB (tiny penalty), @1e16 s=2 is ~−0.01 BPB (tiny gain). No noticeable
+quality difference from a 2nd constant expert at per-token routing — consistent with the premise that
+the constant-expert tradeoff matters mainly under windowed routing (B>1), the next phase.
