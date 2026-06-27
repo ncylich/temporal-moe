@@ -316,3 +316,11 @@ s=1 baseline for comparison @1e17 BPB: s1 1.284, s2 1.269, s3 1.289.
 ### s=2 s2@1e17 result: CE 3.5156 (BPB 1.275); 1e16 (eval@392) BPB 1.638
 **s=2 vs s=1 at s2@1e17: 1.275 vs 1.269 BPB → +0.006 BPB (~0.017 nats) penalty for the 2nd constant
 expert (top-5 vs top-6).** Tiny, as expected at B=1 (per-token routing favors routing flexibility).
+
+### s2e_s2_1e17  (2026-06-27 01:41)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY s2e_s2_1e17: final_val_CE=3.5011 (BPB 1.2700)  val@iters/10=4.5143 (BPB 1.6375)@it392  nan=False  evals=11
+{"run": "s2e_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": 3.501143, "final_val_bpb": 1.27, "final_val_ppl": 33.2, "val_at_1e16": {"iter": 392, "loss": 4.514313}, "val_at_1e16_bpb": 1.6375, "last_train_loss": 3.503286, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+### s=2 s1@1e17: BPB 1.285 (vs s=1 1.284 — identical). 1e16 (eval@834) BPB 1.487 (= s=1 1.488).
+s=2-vs-s=1 @1e17 so far: s1 1.285/1.284 (~same), s2 1.275/1.269 (+0.006). Penalty is small, shape-dependent.
