@@ -312,3 +312,7 @@ Config: SHARED_MULT=3 (shared intermediate 3·moe_ffn=528 for s2) + top-k 5. Act
 identical to s=1 (shared 3 + routed 5 = 8 moe_ffn-units = s=1's shared 2 + routed 6). N & iters unchanged
 → directly comparable. Trio s2/s1/s3 @1e17 launched (eval@iters/10 also gives 1e16 points).
 s=1 baseline for comparison @1e17 BPB: s1 1.284, s2 1.269, s3 1.289.
+
+### s=2 s2@1e17 result: CE 3.5156 (BPB 1.275); 1e16 (eval@392) BPB 1.638
+**s=2 vs s=1 at s2@1e17: 1.275 vs 1.269 BPB → +0.006 BPB (~0.017 nats) penalty for the 2nd constant
+expert (top-5 vs top-6).** Tiny, as expected at B=1 (per-token routing favors routing flexibility).
