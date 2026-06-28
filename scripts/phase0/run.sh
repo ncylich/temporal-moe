@@ -42,6 +42,16 @@ SHARED_INT=$((SHARED_MULT * MOE_FFN))
 # for every shape (identical params/FLOPs, so N and the law are unchanged; s2 already had 16).
 NHEADS=$((H / 16))
 
+# DENSE=1: vanilla dense transformer (no experts/router/shared) as the IsoFLOP floor. ffn_hidden is
+# set so total non-embedding params == the MoE's ACTIVE non-embedding params at this scale, so the
+# FLOP budget and iters carry over unchanged. (Even values: odd ffn crashes the fused-swiglu warmup.)
+if [ "${DENSE:-0}" = "1" ]; then
+  case $SHAPE in
+    sm1) FFN=540;;  s0) FFN=716;;  s1) FFN=1068;; s2) FFN=1420;;
+    s3) FFN=1772;;  s4) FFN=2124;; s5) FFN=2476;; s6) FFN=2828;;
+  esac
+fi
+
 # ---- compute iters so C = 6*N*D ----
 read N TRAIN_ITERS < <(.venv/bin/python scripts/phase0/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
 WARMUP_ITERS=$(.venv/bin/python -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
@@ -59,7 +69,7 @@ OUT=$ROOT/results/phase0/runs/$RUN_NAME
 CKPT=$OUT/ckpt
 mkdir -p "$OUT"
 echo "[run] $RUN_NAME N=$N iters=$TRAIN_ITERS warmup=$WARMUP_ITERS min_lr=$MIN_LR eval@$EVAL_INTERVAL" | tee "$OUT/run.meta"
-echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN shared_mult=$SHARED_MULT topk=$TOPK gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR aux=$AUX_COEFF flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
+echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN dense=${DENSE:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
 
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
@@ -80,29 +90,36 @@ export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_L
 # put .venv first so pybind11 includes resolve.
 export PATH=$ROOT/.venv/bin:$PATH
 
+# MoE-specific args (omitted entirely when DENSE=1 -> a plain dense SwiGLU transformer).
+MOE_ARGS=()
+if [ "${DENSE:-0}" != "1" ]; then
+  MOE_ARGS=(
+    --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk $TOPK
+    --moe-shared-expert-intermediate-size $SHARED_INT --moe-layer-freq "$MOE_LAYER_FREQ"
+    --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
+    --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
+    # --moe-grouped-gemm: batch the 64 local experts (EP=1) into one grouped GEMM (numerically
+    # equivalent to FLAME's EP=8 sequential-per-GPU experts; required for throughput).
+    --moe-grouped-gemm
+  )
+fi
 MODEL_ARGS=(
   --hidden-size $H --ffn-hidden-size $FFN --num-layers $L --num-attention-heads $NHEADS
   --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
   --untie-embeddings-and-output-weights --position-embedding-type rope --disable-bias-linear
-  --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk $TOPK
-  --moe-shared-expert-intermediate-size $SHARED_INT --moe-layer-freq "$MOE_LAYER_FREQ"
-  --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
-  --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
+  "${MOE_ARGS[@]}"
   --hidden-dropout 0.0 --attention-dropout 0.0 --init-method-std 0.02
   --tokenizer-type HuggingFaceTokenizer --tokenizer-model ${TOKENIZER_MODEL:-EleutherAI/pythia-12b}
-  # FLAME's native TransformerEngine path (faithful to FLAME). Single-GPU adaptations:
-  #   --moe-grouped-gemm: batch the 64 local experts (EP=1) into one grouped GEMM
-  #     (numerically equivalent to FLAME's EP=8 sequential-per-GPU experts; required for
-  #     practical throughput with 64 experts on one GPU).
-  #   --no-gradient-accumulation-fusion: that fusion needs apex (absent); perf-only, no math change.
-  --transformer-impl transformer_engine --moe-grouped-gemm --no-gradient-accumulation-fusion
+  # FLAME's native TransformerEngine path; --no-gradient-accumulation-fusion needs no apex (perf-only).
+  --transformer-impl transformer_engine --no-gradient-accumulation-fusion
   ${CE_FUSION:+--cross-entropy-loss-fusion}
 )
 INFRA_ARGS=(
   --pipeline-model-parallel-size 1 --expert-model-parallel-size 1
-  --use-distributed-optimizer --moe-token-dispatcher-type alltoall
+  --use-distributed-optimizer
   --distributed-timeout-minutes 30 --bf16
 )
+[ "${DENSE:-0}" != "1" ] && INFRA_ARGS+=(--moe-token-dispatcher-type alltoall)
 TRAIN_ARGS=(
   --micro-batch-size $MICRO_BATCH --global-batch-size $GLOBAL_BATCH
   --lr $PEAK_LR --min-lr $MIN_LR --lr-decay-style cosine
@@ -114,8 +131,8 @@ LOG_ARGS=(
   --log-interval 10 --log-throughput
   --save "$CKPT" --save-interval $SAVE_INTERVAL --load "$CKPT"
   --eval-interval $EVAL_INTERVAL --eval-iters 20
-  --moe-per-layer-logging
 )
+[ "${DENSE:-0}" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
 
 cd Megatron-LM
 if [ "${EVAL_ONLY:-0}" = "1" ]; then
