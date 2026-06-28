@@ -13,6 +13,7 @@ Semantics under test (K = k, swap-then-use — a token pulls in one expert and u
 """
 import os, sys
 import torch
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from temporal_router import compute_resident_mask
@@ -121,3 +122,20 @@ def test_deterministic():
     m1 = compute_resident_mask(logits, k=3)
     m2 = compute_resident_mask(logits, k=3)
     assert torch.equal(m1, m2)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA-graph fast path needs a GPU")
+def test_accel_matches_reference_on_gpu():
+    # The CUDA-graph accelerator (compute_resident_mask_accel) must equal the eager reference
+    # bit-for-bit at the production shape and both eviction policies. Guards the GPU-only path
+    # the CPU tests above can't reach.
+    import temporal_router as tr
+    tr._scan_path = None; tr._graph_cache.clear()      # exercise the graph path from a clean state
+    torch.manual_seed(3)
+    for evict in ("lru", "min_logit"):
+        for S, B, E, k in [(2048, 32, 64, 6), (2048, 32, 64, 5), (50, 4, 12, 3)]:
+            logits = torch.randn(S, B, E, device="cuda")
+            ref = compute_resident_mask(logits, k, evict)
+            acc = tr.compute_resident_mask_accel(logits, k, evict)
+            assert torch.equal(acc, ref), f"accel != ref for evict={evict} shape={(S,B,E)} k={k}"
+    assert tr._scan_path == "cuda-graph", f"graph path did not engage (path={tr._scan_path})"
