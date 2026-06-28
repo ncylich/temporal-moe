@@ -1,6 +1,0 @@
-# Temporal MoE SMOKE test — s0 @1e16, s=1 (default SHARED_MULT=2 TOPK=6). ~2335 iters, ~10x cheap.
-# Goal: mechanism only — launches, loss descends, nan iterations: 0, routing stays balanced.
-# Run with:  export TEMPORAL=1 CE_FUSION=1  (+ TOKENIZER_MODEL, DATA_DIR, BPB_DIVISOR absolute paths)
-#            EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_1e16_smoke.txt &
-# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
-tmoe_s0_1e16 s0 1e16 3e-3 0.05 256 1234

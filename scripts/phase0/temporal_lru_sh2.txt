@@ -1,0 +1,7 @@
+# Temporal MoE matrix cell — LRU eviction, 2 shared experts (FLOP-matched: SHARED_MULT=3 TOPK=5 -> K=k=5).
+# Launched by temporal_matrix.sh (exports TEMPORAL=1 TEMPORAL_EVICT=lru SHARED_MULT=3 TOPK=5).
+# Intuition: a 2nd always-resident shared expert may absorb generic computation, freeing the rolling set.
+# Target band (BPB, lower better): @1e16/s0 dense 1.519..MoE 1.447 ; @1e17/s2 dense 1.341..MoE 1.269.
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+tmoe_lru_sh2_s0_1e16 s0 1e16 3e-3 0.05 256 1234
+tmoe_lru_sh2_s2_1e17 s2 1e17 3e-3 0.05 256 1234

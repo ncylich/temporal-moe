@@ -1,7 +1,0 @@
-# Temporal MoE eviction A/B — s2 @1e17, s=1, LEAST-WANTED eviction (TEMPORAL_EVICT=min_logit).
-# Identical to temporal_1e17.txt except it evicts the lowest-scoring resident (consistent with the
-# swap trigger) instead of the LRU one. Compare BPB against tmoe_s2_1e17 to pick the eviction policy.
-# Run with:  export TEMPORAL=1 TEMPORAL_EVICT=min_logit CE_FUSION=1  (+ tokenizer/data/bpb abs paths)
-#            nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_minlogit_1e17.txt &
-# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
-tmoe_s2_minlogit_1e17 s2 1e17 3e-3 0.05 256 1234

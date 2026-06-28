@@ -48,18 +48,18 @@ burden (the token gets what it wants *now*) — the right semantics for a *quali
 | file | new? | role |
 |---|---|---|
 | `scripts/phase0/temporal_router.py` | new | `compute_resident_mask` (pure) + `temporal_forward` + `install()` |
-| `scripts/phase0/test_temporal_router.py` | new | 7 pure-function specs (TDD) — run these first |
+| `scripts/phase0/test_temporal_router.py` | new | 9 pure-function specs (TDD) — run these first |
 | `scripts/phase0/pretrain_temporal.py` | new | entrypoint: `install()` then Megatron `pretrain(...)` (mirrors expert_load.py) |
 | `scripts/phase0/run.sh` | edit (~6 lines) | `TEMPORAL=1` swaps entrypoint to `pretrain_temporal.py`; logs `temporal=` |
-| `scripts/phase0/temporal_1e16_smoke.txt` | new | driver config: s0@1e16, s=1 (smoke) |
-| `scripts/phase0/temporal_1e17.txt` | new | driver config: s2@1e17, s=1 (quality) |
-| `scripts/phase0/temporal_s2shared_1e17.txt` | new | driver config: s2@1e17, s=2 (run with `SHARED_MULT=3 TOPK=5`) |
+| `scripts/phase0/temporal_smoke.txt` | new | the lru/1-shared/s0@1e16 cell, run alone first as the integration smoke |
+| `scripts/phase0/temporal_{lru,minlogit}_sh{1,2}.txt` | new | the 4 matrix regimes (each lists its s0@1e16 + s2@1e17 cells) |
+| `scripts/phase0/temporal_matrix.sh` | new | runs the full 8-cell matrix serially (sets per-regime env; idempotent) |
 
 ## Step 0 — verify locally (no GPU; ~1s)
 
 ```bash
 git switch temporal-moe-impl
-python3 -m pytest scripts/phase0/test_temporal_router.py -q   # expect 7 passed
+python3 -m pytest scripts/phase0/test_temporal_router.py -q   # expect 9 passed
 ```
 (Local tree's Megatron-LM submodule is uninitialized — that's fine; only the pure function is tested here.)
 
@@ -72,38 +72,38 @@ EVALUATION_METHODOLOGY §8f/§10a):
 export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k
 export DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568
-export TEMPORAL=1
-EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_1e16_smoke.txt \
+export TEMPORAL=1 TEMPORAL_EVICT=lru SHARED_MULT=2 TOPK=6
+EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_smoke.txt \
   > results/phase0/temporal_smoke.drive.log 2>&1 &
 ```
-Watch with the EVALUATION_METHODOLOGY §11 reactive loop. **Pass = it launches, `[temporal] ... installed`
-prints, `lm loss` descends, `nan iterations: 0`, throughput is tolerable** (see throughput risk below). No
-band judgment here — this only proves the mechanism runs.
+Watch with the EVALUATION_METHODOLOGY §11 reactive loop. **Pass = it launches, `[temporal] rolling-residency
+router installed (evict=lru)` prints, `lm loss` descends, `nan iterations: 0`, throughput is tolerable** (see
+throughput risk below). No band judgment here — this only proves the mechanism runs. (This cell is also the
+matrix's `tmoe_lru_sh1_s0_1e16`, so the matrix skips it afterwards.)
 
-## Step 2 — quality runs (the actual result)
+## Step 2 — the full 8-cell matrix (the actual result)
+
+We run the whole cross-product **{lru, min_logit} × {1 shared, 2 shared} × {s0@1e16, s2@1e17} = 8 runs**.
+Resolving both knobs at both budgets (instead of carrying one winner) is intentional — it shows whether the
+eviction and shared-expert effects are consistent across scale. One GPU ⇒ strictly serial; the wrapper sets
+each regime's env and `drive.sh` skips the already-done smoke cell.
+
+| evict \ shared | 1 shared (`SHARED_MULT=2 TOPK=6`, K=6) | 2 shared (`SHARED_MULT=3 TOPK=5`, K=5) |
+|---|---|---|
+| **lru** | `temporal_lru_sh1.txt` (smoke + 1e17) | `temporal_lru_sh2.txt` |
+| **min_logit** | `temporal_minlogit_sh1.txt` | `temporal_minlogit_sh2.txt` |
 
 ```bash
-# s=1 (shape s2 @1e17), default shared/topk:
-export TEMPORAL=1 CE_FUSION=1   # + tokenizer/data/bpb as above
-nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_1e17.txt \
-  > results/phase0/temporal_1e17.drive.log 2>&1 &
-
-# s=2 (two shared experts, FLOP-matched) — note the extra env:
-export TEMPORAL=1 CE_FUSION=1 SHARED_MULT=3 TOPK=5
-nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_s2shared_1e17.txt \
-  > results/phase0/temporal_s2shared_1e17.drive.log 2>&1 &
-
-# eviction A/B: same s=1 run but least-wanted eviction instead of LRU (default).
-export TEMPORAL=1 CE_FUSION=1 TEMPORAL_EVICT=min_logit
-nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_minlogit_1e17.txt \
-  > results/phase0/temporal_minlogit_1e17.drive.log 2>&1 &
+# common env as above (TEMPORAL is set by the wrapper). Then, after the smoke passes:
+nohup bash scripts/phase0/temporal_matrix.sh > results/phase0/temporal_matrix.log 2>&1 &
 ```
-Read BPB with the existing tool; success = inside (1.269, 1.341):
+Each cell's BPB (success = inside the band, dense .. MoE: @1e16/s0 1.519..1.447, @1e17/s2 1.341..1.269):
 ```bash
-BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py results/phase0/runs/tmoe_s2_1e17
+BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py results/phase0/runs/tmoe_lru_sh1_s2_1e17
+# ... repeat per cell: tmoe_{lru,minlogit}_sh{1,2}_{s0_1e16,s2_1e17}
 ```
-Then back-fill s0@1e16 (s=1 and s=2) for the two-budget frontier figure, and extend
-`scripts/phase0/plot_dense_vs_moe.py` with the temporal curve.
+Then extend `scripts/phase0/plot_dense_vs_moe.py` with the temporal curve(s) — the matrix already covers both
+budgets, so no extra back-fill is needed for the two-budget frontier figure.
 
 ## Risks / knobs the next agent should expect
 
@@ -112,21 +112,28 @@ Then back-fill s0@1e16 (s=1 and s=2) for the two-budget frontier figure, and ext
    If the smoke run's tok/s is unacceptable, optimize the loop (e.g. CUDA-graph/`torch.compile` the per-step
    body, or batch the nominee computation in a pre-pass) — **do not** change the semantics; the unit tests
    must stay green.
-2. **Eviction policy is the #1 quality knob — now a flag, ready to A/B.** `TEMPORAL_EVICT={lru,min_logit}`
-   (default `lru`). `min_logit` evicts the lowest-scoring resident (consistent with the swap trigger,
-   quality-greedy); `lru` evicts the oldest-refresh resident (protects just-loaded experts from thrash,
-   score-neutral w.r.t. the aux loss). Both are unit-tested. Run the A/B with
-   `scripts/phase0/temporal_minlogit_1e17.txt` (sets `TEMPORAL_EVICT=min_logit`) and compare BPB to
-   `tmoe_s2_1e17`. The swap *count* is identical across policies (the trigger gates it) — only which expert
-   leaves differs, so it's a clean quality comparison.
-3. **Coherence, not gradient, is the open empirical question.** The router gets the full gate-weight gradient
+2. **Eviction policy is the #1 quality knob — `TEMPORAL_EVICT={lru,min_logit}` (default `lru`).**
+   `min_logit` evicts the lowest-scoring resident (consistent with the swap trigger, quality-greedy); `lru`
+   evicts the oldest-refresh resident (protects just-loaded experts from thrash, score-neutral w.r.t. the aux
+   loss). Both are unit-tested and both run in the Step-2 matrix. The swap *count* is identical across policies
+   (the trigger gates it) — only which expert leaves differs, so it's a clean quality comparison.
+3. **Loss interaction (verified against the Megatron source — no special handling needed).** The aux/z loss is
+   computed inside the **unmodified** `routing()` from the **masked** logits we pass, so it works identically
+   for both eviction policies (they only change *which* experts are masked). The aux loss balances *how often
+   each expert is resident-and-used*. Two consequences of masking to `-inf` worth knowing: (a) with
+   `--moe-router-pre-softmax`, baseline gates sum to **<1** (mass leaks to unselected experts), but masking
+   concentrates all softmax mass on the resident set so **our gates sum to 1** over the k resident — a free
+   renormalization, identical for both policies; (b) this means temporal gating is *not* a pure restriction of
+   baseline FLAME-MoE gating (different gate magnitudes) — fine for a from-scratch model, just don't expect
+   bit-identical gating to the baseline.
+4. **Coherence, not gradient, is the open empirical question.** The router gets the full gate-weight gradient
    on resident experts; the swap `argmax` is non-differentiable but rides on the trained `W_g`. The failure
    mode is the model tolerating whatever's resident instead of making usage temporally coherent (collapsing
    toward dense). If BPB sits at/under the dense floor, that's the signal. Deferred levers (only if needed):
    a churn-penalty aux loss, or a straight-through estimator on the swap.
-4. **expert_load.py + temporal both patch `TopKRouter.forward`.** For a criterion-4 load check on a temporal
+5. **expert_load.py + temporal both patch `TopKRouter.forward`.** For a criterion-4 load check on a temporal
    model the two patches must compose (count *after* masking) — handle if/when you run that check.
-5. **`K = k` tracks `--moe-router-topk`.** For s=2 (`TOPK=5`) the resident set is automatically 5. Intended.
+6. **`K = k` tracks `--moe-router-topk`.** For s=2 (`TOPK=5`) the resident set is automatically 5. Intended.
 
 ## Pointers
 
