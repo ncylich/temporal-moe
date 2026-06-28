@@ -1,0 +1,4 @@
+# Dense (no-MoE) IsoFLOP floor @1e17. eval@iters/10. DENSE=1.
+dense_s2_1e17 s2 1e17 3e-3 0.05 256 1234
+dense_s3_1e17 s3 1e17 3e-3 0.05 256 1234
+dense_s4_1e17 s4 1e17 3e-3 0.05 256 1234
