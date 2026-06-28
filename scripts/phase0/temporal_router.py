@@ -16,15 +16,22 @@ The whole architecture is:
 The Megatron import lives inside `install()` so this module (and its tests) import with plain torch
 and no Megatron present.
 """
+import os
 import torch
+import torch.nn.functional as F
 
 
-def compute_resident_mask(logits: torch.Tensor, k: int) -> torch.Tensor:
+def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru") -> torch.Tensor:
     """Rolling-residency expert selection.
 
     Args:
         logits: [seq, batch, num_experts] router logits (seq-first, as Megatron's router sees them).
         k: resident-set size (= top-k; K = k for this PoC).
+        evict: which resident to remove when a swap happens (experiment knob, same swap *trigger*):
+            "lru"       — oldest last-refresh time (cache-style; protects just-loaded experts from
+                          immediate re-eviction → less thrash; score-neutral w.r.t. the aux loss).
+            "min_logit" — lowest current logit, i.e. the same "worst resident" the swap trigger
+                          compares against (most consistent; quality-greedy; simpler).
 
     Returns:
         Boolean mask [seq, batch, num_experts] with exactly `k` True per (seq, batch) token: the
@@ -36,18 +43,19 @@ def compute_resident_mask(logits: torch.Tensor, k: int) -> torch.Tensor:
         R_{t+1} = swap(R_t, logits[t]):             # the router nominates one expert to prefetch
             nominee = argmax over NON-resident logits[t]
             swap in nominee iff it beats the worst resident (i.e. R_t != global top-k),
-            evicting the LRU resident (smallest last-refresh time).
-    Refresh times: cold-fill experts rank by ascending logit (lowest = oldest); each nomination is
-    the newest. All resident refresh times stay distinct, so eviction is deterministic.
+            evicting the resident chosen by `evict`.
+    Refresh times (for "lru"): cold-fill experts rank by ascending logit (lowest = oldest); each
+    nomination is the newest. All resident refresh times stay distinct, so eviction is deterministic.
     """
+    assert evict in ("lru", "min_logit"), f"unknown evict policy {evict!r}"
+    use_lru = evict == "lru"
     S, B, E = logits.shape
     dev = logits.device
     NEG, POS = float("-inf"), float("inf")
 
     resident = torch.zeros(B, E, dtype=torch.bool, device=dev)
-    refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert
+    refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert ("lru" only)
     out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
-    rows = torch.arange(B, device=dev)
 
     # --- t=0 cold fill: R_0 = top-k(logits[0]) ---
     _, top_i = logits[0].topk(k, dim=-1)                    # [B,k], descending by logit
@@ -63,15 +71,14 @@ def compute_resident_mask(logits: torch.Tensor, k: int) -> torch.Tensor:
         lt = logits[t]                                      # router at t nominates a prefetch for t+1
         nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)      # best non-resident [B]
         worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)       # worst resident   [B]
-        do_swap = nom_val > worst_val                                   # R_t != global top-k
-        evict_i = refresh.masked_fill(~resident, POS).argmin(dim=-1)    # LRU resident     [B]
-        if do_swap.any():
-            r = rows[do_swap]
-            resident = resident.clone()
-            resident[r, evict_i[do_swap]] = False
-            resident[r, nom_i[do_swap]] = True
-            refresh = refresh.clone()
-            refresh[r, nom_i[do_swap]] = float(k + t)       # newest: strictly > any prior refresh
+        do_swap = (nom_val > worst_val).unsqueeze(-1)                   # [B,1]: R_t != global top-k
+        evict_key = refresh if use_lru else lt
+        evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
+        # Branchless swap: where do_swap is False the one-hots collapse to all-False -> a true no-op.
+        evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
+        nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
+        resident = (resident & ~evicted) | nominee
+        refresh = refresh.masked_fill(nominee, float(k + t))           # newest (read only when "lru")
 
     return out
 
@@ -85,7 +92,7 @@ def temporal_forward(self, input: torch.Tensor):
     input = self.apply_input_jitter(input)
     logits = self.gating(input)                             # [seq, batch, num_experts]
     k = self.config.moe_router_topk
-    mask = compute_resident_mask(logits, k)
+    mask = compute_resident_mask(logits, k, evict=os.environ.get("TEMPORAL_EVICT", "lru"))
     logits = logits.masked_fill(~mask, float("-inf"))       # only resident experts are selectable
     return self.routing(logits)
 
@@ -94,4 +101,4 @@ def install():
     """Monkeypatch TopKRouter.forward (call once at startup, before model build)."""
     from megatron.core.transformer.moe.router import TopKRouter
     TopKRouter.forward = temporal_forward
-    print("[temporal] rolling-residency router installed (TopKRouter.forward patched)")
+    print(f"[temporal] rolling-residency router installed (evict={os.environ.get('TEMPORAL_EVICT', 'lru')})")

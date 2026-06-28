@@ -99,9 +99,13 @@ Then back-fill s0@1e16 (s=1 and s=2) for the two-budget frontier figure, and ext
    If the smoke run's tok/s is unacceptable, optimize the loop (e.g. CUDA-graph/`torch.compile` the per-step
    body, or batch the nominee computation in a pre-pass) — **do not** change the semantics; the unit tests
    must stay green.
-2. **Eviction policy is the #1 quality knob.** Currently LRU-by-refresh (as specified/approved). The obvious
-   alternative to A/B is "evict the least-wanted resident" (lowest current logit). It's a ~2-line change in
-   `compute_resident_mask`'s `evict_i`; add a test if you switch.
+2. **Eviction policy is the #1 quality knob — now a flag, ready to A/B.** `TEMPORAL_EVICT={lru,min_logit}`
+   (default `lru`). `min_logit` evicts the lowest-scoring resident (consistent with the swap trigger,
+   quality-greedy); `lru` evicts the oldest-refresh resident (protects just-loaded experts from thrash,
+   score-neutral w.r.t. the aux loss). Both are unit-tested. Run the A/B with
+   `scripts/phase0/temporal_minlogit_1e17.txt` (sets `TEMPORAL_EVICT=min_logit`) and compare BPB to
+   `tmoe_s2_1e17`. The swap *count* is identical across policies (the trigger gates it) — only which expert
+   leaves differs, so it's a clean quality comparison.
 3. **Coherence, not gradient, is the open empirical question.** The router gets the full gate-weight gradient
    on resident experts; the swap `argmax` is non-differentiable but rides on the trained `W_g`. The failure
    mode is the model tolerating whatever's resident instead of making usage temporally coherent (collapsing

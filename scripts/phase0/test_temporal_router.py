@@ -77,6 +77,19 @@ def test_swap_evicts_lru_not_lowest_logit():
     assert s[2] == frozenset({0, 2})
 
 
+def test_min_logit_evicts_lowest_resident_logit():
+    # Same sequence, but evict="min_logit" removes idx0 (current logit 0.1, the lowest resident)
+    # instead of the LRU idx1 -> {1,2} rather than {0,2}. Pins the eviction knob.
+    logits = torch.zeros(3, 1, 5)
+    logits[0, 0] = torch.tensor([0.9, 0.8, 0.0, 0.0, 0.0])
+    logits[1, 0] = torch.tensor([0.1, 0.95, 0.9, 0.0, 0.0])
+    logits[2, 0] = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0])
+    s = _sets(compute_resident_mask(logits, k=2, evict="min_logit"))
+    assert s[0] == frozenset({0, 1})
+    assert s[1] == frozenset({0, 1})
+    assert s[2] == frozenset({1, 2})
+
+
 def test_batch_elements_are_independent():
     a = torch.zeros(3, 1, 5)
     a[0, 0] = torch.tensor([0.9, 0.8, 0.0, 0.0, 0.0])
