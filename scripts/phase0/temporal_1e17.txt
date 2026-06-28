@@ -1,0 +1,7 @@
+# Temporal MoE QUALITY — s2 @1e17, s=1 (default SHARED_MULT=2 TOPK=6). ~3918 iters.
+# Target band (BPB, lower better): dense floor 1.341 .. MoE ceiling 1.269. Success = land inside.
+# Run with:  export TEMPORAL=1 CE_FUSION=1  (+ TOKENIZER_MODEL, DATA_DIR, BPB_DIVISOR absolute paths)
+#            nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_1e17.txt &
+# (default eval@iters/10 so the 1e16 point is also readable from this run.)
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+tmoe_s2_1e17 s2 1e17 3e-3 0.05 256 1234

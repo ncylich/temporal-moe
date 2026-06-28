@@ -69,7 +69,7 @@ OUT=$ROOT/results/phase0/runs/$RUN_NAME
 CKPT=$OUT/ckpt
 mkdir -p "$OUT"
 echo "[run] $RUN_NAME N=$N iters=$TRAIN_ITERS warmup=$WARMUP_ITERS min_lr=$MIN_LR eval@$EVAL_INTERVAL" | tee "$OUT/run.meta"
-echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN dense=${DENSE:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
+echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN dense=${DENSE:-0} temporal=${TEMPORAL:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
 
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
@@ -148,7 +148,11 @@ if [ "${EVAL_ONLY:-0}" = "1" ]; then
     --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
     2>&1 | tee "$OUT/expert_load.log"
 else
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} pretrain_gpt.py \
+  # TEMPORAL=1: rolling-residency MoE -> run via pretrain_temporal.py (installs the router patch,
+  # then the identical pretrain loop). Same model args; only the expert selection differs.
+  ENTRY=pretrain_gpt.py
+  [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
     2>&1 | tee "$OUT/train.log"
 fi

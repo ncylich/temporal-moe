@@ -1,0 +1,7 @@
+# Temporal MoE QUALITY — s2 @1e17, s=2 (TWO shared experts, FLOP-matched: SHARED_MULT=3 TOPK=5).
+# Intuition: a 2nd always-resident shared expert may better absorb generic computation under the
+# tight rolling constraint, freeing the routed set to specialize. Same target band as s=1.
+# Run with:  export TEMPORAL=1 CE_FUSION=1 SHARED_MULT=3 TOPK=5  (+ tokenizer/data/bpb abs paths)
+#            nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_s2shared_1e17.txt &
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+tmoe_s2_s2shared_1e17 s2 1e17 3e-3 0.05 256 1234
