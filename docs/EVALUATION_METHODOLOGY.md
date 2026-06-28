@@ -271,7 +271,139 @@ one the moment it finishes or fails.
 
 ---
 
-## 10. Script & file map
+## 10. Concrete commands (what we actually ran)
+
+Copy-pasteable, with the real env regimes. All assume repo root `/workspace/FLAME-MoE` and the 16k
+tokenizer/corpus already built. **Paths are absolute** (see §8f).
+
+### 10a. Common environment (every run, every sweep)
+```bash
+export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k        # 16k BPE (abs path required)
+export DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full          # tokenized dclm shards (abs path)
+export CE_FUSION=1                                             # fused cross-entropy
+export BPB_DIVISOR=2.7568                                      # 16k bytes/token -> BPB
+```
+
+### 10b. Train one baseline MoE run directly (single shape/budget)
+`run.sh` is the unit of work; it computes iters from `C=6ND` and applies the whole §2 harness.
+```bash
+# s2 @1e17, locked HPs, eval@iters/10 (so the 1e16 point is also readable from this run)
+SHAPE=s2 TARGET_FLOPS=1e17 RUN_NAME=v16k_sweep_s2_1e17 \
+  bash scripts/phase0/run.sh
+# -> results/phase0/runs/v16k_sweep_s2_1e17/{train.log,ckpt,run.meta}
+
+# a 1e16-only parabola point: one eval at the end (saves ~9 intermediate evals)
+SHAPE=s0 TARGET_FLOPS=1e16 EVAL_AT_END=1 RUN_NAME=v16k_d_s0_1e16 \
+  bash scripts/phase0/run.sh
+```
+
+### 10c. Drive the baseline MoE IsoFLOP sweeps (serial, detached)
+The bracket triple is ordered first in the config file (`s2,s1,s3`), rising branch after, so the
+parabola is decidable as early as possible.
+```bash
+# @1e17 IsoFLOP sweep (config: scripts/phase0/sweep_1e17.txt)
+nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_1e17.txt \
+  > results/phase0/sweep_1e17.drive.log 2>&1 &
+
+# @1e16 dedicated parabola (EVAL_AT_END for every run in this file)
+EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_1e16_dedicated.txt \
+  > results/phase0/sweep_1e16.drive.log 2>&1 &
+```
+A config line is `NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED [AUX]`, e.g.
+`v16k_sweep_s2_1e17 s2 1e17 3e-3 0.05 256 1234`.
+
+### 10d. Variant sweeps (change one knob, re-run §5)
+```bash
+# s=2 (two constant experts, FLOP-matched: shared 3x moe_ffn + top-5). N/iters unchanged.
+SHARED_MULT=3 TOPK=5 nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_s2shared_trio.txt \
+  > results/phase0/s2shared.drive.log 2>&1 &
+
+# dense IsoFLOP floor (DENSE=1 drops all MoE args, sets the matched even ffn per shape)
+DENSE=1 nohup bash scripts/phase0/drive.sh scripts/phase0/dense_1e17.txt \
+  > results/phase0/dense_1e17.drive.log 2>&1 &
+```
+
+### 10e. The two acceptance probes at the chosen optimum
+```bash
+# reproducibility: re-run the winner at a 2nd seed (config has seed 2024)
+nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_seed2.txt \
+  > results/phase0/seed2.drive.log 2>&1 &
+# accept if |Δ CE| <= 0.03 nats vs seed 1234
+
+# expert load (criterion 4): reload the trained ckpt, fire the router hook
+SHAPE=s2 TARGET_FLOPS=1e17 RUN_NAME=v16k_sweep_s2_1e17 EVAL_ONLY=1 \
+  bash scripts/phase0/run.sh
+# -> .../expert_load.json ; accept if worst max/mean <= 8x
+```
+
+### 10f. Reading results
+```bash
+# one run -> final/at-1e16 BPB JSON
+BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py \
+  results/phase0/runs/v16k_sweep_s2_1e17
+
+grep "SUMMARY" results/phase0/log.md          # the measured ledger, one line per run
+.venv/bin/python scripts/phase0/plot_dense_vs_moe.py   # regenerate the comparison plot
+```
+
+## 11. Monitoring commands (what we actually ran)
+
+These are the live polling commands from §8b, exactly as used. Run them between launches to stay
+reactive without busy-looping.
+
+### 11a. Reactive wait-for-event on the current run (the workhorse)
+Sleeps in 15 s steps, breaks the instant the run finishes / NaNs / the driver advances or dies, then
+prints the live `iteration X/total`, loss, and NaN count. `<this>`/`<next>` are run-dir names,
+`<total>` the run's iter count.
+```bash
+cd /workspace/FLAME-MoE
+d=results/phase0/runs/<this>
+for i in $(seq 1 39); do                                       # ~10-min ceiling
+  grep -q "after training is done" $d/train.log 2>/dev/null && { echo DONE; break; }
+  grep -q "nan iterations:   [1-9]" $d/train.log 2>/dev/null && { echo NaN;  break; }
+  [ -d results/phase0/runs/<next> ] && { echo NEXT-STARTED; break; }   # driver advanced => done
+  pgrep -f drive.sh >/dev/null 2>&1 || { echo DRIVER-ENDED; break; }
+  python3 -c "import time; time.sleep(15)"
+done
+grep "consumed samples" $d/train.log | tail -1 \
+  | grep -oE "iteration[ ]+[0-9]+/[ ]*<total>|lm loss: [0-9.E+]+|nan iterations:   [0-9]+"
+```
+(We size the loop cap to the run: 1–2 cycles for a ~1300-iter run, ~15 for an ~8000-iter one — §8c.)
+
+### 11b. Grab a finished run's BPB and confirm the next started
+```bash
+d=results/phase0/runs/<this>
+BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py $d 2>/dev/null \
+  | grep '^{' | python3 -c "import json,sys; o=json.load(sys.stdin); print('BPB', o['final_val_bpb'])"
+echo "next started: $([ -d results/phase0/runs/<next> ] && echo yes || echo no)"
+```
+
+### 11c. One-shot health snapshot (no waiting)
+```bash
+d=results/phase0/runs/<this>
+grep "consumed samples" $d/train.log | tail -1 \
+  | grep -oE "iteration[ ]+[0-9]+/[ ]*<total>|lm loss: [0-9.E+]+|nan iterations:   [0-9]+"
+grep -oE "throughput per GPU \(TFLOP/s/GPU\): [0-9.]+" $d/train.log | tail -1
+```
+
+### 11d. Is anything running? Is the GPU free? (before relaunch / after a kill)
+```bash
+pgrep -af drive.sh        | grep -v grep || echo "  no driver"
+pgrep -af pretrain_gpt    | grep -v grep || echo "  no training proc"
+nvidia-smi --query-gpu=memory.used --format=csv,noheader      # expect ~4 MiB when idle
+```
+
+### 11e. Detect and clean a failed run (§8f)
+```bash
+d=results/phase0/runs/<this>
+grep -iE "error|assert|exitcode|ChildFailedError|cannot be found|not a local folder" $d/train.log \
+  | grep -v "error_file\|enable traceback\|error_injection" | head
+# kill stragglers, free GPU, wipe the crashed dir so the driver restarts it clean:
+pkill -f pretrain_gpt; pkill -f drive.sh
+rm -rf results/phase0/runs/<this>
+```
+
+## 12. Script & file map
 
 | file | role |
 |---|---|
