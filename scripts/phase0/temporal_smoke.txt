@@ -1,7 +1,0 @@
-# Temporal MoE INTEGRATION SMOKE — the lru / 1-shared / s0@1e16 cell, run ALONE first to validate the
-# mechanism (patch fires, loss descends, no NaN, throughput tolerable) BEFORE the full matrix.
-# Same run NAME as the matrix's lru_sh1 1e16 cell, so temporal_matrix.sh skips it afterwards (idempotent).
-# Run with:  export TEMPORAL=1 TEMPORAL_EVICT=lru SHARED_MULT=2 TOPK=6 CE_FUSION=1  (+ tok/data/bpb paths)
-#            EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_smoke.txt &
-# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
-tmoe_lru_sh1_s0_1e16 s0 1e16 3e-3 0.05 256 1234

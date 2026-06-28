@@ -1,6 +1,0 @@
-# Temporal MoE matrix cell — least-wanted eviction, 1 shared expert (SHARED_MULT=2 TOPK=6 -> K=k=6).
-# Launched by temporal_matrix.sh (exports TEMPORAL=1 TEMPORAL_EVICT=min_logit SHARED_MULT=2 TOPK=6).
-# Target band (BPB, lower better): @1e16/s0 dense 1.519..MoE 1.447 ; @1e17/s2 dense 1.341..MoE 1.269.
-# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
-tmoe_minlogit_sh1_s0_1e16 s0 1e16 3e-3 0.05 256 1234
-tmoe_minlogit_sh1_s2_1e17 s2 1e17 3e-3 0.05 256 1234

@@ -51,9 +51,8 @@ burden (the token gets what it wants *now*) — the right semantics for a *quali
 | `scripts/phase0/test_temporal_router.py` | new | 9 pure-function specs (TDD) — run these first |
 | `scripts/phase0/pretrain_temporal.py` | new | entrypoint: `install()` then Megatron `pretrain(...)` (mirrors expert_load.py) |
 | `scripts/phase0/run.sh` | edit (~6 lines) | `TEMPORAL=1` swaps entrypoint to `pretrain_temporal.py`; logs `temporal=` |
-| `scripts/phase0/temporal_smoke.txt` | new | the lru/1-shared/s0@1e16 cell, run alone first as the integration smoke |
-| `scripts/phase0/temporal_{lru,minlogit}_sh{1,2}.txt` | new | the 4 matrix regimes (each lists its s0@1e16 + s2@1e17 cells) |
-| `scripts/phase0/temporal_matrix.sh` | new | runs the full 8-cell matrix serially (sets per-regime env; idempotent) |
+| `scripts/phase0/temporal_{lru,minlogit}_sh{1,2}_{1e16,1e17}.txt` | new | the 8 matrix cells (one run each); `temporal_lru_sh1_1e16.txt` is also the integration smoke |
+| `scripts/phase0/temporal_matrix.sh` | new | runs the full 8-cell matrix serially, all 1e16 before all 1e17 (sets per-cell env; idempotent) |
 
 ## Step 0 — verify locally (no GPU; ~1s)
 
@@ -73,7 +72,7 @@ export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k
 export DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568
 export TEMPORAL=1 TEMPORAL_EVICT=lru SHARED_MULT=2 TOPK=6
-EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_smoke.txt \
+EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_lru_sh1_1e16.txt \
   > results/phase0/temporal_smoke.drive.log 2>&1 &
 ```
 Watch with the EVALUATION_METHODOLOGY §11 reactive loop. **Pass = it launches, `[temporal] rolling-residency
@@ -85,13 +84,14 @@ matrix's `tmoe_lru_sh1_s0_1e16`, so the matrix skips it afterwards.)
 
 We run the whole cross-product **{lru, min_logit} × {1 shared, 2 shared} × {s0@1e16, s2@1e17} = 8 runs**.
 Resolving both knobs at both budgets (instead of carrying one winner) is intentional — it shows whether the
-eviction and shared-expert effects are consistent across scale. One GPU ⇒ strictly serial; the wrapper sets
-each regime's env and `drive.sh` skips the already-done smoke cell.
+eviction and shared-expert effects are consistent across scale. One GPU ⇒ strictly serial; the wrapper runs
+**all four 1e16 cells before any 1e17 cell** (cheap-first), sets each cell's env, and `drive.sh` skips the
+already-done smoke cell. The 8 cells (one config file each, `temporal_<evict>_sh<1|2>_<budget>.txt`):
 
 | evict \ shared | 1 shared (`SHARED_MULT=2 TOPK=6`, K=6) | 2 shared (`SHARED_MULT=3 TOPK=5`, K=5) |
 |---|---|---|
-| **lru** | `temporal_lru_sh1.txt` (smoke + 1e17) | `temporal_lru_sh2.txt` |
-| **min_logit** | `temporal_minlogit_sh1.txt` | `temporal_minlogit_sh2.txt` |
+| **lru** | `temporal_lru_sh1_{1e16,1e17}.txt` (1e16 = smoke) | `temporal_lru_sh2_{1e16,1e17}.txt` |
+| **min_logit** | `temporal_minlogit_sh1_{1e16,1e17}.txt` | `temporal_minlogit_sh2_{1e16,1e17}.txt` |
 
 ```bash
 # common env as above (TEMPORAL is set by the wrapper). Then, after the smoke passes:
@@ -125,7 +125,8 @@ budgets, so no extra back-fill is needed for the two-budget frontier figure.
    concentrates all softmax mass on the resident set so **our gates sum to 1** over the k resident — a free
    renormalization, identical for both policies; (b) this means temporal gating is *not* a pure restriction of
    baseline FLAME-MoE gating (different gate magnitudes) — fine for a from-scratch model, just don't expect
-   bit-identical gating to the baseline.
+   bit-identical gating to the baseline. (We keep FLAME's `--moe-router-pre-softmax`; under masking pre- vs
+   post-softmax is moot — both reduce to `softmax(resident logits)` — so no change is needed there.)
 4. **Coherence, not gradient, is the open empirical question.** The router gets the full gate-weight gradient
    on resident experts; the swap `argmax` is non-differentiable but rides on the trained `W_g`. The failure
    mode is the model tolerating whatever's resident instead of making usage temporally coherent (collapsing
