@@ -5,12 +5,11 @@ Pure-function tests for `compute_resident_mask` — no Megatron, no GPU, CPU tor
 Run: .venv/bin/python -m pytest scripts/phase0/test_temporal_router.py
 (or:  python3 -m pytest scripts/phase0/test_temporal_router.py)
 
-Semantics under test (K = k, use-then-swap, deployment-faithful):
+Semantics under test (K = k, swap-then-use — a token pulls in one expert and uses it the SAME step):
   - t=0 cold fill: R_0 = top-k(logits[0])  ("first token picks all experts")
-  - mask[t] = R_t  (token t is served by the set available to it)
-  - R_{t+1} = swap(R_t, logits[t]): nominate the best NON-resident expert; swap it in ONLY if it
-    beats the worst resident (equivalently: R_t != global top-k); evict the LRU resident
-    (oldest last-refresh; cold-fill refresh ranks by ascending logit, nominations are newest).
+  - for t >= 1: R_t = swap(R_{t-1}, logits[t]): nominate the best NON-resident expert; swap it in
+    ONLY if it beats the worst resident (equivalently: R_{t-1} != global top-k); evict per `evict`
+    (lru = oldest last-refresh; min_logit = lowest current logit). mask[t] = R_t (the set t uses).
 """
 import os, sys
 import torch
@@ -62,32 +61,42 @@ def test_noop_when_preference_stays_resident():
     assert all(r == frozenset({1, 3}) for r in s)  # constant, no churn
 
 
-def test_swap_evicts_lru_not_lowest_logit():
-    # Hand-traced sequence where LRU (oldest refresh) and "lowest current logit" disagree,
-    # so this pins that eviction is by refresh-recency, NOT by current logit.
-    logits = torch.zeros(3, 1, 5)
-    logits[0, 0] = torch.tensor([0.9, 0.8, 0.0, 0.0, 0.0])   # R_0 = {0,1}; refresh: idx1 older, idx0 newer
-    logits[1, 0] = torch.tensor([0.1, 0.95, 0.9, 0.0, 0.0])  # wants idx2 (non-resident, 0.9 > worst 0.1)
-    logits[2, 0] = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0])
-    s = _sets(compute_resident_mask(logits, k=2))
-    assert s[0] == frozenset({0, 1})
-    assert s[1] == frozenset({0, 1})           # served by R_0 (1-token prefetch lag)
-    # idx1 evicted (oldest refresh) even though its current logit 0.95 is the HIGHER of the two;
-    # a lowest-logit policy would have evicted idx0 (0.1) -> {1,2}. LRU gives {0,2}.
-    assert s[2] == frozenset({0, 2})
+def test_swap_then_use_serves_new_expert_same_step():
+    # A token that wants a non-resident expert pulls it in and USES it on the same step (no lag):
+    # idx2 is wanted at t=1 and must appear in mask[1], not a step later.
+    logits = torch.zeros(2, 1, 5)
+    logits[0, 0] = torch.tensor([0.9, 0.8, 0.0, 0.0, 0.0])   # R_0 = {0,1}
+    logits[1, 0] = torch.tensor([0.1, 0.95, 0.9, 0.0, 0.0])  # top-2 = {1,2}; idx2 is non-resident
+    assert 2 in _sets(compute_resident_mask(logits, k=2))[1]
 
 
-def test_min_logit_evicts_lowest_resident_logit():
-    # Same sequence, but evict="min_logit" removes idx0 (current logit 0.1, the lowest resident)
-    # instead of the LRU idx1 -> {1,2} rather than {0,2}. Pins the eviction knob.
-    logits = torch.zeros(3, 1, 5)
-    logits[0, 0] = torch.tensor([0.9, 0.8, 0.0, 0.0, 0.0])
-    logits[1, 0] = torch.tensor([0.1, 0.95, 0.9, 0.0, 0.0])
-    logits[2, 0] = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0])
-    s = _sets(compute_resident_mask(logits, k=2, evict="min_logit"))
-    assert s[0] == frozenset({0, 1})
-    assert s[1] == frozenset({0, 1})
-    assert s[2] == frozenset({1, 2})
+def test_lru_and_min_logit_diverge_then_reconverge():
+    # Trace where LRU and least-wanted GENUINELY disagree, and where LRU does the counter-intuitive
+    # thing: it evicts the resident with the HIGHEST current logit (idx1=10) purely because it is the
+    # oldest, while min_logit keeps it. This is exactly the asymmetry the policies are meant to test.
+    logits = torch.zeros(3, 1, 4)
+    logits[0, 0] = torch.tensor([10.0, 9.0, 0.0, 0.0])  # cold fill R_0={0,1}; idx1 oldest, idx0 newest
+    logits[1, 0] = torch.tensor([1.0, 10.0, 9.0, 0.0])  # idx0 now low (1), idx1 high (10); pull in idx2 (9)
+    logits[2, 0] = torch.tensor([1.0, 10.0, 9.0, 0.0])
+    lru = _sets(compute_resident_mask(logits, k=2, evict="lru"))
+    minl = _sets(compute_resident_mask(logits, k=2, evict="min_logit"))
+    assert lru[0] == minl[0] == frozenset({0, 1})
+    # t=1: min_logit keeps idx1 (logit 10, most wanted) -> {1,2};
+    #      LRU evicts idx1 *despite* its logit 10 (it is the oldest) -> {0,2}.  They differ.
+    assert minl[1] == frozenset({1, 2})
+    assert lru[1] == frozenset({0, 2})
+    assert lru[1] != minl[1]
+    # t=2: LRU spends an extra swap to undo its mistake; both end at {1,2}.
+    assert lru[2] == minl[2] == frozenset({1, 2})
+
+
+def test_policies_actually_differ_on_a_longer_sequence():
+    # Guard against the two policies silently collapsing to identical behavior.
+    torch.manual_seed(7)
+    logits = torch.randn(40, 2, 12)
+    lru = compute_resident_mask(logits, k=4, evict="lru")
+    minl = compute_resident_mask(logits, k=4, evict="min_logit")
+    assert not torch.equal(lru, minl)
 
 
 def test_batch_elements_are_independent():

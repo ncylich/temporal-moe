@@ -37,13 +37,14 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru") -> t
         Boolean mask [seq, batch, num_experts] with exactly `k` True per (seq, batch) token: the
         experts resident — and therefore usable — for that token.
 
-    Policy (use-then-swap, deployment-faithful):
+    Policy (swap-then-use): a token pulls in one expert and uses it the SAME step (no prefetch lag),
+    so the token always gets its top-k experts that are within +1 swap of the current set.
         R_0 = top-k(logits[0])                      # cold fill: first token picks all k experts
-        mask[t] = R_t                               # token t is served by the set available to it
-        R_{t+1} = swap(R_t, logits[t]):             # the router nominates one expert to prefetch
+        for t >= 1:  R_t = swap(R_{t-1}, logits[t]):
             nominee = argmax over NON-resident logits[t]
-            swap in nominee iff it beats the worst resident (i.e. R_t != global top-k),
+            swap in nominee iff it beats the worst resident (i.e. R_{t-1} != global top-k),
             evicting the resident chosen by `evict`.
+        mask[t] = R_t                               # the post-swap set the token actually uses
     Refresh times (for "lru"): cold-fill experts rank by ascending logit (lowest = oldest); each
     nomination is the newest. All resident refresh times stay distinct, so eviction is deterministic.
     """
@@ -53,31 +54,30 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru") -> t
     dev = logits.device
     NEG, POS = float("-inf"), float("inf")
 
-    resident = torch.zeros(B, E, dtype=torch.bool, device=dev)
     refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert ("lru" only)
     out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
 
     # --- t=0 cold fill: R_0 = top-k(logits[0]) ---
+    resident = torch.zeros(B, E, dtype=torch.bool, device=dev)
     _, top_i = logits[0].topk(k, dim=-1)                    # [B,k], descending by logit
     resident.scatter_(1, top_i, True)
     # highest logit -> newest (largest refresh); lowest of the k -> oldest (0).
     rank_refresh = torch.arange(k - 1, -1, -1, device=dev).float().expand(B, k)
     refresh.scatter_(1, top_i, rank_refresh)
+    out[0] = resident
 
-    for t in range(S):
-        out[t] = resident                                   # mask[t] = R_t
-        if t == S - 1:
-            break
-        lt = logits[t]                                      # router at t nominates a prefetch for t+1
+    for t in range(1, S):
+        lt = logits[t]                                      # token t pulls in one expert and uses it
         nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)      # best non-resident [B]
         worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)       # worst resident   [B]
-        do_swap = (nom_val > worst_val).unsqueeze(-1)                   # [B,1]: R_t != global top-k
+        do_swap = (nom_val > worst_val).unsqueeze(-1)                   # [B,1]: R_{t-1} != global top-k
         evict_key = refresh if use_lru else lt
         evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
         evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
         nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
         resident = (resident & ~evicted) | nominee
         refresh = refresh.masked_fill(nominee, float(k + t))           # newest (read only when "lru")
+        out[t] = resident
 
     return out
 

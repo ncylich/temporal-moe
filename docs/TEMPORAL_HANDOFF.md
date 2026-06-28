@@ -29,11 +29,18 @@ math: `docs/research/temporal-moe.md` (§2 "rolling residency") and `docs/EVALUA
   Activation is a single `TEMPORAL=1` env in `run.sh`, following the `DENSE=1`/`EVAL_ONLY=1` precedent.
 
 ### Selection policy (what the pure function computes)
-Use-then-swap, deployment-faithful (so training matches decode-time prefetch):
+**Swap-then-use** — a token pulls in one expert and uses it the SAME step (no prefetch lag), so each
+token gets its top-k experts that are within +1 swap of the current set. This drops the prediction
+burden (the token gets what it wants *now*) — the right semantics for a *quality* PoC.
 - `t=0` cold fill: `R_0 = top-k(logits[0])` ("first token picks all experts").
-- `mask[t] = R_t` (token `t` is served by the set available to it — a 1-token prefetch lag).
-- `R_{t+1} = swap(R_t, logits[t])`: nominate the best **non-resident** expert; swap it in **iff** it beats
-  the worst resident (≡ `R_t` ≠ global top-k); evict the **LRU** resident (oldest last-refresh).
+- for `t ≥ 1`: `R_t = swap(R_{t-1}, logits[t])`: nominate the best **non-resident** expert; swap it in
+  **iff** it beats the worst resident (≡ `R_{t-1}` ≠ global top-k); evict per the `evict` knob.
+  `mask[t] = R_t` (the post-swap set the token actually uses).
+
+> Note: the alternative **use-then-swap** (the router prefetches for `t+1`, so a token is served by the
+> previous step's set) is the *systems*-faithful variant that hides SSD latency — revisit it when
+> throughput is in scope. It is NOT what's implemented now; we deliberately chose swap-then-use for the
+> quality measurement.
 
 ## Files (the entire change)
 
