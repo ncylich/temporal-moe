@@ -1,0 +1,2 @@
+# Dense left-arm extension @1e17 (bracket the s2 min). eval@iters/10. DENSE=1.
+dense_s1_1e17 s1 1e17 3e-3 0.05 256 1234

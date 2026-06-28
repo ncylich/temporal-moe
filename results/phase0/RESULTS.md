@@ -52,6 +52,20 @@ stable across the 14× size range (s2/s4/s6 @3e16, no divergence).
 **The (B=1, s=1) temporal reference baselines** (best shape per budget): **1e17 → 1.269 BPB (s2),
 1e16 → 1.447 BPB (s0)**.
 
+## Dense IsoFLOP floor — does MoE beat a vanilla dense model? (yes, see `DENSE_BASELINES.md`)
+
+For each shape we also trained a plain dense (no-MoE) transformer with `ffn_hidden` enlarged so its
+non-embedding params equal the MoE's *active* non-embedding params — same FLOPs, same tokens, same
+HPs. **FLAME-MoE beats this dense floor at every shape, both budgets, by ~0.07 BPB at the
+compute-optimal shape**, and both parabolas bottom out at the *same* shape (s0@1e16, s2@1e17):
+
+| budget | dense floor (best) | MoE (best) | MoE gain |
+|---|---|---|---|
+| 1e16 | s0 → 1.519 | s0 → **1.447** | **0.072 BPB** |
+| 1e17 | s2 → 1.341 | s2 → **1.269** | **0.072 BPB** |
+
+The MoE advantage *widens* with size (@1e17: −0.077 at s1 → −0.119 at s3). Plot: `dense_vs_moe.png`.
+
 ## Acceptance criteria — ALL 4 PASS (see PASS.md)
 
 1. **Best-shape ≤ bar — PASS.** @1e17 s2 = 1.269 ≤ 1.645; @1e16 s0 = 1.447 ≤ 2.149. (Real models beat

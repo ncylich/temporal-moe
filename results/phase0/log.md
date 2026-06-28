@@ -419,3 +419,28 @@ SUMMARY dense_s2_1e16: final_val_CE=5.0934 (BPB 1.8476)  val@iters/10=5.0934 (BP
 | s1 | 1.591 | 1.540 | 0.051 |
 | s2 | 1.849 | 1.819 | 0.030 |
 → MoE beats the dense floor at every @1e16 shape. Dense @1e16 monotone (min at s0) → add dense s_-1.
+
+### dense_s2_1e17  (2026-06-28 04:48)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY dense_s2_1e17: final_val_CE=3.6964 (BPB 1.3408)  val@iters/10=4.6249 (BPB 1.6776)@it392  nan=False  evals=11
+{"run": "dense_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": 3.69644, "final_val_bpb": 1.3408, "final_val_ppl": 40.3, "val_at_1e16": {"iter": 392, "loss": 4.624911}, "val_at_1e16_bpb": 1.6776, "last_train_loss": 3.698963, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+### dense_s3_1e17  (2026-06-28 06:11)
+Config: shape=s3 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2152
+SUMMARY dense_s3_1e17: final_val_CE=3.8827 (BPB 1.4084)  val@iters/10=6.1517 (BPB 2.2315)@it215  nan=False  evals=12
+{"run": "dense_s3_1e17", "total_iters": 2152, "iters_1e16": 215, "final_val_loss": 3.882747, "final_val_bpb": 1.4084, "final_val_ppl": 48.6, "val_at_1e16": {"iter": 215, "loss": 6.151744}, "val_at_1e16_bpb": 2.2315, "last_train_loss": 3.882304, "nan": false, "n_val_evals": 12, "bpb_divisor": 2.7568}
+
+### dense_s4_1e17  (2026-06-28 07:17)
+Config: shape=s4 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=1309
+SUMMARY dense_s4_1e17: final_val_CE=4.0948 (BPB 1.4853)  val@iters/10=6.2626 (BPB 2.2717)@it131  nan=False  evals=11
+{"run": "dense_s4_1e17", "total_iters": 1309, "iters_1e16": 131, "final_val_loss": 4.094794, "final_val_bpb": 1.4853, "final_val_ppl": 60.0, "val_at_1e16": {"iter": 131, "loss": 6.262603}, "val_at_1e16_bpb": 2.2717, "last_train_loss": 4.102172, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+### dense_sm1_1e16  (2026-06-28 08:30)
+Config: shape=sm1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=4127
+SUMMARY dense_sm1_1e16: final_val_CE=4.2289 (BPB 1.5340)  val@iters/10=4.2289 (BPB 1.5340)@it4127  nan=False  evals=3
+{"run": "dense_sm1_1e16", "total_iters": 4127, "iters_1e16": 413, "final_val_loss": 4.228884, "final_val_bpb": 1.534, "final_val_ppl": 68.6, "val_at_1e16": {"iter": 4127, "loss": 4.228884}, "val_at_1e16_bpb": 1.534, "last_train_loss": 4.242376, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### dense_s1_1e17  (2026-06-28 11:26)
+Config: shape=s1 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=8338
+SUMMARY dense_s1_1e17: final_val_CE=3.7525 (BPB 1.3612)  val@iters/10=4.2863 (BPB 1.5548)@it834  nan=False  evals=11
+{"run": "dense_s1_1e17", "total_iters": 8338, "iters_1e16": 834, "final_val_loss": 3.752451, "final_val_bpb": 1.3612, "final_val_ppl": 42.6, "val_at_1e16": {"iter": 834, "loss": 4.286273}, "val_at_1e16_bpb": 1.5548, "last_train_loss": 3.767075, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
