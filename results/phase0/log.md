@@ -390,3 +390,32 @@ SUMMARY s2e_d_sm1_1e16: final_val_CE=4.0660 (BPB 1.4749)  val@iters/10=4.0660 (B
 ## Criterion 3 — reproducibility (s2@1e17, 2nd seed) → PASS
 seed-1 CE 3.4985, seed-2 CE 3.5075 → |Δloss| = 0.0090 nats ≤ 0.03 → PASS.
 **ALL 4 CRITERIA PASS → writing PASS.md.**
+
+### v16k_sweep_s2_1e17_seed2  (2026-06-27 13:12)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=2024 aux=0.01 iters=3917
+SUMMARY v16k_sweep_s2_1e17_seed2: final_val_CE=3.5004 (BPB 1.2697)  val@iters/10=3.6522 (BPB 1.3248)@it1960  nan=False  evals=7
+{"run": "v16k_sweep_s2_1e17_seed2", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": 3.500369, "final_val_bpb": 1.2697, "final_val_ppl": 33.1, "val_at_1e16": {"iter": 1960, "loss": 3.652214}, "val_at_1e16_bpb": 1.3248, "last_train_loss": 3.509615, "nan": false, "n_val_evals": 7, "bpb_divisor": 2.7568}
+
+### dense_s0_1e16  (2026-06-28 02:29)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY dense_s0_1e16: final_val_CE=4.1881 (BPB 1.5192)  val@iters/10=4.1881 (BPB 1.5192)@it2335  nan=False  evals=3
+{"run": "dense_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 4.188138, "final_val_bpb": 1.5192, "final_val_ppl": 65.9, "val_at_1e16": {"iter": 2335, "loss": 4.188138}, "val_at_1e16_bpb": 1.5192, "last_train_loss": 4.17646, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### dense_s1_1e16  (2026-06-28 02:49)
+Config: shape=s1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=834
+SUMMARY dense_s1_1e16: final_val_CE=4.3869 (BPB 1.5913)  val@iters/10=4.3869 (BPB 1.5913)@it834  nan=False  evals=3
+{"run": "dense_s1_1e16", "total_iters": 834, "iters_1e16": 83, "final_val_loss": 4.38692, "final_val_bpb": 1.5913, "final_val_ppl": 80.4, "val_at_1e16": {"iter": 834, "loss": 4.38692}, "val_at_1e16_bpb": 1.5913, "last_train_loss": 4.404155, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### dense_s2_1e16  (2026-06-28 03:01)
+Config: shape=s2 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY dense_s2_1e16: final_val_CE=5.0934 (BPB 1.8476)  val@iters/10=5.0934 (BPB 1.8476)@it392  nan=False  evals=3
+{"run": "dense_s2_1e16", "total_iters": 392, "iters_1e16": 39, "final_val_loss": 5.093434, "final_val_bpb": 1.8476, "final_val_ppl": 162.9, "val_at_1e16": {"iter": 392, "loss": 5.093434}, "val_at_1e16_bpb": 1.8476, "last_train_loss": 5.101406, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+## DENSE baselines (IsoFLOP floor, no experts) — does MoE beat dense?
+@1e16 (dense vs MoE s=1, BPB):
+| shape | dense | MoE s=1 | MoE wins by |
+|---|---|---|---|
+| s0 | 1.519 | 1.447 | 0.072 |
+| s1 | 1.591 | 1.540 | 0.051 |
+| s2 | 1.849 | 1.819 | 0.030 |
+→ MoE beats the dense floor at every @1e16 shape. Dense @1e16 monotone (min at s0) → add dense s_-1.
