@@ -74,7 +74,6 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru") -> t
         do_swap = (nom_val > worst_val).unsqueeze(-1)                   # [B,1]: R_t != global top-k
         evict_key = refresh if use_lru else lt
         evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
-        # Branchless swap: where do_swap is False the one-hots collapse to all-False -> a true no-op.
         evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
         nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
         resident = (resident & ~evicted) | nominee
