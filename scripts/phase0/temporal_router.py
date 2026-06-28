@@ -2,7 +2,8 @@
 """Temporal MoE — rolling-residency routing (proof of concept).
 
 A trained-from-scratch MoE variant that keeps only K = k routed experts resident per layer and
-streams one expert at a time (LRU), so the resident footprint is a small fraction of all E experts.
+streams one expert at a time (evicting the LRU or least-wanted resident — see `evict` below),
+so the resident footprint is a small fraction of all E experts.
 See docs/research/temporal-moe.md (§2 "rolling residency").
 
 The whole architecture is:

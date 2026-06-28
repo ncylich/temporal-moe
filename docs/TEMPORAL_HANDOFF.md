@@ -8,7 +8,8 @@ dense↔MoE frontier.
 ## What this is (one paragraph)
 
 A trained-from-scratch MoE variant that keeps only `K = k = 6` routed experts resident per layer and
-streams one expert in per token (LRU), so resident RAM is a small fraction of all `E = 64` experts. The
+streams one expert in per token (evicting either the LRU or the least-wanted resident — a tested knob,
+see below), so resident RAM is a small fraction of all `E = 64` experts. The
 goal is **not** to match full-MoE quality — it is a tunable intermediate on the RAM-footprint↔quality
 frontier (between dense and MoE) for RAM-constrained deployment. Success = at the compute-optimal shape,
 temporal validation **BPB (bits-per-byte, lower better)** lands **inside the already-measured band**:
@@ -17,9 +18,9 @@ math: `docs/research/temporal-moe.md` (§2 "rolling residency") and `docs/EVALUA
 
 ## Design (why the diff is tiny and safe to review)
 
-- **All logic is one pure function** `compute_resident_mask(logits, k)` in `scripts/phase0/temporal_router.py`
-  — `[seq,batch,E]` logits → boolean `[seq,batch,E]` mask, exactly `k` True per token. No Megatron, no GPU.
-  This is the only novel code; it is fully unit-tested.
+- **All logic is one pure function** `compute_resident_mask(logits, k, evict)` in
+  `scripts/phase0/temporal_router.py` — `[seq,batch,E]` logits → boolean `[seq,batch,E]` mask, exactly `k`
+  True per token. No Megatron, no GPU. This is the only novel code; it is fully unit-tested.
 - **The router patch is ~6 lines** (`temporal_forward`): mask non-resident experts to `-inf`, then call
   Megatron's **unmodified** `routing()`. So z-loss, aux-loss, top-k and the alltoall dispatcher are reused
   byte-for-byte (they just see masked logits — the deliberately chosen, most-surgical option).
@@ -91,6 +92,11 @@ nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_1e17.txt \
 export TEMPORAL=1 CE_FUSION=1 SHARED_MULT=3 TOPK=5
 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_s2shared_1e17.txt \
   > results/phase0/temporal_s2shared_1e17.drive.log 2>&1 &
+
+# eviction A/B: same s=1 run but least-wanted eviction instead of LRU (default).
+export TEMPORAL=1 CE_FUSION=1 TEMPORAL_EVICT=min_logit
+nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_minlogit_1e17.txt \
+  > results/phase0/temporal_minlogit_1e17.drive.log 2>&1 &
 ```
 Read BPB with the existing tool; success = inside (1.269, 1.341):
 ```bash
