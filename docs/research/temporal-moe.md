@@ -127,6 +127,45 @@ baseline-identical except through `S`; `[ROUTE]` is trained only by the window i
 > `--moe-z-loss-coeff` *on the macro-router specifically* to bound logit magnitude during the
 > noisy early/transition phases.
 
+### Preferred implementation: rolling residency (per-token streaming)
+
+Keep `K = k` experts resident per layer and **stream one expert at a time** instead of
+swapping a whole set at a boundary: each token routes normally; any expert entering its
+top-`k` that isn't resident is loaded, evicting the one that left (LRU). The set slides with
+the stream. Cold start is free — the first token is fixed (BOS), so the model **ships with
+that token's top-`k` preloaded**. This removes the macro-router, the `[ROUTE]` token, and the
+`B`-ahead prediction: the horizon is a single expert's load latency (`b/r ≈ 3.5 ms ≪ t_tok`,
+`b` = bytes/expert), so the ordinary per-token router decides early enough. Runs zero-shot on
+a trained MoE; cache-aware finetuning (§7) is optional.
+
+**Masking condition (the one equation).** Per token you read `k` resident experts from RAM
+and stream `s` new ones from SSD; streaming hides under compute when
+
+```
+   s·(b/r) ≤ k·(b/r_ram)   ⇒   s ≤ k·(r/r_ram),   so for s = 1:   k ≥ r_ram/r ≈ 32
+```
+
+(`r_ram ≈ 32·r` on typical systems). Hence **`k` (= active experts = resident `K`) is the
+primary knob,** and the `s=1` floor wants `k ≈ 32`. Reach it not by enlarging the model but by
+**fine-graining the experts** (DeepSeek-style segmentation): subdivide each expert by ~`32/6`,
+so `E: 64 → 341`, `k: 6 → 32`, each expert `6/32` the size. Total and active params/compute are
+**unchanged** (`k·b` constant), the footprint reduction `E/k ≈ 10.7×` is preserved, and finer
+specialization tends to *help* quality — but now one expert swaps per token within budget. The
+average swap rate equals the routing turnover, which locality holds well below `s_max`
+(~`L/60` experts/token at 55–76-token expert lifetimes); bursts (topic shifts) spread over
+consecutive tokens rather than stalling — switching at least as fast as the block scheme at
+equal bandwidth.
+
+The block / `[ROUTE]` design above remains a valid option (hard fixed-`K` bound, simple
+double-buffer), but rolling residency is preferred: smoother I/O, better top-`k` coverage per
+`K`, and no new training machinery.
+
+**First round (feasibility).** Keep the current FLAME-MoE setup (`E=64`, `k=K=6`, coarse
+experts) and swap one expert per token — easier, and a quality-only probe: at `k=6` the
+stream isn't bandwidth-hidden (`s_max ≈ 0.2`), so it answers only whether a rolling top-`k`
+set retains accuracy, independent of throughput. If it does, fine-grain to `k≈32` / `E≈341`
+for the masked-throughput runs.
+
 ## 3. What it buys: footprint and the latency-hiding condition
 
 **Resident footprint.** RAM holds `K` experts/layer instead of `E`:
@@ -296,4 +335,6 @@ on the footprint↔quality frontier under SSD offload.
 
 `E` experts/layer · `k` top-k per token · `K` resident budget/layer (`k ≤ K ≤ E`) ·
 `L` MoE layers · `B` window length · `S(m,ℓ)` resident set for window `m`, layer `ℓ` ·
-`Δ(m,ℓ)` newly-loaded experts · `r` SSD bandwidth · `t_tok` per-token compute time.
+`Δ(m,ℓ)` newly-loaded experts · `r` SSD bandwidth · `r_ram` RAM bandwidth (`≈32·r`) ·
+`b` bytes/expert · `s` experts streamed/token (rolling residency, `K=k`) ·
+`t_tok` per-token compute time.
