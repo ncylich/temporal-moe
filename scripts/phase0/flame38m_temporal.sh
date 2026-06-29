@@ -19,7 +19,11 @@ cd "$(dirname "$0")/../.."
 ROOT=$(pwd)
 
 TRAIN_ITERS=${TRAIN_ITERS:-2121}
-RUN_NAME=${RUN_NAME:-flame38m_temporal_${TEMPORAL_EVICT:-min_logit}}
+# DENSE=1: fully-dense IsoFLOP floor — all 9 layers dense SwiGLU with ffn=1422 so the dense non-embedding
+# params equal the MoE's ACTIVE non-embedding params (12.20M), same 1e18 budget/tokens. No MoE, no temporal.
+DENSE=${DENSE:-0}
+if [ "$DENSE" = "1" ]; then FFN=1422; else FFN=1368; fi
+RUN_NAME=${RUN_NAME:-flame38m_$([ "$DENSE" = 1 ] && echo dense || echo temporal_${TEMPORAL_EVICT:-min_logit})}
 WSD_DECAY=$(.venv/bin/python -c "print(max(1,$TRAIN_ITERS//10))")
 EVAL_INTERVAL=${EVAL_INTERVAL:-$TRAIN_ITERS}     # default: one eval at the end
 WARMUP_FRAC=0.01
@@ -27,7 +31,7 @@ WARMUP_FRAC=0.01
 OUT=$ROOT/results/phase0/runs/$RUN_NAME
 CKPT=$OUT/ckpt
 mkdir -p "$OUT"
-echo "[run] $RUN_NAME iters=$TRAIN_ITERS gb=1024 mb=${MICRO_BATCH:-8} lr=3e-4 WSD(decay=$WSD_DECAY) evict=${TEMPORAL_EVICT:-min_logit} tok=pythia-12b(50k)" | tee "$OUT/run.meta"
+echo "[run] $RUN_NAME dense=$DENSE ffn=$FFN iters=$TRAIN_ITERS gb=1024 mb=${MICRO_BATCH:-8} lr=3e-4 WSD(decay=$WSD_DECAY) evict=${TEMPORAL_EVICT:-min_logit} tok=pythia-12b(50k)" | tee "$OUT/run.meta"
 
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
 DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
@@ -42,14 +46,20 @@ export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_L
 export PATH=$ROOT/.venv/bin:$PATH
 export TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
 
+MOE_ARGS=()
+if [ "$DENSE" != "1" ]; then
+  MOE_ARGS=(
+    --moe-ffn-hidden-size 176 --num-experts 64 --moe-router-topk 6
+    --moe-shared-expert-intermediate-size 352 --moe-layer-freq "[0]*1+[1]*8"
+    --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
+    --moe-aux-loss-coeff 0.01 --moe-z-loss-coeff 0.001 --moe-grouped-gemm
+  )
+fi
 MODEL_ARGS=(
-  --hidden-size 256 --ffn-hidden-size 1368 --num-layers 9 --num-attention-heads 16
+  --hidden-size 256 --ffn-hidden-size $FFN --num-layers 9 --num-attention-heads 16
   --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
   --untie-embeddings-and-output-weights --position-embedding-type rope --disable-bias-linear
-  --moe-ffn-hidden-size 176 --num-experts 64 --moe-router-topk 6
-  --moe-shared-expert-intermediate-size 352 --moe-layer-freq "[0]*1+[1]*8"
-  --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
-  --moe-aux-loss-coeff 0.01 --moe-z-loss-coeff 0.001 --moe-grouped-gemm
+  "${MOE_ARGS[@]}"
   --hidden-dropout 0.0 --attention-dropout 0.0 --init-method-std 0.02
   --tokenizer-type HuggingFaceTokenizer --tokenizer-model EleutherAI/pythia-12b
   --transformer-impl transformer_engine --no-gradient-accumulation-fusion
@@ -57,8 +67,9 @@ MODEL_ARGS=(
 )
 INFRA_ARGS=(
   --pipeline-model-parallel-size 1 --expert-model-parallel-size 1 --use-distributed-optimizer
-  --moe-token-dispatcher-type alltoall --distributed-timeout-minutes 30 --bf16
+  --distributed-timeout-minutes 30 --bf16
 )
+[ "$DENSE" != "1" ] && INFRA_ARGS+=(--moe-token-dispatcher-type alltoall)
 TRAIN_ARGS=(
   --micro-batch-size ${MICRO_BATCH:-8} --global-batch-size 1024
   --lr 3e-4 --min-lr 3e-5 --lr-decay-style WSD --lr-warmup-fraction $WARMUP_FRAC
@@ -67,13 +78,16 @@ TRAIN_ARGS=(
 )
 DATA_ARGS=( --seq-length 2048 --data-path $DATA_PATH --split 90,5,5 )
 LOG_ARGS=(
-  --log-interval 5 --log-throughput --moe-per-layer-logging
+  --log-interval 5 --log-throughput
   --save "$CKPT" --save-interval $TRAIN_ITERS --load "$CKPT"
   --eval-interval $EVAL_INTERVAL --eval-iters ${EVAL_ITERS:-50}
 )
+[ "$DENSE" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
 
+# DENSE -> plain pretrain_gpt.py (no temporal router); else pretrain_temporal.py installs the router patch.
+ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py
+[ "$DENSE" = "1" ] && ENTRY=pretrain_gpt.py
 cd Megatron-LM
-$ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} \
-  $ROOT/scripts/phase0/pretrain_temporal.py \
+$ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
   "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
   2>&1 | tee "$OUT/train.log"
