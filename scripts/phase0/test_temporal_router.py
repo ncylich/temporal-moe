@@ -124,18 +124,44 @@ def test_deterministic():
     assert torch.equal(m1, m2)
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA-graph fast path needs a GPU")
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU fast path needs a GPU")
 def test_accel_matches_reference_on_gpu():
-    # The CUDA-graph accelerator (compute_resident_mask_accel) must equal the eager reference
-    # bit-for-bit at the production shape and both eviction policies. Guards the GPU-only path
-    # the CPU tests above can't reach.
+    # The default accelerator (compute_resident_mask_accel -> Triton single-launch scan) must equal
+    # the eager reference bit-for-bit at the production shape and both eviction policies, including
+    # integer-valued logits with deliberate ties (the tie-breaking regime the CPU tests use).
+    # Guards the GPU-only path the CPU tests above can't reach.
     import temporal_router as tr
-    tr._scan_path = None; tr._graph_cache.clear()      # exercise the graph path from a clean state
+    tr._scan_path = None; tr._graph_cache.clear()      # exercise the fast path from a clean state
     torch.manual_seed(3)
     for evict in ("lru", "min_logit"):
-        for S, B, E, k in [(2048, 32, 64, 6), (2048, 32, 64, 5), (50, 4, 12, 3)]:
+        for S, B, E, k in [(2048, 32, 64, 6), (2048, 32, 64, 5), (50, 4, 12, 3), (40, 2, 12, 4)]:
             logits = torch.randn(S, B, E, device="cuda")
             ref = compute_resident_mask(logits, k, evict)
             acc = tr.compute_resident_mask_accel(logits, k, evict)
             assert torch.equal(acc, ref), f"accel != ref for evict={evict} shape={(S,B,E)} k={k}"
-    assert tr._scan_path == "cuda-graph", f"graph path did not engage (path={tr._scan_path})"
+            # integer logits with heavy ties -> stresses argmax/argmin/topk tie-breaking
+            tied = torch.randint(0, 4, (S, B, E), device="cuda").float()
+            ref_t = compute_resident_mask(tied, k, evict)
+            acc_t = tr.compute_resident_mask_accel(tied, k, evict)
+            assert torch.equal(acc_t, ref_t), f"accel != ref (ties) evict={evict} shape={(S,B,E)} k={k}"
+    assert tr._scan_path == "triton", f"triton path did not engage (path={tr._scan_path})"
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU fast path needs a GPU")
+def test_graph_path_matches_reference_on_gpu():
+    # The alternate CUDA-graph fast path (TEMPORAL_SCAN=graph) must also stay bit-exact.
+    import os, temporal_router as tr
+    tr._scan_path = None; tr._graph_cache.clear()
+    os.environ["TEMPORAL_SCAN"] = "graph"
+    try:
+        torch.manual_seed(4)
+        for evict in ("lru", "min_logit"):
+            for S, B, E, k in [(2048, 32, 64, 6), (50, 4, 12, 3)]:
+                logits = torch.randn(S, B, E, device="cuda")
+                ref = compute_resident_mask(logits, k, evict)
+                acc = tr.compute_resident_mask_accel(logits, k, evict)
+                assert torch.equal(acc, ref), f"graph != ref evict={evict} shape={(S,B,E)} k={k}"
+        assert tr._scan_path == "cuda-graph", f"graph path did not engage (path={tr._scan_path})"
+    finally:
+        os.environ.pop("TEMPORAL_SCAN", None)
+        tr._scan_path = None; tr._graph_cache.clear()

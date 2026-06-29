@@ -21,6 +21,13 @@ import os
 import torch
 import torch.nn.functional as F
 
+try:
+    import triton
+    import triton.language as tl
+    _HAS_TRITON = True
+except Exception:                                           # triton missing -> eager/graph fallback
+    _HAS_TRITON = False
+
 
 def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru") -> torch.Tensor:
     """Rolling-residency expert selection.
@@ -154,24 +161,100 @@ def _graph_scan(logits, k, use_lru):
     return out
 
 
-def compute_resident_mask_accel(logits, k, evict="lru"):
-    """Resident mask with the CUDA-graph fast path; identical result to compute_resident_mask.
+# ---------------------------------------------------------------------------
+# Triton fast path (default) — the whole sequential scan in ONE kernel launch.
+#
+# The CUDA-graph path above still launches ~4 kernels/step × 2048 steps (the
+# replay is GPU-side but every captured op is its own dispatch), ~91 ms/call.
+# This fuses the entire t=1..S-1 residency update into a single kernel: grid of
+# B programs (one per batch element), each holding the E-wide resident/refresh
+# state in registers and looping the steps in-kernel. One launch total -> ~1 ms
+# at the production shape ([2048,32,64], k=6), a further ~90× over the graph.
+#
+# The t=0 cold fill (torch.topk) is done in torch so its tie-breaking matches the
+# reference exactly; the kernel reproduces torch's first-index argmax/argmin tie
+# semantics via "max value, then min index achieving it". All comparisons are in
+# fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
+# bit-identical to the reference for any input dtype. Verified == reference once at
+# runtime by compute_resident_mask_accel, with eager fallback on any failure.
+# ---------------------------------------------------------------------------
+if _HAS_TRITON:
+    @triton.jit
+    def _scan_kernel(logits_ptr, res0_ptr, ref0_ptr, out_ptr,
+                     S, B, k, E, use_lru: tl.constexpr, BLOCK: tl.constexpr):
+        b = tl.program_id(0)
+        e = tl.arange(0, BLOCK)
+        valid = e < E                                        # BLOCK = next pow2 >= E; mask pad lanes
+        NEG, POS = float("-inf"), float("inf")
+        resident = tl.load(res0_ptr + b * E + e, mask=valid, other=0) != 0
+        refresh = tl.load(ref0_ptr + b * E + e, mask=valid, other=0.0)
+        tl.store(out_ptr + b * E + e, resident.to(tl.int8), mask=valid)   # out[0] = cold fill
+        for t in range(1, S):
+            base = t * B * E + b * E + e
+            lt = tl.load(logits_ptr + base, mask=valid, other=0.0).to(tl.float32)
+            # nominee = argmax over NON-resident logits (first index on ties)
+            masked_nom = tl.where(valid & (resident == 0), lt, NEG)
+            nom_val = tl.max(masked_nom, 0)
+            nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
+            # worst resident logit (the swap trigger)
+            worst_val = tl.min(tl.where(resident, lt, POS), 0)
+            do_swap = nom_val > worst_val
+            # evict: lru -> oldest refresh; min_logit -> lowest current logit (first index on ties)
+            if use_lru:
+                evict_key = refresh
+            else:
+                evict_key = lt
+            masked_ev = tl.where(resident, evict_key, POS)
+            ev_val = tl.min(masked_ev, 0)
+            evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
+            is_evict = (e == evict_i) & do_swap
+            is_nom = (e == nom_i) & do_swap
+            resident = (resident & (is_evict == 0)) | is_nom
+            refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)   # newest (read only when lru)
+            tl.store(out_ptr + base, resident.to(tl.int8), mask=valid)
 
-    Uses the graph path on CUDA (unless TEMPORAL_SCAN=eager); verifies it equals the reference
-    once, then trusts it. Any capture/replay failure logs and falls back to eager for the run.
+
+def _triton_scan(logits, k, use_lru):
+    """Single-launch Triton fast path: cold fill in torch, full t>=1 scan in one kernel."""
+    if not _HAS_TRITON:
+        raise RuntimeError("triton unavailable")
+    S, B, E = logits.shape
+    dev = logits.device
+    logits = logits.contiguous()
+    resident0 = torch.zeros(B, E, dtype=torch.bool, device=dev)
+    refresh0 = torch.full((B, E), float("-inf"), device=dev, dtype=torch.float32)
+    _, top_i = logits[0].topk(k, dim=-1)
+    resident0.scatter_(1, top_i, True)
+    rank = torch.arange(k - 1, -1, -1, device=dev, dtype=torch.float32).expand(B, k)
+    refresh0.scatter_(1, top_i, rank)
+    out = torch.empty(S, B, E, dtype=torch.int8, device=dev)
+    BLOCK = 1 << (E - 1).bit_length()
+    _scan_kernel[(B,)](logits, resident0.to(torch.int8), refresh0, out,
+                       S, B, k, E, use_lru, BLOCK, num_warps=1)
+    return out.to(torch.bool)
+
+
+def compute_resident_mask_accel(logits, k, evict="lru"):
+    """Resident mask via a GPU fast path; identical result to compute_resident_mask.
+
+    On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects
+    the CUDA-graph path, "eager" disables both). Verifies the fast path equals the reference once,
+    then trusts it. Any failure logs and falls back to eager for the rest of the run.
     """
     global _scan_path
-    use_graph = (logits.is_cuda and os.environ.get("TEMPORAL_SCAN", "graph") == "graph"
-                 and _scan_path != "eager")
-    if use_graph:
+    mode = os.environ.get("TEMPORAL_SCAN", "triton")
+    if logits.is_cuda and mode != "eager" and _scan_path != "eager":
         try:
             with torch.no_grad():
-                out = _graph_scan(logits, k, evict == "lru")
+                if mode == "graph":
+                    out, pathname = _graph_scan(logits, k, evict == "lru"), "cuda-graph"
+                else:
+                    out, pathname = _triton_scan(logits, k, evict == "lru"), "triton"
             if _scan_path is None:                          # one-time correctness gate
                 if not torch.equal(out, compute_resident_mask(logits, k, evict)):
-                    raise RuntimeError("graph scan != reference")
-                _scan_path = "cuda-graph"
-                print("[temporal] scan path: cuda-graph (verified == reference)")
+                    raise RuntimeError(f"{pathname} scan != reference")
+                _scan_path = pathname
+                print(f"[temporal] scan path: {pathname} (verified == reference)")
             return out
         except Exception as e:
             _scan_path = "eager"
