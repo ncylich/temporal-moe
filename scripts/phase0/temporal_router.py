@@ -100,7 +100,7 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru") -> t
 # captured once into a CUDA graph and replayed, collapsing the launch storm (~7×
 # faster, measured). The captured body is numerically identical to the reference
 # loop; `compute_resident_mask_accel` enforces that at runtime (one-time equality
-# check vs `compute_resident_mask`) and falls back to eager on any capture failure.
+# check vs `compute_resident_mask`) and RAISES HARD on any mismatch (no fallback).
 # ---------------------------------------------------------------------------
 def _step(lt, resident, refresh, tval, use_lru):
     """One rolling-residency update step (the body of compute_resident_mask's loop)."""
@@ -176,7 +176,7 @@ def _graph_scan(logits, k, use_lru):
 # semantics via "max value, then min index achieving it". All comparisons are in
 # fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
 # bit-identical to the reference for any input dtype. Verified == reference once at
-# runtime by compute_resident_mask_accel, with eager fallback on any failure.
+# runtime by compute_resident_mask_accel, which raises hard on any mismatch.
 # ---------------------------------------------------------------------------
 if _HAS_TRITON:
     @triton.jit
@@ -237,33 +237,34 @@ def _triton_scan(logits, k, use_lru):
 def compute_resident_mask_accel(logits, k, evict="lru"):
     """Resident mask via a GPU fast path; identical result to compute_resident_mask.
 
-    On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects
-    the CUDA-graph path, "eager" disables both). Verifies the fast path equals the reference once,
-    then trusts it. Any failure logs and falls back to eager for the rest of the run.
+    On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects the
+    CUDA-graph path, "eager" forces the reference). The fast path is verified bit-exact against the
+    reference once at startup; a mismatch (or any kernel/capture error) RAISES HARD — we deliberately
+    do NOT silently fall back to eager, so a correctness bug crashes the run loudly instead of
+    degrading to the ~10x-slower path unnoticed across a multi-hour sweep.
     """
     global _scan_path
     mode = os.environ.get("TEMPORAL_SCAN", "triton")
-    if logits.is_cuda and mode != "eager" and _scan_path != "eager":
-        try:
-            with torch.no_grad():
-                if mode == "graph":
-                    out, pathname = _graph_scan(logits, k, evict == "lru"), "cuda-graph"
-                else:
-                    out, pathname = _triton_scan(logits, k, evict == "lru"), "triton"
-            if _scan_path is None:                          # one-time correctness gate
-                if not torch.equal(out, compute_resident_mask(logits, k, evict)):
-                    raise RuntimeError(f"{pathname} scan != reference")
-                _scan_path = pathname
-                print(f"[temporal] scan path: {pathname} (verified == reference)")
-            return out
-        except Exception as e:
+    if not logits.is_cuda or mode == "eager":               # CPU (tests) or explicit opt-out
+        if _scan_path is None:
             _scan_path = "eager"
-            print(f"[temporal] scan path: EAGER fallback ({type(e).__name__}: {str(e)[:100]})")
-    elif _scan_path is None:
-        _scan_path = "eager"
-        print("[temporal] scan path: eager")
+            print("[temporal] scan path: eager")
+        with torch.no_grad():
+            return compute_resident_mask(logits, k, evict)
+    # GPU fast path — correct or crash; no fallback.
     with torch.no_grad():
-        return compute_resident_mask(logits, k, evict)
+        out, pathname = ((_graph_scan(logits, k, evict == "lru"), "cuda-graph") if mode == "graph"
+                         else (_triton_scan(logits, k, evict == "lru"), "triton"))
+        if _scan_path is None:                              # one-time bit-exactness gate (hard)
+            ref = compute_resident_mask(logits, k, evict)
+            if not torch.equal(out, ref):
+                bad = (out != ref).any(dim=-1).sum().item()
+                raise RuntimeError(
+                    f"[temporal] FAST PATH '{pathname}' DISAGREES WITH REFERENCE on {bad} tokens — "
+                    f"aborting (kernel bug; do not trust results). Set TEMPORAL_SCAN=eager to bypass.")
+            _scan_path = pathname
+            print(f"[temporal] scan path: {pathname} (verified == reference)")
+    return out
 
 
 def temporal_forward(self, input: torch.Tensor):
