@@ -444,3 +444,28 @@ SUMMARY dense_sm1_1e16: final_val_CE=4.2289 (BPB 1.5340)  val@iters/10=4.2289 (B
 Config: shape=s1 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=8338
 SUMMARY dense_s1_1e17: final_val_CE=3.7525 (BPB 1.3612)  val@iters/10=4.2863 (BPB 1.5548)@it834  nan=False  evals=11
 {"run": "dense_s1_1e17", "total_iters": 8338, "iters_1e16": 834, "final_val_loss": 3.752451, "final_val_bpb": 1.3612, "final_val_ppl": 42.6, "val_at_1e16": {"iter": 834, "loss": 4.286273}, "val_at_1e16_bpb": 1.5548, "last_train_loss": 3.767075, "nan": false, "n_val_evals": 11, "bpb_divisor": 2.7568}
+
+### tmoe_lru_sh1_s0_1e16  (2026-06-29 01:17)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY tmoe_lru_sh1_s0_1e16: final_val_CE=4.0361 (BPB 1.4641)  val@iters/10=4.0361 (BPB 1.4641)@it2335  nan=False  evals=3
+{"run": "tmoe_lru_sh1_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 4.03614, "final_val_bpb": 1.4641, "final_val_ppl": 56.6, "val_at_1e16": {"iter": 2335, "loss": 4.03614}, "val_at_1e16_bpb": 1.4641, "last_train_loss": 4.027115, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_s0_1e16  (2026-06-29 02:17)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY tmoe_minlogit_sh1_s0_1e16: final_val_CE=4.0247 (BPB 1.4599)  val@iters/10=4.0247 (BPB 1.4599)@it2335  nan=False  evals=3
+{"run": "tmoe_minlogit_sh1_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 4.024693, "final_val_bpb": 1.4599, "final_val_ppl": 56.0, "val_at_1e16": {"iter": 2335, "loss": 4.024693}, "val_at_1e16_bpb": 1.4599, "last_train_loss": 4.014838, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_lru_sh2_s0_1e16  (2026-06-29 03:13)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY tmoe_lru_sh2_s0_1e16: final_val_CE=4.0336 (BPB 1.4632)  val@iters/10=4.0336 (BPB 1.4632)@it2335  nan=False  evals=3
+{"run": "tmoe_lru_sh2_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 4.033635, "final_val_bpb": 1.4632, "final_val_ppl": 56.5, "val_at_1e16": {"iter": 2335, "loss": 4.033635}, "val_at_1e16_bpb": 1.4632, "last_train_loss": 4.02505, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh2_s0_1e16  (2026-06-29 04:08)
+Config: shape=s0 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2335
+SUMMARY tmoe_minlogit_sh2_s0_1e16: final_val_CE=4.0165 (BPB 1.4569)  val@iters/10=4.0165 (BPB 1.4569)@it2335  nan=False  evals=3
+{"run": "tmoe_minlogit_sh2_s0_1e16", "total_iters": 2335, "iters_1e16": 234, "final_val_loss": 4.016463, "final_val_bpb": 1.4569, "final_val_ppl": 55.5, "val_at_1e16": {"iter": 2335, "loss": 4.016463}, "val_at_1e16_bpb": 1.4569, "last_train_loss": 4.006751, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_lru_sh1_s2_1e17  (2026-06-29 04:09)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY tmoe_lru_sh1_s2_1e17: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "tmoe_lru_sh1_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": null, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
