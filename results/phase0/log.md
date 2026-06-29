@@ -469,3 +469,38 @@ SUMMARY tmoe_minlogit_sh2_s0_1e16: final_val_CE=4.0165 (BPB 1.4569)  val@iters/1
 Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
 SUMMARY tmoe_lru_sh1_s2_1e17: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
 {"run": "tmoe_lru_sh1_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": null, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_s2_1e17  (2026-06-29 07:19)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY tmoe_minlogit_sh1_s2_1e17: final_val_CE=NA  val@iters/10=NA  nan=False  evals=0
+{"run": "tmoe_minlogit_sh1_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": null, "final_val_bpb": null, "final_val_ppl": null, "val_at_1e16": null, "val_at_1e16_bpb": null, "last_train_loss": 3.838258, "nan": false, "n_val_evals": 0, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh2_s2_1e17  (2026-06-29 10:01)
+Config: shape=s2 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=3917
+SUMMARY tmoe_minlogit_sh2_s2_1e17: final_val_CE=3.5539 (BPB 1.2891)  val@iters/10=3.5539 (BPB 1.2891)@it3917  nan=False  evals=3
+{"run": "tmoe_minlogit_sh2_s2_1e17", "total_iters": 3917, "iters_1e16": 392, "final_val_loss": 3.553884, "final_val_bpb": 1.2891, "final_val_ppl": 34.9, "val_at_1e16": {"iter": 3917, "loss": 3.553884}, "val_at_1e16_bpb": 1.2891, "last_train_loss": 3.556215, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_sm1_1e16  (2026-06-29 11:35)
+Config: shape=sm1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=4127
+SUMMARY tmoe_minlogit_sh1_sm1_1e16: final_val_CE=4.1000 (BPB 1.4872)  val@iters/10=4.1000 (BPB 1.4872)@it4127  nan=False  evals=3
+{"run": "tmoe_minlogit_sh1_sm1_1e16", "total_iters": 4127, "iters_1e16": 413, "final_val_loss": 4.100036, "final_val_bpb": 1.4872, "final_val_ppl": 60.3, "val_at_1e16": {"iter": 4127, "loss": 4.100036}, "val_at_1e16_bpb": 1.4872, "last_train_loss": 4.113785, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_s1_1e16  (2026-06-29 12:04)
+Config: shape=s1 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=834
+SUMMARY tmoe_minlogit_sh1_s1_1e16: final_val_CE=4.2657 (BPB 1.5473)  val@iters/10=4.2657 (BPB 1.5473)@it834  nan=False  evals=3
+{"run": "tmoe_minlogit_sh1_s1_1e16", "total_iters": 834, "iters_1e16": 83, "final_val_loss": 4.265651, "final_val_bpb": 1.5473, "final_val_ppl": 71.2, "val_at_1e16": {"iter": 834, "loss": 4.265651}, "val_at_1e16_bpb": 1.5473, "last_train_loss": 4.285384, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_s2_1e16  (2026-06-29 12:24)
+Config: shape=s2 flops=1e16 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=392
+SUMMARY tmoe_minlogit_sh1_s2_1e16: final_val_CE=5.0307 (BPB 1.8248)  val@iters/10=5.0307 (BPB 1.8248)@it392  nan=False  evals=3
+{"run": "tmoe_minlogit_sh1_s2_1e16", "total_iters": 392, "iters_1e16": 39, "final_val_loss": 5.030727, "final_val_bpb": 1.8248, "final_val_ppl": 153.0, "val_at_1e16": {"iter": 392, "loss": 5.030727}, "val_at_1e16_bpb": 1.8248, "last_train_loss": 5.038204, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_s1_1e17  (2026-06-29 16:59)
+Config: shape=s1 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=8338
+SUMMARY tmoe_minlogit_sh1_s1_1e17: final_val_CE=3.5912 (BPB 1.3027)  val@iters/10=3.5912 (BPB 1.3027)@it8338  nan=False  evals=3
+{"run": "tmoe_minlogit_sh1_s1_1e17", "total_iters": 8338, "iters_1e16": 834, "final_val_loss": 3.591213, "final_val_bpb": 1.3027, "final_val_ppl": 36.3, "val_at_1e16": {"iter": 8338, "loss": 3.591213}, "val_at_1e16_bpb": 1.3027, "last_train_loss": 3.606274, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### tmoe_minlogit_sh1_s3_1e17  (2026-06-29 19:08)
+Config: shape=s3 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2152
+SUMMARY tmoe_minlogit_sh1_s3_1e17: final_val_CE=3.6006 (BPB 1.3061)  val@iters/10=3.6006 (BPB 1.3061)@it2152  nan=False  evals=3
+{"run": "tmoe_minlogit_sh1_s3_1e17", "total_iters": 2152, "iters_1e16": 215, "final_val_loss": 3.600576, "final_val_bpb": 1.3061, "final_val_ppl": 36.6, "val_at_1e16": {"iter": 2152, "loss": 3.600576}, "val_at_1e16_bpb": 1.3061, "last_train_loss": 3.600008, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
