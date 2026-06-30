@@ -504,3 +504,11 @@ SUMMARY tmoe_minlogit_sh1_s1_1e17: final_val_CE=3.5912 (BPB 1.3027)  val@iters/1
 Config: shape=s3 flops=1e17 peak_lr=3e-3 warmup=0.05 gb=256 seed=1234 aux=0.01 iters=2152
 SUMMARY tmoe_minlogit_sh1_s3_1e17: final_val_CE=3.6006 (BPB 1.3061)  val@iters/10=3.6006 (BPB 1.3061)@it2152  nan=False  evals=3
 {"run": "tmoe_minlogit_sh1_s3_1e17", "total_iters": 2152, "iters_1e16": 215, "final_val_loss": 3.600576, "final_val_bpb": 1.3061, "final_val_ppl": 36.6, "val_at_1e16": {"iter": 2152, "loss": 3.600576}, "val_at_1e16_bpb": 1.3061, "last_train_loss": 3.600008, "nan": false, "n_val_evals": 3, "bpb_divisor": 2.7568}
+
+### flame38m_temporal_minlogit (1e18, FLAME-MoE-38M-100M temporal) (2026-06-30 13:12)
+Config: hidden256/L9, top-6, shared 2*moe_ffn, pythia-12b(50k), gb1024 mb8 lr3e-4 WSD, 2121 iters = 1e18 FLOPs.
+SUMMARY flame38m_temporal_minlogit: final_val_CE=3.9045 (PPL 49.6)  [paper law MoE@1e18 ~3.78; delta +0.124]  nan=False
+
+### flame38m_dense (1e18, dense floor, matched active non-embed) (2026-06-30 23:13)
+Config: hidden256/L9 all-dense swiglu ffn=1422 (=12.19M non-embed, matched), pythia-12b(50k), gb1024 mb32 lr3e-4 WSD, 2121 iters = 1e18.
+SUMMARY flame38m_dense: final_val_CE=4.1373 (PPL 62.6)  [temporal 3.906; MoE law 3.78]  nan=False

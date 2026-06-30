@@ -43,6 +43,30 @@ bit-exact vs the reference at runtime). Figure: `temporal_minlogit_final_combine
 ## min_logit 2-shared spot-checks (FLOP-matched, K=5)
 s0@1e16 → 1.4569 ; s2@1e17 → 1.2903 (both inside band; see finding 4).
 
+## At the paper's real budget (1e18, FLAME-MoE-38M-100M) — temporal lands between dense and MoE
+
+We replicated the paper's smallest compute-optimal model **exactly** (hidden 256 / 9 layers, top-6,
+shared 2·moe_ffn, **pythia-12b 50k tokenizer**, dclm, gb 1024, LR 3e-4, WSD, 2121 iters = 4.45B tokens
+= 1e18 FLOPs) and swapped in the temporal router. Metric = **validation cross-entropy (nats, lower
+better)** — the paper's metric, so directly comparable (we match their tokenizer). Figure:
+`temporal_1e18_bars.png` (script `plot_1e18.py`).
+
+| config | val-CE @1e18 | source |
+|---|---|---|
+| dense floor (ffn 1422, matched active non-embed params) | **4.137** | measured (our setup) |
+| **temporal** (rolling residency, 6/64 resident, min_logit) | **3.906** | measured (our setup) |
+| MoE (compute-optimal) | **≈3.78** | paper fitted scaling law |
+
+- **Temporal beats the dense floor by 0.231 nats** — a clean, fully-measured result (dense and temporal
+  trained identically on our setup; the only difference is the router). With just 6 of 64 experts
+  resident, temporal is a real, large step up from dense.
+- Against the MoE endpoint it recovers **~65%** of the dense→MoE gap (0.231 / 0.357). This fraction is
+  softer than the dense↔temporal gap because the MoE value is the paper's **law prediction on their val
+  set**, not measured on ours — so it carries extrapolation + val-set confounds. (At 1e16/1e17, where MoE
+  was measured directly, recovery was ~82%.) A same-setup MoE control run would make the fraction exact.
+- Single-GPU adaptations (vs paper EP=8): EP=1 + grouped-gemm, mb=8 (temporal) / mb=32 (dense),
+  no CE-fusion (the 50k-vocab logits overflow the inductor-fused CE) — all numerically equivalent.
+
 ## Caveat on absolute scale
 These budgets (1e16, 1e17) are **1–2 orders below the FLAME-MoE paper's smallest point (1e18 →
 FLAME-MoE-38M-100M: 38M active, 4.4B tokens, hidden 256/9 layers/64 experts/top-8/2 shared)**, so the
