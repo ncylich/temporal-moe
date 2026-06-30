@@ -8,3 +8,7 @@ data/dclm_raw/
 data/dclm_tokenized/
 results/phase0/runs/
 results/phase0/tok_logs/
+
+# python bytecode
+__pycache__/
+*.pyc
