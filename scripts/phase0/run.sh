@@ -147,7 +147,16 @@ LOG_ARGS=(
 [ "${DENSE:-0}" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
 
 cd Megatron-LM
-if [ "${EVAL_ONLY:-0}" = "1" ]; then
+if [ "${PROBE:-0}" = "1" ]; then
+  # Mechanistic router probe: load CKPT, log per-MoE-layer per-token routing on one fixed batch
+  # (raw logits + resident mask). --finetune loads weights only; the hook records the first forward.
+  export ROUTER_LOG_OUT=$OUT/router_log.pt
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/scripts/phase0/router_probe.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
+    2>&1 | tee "$OUT/probe.log"
+elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   # criterion-4 per-expert load: load CKPT and run a few extra training iters so the router hook
   # fires on real forward passes of the trained model (--skip-train trips Megatron's val sampler).
   # The +3 iters at min-LR barely perturb the model.
