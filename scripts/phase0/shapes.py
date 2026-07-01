@@ -17,15 +17,22 @@ SHAPES = {
     "s5": dict(h=448, L=9,  ffn=2394, moe_ffn=308),
     "s6": dict(h=512, L=10, ffn=2736, moe_ffn=352),
 }
-TOPK, SHARED_MULT, NEXP = 6, 2, 64
+import os
+# GRAIN>1: fine-grain the ROUTED experts (see run.sh). num_experts and top-k scale by GRAIN; each
+# routed expert's moe_ffn shrinks to even-rounded moe_ffn/GRAIN; the shared expert is unchanged.
+# Active routed FLOPs (topk*moe_ffn) stay ~fixed, so N moves only by the router term (h*NEXP, x GRAIN)
+# plus sub-% even-rounding drift. Must match run.sh exactly so C=6ND hits the budget.
+GRAIN = int(os.environ.get("GRAIN", "1"))
+TOPK, SHARED_MULT, NEXP = 6 * GRAIN, 2, 64 * GRAIN
 
 def active_nonembed(h, L, ffn, moe_ffn):
+    moe_ffn_routed = 2 * round((moe_ffn / GRAIN) / 2) if GRAIN != 1 else moe_ffn
     attn = 4 * h * h                      # qkv (3h^2) + out (h^2), no bias
     norm = 2 * h                          # 2 RMSNorms/layer (gamma only)
     dense_ffn = 3 * h * ffn               # swiglu: fc1=2*h*ffn, fc2=h*ffn
     router = h * NEXP
-    shared = 3 * h * (SHARED_MULT * moe_ffn)
-    routed_active = TOPK * (3 * h * moe_ffn)
+    shared = 3 * h * (SHARED_MULT * moe_ffn)          # shared from ORIGINAL moe_ffn (not grained)
+    routed_active = TOPK * (3 * h * moe_ffn_routed)
     moe = router + shared + routed_active
     n = 0
     for layer in range(L):

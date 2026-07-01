@@ -12,3 +12,6 @@ results/phase0/tok_logs/
 # python bytecode
 __pycache__/
 *.pyc
+results/phase0/*.out
+results/phase0/*.log
+results/phase0/log.md
