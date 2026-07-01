@@ -1,18 +1,14 @@
-/dataset
-/weights
-/results
+*.bin
+*.idx
+.venv/
+data/
+data/dclm_jsonl/
+data/dclm_parts/
+data/dclm_raw/
+data/dclm_tokenized/
+results/phase0/runs/
+results/phase0/tok_logs/
 
-/logs
-/site
-/slurm-*
-
-/scripts/secret.sh
-.env*
-
-/figures
-/results
-
+# python bytecode
+__pycache__/
 *.pyc
-.nfs*
-
-.vscode

@@ -1,0 +1,158 @@
+#!/bin/bash
+# Single-GPU FLAME-MoE Phase-0 launcher (stock FLAME-MoE, B=1, EP=1, torchrun nproc=1).
+# Adapted from scripts/training/flame-moe.sh: no SLURM, no GCS, local transformer impl.
+# All knobs via env vars (see defaults). Computes train_iters so C = 6*N*D hits TARGET_FLOPS.
+set -euo pipefail
+cd "$(dirname "$0")/../.."        # repo root
+ROOT=$(pwd)
+
+# ---- run config (env overridable) ----
+SHAPE=${SHAPE:?set SHAPE s1..s6}
+TARGET_FLOPS=${TARGET_FLOPS:?set TARGET_FLOPS e.g. 1e17}
+PEAK_LR=${PEAK_LR:-3e-3}
+WARMUP_FRAC=${WARMUP_FRAC:-0.05}
+GLOBAL_BATCH=${GLOBAL_BATCH:-256}
+MICRO_BATCH=${MICRO_BATCH:-32}
+SEED=${SEED:-1234}
+AUX_COEFF=${AUX_COEFF:-0.01}
+RUN_NAME=${RUN_NAME:-${SHAPE}_${TARGET_FLOPS}_lr${PEAK_LR}_wu${WARMUP_FRAC}_gb${GLOBAL_BATCH}_s${SEED}}
+EXTRA_ARGS=${EXTRA_ARGS:-}
+
+# ---- shape geometry ----
+case $SHAPE in
+  sm1) H=96;  L=4; FFN=512;  MOE_FFN=66;;
+  s0)  H=128; L=4; FFN=684;  MOE_FFN=88;;
+  s1) H=192; L=5;  FFN=1026; MOE_FFN=132;;
+  s2) H=256; L=6;  FFN=1368; MOE_FFN=176;;
+  s3) H=320; L=7;  FFN=1710; MOE_FFN=220;;
+  s4) H=384; L=8;  FFN=2052; MOE_FFN=264;;
+  s5) H=448; L=9;  FFN=2394; MOE_FFN=308;;
+  s6) H=512; L=10; FFN=2736; MOE_FFN=352;;
+  *) echo "bad SHAPE $SHAPE"; exit 1;;
+esac
+MOE_LAYER_FREQ="[0]+[1]*$((L-1))"
+# s-dimension (constant/shared experts). s=1 (default): SHARED_MULT=2, TOPK=6 (FLAME stock).
+# FLOP-matched s=2: SHARED_MULT=3, TOPK=5 -> active expert-FFN FLOPs identical (shared 3 + routed 5
+# = 8 moe_ffn-units, same as s=1's shared 2 + routed 6); N and iters unchanged.
+SHARED_MULT=${SHARED_MULT:-2}
+TOPK=${TOPK:-6}
+SHARED_INT=$((SHARED_MULT * MOE_FFN))
+# head_dim must be a multiple of 8 for TE fused attention. Fixed 16 heads gives head_dim
+# 12/20/28 for s1/s3/s5 -> unfused slow path (~3x slower). Use heads=hidden/16 -> head_dim=16
+# for every shape (identical params/FLOPs, so N and the law are unchanged; s2 already had 16).
+NHEADS=$((H / 16))
+
+# DENSE=1: vanilla dense transformer (no experts/router/shared) as the IsoFLOP floor. ffn_hidden is
+# set so total non-embedding params == the MoE's ACTIVE non-embedding params at this scale, so the
+# FLOP budget and iters carry over unchanged. (Even values: odd ffn crashes the fused-swiglu warmup.)
+if [ "${DENSE:-0}" = "1" ]; then
+  case $SHAPE in
+    sm1) FFN=540;;  s0) FFN=716;;  s1) FFN=1068;; s2) FFN=1420;;
+    s3) FFN=1772;;  s4) FFN=2124;; s5) FFN=2476;; s6) FFN=2828;;
+  esac
+fi
+
+# ---- compute iters so C = 6*N*D ----
+read N TRAIN_ITERS < <(.venv/bin/python scripts/phase0/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
+WARMUP_ITERS=$(.venv/bin/python -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
+MIN_LR=$(.venv/bin/python -c "print($PEAK_LR*0.1)")
+# Sweep runs (0c/0d) need eval@iters/10 to read the 1e16 point from the 1e17 run; HP runs only
+# need the final val loss -> EVAL_AT_END=1 evaluates once at the end (saves ~9 intermediate evals).
+if [ "${EVAL_AT_END:-0}" = "1" ]; then
+  EVAL_INTERVAL=$TRAIN_ITERS
+else
+  EVAL_INTERVAL=$(.venv/bin/python -c "print(max(1,round($TRAIN_ITERS/10)))")   # 1e16 point = iters/10
+fi
+SAVE_INTERVAL=$EVAL_INTERVAL
+
+OUT=$ROOT/results/phase0/runs/$RUN_NAME
+CKPT=$OUT/ckpt
+mkdir -p "$OUT"
+echo "[run] $RUN_NAME N=$N iters=$TRAIN_ITERS warmup=$WARMUP_ITERS min_lr=$MIN_LR eval@$EVAL_INTERVAL" | tee "$OUT/run.meta"
+echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN dense=${DENSE:-0} temporal=${TEMPORAL:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
+
+# ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
+DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
+DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
+  -exec sh -c '[ -f "${1%.bin}.idx" ] && printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
+if [ -z "$DATA_PATH" ]; then echo "ERROR: no tokenized part*_text_document.bin in $DATA_DIR"; exit 1; fi
+
+export OMP_NUM_THREADS=16
+export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+export WANDB_MODE=disabled
+export HF_TOKEN=${HF_TOKEN:-}
+# TE 1.11 runtime needs cudnn/cublas (pip nvidia-* packages) on the loader path
+NV=/usr/local/lib/python3.11/dist-packages/nvidia
+export CUDNN_PATH=$NV/cudnn
+export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
+# Megatron compiles datasets/helpers_cpp via `make` calling bare python3/python3-config:
+# put .venv first so pybind11 includes resolve.
+export PATH=$ROOT/.venv/bin:$PATH
+
+# MoE-specific args (omitted entirely when DENSE=1 -> a plain dense SwiGLU transformer).
+MOE_ARGS=()
+if [ "${DENSE:-0}" != "1" ]; then
+  MOE_ARGS=(
+    --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk $TOPK
+    --moe-shared-expert-intermediate-size $SHARED_INT --moe-layer-freq "$MOE_LAYER_FREQ"
+    --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
+    --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
+    # --moe-grouped-gemm: batch the 64 local experts (EP=1) into one grouped GEMM (numerically
+    # equivalent to FLAME's EP=8 sequential-per-GPU experts; required for throughput).
+    --moe-grouped-gemm
+  )
+fi
+MODEL_ARGS=(
+  --hidden-size $H --ffn-hidden-size $FFN --num-layers $L --num-attention-heads $NHEADS
+  --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
+  --untie-embeddings-and-output-weights --position-embedding-type rope --disable-bias-linear
+  "${MOE_ARGS[@]}"
+  --hidden-dropout 0.0 --attention-dropout 0.0 --init-method-std 0.02
+  --tokenizer-type HuggingFaceTokenizer --tokenizer-model ${TOKENIZER_MODEL:-EleutherAI/pythia-12b}
+  # FLAME's native TransformerEngine path; --no-gradient-accumulation-fusion needs no apex (perf-only).
+  --transformer-impl transformer_engine --no-gradient-accumulation-fusion
+  ${CE_FUSION:+--cross-entropy-loss-fusion}
+)
+INFRA_ARGS=(
+  --pipeline-model-parallel-size 1 --expert-model-parallel-size 1
+  --use-distributed-optimizer
+  --distributed-timeout-minutes 30 --bf16
+)
+[ "${DENSE:-0}" != "1" ] && INFRA_ARGS+=(--moe-token-dispatcher-type alltoall)
+TRAIN_ARGS=(
+  --micro-batch-size $MICRO_BATCH --global-batch-size $GLOBAL_BATCH
+  --lr $PEAK_LR --min-lr $MIN_LR --lr-decay-style cosine
+  --lr-warmup-iters $WARMUP_ITERS --lr-decay-iters $TRAIN_ITERS --train-iters $TRAIN_ITERS
+  --weight-decay 0.01 --clip-grad 1.0 --seed $SEED
+)
+DATA_ARGS=( --seq-length 2048 --data-path $DATA_PATH --split 90,5,5 )
+LOG_ARGS=(
+  --log-interval 10 --log-throughput
+  --save "$CKPT" --save-interval $SAVE_INTERVAL --load "$CKPT"
+  --eval-interval $EVAL_INTERVAL --eval-iters 20
+)
+[ "${DENSE:-0}" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
+
+cd Megatron-LM
+if [ "${EVAL_ONLY:-0}" = "1" ]; then
+  # criterion-4 per-expert load: load CKPT and run a few extra training iters so the router hook
+  # fires on real forward passes of the trained model (--skip-train trips Megatron's val sampler).
+  # The +3 iters at min-LR barely perturb the model.
+  export EXPERT_LOAD_OUT=$OUT/expert_load.json
+  # --finetune: load only model weights (reset iter/optim/sampler) -> run a few forward passes of the
+  # trained model so the router hook records per-expert load. Tail args override the TRAIN/LOG arrays.
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/scripts/phase0/expert_load.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
+    2>&1 | tee "$OUT/expert_load.log"
+else
+  # TEMPORAL=1: rolling-residency MoE -> run via pretrain_temporal.py (installs the router patch,
+  # then the identical pretrain loop). Same model args; only the expert selection differs.
+  ENTRY=pretrain_gpt.py
+  [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
+    2>&1 | tee "$OUT/train.log"
+fi

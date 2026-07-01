@@ -1,0 +1,4 @@
+# Dense (no-MoE) dedicated annealed 1e16 parabola. EVAL_AT_END. DENSE=1.
+dense_s0_1e16 s0 1e16 3e-3 0.05 256 1234
+dense_s1_1e16 s1 1e16 3e-3 0.05 256 1234
+dense_s2_1e16 s2 1e16 3e-3 0.05 256 1234
