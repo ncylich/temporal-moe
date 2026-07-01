@@ -4,7 +4,7 @@ Establishes & validates stock FLAME-MoE (B=1, s=1) scaling behavior as the refer
 Temporal-MoE ablation (`docs/research/TEMPORAL_ABLATION_PLAN.md`). All numbers below are **measured**
 (logged in `log.md`); none are fabricated.
 
-![IsoFLOP parabolas](isoflop_parabolas.png)
+![Full MoE vs dense-baseline IsoFLOP curves](figures/dense_floor_vs_full_moe_isoflop.png)
 
 ## Headline
 
@@ -64,7 +64,7 @@ compute-optimal shape**, and both parabolas bottom out at the *same* shape (s0@1
 | 1e16 | s0 → 1.519 | s0 → **1.447** | **0.072 BPB** |
 | 1e17 | s2 → 1.341 | s2 → **1.269** | **0.072 BPB** |
 
-The MoE advantage *widens* with size (@1e17: −0.077 at s1 → −0.119 at s3). Plot: `dense_vs_moe.png`.
+The MoE advantage *widens* with size (@1e17: −0.077 at s1 → −0.119 at s3). Plot: `figures/dense_floor_vs_full_moe_isoflop.png`.
 
 ## Acceptance criteria — ALL 4 PASS (see PASS.md)
 

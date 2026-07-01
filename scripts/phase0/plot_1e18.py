@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-labels = ["dense floor\n(measured)", "temporal\n(measured)", "MoE\n(paper law)"]
+labels = ["dense baseline\n(measured)", "temporal\n(measured)", "full MoE\n(paper law)"]
 ce     = [4.137, 3.906, 3.78]
 colors = ["C3", "C2", "C0"]
 
@@ -23,14 +23,21 @@ ax.annotate("", xy=(1, 3.906), xytext=(0, 4.137),
             arrowprops=dict(arrowstyle="->", color="gray", lw=1.2))
 ax.text(0.5, 4.03, "−0.231 nats\n(beats dense)", ha="center", fontsize=9, color="gray")
 rec = (4.137-3.906)/(4.137-3.78)*100
-ax.text(0.5, 0.04, f"temporal recovers ~{rec:.0f}% of the dense→MoE gap\n"
-        "(dense & temporal measured on our setup; MoE = paper scaling law)",
+ax.text(0.5, 0.10, f"temporal recovers ~{rec:.0f}% of the dense-baseline -> full-MoE gap\n"
+        "(dense & temporal measured on our setup; full MoE = paper scaling law)",
         transform=ax.transAxes, ha="center", fontsize=8.5, color="dimgray")
 
 ax.set_ylim(3.6, 4.25)
-ax.set_ylabel("validation CE (nats, lower better)")
-ax.set_title("1e18 FLOPs (FLAME-MoE-38M-100M scale): temporal between dense and MoE")
+ax.set_ylabel("validation cross-entropy (nats, lower better)")
+ax.set_title("At 10^18 FLOPs: temporal routing lands between the dense baseline and full MoE")
 ax.grid(True, axis="y", ls=":", alpha=0.4)
-fig.tight_layout()
-fig.savefig("results/phase0/temporal_1e18_bars.png", dpi=130)
-print("wrote results/phase0/temporal_1e18_bars.png")
+fig.text(0.5, 0.01,
+         "Validation cross-entropy (CE, in nats, lower is better) at a 10^18-FLOP compute budget "
+         "(the ~38M-active-parameter model scale). 'temporal' = rolling residency (keep top-k experts "
+         "resident, swap 1 per token); 'full MoE' = standard top-k routing (a scaling-law estimate, hatched "
+         "bar); 'dense baseline' = a plain feed-forward model. Dense and temporal are measured on our setup.",
+         ha="center", fontsize=8, wrap=True)
+fig.tight_layout(rect=[0, 0.08, 1, 1])
+out = "/workspace/FLAME-MoE/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png"
+fig.savefig(out, dpi=130)
+print("wrote", out)

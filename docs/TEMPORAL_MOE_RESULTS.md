@@ -32,7 +32,7 @@ The temporal config reported below is **min_logit eviction, 1 shared expert** (t
 ## Results at 1e16 and 1e17 (our IsoFLOP sweeps, BPB)
 
 Full curves: dense floor vs full MoE (1 shared) vs temporal, over dense-matched shapes. Figure:
-`results/phase0/temporal_minlogit_final_combined.png` (combined single-axes, both budgets).
+`results/phase0/figures/temporal_vs_dense_and_full_moe_isoflop.png` (combined single-axes, both budgets).
 
 **@1e16** (compute-optimal shape s0):
 | shape | N_active | dense | MoE | **temporal** | recovery* |
@@ -63,7 +63,7 @@ lru (≤0.006 BPB). Shared experts: negligible/inconsistent at B=1 (2-shared bet
 We replicated the paper's smallest compute-optimal model **exactly** (hidden 256 / 9 layers, top-6,
 shared 2·moe_ffn, **pythia-12b 50k tokenizer**, dclm, global-batch 1024, LR 3e-4, WSD schedule, 2121
 iters = 4.45B tokens = 1e18 FLOPs) and swapped in the temporal router. Figure:
-`results/phase0/temporal_1e18_bars.png`.
+`results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png`.
 
 | config | val-CE @1e18 | source |
 |---|---|---|

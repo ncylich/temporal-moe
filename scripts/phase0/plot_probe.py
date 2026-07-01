@@ -9,7 +9,7 @@ Reads results/phase0/runs/<run>/router_log.pt. See docs/research/mechanistic-pro
 import numpy as np, torch
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
-RUNS = "/workspace/FLAME-MoE/results/phase0/runs"; OUT = "/workspace/FLAME-MoE/results/phase0"
+RUNS = "/workspace/FLAME-MoE/results/phase0/runs"; OUT = "/workspace/FLAME-MoE/results/phase0/figures"
 def load(run):
     d = torch.load(f"{RUNS}/{run}/router_log.pt", map_location="cpu")
     return {"temporal": d["temporal"],
@@ -44,9 +44,15 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
         ax.set_ylabel("expert"); ax.set_title(title, loc="left", fontsize=10)
         ax.set_ylim(-1, E); ax.grid(True, ls=":", alpha=0.3)
     axes[-1].set_xlabel(f"token position (sequence 0, MoE layer {L})")
-    fig.suptitle(f"A — experts chosen per token: {tag} (k={k} of {E})\n"
-                 "horizontal streaks = expert stays active across consecutive tokens (temporal locality)")
-    fig.tight_layout(); fig.savefig(f"{OUT}/{outfile}", dpi=140); plt.close(fig); print("wrote", outfile)
+    fig.suptitle(f"Which experts are active at each token: {tag} (top-k = {k} of {E} experts)\n"
+                 "horizontal streaks = an expert stays active across consecutive tokens (temporal locality)")
+    fig.text(0.5, 0.01,
+             "Each dot marks an expert (y-axis) that is active at a given token position (x-axis) in one "
+             "sequence, at the last Mixture-of-Experts layer. 'temporal' = rolling residency: keep the "
+             "top-k experts resident and swap at most one per token. Long horizontal streaks mean an "
+             "expert stays selected across many consecutive tokens (temporal locality); this is descriptive, "
+             "not better/worse.", ha="center", fontsize=8, wrap=True)
+    fig.tight_layout(rect=[0, 0.06, 1, 1]); fig.savefig(f"{OUT}/{outfile}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outfile}")
 
 # ---------------- A3: learned-locality overlap vs scale ----------------
 def overlap(run):
@@ -70,14 +76,21 @@ def a3_scale():
     fig, ax = plt.subplots(figsize=(8, 5.2))
     ax.plot(xs, np.array(temp)*100, "o-", color="C2", lw=2, label="temporal (learned preference)")
     mm = [(x, v*100) for x, v in zip(xs, moe) if not np.isnan(v)]
-    ax.plot([p[0] for p in mm], [p[1] for p in mm], "o-", color="C0", label="vanilla MoE (natural)")
-    ax.plot(xs, np.array(rnd)*100, ":", color="gray", label="random baseline (k/E)")
-    ax.set_xscale("log"); ax.set_xlabel("active non-embedding params (millions)")
+    ax.plot([p[0] for p in mm], [p[1] for p in mm], "o-", color="C0", label="full MoE (natural)")
+    ax.plot(xs, np.array(rnd)*100, ":", color="gray", label="random baseline (k / E)")
+    ax.set_xscale("log"); ax.set_xlabel("active non-embedding params N (millions)")
     ax.set_ylabel("overlap with previous active set  (%)  — higher = more temporally coherent")
-    ax.set_title("A3 — the temporal router learns to want its resident set (and it holds with scale)")
+    ax.set_title("The temporal router learns to prefer its resident set of experts (and it holds as models grow)")
     ax.grid(True, which="both", ls=":", alpha=0.4); ax.legend()
-    fig.tight_layout(); fig.savefig(f"{OUT}/probe_A3_vs_scale.png", dpi=140); plt.close(fig)
-    print("wrote probe_A3_vs_scale.png")
+    fig.text(0.5, 0.01,
+             "Overlap between a token's freely chosen top-k experts and the previous token's active expert "
+             "set, averaged over layers and tokens; higher (%) = more temporally coherent routing. "
+             "'temporal' = rolling residency (keep top-k experts resident, swap 1 per token). x-axis is "
+             "active non-embedding parameters N (millions, log scale). Random baseline = k / E (top-k over "
+             "E experts).", ha="center", fontsize=8, wrap=True)
+    fig.tight_layout(rect=[0, 0.08, 1, 1]); out = f"{OUT}/learned_temporal_locality_vs_model_size.png"
+    fig.savefig(out, dpi=140); plt.close(fig)
+    print("wrote", out)
 
 # ---------------- rolling residency sim (our policy: K, <=1 swap/token, min_logit) ----------------
 def rolling(logits, k, K):
@@ -105,27 +118,37 @@ def sweep(run, nseq=8):
     return np.array(Ks), np.array(covs), np.array(lifes), k
 
 def graphs_BC():
-    series = [("temporal s2 (8M, k6/64)",  "tmoe_minlogit_sh1_s2_1e17", "C2", "-"),
-              ("temporal s3 (15M, k6/64)",  "tmoe_minlogit_sh1_s3_1e17", "C2", "--"),
-              ("temporal 38M@1e18 (k6/64)", "flame38m_temporal_minlogit", "C4", "-"),
-              ("MoE s2 (8M, k6/64)",        "v16k_sweep_s2_1e17", "C0", "-"),
-              ("temporal G3 (k18/192)",     "g3_tmoe_s1_1e17", "C3", ":")]
+    series = [("temporal, 8.1M active",             "tmoe_minlogit_sh1_s2_1e17", "C2", "-"),
+              ("temporal, 15M active",              "tmoe_minlogit_sh1_s3_1e17", "C2", "--"),
+              ("temporal, 38M active",              "flame38m_temporal_minlogit", "C4", "-"),
+              ("full MoE, 8.1M active",             "v16k_sweep_s2_1e17", "C0", "-"),
+              ("temporal, fine-grained (18 of 192)", "g3_tmoe_s1_1e17", "C3", ":")]
     data = {n: sweep(r) for n, r, _, _ in series}
-    for fname, idx, ylab, title in [
-        ("probe_B_coverage_vs_k.png", 1, "rolling-policy hit-rate (mean top-k coverage)",
-         "B — bigger resident cache closes the routing gap (≤1-swap/token); temporal ~2x more cacheable than MoE at every scale"),
-        ("probe_C_lifetime_vs_k.png", 2, "mean expert lifetime (consecutive tokens resident)",
-         "C — expert lifetime vs resident budget (≤1-swap/token policy)")]:
-        fig, ax = plt.subplots(figsize=(9, 5.6))
+    for fname, idx, ylab, title, cap in [
+        ("routing_coverage_vs_resident_cache_size.png", 1, "routing hit-rate (mean fraction of top-k already resident)",
+         "A bigger resident cache closes the routing gap; the temporal router is ~2x more cacheable than full MoE at every model size",
+         "Rolling-residency simulation: keep K experts resident and evict at most one per token (min-logit "
+         "eviction). x-axis K / k = resident cache size relative to the active top-k (k), where 1 = the "
+         "current setting. y-axis = fraction of each token's top-k experts that are already resident "
+         "(hit-rate, 0-1); higher is better. 'temporal' = rolling-residency model; 'full MoE' = standard "
+         "top-k routing. E = total experts."),
+        ("expert_lifetime_vs_resident_cache_size.png", 2, "mean expert lifetime (consecutive tokens resident)",
+         "Experts stay resident longer as the resident cache grows",
+         "Same rolling-residency simulation (keep K experts resident, evict at most one per token). "
+         "x-axis K / k = resident cache size relative to the active top-k (k), 1 = current setting. y-axis = "
+         "mean number of consecutive tokens an expert stays resident before eviction (lifetime); higher = "
+         "more stable residency. 'temporal' = rolling-residency model; 'full MoE' = standard top-k routing.")]:
+        fig, ax = plt.subplots(figsize=(9, 5.9))
         for n, r, c, ls in series:
             Ks, cov, life, k = data[n]; ax.plot(Ks/k, (cov if idx == 1 else life), ls, color=c, marker="o", ms=3.5, label=n)
-        ax.set_xlabel("resident budget  K / k   (1 = current; →  larger resident cache)")
+        ax.set_xlabel("resident cache size  K / k   (1 = current; →  larger resident cache)")
         ax.set_ylabel(ylab); ax.set_title(title); ax.grid(True, ls=":", alpha=0.4); ax.legend(fontsize=8)
         if idx == 1: ax.axhline(1.0, color="gray", lw=.8, ls=":")
-        fig.tight_layout(); fig.savefig(f"{OUT}/{fname}", dpi=140); plt.close(fig); print("wrote", fname)
+        fig.text(0.5, 0.01, cap, ha="center", fontsize=8, wrap=True)
+        fig.tight_layout(rect=[0, 0.08, 1, 1]); fig.savefig(f"{OUT}/{fname}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{fname}")
 
 if __name__ == "__main__":
-    raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal (s2 @ 1e17)", "probe_A_raster.png")
-    raster("tmoe_minlogit_sh1_s3_1e17", "v16k_sweep_s3_1e17", "full MoE vs temporal (s3 @ 1e17, 15M)", "probe_A_raster_s3.png")
-    raster("flame38m_temporal_minlogit", None, "temporal 38M @ 1e18 (real budget)", "probe_A_raster_38M.png")
+    raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal, 8.1M active @ 10^17 FLOPs", "expert_selection_per_token_8M_model.png")
+    raster("tmoe_minlogit_sh1_s3_1e17", "v16k_sweep_s3_1e17", "full MoE vs temporal, 15M active @ 10^17 FLOPs", "expert_selection_per_token_15M_model.png")
+    raster("flame38m_temporal_minlogit", None, "temporal, 38M active @ 10^18 FLOPs", "expert_selection_per_token_38M_model.png")
     a3_scale(); graphs_BC()

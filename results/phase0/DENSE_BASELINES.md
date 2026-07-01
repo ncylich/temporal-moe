@@ -6,7 +6,7 @@ non-embedding parameter count — by **~0.07 bits-per-byte at the compute-optima
 budget, and the gap *widens* as the models grow. This justifies the MoE's routing overhead: the
 sparsity buys real quality over a dense model you could have trained instead for the same cost.
 
-![dense vs MoE](dense_vs_moe.png)
+![dense baseline vs full MoE](figures/dense_floor_vs_full_moe_isoflop.png)
 
 ## What "dense floor" means here
 

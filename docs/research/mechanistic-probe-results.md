@@ -9,7 +9,7 @@ Checkpoints probed (matched temporal+MoE pairs, 16k vocab, plus G3): `tmoe_minlo
 `v16k_sweep_s2_1e17` (s2@1e17, 64 experts, k=6); `tmoe_minlogit_sh1_s0_1e16` + `v16k_d_s0_1e16`;
 `g3_tmoe_s1_1e17` (192 experts, k=18).
 
-## A — experts chosen per token (`probe_A_raster.png`)
+## A — experts chosen per token (`results/phase0/figures/expert_selection_per_token_8M_model.png`)
 Token × expert raster, s2@1e17, deepest MoE layer, three panels:
 - **full MoE (top-k)** — scattered dots, switches experts nearly every token.
 - **temporal (resident set used)** — clear horizontal bands (held experts).
@@ -22,14 +22,14 @@ Token × expert raster, s2@1e17, deepest MoE layer, three panels:
   **~1.8× more temporally self-consistent**. The constraint became *partly self-enforcing*: the model
   internalized locality rather than fighting the mask.
 
-## B — rolling-policy hit-rate vs resident budget K (`probe_B_coverage_vs_k.png`)
+## B — rolling-policy hit-rate vs resident budget K (`results/phase0/figures/routing_coverage_vs_resident_cache_size.png`)
 Replay each model's demand through *our* policy (K resident, ≤1 swap/token, min_logit evict); mean top-k
 coverage vs K/k:
 - **temporal routing is ~2× more cacheable than the MoE** at every budget (s2: 36% vs 18% at K=k).
 - A modestly bigger cache pays off fast: **K=k → 2k ≈ +15 points** coverage; → 1.0 (= full MoE) at K=E.
 - **G3 (18/192) sits just below G1 (6/64)** — the same fine-graining penalty seen in the quality results.
 
-## C — expert lifetime vs K (`probe_C_lifetime_vs_k.png`)
+## C — expert lifetime vs K (`results/phase0/figures/expert_lifetime_vs_resident_cache_size.png`)
 Mean consecutive tokens an expert stays resident grows super-linearly with K; temporal > MoE at moderate K;
 G3 experts live longer per swap (more experts, each churned less often).
 
@@ -50,7 +50,7 @@ All A/B/C come from the same 5 probe passes; only D needs new training.
 
 Added probes: `tmoe_minlogit_sh1_s3_1e17` + `v16k_sweep_s3_1e17` (s3, ~14.8M active), and
 `flame38m_temporal_minlogit` (38M active, the paper's 1e18 budget, 50k vocab). Figures:
-`probe_A_raster_s3.png`, `probe_A_raster_38M.png`, `probe_A3_vs_scale.png` (+ B/C now overlay all).
+`results/phase0/figures/expert_selection_per_token_15M_model.png`, `results/phase0/figures/expert_selection_per_token_38M_model.png`, `results/phase0/figures/learned_temporal_locality_vs_model_size.png` (+ B/C now overlay all).
 
 **A3 overlap (top-k(t) vs previous active set), by scale:**
 

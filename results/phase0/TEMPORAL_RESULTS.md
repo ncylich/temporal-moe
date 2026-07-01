@@ -7,7 +7,7 @@ recovers ~80% of MoE's quality gain over a dense model at every shape, both comp
 Metric is **bits-per-byte (BPB) = CE/(ln2·bytes_per_token)**, lower is better; all values measured
 (`log.md`). The temporal config below is **min_logit eviction, 1 shared expert** (the swept curve);
 `temporal_router.py` implements the rolling-residency router (single-launch Triton scan, verified
-bit-exact vs the reference at runtime). Figure: `temporal_minlogit_final_combined.png`.
+bit-exact vs the reference at runtime). Figure: `figures/temporal_vs_dense_and_full_moe_isoflop.png`.
 
 ## Full IsoFLOP curves (BPB) — dense floor vs full MoE (1 shared) vs temporal
 
@@ -49,7 +49,7 @@ We replicated the paper's smallest compute-optimal model **exactly** (hidden 256
 shared 2·moe_ffn, **pythia-12b 50k tokenizer**, dclm, gb 1024, LR 3e-4, WSD, 2121 iters = 4.45B tokens
 = 1e18 FLOPs) and swapped in the temporal router. Metric = **validation cross-entropy (nats, lower
 better)** — the paper's metric, so directly comparable (we match their tokenizer). Figure:
-`temporal_1e18_bars.png` (script `plot_1e18.py`).
+`figures/temporal_vs_dense_and_moe_1e18_crossentropy.png` (script `plot_1e18.py`).
 
 | config | val-CE @1e18 | source |
 |---|---|---|

@@ -47,12 +47,12 @@ the same compute-optimal shape (s2) as MoE/dense; s1@1e17 recovers 71%.
 
 All three A6000 temporal points done: `g3_tmoe_s0_1e16` (1.4753), `g3_tmoe_s1_1e16` (1.5861),
 `g3_tmoe_s1_1e17` (1.3065). Both G3 temporal parabolas are now bracketed.
-Combined graph: `results/phase0/g3_vs_g1_combined.png` (regenerate via `plot_g3_curves.py`).
+Combined graph: `results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png` (regenerate via `plot_g3_curves.py`).
 
 ## To finalize
 
-`BPB_DIVISOR=2.7600 .venv/bin/python scripts/phase0/plot_g3.py` → `results/phase0/g3_isoflop.png`
-(dense/MoE/temporal parabolas, G3 vs G1 overlay). Then fill the recovery column for the A6000 points
+`.venv/bin/python scripts/phase0/plot_g3_curves.py` → `results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png`
+(dense/full-MoE/temporal curves, fine-grained vs coarse overlay). Then fill the recovery column for the A6000 points
 and add the acceptance checks (2nd-seed repro + expert-load ≤8× mean) if run.
 
 ## Perf note
