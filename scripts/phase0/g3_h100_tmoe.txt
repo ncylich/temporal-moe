@@ -1,0 +1,6 @@
+# H100 temporal: big shapes s2/s3 @1e17 (A6000 can't fit these) + sm1@1e16 filler.
+# Run with GRAIN=3 MICRO_BATCH=64 TEMPORAL=1 TEMPORAL_EVICT=min_logit EVAL_AT_END=1
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+g3_tmoe_s2_1e17 s2 1e17 3e-3 0.05 256 1234
+g3_tmoe_s3_1e17 s3 1e17 3e-3 0.05 256 1234
+g3_tmoe_sm1_1e16 sm1 1e16 3e-3 0.05 256 1234

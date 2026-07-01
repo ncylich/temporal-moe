@@ -1,0 +1,6 @@
+# G=3 fine-grained MoE, 1e16 IsoFLOP bracket. 18 routed of 192, 1 shared (unchanged size).
+# Run with: GRAIN=3 EVAL_AT_END=1 (+ common env). Min expected at s0; sm1/s1 bracket it.
+# NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED
+g3_moe_s0_1e16 s0 1e16 3e-3 0.05 256 1234
+g3_moe_sm1_1e16 sm1 1e16 3e-3 0.05 256 1234
+g3_moe_s1_1e16 s1 1e16 3e-3 0.05 256 1234

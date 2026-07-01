@@ -35,8 +35,17 @@ MOE_LAYER_FREQ="[0]+[1]*$((L-1))"
 # FLOP-matched s=2: SHARED_MULT=3, TOPK=5 -> active expert-FFN FLOPs identical (shared 3 + routed 5
 # = 8 moe_ffn-units, same as s=1's shared 2 + routed 6); N and iters unchanged.
 SHARED_MULT=${SHARED_MULT:-2}
-TOPK=${TOPK:-6}
-SHARED_INT=$((SHARED_MULT * MOE_FFN))
+SHARED_INT=$((SHARED_MULT * MOE_FFN))            # shared FFN sized from the ORIGINAL moe_ffn
+# GRAIN>1: DeepSeek-style fine-graining of the ROUTED experts (compute-preserving). Subdivide each
+# routed expert by GRAIN (moe_ffn/GRAIN, even-rounded for fused-SwiGLU), and scale the routed pool
+# (num_experts) and top-k by GRAIN. Active routed FLOPs (topk*moe_ffn) stay ~fixed; the shared expert
+# (SHARED_INT above) is NOT fine-grained. Temporal resident K = TOPK, still swaps 1 expert/token.
+GRAIN=${GRAIN:-1}
+NUM_EXPERTS=$((64 * GRAIN))
+TOPK=${TOPK:-$((6 * GRAIN))}
+if [ "$GRAIN" != "1" ]; then
+  MOE_FFN=$(.venv/bin/python -c "print(2*round(($MOE_FFN/$GRAIN)/2))")
+fi
 # head_dim must be a multiple of 8 for TE fused attention. Fixed 16 heads gives head_dim
 # 12/20/28 for s1/s3/s5 -> unfused slow path (~3x slower). Use heads=hidden/16 -> head_dim=16
 # for every shape (identical params/FLOPs, so N and the law are unchanged; s2 already had 16).
@@ -69,7 +78,7 @@ OUT=$ROOT/results/phase0/runs/$RUN_NAME
 CKPT=$OUT/ckpt
 mkdir -p "$OUT"
 echo "[run] $RUN_NAME N=$N iters=$TRAIN_ITERS warmup=$WARMUP_ITERS min_lr=$MIN_LR eval@$EVAL_INTERVAL" | tee "$OUT/run.meta"
-echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN dense=${DENSE:-0} temporal=${TEMPORAL:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
+echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN grain=$GRAIN num_experts=$NUM_EXPERTS shared_int=$SHARED_INT dense=${DENSE:-0} temporal=${TEMPORAL:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
 
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
@@ -94,13 +103,16 @@ export PATH=$ROOT/.venv/bin:$PATH
 MOE_ARGS=()
 if [ "${DENSE:-0}" != "1" ]; then
   MOE_ARGS=(
-    --moe-ffn-hidden-size $MOE_FFN --num-experts 64 --moe-router-topk $TOPK
+    --moe-ffn-hidden-size $MOE_FFN --num-experts $NUM_EXPERTS --moe-router-topk $TOPK
     --moe-shared-expert-intermediate-size $SHARED_INT --moe-layer-freq "$MOE_LAYER_FREQ"
     --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
     --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
     # --moe-grouped-gemm: batch the 64 local experts (EP=1) into one grouped GEMM (numerically
     # equivalent to FLAME's EP=8 sequential-per-GPU experts; required for throughput).
     --moe-grouped-gemm
+    # MOE_PERMUTE_FUSION=1: fuse the token permute/unpermute (needs TE>=2.1). Cuts the
+    # bandwidth-bound permute and avoids the fp32-router permute-memory blowup -> faster + less mem.
+    ${MOE_PERMUTE_FUSION:+--moe-permute-fusion}
   )
 fi
 MODEL_ARGS=(
