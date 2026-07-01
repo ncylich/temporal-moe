@@ -45,3 +45,28 @@ G3 experts live longer per swap (more experts, each churned less often).
    — finer experts specialize harder and tolerate residency slightly worse.
 
 All A/B/C come from the same 5 probe passes; only D needs new training.
+
+## Larger models (#1 s3@1e17 14.8M, #2 38M@1e18 real budget) — does it hold at scale?
+
+Added probes: `tmoe_minlogit_sh1_s3_1e17` + `v16k_sweep_s3_1e17` (s3, ~14.8M active), and
+`flame38m_temporal_minlogit` (38M active, the paper's 1e18 budget, 50k vocab). Figures:
+`probe_A_raster_s3.png`, `probe_A_raster_38M.png`, `probe_A3_vs_scale.png` (+ B/C now overlay all).
+
+**A3 overlap (top-k(t) vs previous active set), by scale:**
+
+| model | active | temporal | vanilla MoE | random |
+|---|---|---|---|---|
+| s0 @1e16 | 1.4M | 33.2% | 19.4% | 9.4% |
+| s2 @1e17 | 8.1M | 38.2% | 21.3% | 9.4% |
+| s3 @1e17 | 14.8M | 33.5% | 20.2% | 9.4% |
+| 38M @1e18 | 38M | 30.4% | (not trained) | 9.4% |
+
+**Finding: the learned-locality effect is robust but roughly flat, not a scaling law.** Temporal stays
+**~1.5–1.8× the vanilla MoE and ~3–4× random at every size** (incl. 38M at the paper's real 1e18 budget,
+50k vocab). The 38M raster still shows clearly banded resident + unconstrained-preference panels. It does
+**not** strengthen with scale in our range (peaks at s2, slight decline at 38M — though 38M uses a
+different tokenizer/data, so it's not a clean same-family comparison; the clean 16k family s0/s2/s3 is
+33→38→33%). B/C: all temporal models cluster ~2× more cacheable than the MoE regardless of size.
+
+**Caveat:** these are still small (≤38M active) vs frontier MoEs; the effect could scale differently at
+100B+. The definitive test is a released FLAME-MoE (290M–1.7B) probe (#3) or a larger temporal train (#4).
