@@ -1,4 +1,4 @@
-# G=3 fine-grained MoE — Phase-0 results (live, 9/12 runs)
+# G=3 fine-grained MoE — Phase-0 results (live, 11/12 runs)
 
 Fine-grained (`GRAIN=3`: routed experts 64→192, top-k 6→18, shared expert unchanged) IsoFLOP sweep,
 comparing MoE vs temporal (rolling-residency, K=18 resident of 192, swap 1/token, min_logit) vs the
@@ -6,7 +6,7 @@ dense floor. Config: mb=64, TE 1.11, seed 1234, `BPB_DIVISOR=2.7600`. **Lower BP
 All values **measured** from `results/phase0/runs/`. Split across H100 (@1e17 big shapes + fillers)
 and A6000 (small-shape temporal) per `docs/shared-fine-grained-moe.md`.
 
-**Status: 9/12 done** — all 6 MoE + 3 temporal (H100). Pending (A6000): temporal s0/s1@1e16, s1@1e17.
+**Status: 11/12 done** — all 6 MoE + 5 temporal (3 H100 + 2 A6000). Pending: temporal s1@1e17 (A6000, running ~46%).
 
 ## Both MoE parabolas — complete & bracketed (min unchanged vs G=1)
 
@@ -25,21 +25,27 @@ Dense floor = G=1 baseline (dense doesn't fine-grain; active params identical).
 | budget | shape | N_active | dense (G1) | MoE (G3) | **temporal (G3)** | recovery | vs G1 temporal |
 |---|---|---|---|---|---|---|---|
 | 1e16 | sm1 | 0.81M | 1.534 | 1.4786 | **1.4976** | 66% | G1 1.4891 |
-| 1e16 | s0  | 1.42M | 1.519 | 1.4585 | *A6000* | — | G1 1.4599 |
-| 1e16 | s1  | 3.91M | 1.591 | 1.5352 | *A6000* | — | G1 1.5488 |
-| 1e17 | s1  | 3.91M | 1.361 | 1.2846 | *A6000* | — | G1 1.3039 |
+| 1e16 | **s0** | 1.42M | 1.519 | 1.4585 | **1.4753** | 72% | G1 1.4599 |
+| 1e16 | s1  | 3.91M | 1.591 | 1.5352 | **1.5861** | 9% | G1 1.5488 |
+| 1e17 | s1  | 3.91M | 1.361 | 1.2846 | *running (A6000)* | — | G1 1.3039 |
 | 1e17 | **s2** | 8.23M | 1.341 | 1.2708 | **1.2873** | 77% | G1 1.2821 |
 | 1e17 | s3  | 15.09M | 1.408 | 1.2815 | **1.3129** | 75% | G1 1.3073 |
 
-**Finding so far:** every measured temporal point lands **inside the dense↔MoE band** (66–77%
-recovery), costing only +0.017–0.031 BPB over the full MoE. That's slightly below the G=1 baseline's
-~80–85% — a real hint that **finer experts (18/192) recover marginally less under rolling residency**
-than coarse (6/64), but the headline holds: 18-of-192 resident with a single swap/token keeps most of
-the MoE advantage.
+**Finding so far:** at the **compute-optimal shapes** temporal lands solidly inside the dense↔MoE band —
+**s0@1e16 72%**, **s2@1e17 77%** recovery, costing only ~+0.017 BPB over the full MoE. That's below
+the G=1 baseline's ~82% at the same shapes (G1 was s0@1e16 82%, s2@1e17 82%) — a consistent **~5–10-pt
+hint that finer experts (18/192) recover marginally less under rolling residency** than coarse (6/64).
+The **off-optimal right-arm points are noisier**: s1@1e16 temporal (1.5861) recovers only 9% — it barely
+beats the dense floor because the dense→MoE gap there is tiny (0.056) and the model is oversized/
+undertrained for the 1e16 budget (G1 temporal was also worst here at 83% but G3 is markedly worse). Net:
+the headline holds at the shapes that matter (18-of-192 resident, single swap/token keeps most of the MoE
+gain), with fine-graining costing a modest, consistent recovery penalty vs coarse experts. s1@1e17
+(the remaining point) will complete the 1e17 temporal parabola.
 
-## Remaining (A6000, separate machine — copy run dirs here when done)
+## Remaining (A6000)
 
-`g3_tmoe_s0_1e16`, `g3_tmoe_s1_1e16`, `g3_tmoe_s1_1e17` → will complete both temporal parabolas.
+`g3_tmoe_s0_1e16` ✅ (1.4753) and `g3_tmoe_s1_1e16` ✅ (1.5861) done on the A6000 and filled in above.
+Only `g3_tmoe_s1_1e17` is still running (A6000, ~46%) → completes the 1e17 temporal parabola (left arm).
 
 ## To finalize
 
