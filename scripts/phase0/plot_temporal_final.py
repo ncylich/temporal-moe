@@ -2,9 +2,9 @@
 """Final temporal-MoE figure: full IsoFLOP curves for dense floor, full MoE (1 shared), and temporal
 (rolling residency, min_logit eviction, 1 shared = 6/64 experts resident) at both FLOP budgets.
 
-Combined single-axes (preferred): color = method, linestyle = budget (dashed 1e16, solid 1e17).
-Also a 2-panel version. All BPB measured (results/phase0/log.md); lower is better. Each budget trimmed
-to the shapes all three curves share so an unmatched extreme doesn't stretch the y-scale.
+Combined single-axes only: color = method, linestyle = budget (dashed 1e16, solid 1e17). All BPB
+measured (results/phase0/log.md); lower is better. Each budget trimmed to the shapes all three curves
+share so an unmatched extreme doesn't stretch the y-scale.
 """
 import numpy as np
 import matplotlib
@@ -32,7 +32,7 @@ def pts(d):
     xs = np.array([N[k] for k in d]); ys = np.array([d[k] for k in d])
     o = np.argsort(xs); return xs[o], ys[o]
 
-# ---------- combined single axes (preferred) ----------
+# ---------- combined single axes ----------
 fig, ax = plt.subplots(figsize=(9.5, 6.2))
 STYLE = {"1e16": "--", "1e17": "-"}
 for name, data, color in SERIES:
@@ -55,16 +55,3 @@ ax.legend(fontsize=8.5, ncol=3, loc="upper left")
 fig.tight_layout()
 fig.savefig("results/phase0/temporal_minlogit_final_combined.png", dpi=130)
 print("wrote results/phase0/temporal_minlogit_final_combined.png")
-
-# ---------- 2-panel (reference) ----------
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-for ax, b in zip(axes, ["1e16", "1e17"]):
-    for name, data, color in SERIES:
-        x, y = pts(data[b]); ax.plot(x, y, "o-", color=color, lw=1.7, ms=7, label=name)
-    ax.set_xscale("log"); ax.set_xlabel("active non-embedding params N (millions)")
-    ax.set_ylabel("validation BPB (bits/byte, lower better)")
-    ax.set_title(f"IsoFLOP @ {b} FLOPs"); ax.grid(True, which="both", ls=":", alpha=0.4)
-    ax.legend(fontsize=9)
-fig.suptitle("Dense vs MoE (1 shared) vs temporal (min_logit, 1 shared)", fontsize=12)
-fig.tight_layout(); fig.savefig("results/phase0/temporal_minlogit_final_2panel.png", dpi=130)
-print("wrote results/phase0/temporal_minlogit_final_2panel.png")

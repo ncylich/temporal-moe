@@ -3,7 +3,7 @@
 
 Reads measured BPB for the g3_* runs by calling parse_run.py on each run dir (so BPB_DIVISOR is
 honored). Overlays the already-measured G=1 reference numbers (from results/phase0/*.md). Plots one
-panel per budget (1e16, 1e17): BPB vs active non-embedding params N. Lower BPB is better.
+combined single axes: BPB vs active non-embedding params N (color=method, linestyle=budget). Lower is better.
 
 Usage: BPB_DIVISOR=2.7600 .venv/bin/python scripts/phase0/plot_g3.py
 """
@@ -72,35 +72,36 @@ def collect():
 
 def main():
     g3 = collect()
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.2))
-    for ax, budget in zip(axes, ["1e16", "1e17"]):
-        # baseline reference (G1) — dashed
-        for mt, color, label in [("dense", "tab:gray", "dense floor (G1)"),
-                                 ("moe", "tab:blue", "MoE (G1)"),
-                                 ("temporal", "tab:green", "temporal (G1)")]:
+    # Combined single axes: color = method, linestyle = budget (dashed 1e16 / solid 1e17),
+    # granularity = weight+marker (G1 thin+open circle, G3 bold+filled square).
+    COL = {"dense": "tab:gray", "moe": "tab:blue", "temporal": "tab:green"}
+    LST = {"1e16": "--", "1e17": "-"}
+    fig, ax = plt.subplots(figsize=(10.5, 6.6))
+    for budget in ["1e16", "1e17"]:
+        # G1 baseline (thin, open circle)
+        for mt in ["dense", "moe", "temporal"]:
             d = BASE[budget][mt]
-            xs = [N_G1[s] for s in d]; ys = [d[s] for s in d]
-            pts = sorted(zip(xs, ys))
-            ax.plot([p[0] for p in pts], [p[1] for p in pts], "--", color=color, alpha=0.45,
-                    marker="o", ms=3, label=label)
-        # G3 measured — solid bold
-        for mt, color, label in [("moe", "tab:blue", "MoE (G3, 18/192)"),
-                                  ("temporal", "tab:green", "temporal (G3, K=18)")]:
+            pts = sorted((N_G1[s], d[s]) for s in d)
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], LST[budget], color=COL[mt],
+                    marker="o", mfc="none", ms=6, lw=1.4, alpha=0.55,
+                    label=f"{mt} G1  {budget}")
+        # G3 measured (bold, filled square)
+        for mt in ["moe", "temporal"]:
             d = g3.get((mt, budget), {})
             if not d:
                 continue
             pts = sorted((N_G3[s], d[s], s) for s in d)
-            ax.plot([p[0] for p in pts], [p[1] for p in pts], "-", color=color, lw=2.2,
-                    marker="s", ms=6, label=label)
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], LST[budget], color=COL[mt],
+                    marker="s", ms=6.5, lw=2.4, label=f"{mt} G3  {budget}")
             for x, y, s in pts:
-                ax.annotate(s, (x, y), textcoords="offset points", xytext=(4, 5), fontsize=8)
-        ax.set_xscale("log")
-        ax.set_xlabel("active non-embedding params N (M)")
-        ax.set_ylabel("validation BPB (lower better)")
-        ax.set_title(f"IsoFLOP @ {budget}")
-        ax.grid(True, which="both", alpha=0.25)
-        ax.legend(fontsize=7.5, loc="upper center")
-    fig.suptitle("G=3 fine-grained (18 active routed of 192) vs G=1 baseline — FLAME-MoE Phase-0", fontsize=12)
+                ax.annotate(s, (x, y), textcoords="offset points", xytext=(4, 5), fontsize=7.5)
+    ax.set_xscale("log")
+    ax.set_xlabel("active non-embedding params N (M)")
+    ax.set_ylabel("validation BPB (lower better)")
+    ax.set_title("G=3 fine-grained (18 routed of 192) vs G=1 baseline — FLAME-MoE Phase-0\n"
+                 "color = method, dashed = 1e16 / solid = 1e17, bold-square = G3 / thin-open = G1")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend(fontsize=8, ncol=2, loc="upper center")
     fig.tight_layout()
     out = f"{ROOT}/results/phase0/g3_isoflop.png"
     fig.savefig(out, dpi=130)

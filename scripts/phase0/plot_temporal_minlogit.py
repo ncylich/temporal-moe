@@ -27,29 +27,26 @@ def pts(d):
     xs = np.array([N[k] for k in d]); ys = np.array([d[k] for k in d])
     o = np.argsort(xs); return xs[o], ys[o]
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-for ax, b in zip(axes, ["1e16", "1e17"]):
+LSTYLE = {"1e16": "--", "1e17": "-"}
+fig, ax = plt.subplots(figsize=(9.5, 6.2))
+for b in ["1e16", "1e17"]:
     for label, data, color in [("dense floor", DENSE[b], "C3"), ("MoE (1 shared)", MOE[b], "C0")]:
         x, y = pts(data)
-        ax.plot(x, y, "o-", color=color, label=label, lw=1.6, ms=7)
+        ax.plot(x, y, LSTYLE[b], color=color, marker="o", lw=1.8, ms=6, label=f"{label}  {b}")
         lx = np.log10(x); c = np.polyfit(lx, y, 2); xx = np.linspace(lx.min(), lx.max(), 100)
-        ax.plot(10**xx, np.polyval(c, xx), "--", color=color, lw=1, alpha=0.4)
+        ax.plot(10**xx, np.polyval(c, xx), ":", color=color, lw=1, alpha=0.35)
     shape, bpb = TEMPORAL[b]
-    ax.plot(N[shape], bpb, "*", color="C2", ms=20, zorder=5,
-            label="temporal (min_logit, 1 shared)")
+    ax.plot(N[shape], bpb, "*", color="C2", ms=20, zorder=5, markeredgecolor="k",
+            markeredgewidth=0.5, label=f"temporal (min_logit, 1 shared)  {b}")
     ax.annotate(f"{bpb:.4f}", (N[shape], bpb), textcoords="offset points",
-                xytext=(10, -4), fontsize=10, color="C2", fontweight="bold")
-    # band annotation at the optimal shape
-    dmin = min(DENSE[b].values()); mmin = min(MOE[b].values())
-    ax.annotate(f"band: {mmin:.3f}–{dmin:.3f}", (0.02, 0.02), xycoords="axes fraction",
-                fontsize=8, color="gray")
-    ax.set_xscale("log")
-    ax.set_xlabel("active non-embedding params N (millions)")
-    ax.set_ylabel("validation BPB (bits/byte, lower better)")
-    ax.set_title(f"IsoFLOP @ {b} FLOPs")
-    ax.grid(True, which="both", ls=":", alpha=0.4)
-    ax.legend(fontsize=9)
-fig.suptitle("Temporal MoE (6/64 experts resident) lands inside the dense↔MoE band", fontsize=12)
+                xytext=(10, -4), fontsize=9, color="C2", fontweight="bold")
+ax.set_xscale("log")
+ax.set_xlabel("active non-embedding params N (millions)")
+ax.set_ylabel("validation BPB (bits/byte, lower better)")
+ax.set_title("Temporal MoE (6/64 experts resident) lands inside the dense↔MoE band — both budgets\n"
+             "color = method, dashed = 1e16 / solid = 1e17; lower is better")
+ax.grid(True, which="both", ls=":", alpha=0.4)
+ax.legend(fontsize=9, ncol=2)
 fig.tight_layout()
 fig.savefig("results/phase0/temporal_minlogit_vs_baselines.png", dpi=130)
 print("wrote results/phase0/temporal_minlogit_vs_baselines.png")
