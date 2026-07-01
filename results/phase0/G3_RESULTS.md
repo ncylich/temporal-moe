@@ -6,7 +6,7 @@ dense floor. Config: mb=64, TE 1.11, seed 1234, `BPB_DIVISOR=2.7600`. **Lower BP
 All values **measured** from `results/phase0/runs/`. Split across H100 (@1e17 big shapes + fillers)
 and A6000 (small-shape temporal) per `docs/shared-fine-grained-moe.md`.
 
-**Status: 11/12 done** — all 6 MoE + 5 temporal (3 H100 + 2 A6000). Pending: temporal s1@1e17 (A6000, running ~46%).
+**Status: 12/12 done** — all 6 MoE + 6 temporal (3 H100 + 3 A6000). Complete.
 
 ## Both MoE parabolas — complete & bracketed (min unchanged vs G=1)
 
@@ -27,7 +27,7 @@ Dense floor = G=1 baseline (dense doesn't fine-grain; active params identical).
 | 1e16 | sm1 | 0.81M | 1.534 | 1.4786 | **1.4976** | 66% | G1 1.4891 |
 | 1e16 | **s0** | 1.42M | 1.519 | 1.4585 | **1.4753** | 72% | G1 1.4599 |
 | 1e16 | s1  | 3.91M | 1.591 | 1.5352 | **1.5861** | 9% | G1 1.5488 |
-| 1e17 | s1  | 3.91M | 1.361 | 1.2846 | *running (A6000)* | — | G1 1.3039 |
+| 1e17 | s1  | 3.91M | 1.361 | 1.2846 | **1.3065** | 71% | G1 1.3039 |
 | 1e17 | **s2** | 8.23M | 1.341 | 1.2708 | **1.2873** | 77% | G1 1.2821 |
 | 1e17 | s3  | 15.09M | 1.408 | 1.2815 | **1.3129** | 75% | G1 1.3073 |
 
@@ -39,13 +39,15 @@ The **off-optimal right-arm points are noisier**: s1@1e16 temporal (1.5861) reco
 beats the dense floor because the dense→MoE gap there is tiny (0.056) and the model is oversized/
 undertrained for the 1e16 budget (G1 temporal was also worst here at 83% but G3 is markedly worse). Net:
 the headline holds at the shapes that matter (18-of-192 resident, single swap/token keeps most of the MoE
-gain), with fine-graining costing a modest, consistent recovery penalty vs coarse experts. s1@1e17
-(the remaining point) will complete the 1e17 temporal parabola.
+gain), with fine-graining costing a modest, consistent recovery penalty vs coarse experts. The 1e17
+temporal parabola is now **complete and bracketed** — s1 1.3065 · **s2 1.2873 (min)** · s3 1.3129 — with
+the same compute-optimal shape (s2) as MoE/dense; s1@1e17 recovers 71%.
 
-## Remaining (A6000)
+## Complete (A6000)
 
-`g3_tmoe_s0_1e16` ✅ (1.4753) and `g3_tmoe_s1_1e16` ✅ (1.5861) done on the A6000 and filled in above.
-Only `g3_tmoe_s1_1e17` is still running (A6000, ~46%) → completes the 1e17 temporal parabola (left arm).
+All three A6000 temporal points done: `g3_tmoe_s0_1e16` (1.4753), `g3_tmoe_s1_1e16` (1.5861),
+`g3_tmoe_s1_1e17` (1.3065). Both G3 temporal parabolas are now bracketed.
+Combined graph: `results/phase0/g3_vs_g1_combined.png` (regenerate via `plot_g3_curves.py`).
 
 ## To finalize
 

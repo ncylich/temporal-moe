@@ -4,7 +4,7 @@
   linestyle = budget (dashed 1e16, solid 1e17)
   weight/marker = granularity (G1 6/64 thin+open circle+faded, G3 18/192 bold+filled square)
 All BPB measured (results/phase0/G3_RESULTS.md + baseline docs); lower is better.
-G3 temporal s1@1e17 still running on the A6000 -> omitted.
+All 12 G3 runs complete (G3 temporal s1@1e17 = 1.3065, the last A6000 point).
 """
 import numpy as np
 import matplotlib
@@ -23,7 +23,7 @@ MOE_G3   = {"1e16": {"sm1": 1.4786, "s0": 1.4585, "s1": 1.5352},
 TMP_G1   = {"1e16": {"sm1": 1.4891, "s0": 1.4599, "s1": 1.5488},
             "1e17": {"s1": 1.3039, "s2": 1.2821, "s3": 1.3073}}
 TMP_G3   = {"1e16": {"sm1": 1.4976, "s0": 1.4753, "s1": 1.5861},
-            "1e17": {"s2": 1.2873, "s3": 1.3129}}   # s1@1e17 running -> omitted
+            "1e17": {"s1": 1.3065, "s2": 1.2873, "s3": 1.3129}}
 
 # name, data, N-table, color, marker, facecolor, lw, alpha, label
 SERIES = [
