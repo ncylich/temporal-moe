@@ -10,6 +10,18 @@ Complements `temporal-moe.md §6` (systems/offloading prior work) and `cache-con
 Existing probes in-repo that already mirror these methods: `analysis/router_saturation.py`,
 `analysis/expert_coactivation.py`, `empirical_analysis/expert_specialization.*`.
 
+### Exact figures to open (verified against the papers)
+- **Mixtral** [2401.04088] §5: **Table 5** (% consecutive expert-assignment repetitions ← the mechanism),
+  **Fig 8** (tokens colored by expert — the visual), **Fig 7** (no domain specialization).
+- **Local Routing Consistency** [2505.16056]: **Fig 4** (SRP vs segment len), **Fig 8** (SCH vs len×cache),
+  **Table 1** (20 models ranked by SRP vs architecture), **Fig 7** (SRP vs specialization).
+- **OLMoE** [2409.02060] §5: **Fig 20** (router saturation, §5.1), **Fig 21** (co-activation, §5.2),
+  **Fig 22** (domain spec., §5.3), **Fig 23** (vocab spec., §5.4).
+- **DeepSeekMoE** [2401.06066] §4.5: **Fig 4** (Pile loss vs top-experts disabled ← explains our G3 dip),
+  **Fig 5** (loss vs #activated), **Fig 6** (half-activated comparison).
+- **Cache-Conditional** [2412.00099]: expert-lifetime result (~19–26 → ~55–76 tokens), results section.
+- **Only three?** Mixtral **Table 5** (mechanism) · OLMoE **Fig 20** (stability) · DeepSeekMoE **Fig 4** (fine-graining).
+
 ---
 
 ## A. The core mechanism — temporal/local routing coherence (*directly why a fixed set covers a window*)
