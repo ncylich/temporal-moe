@@ -59,8 +59,8 @@ will not be found after training. It must be trained in.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
 with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, and $10^{18}$ FLOPs
-that it recovers most of the MoE quality gain at a fraction of the resident memory, and is more
-robust to fine-grained experts than standard MoE training, and (iii) a mechanistic account showing
+that it recovers most of the MoE quality gain at a fraction of the resident memory, with
+preliminary evidence of robustness to fine-grained experts, and (iii) a mechanistic account showing
 the router internalizes the constraint, with two measured negative results that redirect future
 work from cache policy toward anticipation.
 
@@ -85,9 +85,9 @@ receives ordinary gate gradients on every resident it scores, which trains the s
 swap rule reads. The selection scan runs as a single-launch Triton kernel, verified bit-exact
 against a unit-tested reference, adding under 50\% to step time at our scales.
 
-We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) at two
-granularities, coarse G1 (6 of 64) and fine-grained G3 (18 of 192, DeepSeek-style splitting
-\cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over model
+We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
+a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 192, DeepSeek-style
+splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over model
 sizes (0.77M--14.8M active non-embedding parameters) with locked hyperparameters, reporting
 tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
@@ -111,7 +111,7 @@ the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory
   baselines' compute-optimal shapes; recovery at the optima is 82\%. \textbf{Right,} paper-scale
   points at $10^{18}$ FLOPs (validation cross-entropy). Dense 4.137, fine-grained MoE 4.009,
   fine-grained temporal 3.977, coarse MoE 3.921. Temporal recovers 74\% against the strongest MoE
-  and beats the full MoE at its own granularity by 0.032 nats.}
+  and beats the full MoE at its own granularity by 0.032 nats (single run, see text).}
   \label{fig:isoflop}
 \end{figure}
 
@@ -119,18 +119,20 @@ the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory
 
 \textbf{IsoFLOP bands.} Across every model size and both sweep budgets
 (Figure~\ref{fig:isoflop}, left), temporal MoE sits well inside the dense-to-MoE band, recovering
-72--82\% of the MoE uplift at compute-optimal sizes (82\% for G1 at both budgets, 72\% and 77\% for
-G3) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
+72--82\% of the MoE uplift at compute-optimal sizes (82\% for the coarse model at both budgets,
+72\% and 77\% fine-grained) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
 MoE baselines, so the constraint does not distort scaling geometry.
 
 \textbf{Paper scale and fine-graining robustness.} At $10^{18}$ FLOPs
 (Figure~\ref{fig:isoflop}, right) recovery is 74\%, consistent with the smaller budgets. The panel
-also contains a finding we did not anticipate. Splitting experts 3$\times$ costs the \emph{full}
-MoE 0.088 nats at this token budget, its 192 experts becoming individually undertrained, yet
-fine-grained temporal MoE beats the fine-grained full MoE by 0.032 nats. Rolling residency
-concentrates each span of tokens on a small resident set, so its experts see more data and train
-better. Temporal MoE is thus more robust to aggressive expert splitting than the training it
-approximates, and fine granularity is precisely what memory-constrained serving wants.
+also contains a suggestive observation. Splitting experts 3$\times$ costs the \emph{full} MoE
+0.088 nats at this token budget, its 192 experts becoming individually undertrained, while the
+fine-grained temporal model beats the fine-grained full MoE by 0.032 nats. A plausible mechanism
+is that rolling residency concentrates each span of tokens on a small resident set, so its experts
+see more data and train better. The caveats are equally plain. The fine-grained temporal model
+still trails the coarse full MoE (3.977 vs.\ 3.921), and we have observed the crossover once at a
+single budget, so it may reflect noise or another effect. Because fine granularity is what
+memory-constrained serving wants, confirming this robustness is a priority, not yet a claim.
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -159,25 +161,24 @@ time-multiplexed access to the full pool rather than a static subset.
   \label{fig:locality}
 \end{figure}
 
-\section{What caching intuition does not transfer}
+\section{Outlook and next steps}
 
-Two natural follow-ups fail informatively. An explicit coherence loss pulling router logits toward
-the resident set hurts monotonically at every weight scanned; the constraint is already
-internalized, and a backward-looking gradient adds nothing the router lacks. And replaying logged
-routing through better eviction shows offline-optimal eviction is worth only +6--10 points of
-hit-rate over our greedy rule (LRU is 7 points worse), while an oracle selecting swaps by
-short-horizon \emph{future} demand gains +20--30 points. The headroom is anticipation, not cache
-policy.
+Two early probes shape the roadmap. An explicit coherence loss pulling router logits toward the
+resident set hurts monotonically at every weight scanned; the constraint is already internalized,
+and a backward-looking gradient adds nothing the router lacks. And replaying logged routing through
+better eviction shows offline-optimal eviction is worth only +6--10 points of hit-rate over our
+greedy rule (LRU is 7 points worse), while an oracle selecting swaps by short-horizon \emph{future}
+demand gains +20--30 points. The headroom is anticipation, not cache policy.
 
-\section{Outlook}
-
-The recovery deficit is a stable, attackable 18--26\%. We are pursuing decision-time mechanisms, a
-swap margin on smoothed demand to spend fewer, better swaps, and an anticipatory training loss
-whose targets are discounted future expert demand, new information rather than imitation of the
-past. Beyond closing the gap, the highest-leverage directions are converting released MoE
-checkpoints by router-only adaptation under the residency mask, and downstream task evaluation of
-the existing checkpoint pairs. If either matches the pretraining results, temporal routing becomes
-a general recipe for serving MoE-class models in the memory of their active parameters.
+The recovery deficit is therefore a stable, attackable 18--26\%, and we are pursuing it with
+decision-time mechanisms, a swap margin on smoothed demand to spend fewer, better swaps, and an
+anticipatory training loss whose targets are discounted future expert demand, new information
+rather than imitation of the past. We are also weighing auxiliary-loss-free, DeepSeek-inspired
+designs that replace routing losses with gradient-free selection biases \cite{wang2024auxfree}.
+Beyond closing the gap, the highest-leverage directions are converting released MoE checkpoints by
+router-only adaptation under the residency mask, and downstream task evaluation of the existing
+checkpoint pairs. If either matches the pretraining results, temporal routing becomes a general
+recipe for serving MoE-class models in the memory of their active parameters.
 
 \begingroup
 \footnotesize
@@ -223,6 +224,11 @@ J.~Zhu et al.
 N.~Muennighoff et al.
 \newblock OLMoE: open mixture-of-experts language models.
 \newblock \emph{arXiv:2409.02060}, 2024.
+
+\bibitem{wang2024auxfree}
+L.~Wang et al.
+\newblock Auxiliary-loss-free load balancing strategy for mixture-of-experts.
+\newblock \emph{arXiv:2408.15664}, 2024.
 
 \end{thebibliography}
 \endgroup
