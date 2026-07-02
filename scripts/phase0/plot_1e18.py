@@ -25,23 +25,22 @@ if PAPER:
 # (gray dense, blue MoE, green temporal), shade = granularity (coarse normal / fine dark).
 # Only dense is A6000 cross-data (different val split, within ~0.01 nats) — noted in the caption;
 # the other four are local, one shared split. Coarse arms: two seeds each (val@2121 basis),
-# bar = seed mean, dots = individual seeds.
-SEEDS  = {3: [3.9209, 3.9336], 4: [3.9121, 3.9074]}   # bar index -> seed values
+# bar = seed mean. Error bars: MEASURED two-seed half-ranges on the coarse bars (MoE 0.0064,
+# temporal 0.0024); the single-seed fine bars carry the METHOD-MATCHED coarse half-range as an
+# estimate; dense carries its documented +/-0.01 cross-data uncertainty.
 ce     = [4.137, 4.0087, 3.9768, 3.9273, 3.9098]      # coarse bars = two-seed means
+yerr   = [0.010, 0.0064, 0.0024, 0.0064, 0.0024]      # dense xdata | fine est. | coarse measured
 colors = ["#7f7f7f", "#0d3b66", "#145a14", "#5aa0dd", "#5cc85c"]
 labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "temporal\ncoarse"] if PAPER else
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
            "full MoE\ncoarse (6 of 64)", "temporal\ncoarse (6 of 64)"])
 
 fig, ax = plt.subplots(figsize=(5.4, 4.0) if PAPER else (8.6, 5.8))
-bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6)
-for i, (b, v) in enumerate(zip(bars, ce)):
-    lab_y = max([v] + SEEDS.get(i, [])) + 0.004
-    ax.text(b.get_x()+b.get_width()/2, lab_y, f"{v:.3f}", ha="center",
+bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6,
+              yerr=yerr, capsize=(4 if PAPER else 5), error_kw=dict(lw=1.3, ecolor="k", zorder=5))
+for b, v, e in zip(bars, ce, yerr):
+    ax.text(b.get_x()+b.get_width()/2, v + e + 0.005, f"{v:.3f}", ha="center",
             fontsize=(11 if PAPER else 10.5), fontweight="bold")
-    if i in SEEDS:
-        xc = b.get_x() + b.get_width()/2
-        ax.plot([xc]*len(SEEDS[i]), SEEDS[i], "o", color="k", ms=4, zorder=5)
 ax.grid(True, axis="y", ls=":", alpha=0.4)
 
 if PAPER:
