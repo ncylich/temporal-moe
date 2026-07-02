@@ -55,6 +55,8 @@ with the reason it exists.
   compute budget (circle $10^{16}$, triangle $10^{17}$), equal line weight + opacity. One canonical
   figure/script: `fine_grained_vs_coarse_experts_isoflop*.png` from `plot_g3_curves.py`. Superseded
   coarse-only / dense-only isoFLOP figures and their scripts were deleted — don't reintroduce them.
+- **Reuse that same hue+shade scheme on other quality graphs** (e.g. the 1e18 bars, `plot_1e18.py`):
+  solid bars, no hatching (reads as noise); note any cross-data / different-split bars in the caption.
 
 ## Build
 `cd paper && pdflatex main.tex` twice (uses `neurips_2024.sty` if present, else a plain-article
