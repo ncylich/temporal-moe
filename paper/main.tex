@@ -1,0 +1,230 @@
+% Temporal Mixture-of-Experts, short technical report (~2 pages).
+% Compiles with the official NeurIPS style if neurips_2024.sty is present,
+% otherwise falls back to a plain article layout.
+\documentclass{article}
+
+\IfFileExists{neurips_2024.sty}
+  {\usepackage[preprint]{neurips_2024}}
+  {\usepackage[margin=1in]{geometry}}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\usepackage[font=small,skip=4pt]{caption}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\title{Temporal Mixture-of-Experts:\\ Serving Memory that Scales with Active Parameters}
+
+\author{%
+  Noah Cylich\\
+  \texttt{noahcylich@gmail.com}\\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Mixture-of-Experts (MoE) models improve language model quality by activating only a small fraction
+of parameters per token, but serving them still requires the full expert pool in memory. We study
+\emph{temporal MoE}, which enforces expert reuse across neighboring tokens so serving memory can
+scale with active rather than total parameters. Unlike post-hoc caching or offloading, locality is
+imposed as a training-time constraint. A rolling-residency router keeps only the $k$ active experts
+of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
+spanning $10^{16}$ to $10^{18}$ FLOPs, temporal MoE recovers 72--82\% of the MoE-over-dense quality
+uplift at compute-optimal sizes with 6 of 64 experts resident, a 5.7$\times$ reduction in resident
+memory. The trained router internalizes the constraint, roughly doubling its temporal
+self-consistency over vanilla routing, and recovery is stable across three orders of magnitude of
+compute. Trained temporal routing is a practical path toward MoE-quality models under
+memory-constrained serving.
+\end{abstract}
+
+\section{Introduction}
+
+Sparse MoE layers buy quality with total parameters while paying compute only for the $k$ experts
+active per token \cite{shazeer2017,dai2024deepseekmoe,jiang2024mixtral}. Serving inverts the
+bargain. In FLAME-MoE-1.7B \cite{kang2025flame}, routed experts hold 91\% of all weights, yet every
+expert must sit in fast memory even though most do nothing for a given token. Offloading systems
+stream experts from slower storage on demand \cite{eliseev2023,skliar2024}, but per-token offload
+is bandwidth-infeasible. Hiding one expert miss costs roughly the fast-to-slow bandwidth ratio,
+20--110 resident-expert computations on modern hardware, while only $k\!\approx\!6$--$8$ experts of
+work exist per layer to hide it behind. Caching lowers the miss rate, not the miss cost, and
+vanilla routers give it little to work with, as consecutive tokens share only about 20\% of their
+expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,zhu2025}. The locality serving needs
+will not be found after training. It must be trained in.
+
+We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
+with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, and $10^{18}$ FLOPs
+that it recovers most of the MoE quality gain at a fraction of the resident memory, and is more
+robust to fine-grained experts than standard MoE training, and (iii) a mechanistic account showing
+the router internalizes the constraint, with two measured negative results that redirect future
+work from cache policy toward anticipation.
+
+\section{Method}
+
+Each MoE layer with $E$ routed experts keeps a resident set $S_t$ of fixed size $K=k$, the routing
+width. Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
+non-resident expert $n_t=\arg\max_{e\notin S_{t-1}}R_t[e]$ and swaps it in only if it beats the
+worst resident, evicting that resident,
+\begin{equation}
+S_t=
+\begin{cases}
+\bigl(S_{t-1}\setminus\{\arg\min_{e\in S_{t-1}}R_t[e]\}\bigr)\cup\{n_t\}, & R_t[n_t]>\min_{e\in S_{t-1}}R_t[e],\\[1pt]
+S_{t-1}, & \text{otherwise.}
+\end{cases}
+\end{equation}
+At most one expert moves per token, so the transfer overlaps the compute of the other $k-1$
+residents within the layer. The token is served by $S_t$ with gates from the softmax of resident
+logits, and $S_0$ cold-fills from the first token's top-$k$. Training uses the standard language
+modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
+receives ordinary gate gradients on every resident it scores, which trains the scoring function the
+swap rule reads. The selection scan runs as a single-launch Triton kernel, verified bit-exact
+against a unit-tested reference, adding under 50\% to step time at our scales.
+
+We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) at two
+granularities, coarse G1 (6 of 64) and fine-grained G3 (18 of 192, DeepSeek-style splitting
+\cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over model
+sizes (0.77M--14.8M active non-embedding parameters) with locked hyperparameters, reporting
+tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
+matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
+$(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$. At $10^{18}$ FLOPs we replicate
+FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy. With $K=k=6$ of 64
+the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$.
+
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[t]{0.555\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_full_moe_isoflop.png}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.42\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy.png}
+  \end{minipage}
+  \caption{\textbf{Left,} isoFLOP curves at fixed compute ($10^{16}$ dashed, $10^{17}$ solid;
+  validation BPB, lower is better). Temporal MoE (green, 6 of 64 resident) lands inside the
+  dense-to-MoE band at every size, tracks 0.01--0.02 BPB above the full MoE, and preserves both
+  baselines' compute-optimal shapes; recovery at the optima is 82\%. \textbf{Right,} paper-scale
+  points at $10^{18}$ FLOPs (validation cross-entropy). Dense 4.137, fine-grained MoE 4.009,
+  fine-grained temporal 3.977, coarse MoE 3.921. Temporal recovers 74\% against the strongest MoE
+  and beats the full MoE at its own granularity by 0.032 nats.}
+  \label{fig:isoflop}
+\end{figure}
+
+\section{Results}
+
+\textbf{IsoFLOP bands.} Across every model size and both sweep budgets
+(Figure~\ref{fig:isoflop}, left), temporal MoE sits well inside the dense-to-MoE band, recovering
+72--82\% of the MoE uplift at compute-optimal sizes (82\% for G1 at both budgets, 72\% and 77\% for
+G3) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
+MoE baselines, so the constraint does not distort scaling geometry.
+
+\textbf{Paper scale and fine-graining robustness.} At $10^{18}$ FLOPs
+(Figure~\ref{fig:isoflop}, right) recovery is 74\%, consistent with the smaller budgets. The panel
+also contains a finding we did not anticipate. Splitting experts 3$\times$ costs the \emph{full}
+MoE 0.088 nats at this token budget, its 192 experts becoming individually undertrained, yet
+fine-grained temporal MoE beats the fine-grained full MoE by 0.032 nats. Rolling residency
+concentrates each span of tokens on a small resident set, so its experts see more data and train
+better. Temporal MoE is thus more robust to aggressive expert splitting than the training it
+approximates, and fine granularity is precisely what memory-constrained serving wants.
+
+\textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
+under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
+next-token self-consistency roughly doubles over vanilla routing at every scale probed. The effect
+is streaming, not collapse. Over a 2048-token sequence a temporal model still touches 83--97\% of
+its expert pool, and no expert is resident more than 39\% of the time, so quality comes from
+time-multiplexed access to the full pool rather than a static subset.
+
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[t]{0.565\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/expert_selection_per_token_8M_model.png}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.41\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/learned_temporal_locality_vs_model_size.png}
+  \end{minipage}
+  \caption{\textbf{The router learns the locality it is constrained to. Left,} experts active per
+  token (8.1M model, deepest MoE layer). The vanilla MoE (top) scatters, the temporal resident set
+  (middle) forms long streaks, and the temporal router's \emph{unconstrained} preference (bottom,
+  mask removed) is also streaked, so the model wants stable experts rather than merely tolerating
+  them. \textbf{Right,} overlap between a token's free top-$k$ and the previous active set,
+  30--38\% for temporal vs.\ 19--21\% vanilla and 9.4\% random, flat from 1.4M to 38M active
+  parameters.}
+  \label{fig:locality}
+\end{figure}
+
+\section{What caching intuition does not transfer}
+
+Two natural follow-ups fail informatively. An explicit coherence loss pulling router logits toward
+the resident set hurts monotonically at every weight scanned; the constraint is already
+internalized, and a backward-looking gradient adds nothing the router lacks. And replaying logged
+routing through better eviction shows offline-optimal eviction is worth only +6--10 points of
+hit-rate over our greedy rule (LRU is 7 points worse), while an oracle selecting swaps by
+short-horizon \emph{future} demand gains +20--30 points. The headroom is anticipation, not cache
+policy.
+
+\section{Outlook}
+
+The recovery deficit is a stable, attackable 18--26\%. We are pursuing decision-time mechanisms, a
+swap margin on smoothed demand to spend fewer, better swaps, and an anticipatory training loss
+whose targets are discounted future expert demand, new information rather than imitation of the
+past. Beyond closing the gap, the highest-leverage directions are converting released MoE
+checkpoints by router-only adaptation under the residency mask, and downstream task evaluation of
+the existing checkpoint pairs. If either matches the pretraining results, temporal routing becomes
+a general recipe for serving MoE-class models in the memory of their active parameters.
+
+\begingroup
+\footnotesize
+\begin{thebibliography}{9}
+\itemsep1pt
+
+\bibitem{shazeer2017}
+N.~Shazeer et al.
+\newblock Outrageously large neural networks: the sparsely-gated mixture-of-experts layer.
+\newblock \emph{arXiv:1701.06538}, 2017.
+
+\bibitem{dai2024deepseekmoe}
+D.~Dai et al.
+\newblock DeepSeekMoE: towards ultimate expert specialization in mixture-of-experts language models.
+\newblock \emph{arXiv:2401.06066}, 2024.
+
+\bibitem{jiang2024mixtral}
+A.~Q. Jiang et al.
+\newblock Mixtral of experts.
+\newblock \emph{arXiv:2401.04088}, 2024.
+
+\bibitem{kang2025flame}
+H.~Kang, Z.~Yu, and C.~Xiong.
+\newblock FLAME-MoE: a transparent end-to-end research platform for mixture-of-experts language models.
+\newblock \emph{arXiv:2505.20225}, 2025.
+
+\bibitem{eliseev2023}
+A.~Eliseev and D.~Mazur.
+\newblock Fast inference of mixture-of-experts language models with offloading.
+\newblock \emph{arXiv:2312.17238}, 2023.
+
+\bibitem{skliar2024}
+A.~Skliar et al.
+\newblock Mixture of cache-conditional experts for efficient mobile device inference.
+\newblock \emph{arXiv:2412.00099}, 2024.
+
+\bibitem{zhu2025}
+J.~Zhu et al.
+\newblock Not all models suit expert offloading: on local routing consistency of mixture-of-expert models.
+\newblock \emph{arXiv:2505.16056}, 2025.
+
+\bibitem{muennighoff2024olmoe}
+N.~Muennighoff et al.
+\newblock OLMoE: open mixture-of-experts language models.
+\newblock \emph{arXiv:2409.02060}, 2024.
+
+\end{thebibliography}
+\endgroup
+
+\end{document}
