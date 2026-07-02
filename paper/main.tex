@@ -5,7 +5,7 @@
 
 \IfFileExists{neurips_2024.sty}
   {\usepackage[preprint]{neurips_2024}}
-  {\usepackage[hmargin=1in,vmargin=0.72in]{geometry}}
+  {\usepackage[margin=1in]{geometry}}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -14,7 +14,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{microtype}
-\usepackage[font=small,skip=3pt]{caption}
+\usepackage[font=small,skip=4pt]{caption}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 \title{Temporal Mixture-of-Experts:\\ Serving Memory that Scales with Active Parameters}
@@ -28,7 +28,7 @@
 
 \maketitle
 
-\begin{abstract}
+\begin{abstract}\normalsize
 Mixture-of-Experts (MoE) models improve language model quality by activating only a small fraction
 of parameters per token, but serving them still requires the full expert pool in memory. We study
 \emph{temporal MoE}, which enforces expert reuse across neighboring tokens so serving memory can
@@ -77,21 +77,23 @@ S_t=
 S_{t-1}, & \text{otherwise.}
 \end{cases}
 \end{equation}
-At most one expert moves per token so that its transfer can hide behind compute. At small batch the
-expert FFN is memory-bandwidth-bound, so serving the $k-1$ already-resident experts reads
-$(k-1)\,b$ bytes from fast memory while the incoming expert streams its $b$ bytes from slower
-storage, and the load is fully masked when
-$b/\mathrm{BW}_{\mathrm{slow}}\le(k-1)\,b/\mathrm{BW}_{\mathrm{fast}}$, that is, once $k-1$
-approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM over NVMe). The expert size $b$
-cancels, so the condition depends only on the routing width, which DeepSeek-style fine-graining
-toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. We also plan to
-explore computing the router earlier in the network than its experts' computation, lengthening the
-window available to mask each load. The token is served by $S_t$ with gates from the softmax of resident
-logits, and $S_0$ cold-fills from the first token's top-$k$. Training uses the standard language
+At most one expert moves per token. The token is served by $S_t$ with gates from the softmax of
+resident logits, and $S_0$ cold-fills from the first token's top-$k$. Training uses the standard language
 modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
 receives ordinary gate gradients on every resident it scores, which trains the scoring function the
 swap rule reads. The selection scan runs as a single-launch Triton kernel, verified bit-exact
 against a unit-tested reference, adding under 50\% to step time at our scales.
+
+The single-swap budget is what lets the load hide behind compute. At small batch the expert FFN is
+memory-bandwidth-bound, so serving the $k-1$ already-resident experts reads $(k-1)\,b$ bytes from
+fast memory while the incoming expert streams its $b$ bytes from slower storage, and the load is
+fully masked when $b/\mathrm{BW}_{\mathrm{slow}}\le(k-1)\,b/\mathrm{BW}_{\mathrm{fast}}$, that
+is, once $k-1$ approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM over NVMe). The
+expert size $b$ cancels, so the condition depends only on the routing width, which DeepSeek-style
+fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 6
+of 64 experts resident the routed-expert footprint shrinks 10.7$\times$ and whole-model resident
+memory 5.7$\times$. We also plan to explore computing the router earlier in the network than its
+experts' computation, lengthening the window available to mask each load.
 
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
 a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 192, DeepSeek-style
@@ -100,16 +102,15 @@ sizes (0.77M--14.8M active non-embedding parameters) with locked hyperparameters
 tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
 $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$. At $10^{18}$ FLOPs we replicate
-FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy. With 6 of 64 experts resident
-the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$.
+FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
 
 \begin{figure}[t]
   \centering
-  \begin{minipage}[t]{0.535\linewidth}
+  \begin{minipage}[t]{0.555\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_full_moe_isoflop.png}
   \end{minipage}\hfill
-  \begin{minipage}[t]{0.40\linewidth}
+  \begin{minipage}[t]{0.42\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy.png}
   \end{minipage}
@@ -145,11 +146,11 @@ time-multiplexed access to the full pool rather than a static subset.
 
 \begin{figure}[t]
   \centering
-  \begin{minipage}[t]{0.54\linewidth}
+  \begin{minipage}[t]{0.565\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/expert_selection_per_token_8M_model.png}
   \end{minipage}\hfill
-  \begin{minipage}[t]{0.39\linewidth}
+  \begin{minipage}[t]{0.41\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/learned_temporal_locality_vs_model_size.png}
   \end{minipage}
@@ -190,10 +191,8 @@ future where users can run extremely sparse models, imagine a Kimi-K2.X-scale mo
 running at similar performance, completely locally on quantized consumer GPU hardware.
 Near-state-of-the-art models will be accessible, privately and safely, to the average person.
 
-\begingroup
-\scriptsize
+\clearpage
 \begin{thebibliography}{10}
-\itemsep0pt
 
 \bibitem{shazeer2017}
 N.~Shazeer et al.
@@ -246,6 +245,5 @@ Kimi Team.
 \newblock \emph{arXiv:2507.20534}, 2025.
 
 \end{thebibliography}
-\endgroup
 
 \end{document}
