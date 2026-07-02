@@ -64,9 +64,9 @@ def _draw_raster(panels, k, E, L, tag, outfile):
     fig, axes = plt.subplots(len(panels), 1, figsize=(fig_w, per_panel*len(panels)+0.6), sharex=True)
     if len(panels) == 1: axes = [axes]
     for ax, (title, M, c) in zip(axes, panels):
-        ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(1.5 if PAPER else 6), c=c, marker="s", linewidths=0)
-        ax.set_ylabel("expert"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
-        ax.set_ylim(-1, E); ax.grid(True, ls=":", alpha=0.3)
+        ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(2.4 if PAPER else 6), c=c, marker="o", linewidths=0)
+        ax.set_ylabel("expert idx"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
+        ax.set_ylim(-1, E); ax.set_yticks([0, (E-1)//2, E-1]); ax.grid(True, ls=":", alpha=0.3)
     axes[-1].set_xlabel("token position" if PAPER else f"token position (sequence 0, MoE layer {L})")
     if PAPER:
         fig.suptitle(f"Experts active per token ({k} of {E})", fontsize=16)
