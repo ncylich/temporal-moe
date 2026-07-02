@@ -5,7 +5,7 @@
 
 \IfFileExists{neurips_2024.sty}
   {\usepackage[preprint]{neurips_2024}}
-  {\usepackage[hmargin=1in,vmargin=0.85in]{geometry}}
+  {\usepackage[hmargin=1in,vmargin=0.72in]{geometry}}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -14,7 +14,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{microtype}
-\usepackage[font=small,skip=4pt]{caption}
+\usepackage[font=small,skip=3pt]{caption}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 \title{Temporal Mixture-of-Experts:\\ Serving Memory that Scales with Active Parameters}
@@ -66,8 +66,8 @@ work from cache policy toward anticipation.
 
 \section{Method}
 
-Each MoE layer with $E$ routed experts keeps a resident set $S_t$ of fixed size $K=k$, the routing
-width. Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
+Each MoE layer with $E$ routed experts keeps only its $k$ active experts resident, a set $S_t$
+with $|S_t|=k$. Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
 non-resident expert $n_t=\arg\max_{e\notin S_{t-1}}R_t[e]$ and swaps it in only if it beats the
 worst resident, evicting that resident,
 \begin{equation}
@@ -77,8 +77,16 @@ S_t=
 S_{t-1}, & \text{otherwise.}
 \end{cases}
 \end{equation}
-At most one expert moves per token, so the transfer overlaps the compute of the other $k-1$
-residents within the layer. The token is served by $S_t$ with gates from the softmax of resident
+At most one expert moves per token so that its transfer can hide behind compute. At small batch the
+expert FFN is memory-bandwidth-bound, so serving the $k-1$ already-resident experts reads
+$(k-1)\,b$ bytes from fast memory while the incoming expert streams its $b$ bytes from slower
+storage, and the load is fully masked when
+$b/\mathrm{BW}_{\mathrm{slow}}\le(k-1)\,b/\mathrm{BW}_{\mathrm{fast}}$, that is, once $k-1$
+approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM over NVMe). The expert size $b$
+cancels, so the condition depends only on the routing width, which DeepSeek-style fine-graining
+toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. We also plan to
+explore computing the router earlier in the network than its experts' computation, lengthening the
+window available to mask each load. The token is served by $S_t$ with gates from the softmax of resident
 logits, and $S_0$ cold-fills from the first token's top-$k$. Training uses the standard language
 modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
 receives ordinary gate gradients on every resident it scores, which trains the scoring function the
@@ -92,16 +100,16 @@ sizes (0.77M--14.8M active non-embedding parameters) with locked hyperparameters
 tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
 $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$. At $10^{18}$ FLOPs we replicate
-FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy. With $K=k=6$ of 64
+FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy. With 6 of 64 experts resident
 the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$.
 
 \begin{figure}[t]
   \centering
-  \begin{minipage}[t]{0.555\linewidth}
+  \begin{minipage}[t]{0.535\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_full_moe_isoflop.png}
   \end{minipage}\hfill
-  \begin{minipage}[t]{0.42\linewidth}
+  \begin{minipage}[t]{0.40\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy.png}
   \end{minipage}
@@ -137,11 +145,11 @@ time-multiplexed access to the full pool rather than a static subset.
 
 \begin{figure}[t]
   \centering
-  \begin{minipage}[t]{0.565\linewidth}
+  \begin{minipage}[t]{0.54\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/expert_selection_per_token_8M_model.png}
   \end{minipage}\hfill
-  \begin{minipage}[t]{0.41\linewidth}
+  \begin{minipage}[t]{0.39\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/learned_temporal_locality_vs_model_size.png}
   \end{minipage}
@@ -183,7 +191,7 @@ running at similar performance, completely locally on quantized consumer GPU har
 Near-state-of-the-art models will be accessible, privately and safely, to the average person.
 
 \begingroup
-\footnotesize
+\scriptsize
 \begin{thebibliography}{10}
 \itemsep0pt
 
