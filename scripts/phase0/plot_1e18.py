@@ -19,19 +19,21 @@ if PAPER:
     plt.rcParams.update({"font.size": 15, "axes.titlesize": 15, "axes.labelsize": 15,
                          "xtick.labelsize": 12, "ytick.labelsize": 13})
 
-# worst -> best CE (left -> right); all four measured on one val split
-ce     = [4.137, 4.0087, 3.9768, 3.9209]
-colors = ["C3", "C0", "C2", "C0"]
-labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse"] if PAPER else
+# worst -> best CE (left -> right). Colors match the left isoFLOP figure: hue = method
+# (gray dense, blue MoE, green temporal), shade = granularity (coarse normal / fine dark).
+# hatched bars = A6000 cross-data (different val split, within ~0.01 nats); solid = one local split.
+ce     = [4.137, 4.0087, 3.9768, 3.9209, 3.906]
+colors = ["#7f7f7f", "#0d3b66", "#145a14", "#5aa0dd", "#5cc85c"]
+hatch  = ["//", "", "", "", "//"]                       # dense + temporal-coarse are cross-data
+labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "temporal\ncoarse"] if PAPER else
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
-           "full MoE\ncoarse (6 of 64)"])
+           "full MoE\ncoarse (6 of 64)", "temporal\ncoarse (6 of 64)"])
 
-fig, ax = plt.subplots(figsize=(4.8, 4.0) if PAPER else (8.0, 5.8))
-bars = ax.bar(labels, ce, color=colors, width=0.62, edgecolor="k", linewidth=0.6)
-bars[1].set_alpha(0.5)                                  # fine-grained full MoE (measured)
+fig, ax = plt.subplots(figsize=(5.4, 4.0) if PAPER else (8.6, 5.8))
+bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6, hatch=hatch)
 for b, v in zip(bars, ce):
     ax.text(b.get_x()+b.get_width()/2, v+0.004, f"{v:.3f}", ha="center",
-            fontsize=(12 if PAPER else 10.5), fontweight="bold")
+            fontsize=(11 if PAPER else 10.5), fontweight="bold")
 ax.grid(True, axis="y", ls=":", alpha=0.4)
 
 if PAPER:
@@ -58,10 +60,10 @@ else:
                  "but temporal routing is robust — and stays inside the dense↔MoE band")
     fig.text(0.5, 0.005,
              "Validation cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
-             "dclm). 'full MoE' = standard top-k routing at coarse (64 experts, top-6) or fine-grained (192 "
-             "experts, top-18) granularity; 'temporal' = rolling residency (keep top-k resident, swap 1/token); "
-             "'dense baseline' = plain feed-forward. Faded blue = fine-grained full MoE. All four measured on "
-             "one val split.", ha="center", fontsize=7.8, wrap=True)
+             "dclm). Hue = method (dense gray, MoE blue, temporal green); shade = granularity (coarse normal, "
+             "fine-grained dark). 'temporal' = rolling residency (keep top-k resident, swap 1/token). Hatched "
+             "bars (dense, coarse temporal) are A6000 cross-data (different val split, within ~0.01 nats); the "
+             "other three share one local split.", ha="center", fontsize=7.8, wrap=True)
     fig.tight_layout(rect=[0, 0.09, 1, 1])
     out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png"
 fig.savefig(out, dpi=200)

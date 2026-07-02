@@ -32,7 +32,7 @@ The temporal config reported below is **min_logit eviction, 1 shared expert** (t
 ## Results at 1e16 and 1e17 (our IsoFLOP sweeps, BPB)
 
 Full curves: dense floor vs full MoE (1 shared) vs temporal, over dense-matched shapes. Figure:
-`results/phase0/figures/temporal_vs_dense_and_full_moe_isoflop.png` (combined single-axes, both budgets).
+`results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png` (combined single-axes, both budgets).
 
 **@1e16** (compute-optimal shape s0):
 | shape | N_active | dense | MoE | **temporal** | recovery* |
@@ -102,6 +102,6 @@ it **raises hard** (no silent fallback) so a bug crashes the run rather than deg
 - Router + tests: `scripts/phase0/temporal_router.py`, `test_temporal_router.py`; entrypoint
   `pretrain_temporal.py` (monkeypatches `TopKRouter.forward`).
 - 1e16/1e17: `run.sh TEMPORAL=1 TEMPORAL_EVICT=min_logit` via `temporal_matrix.sh` /
-  `temporal_minlogit_1e17.sh` / `temporal_minlogit_sh1_sweep.txt`. Plot: `plot_temporal_final.py`.
+  `temporal_minlogit_1e17.sh` / `temporal_minlogit_sh1_sweep.txt`. Plot: `plot_g3_curves.py`.
 - 1e18: `flame38m_temporal.sh` (temporal) and `flame38m_temporal.sh` with `DENSE=1` (floor).
   Plot: `plot_1e18.py`.

@@ -343,7 +343,7 @@ BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py \
   results/phase0/runs/v16k_sweep_s2_1e17
 
 grep "SUMMARY" results/phase0/log.md          # the measured ledger, one line per run
-.venv/bin/python scripts/phase0/plot_dense_vs_moe.py   # regenerate the comparison plot
+.venv/bin/python scripts/phase0/plot_g3_curves.py   # regenerate the comparison plot
 ```
 
 ## 11. Monitoring commands (what we actually ran)
@@ -412,7 +412,7 @@ rm -rf results/phase0/runs/<this>
 | `scripts/phase0/drive.sh` | serial driver over a configs file; idempotent skip; parse+log (§8a) |
 | `scripts/phase0/parse_run.py` | train.log → final/at-1e16 BPB (`BPB_DIVISOR`) |
 | `scripts/phase0/expert_load.py` | per-expert load, criterion 4 (§5 Step 5) |
-| `scripts/phase0/plot_dense_vs_moe.py` | dense-vs-MoE parabola plot (§6) |
+| `scripts/phase0/plot_g3_curves.py` | dense-vs-MoE parabola plot (§6) |
 | `results/phase0/log.md` | append-only measured-results ledger |
 | `results/phase0/{RESULTS,PASS,DENSE_BASELINES}.md` | writeups |
 | `*.txt` (sweep_*, dense_*, dense_ext_*) | driver config lists |

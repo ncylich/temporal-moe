@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
-"""Combined single-axes IsoFLOP figure (matches plot_temporal_final.py style):
-  color   = method   (dense gray, MoE blue, temporal green)
-  linestyle = budget (dashed 1e16, solid 1e17)
-  weight/marker = granularity (G1 6/64 thin+open circle+faded, G3 18/192 bold+filled square)
-All BPB measured (results/phase0/G3_RESULTS.md + baseline docs); lower is better.
-All 12 G3 runs complete (G3 temporal s1@1e17 = 1.3065, the last A6000 point).
+"""THE standard IsoFLOP figure: coarse + fine-grained, all methods, both budgets, one axes.
+
+Encoding standard (keep this for every isoFLOP-style graph going forward):
+  color  = method       (dense gray, MoE blue, temporal green)
+  shade  = granularity  (coarse = normal color, fine-grained = dark color)
+  marker = compute budget (10^16 = circle, 10^17 = triangle)
+Equal line weight + opacity so no series overpowers another. All BPB measured
+(results/phase0/G3_RESULTS.md + baseline docs); lower is better.
 
 --no-caption = paper mode: compact figsize + short title/labels + large fonts + no baked caption
-(detail goes in the LaTeX caption). Output gets a _nocaption suffix. Default mode is unchanged.
+(detail goes in the LaTeX caption). Output gets a _nocaption suffix.
 """
 import os, sys
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 PAPER = "--no-caption" in sys.argv
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if PAPER:
     plt.rcParams.update({"font.size": 15, "axes.titlesize": 15, "axes.labelsize": 15,
-                         "xtick.labelsize": 13, "ytick.labelsize": 13, "legend.fontsize": 11})
+                         "xtick.labelsize": 13, "ytick.labelsize": 13, "legend.fontsize": 9.5})
 
 N_G1 = {"sm1": 0.770, "s0": 1.361, "s1": 3.812, "s2": 8.115, "s3": 14.774}
 N_G3 = {"sm1": 0.81, "s0": 1.42, "s1": 3.91, "s2": 8.23, "s3": 15.09}
@@ -35,51 +38,57 @@ TMP_G1   = {"1e16": {"sm1": 1.4891, "s0": 1.4599, "s1": 1.5488},
 TMP_G3   = {"1e16": {"sm1": 1.4976, "s0": 1.4753, "s1": 1.5861},
             "1e17": {"s1": 1.3065, "s2": 1.2873, "s3": 1.3129}}
 
-# Balanced encoding: color = method, dashed/solid = budget, marker FILL = granularity
-# (open = coarse, filled = fine). Equal line weight + opacity so neither grain overpowers the other.
-# name, data, N-table, color, marker, facecolor, label, short-label (paper)
-SERIES = [
-    ("dense_g1", DENSE_G1, N_G1, "0.5", "x", "0.5",  "dense baseline",                    "dense"),
-    ("moe_g1",   MOE_G1,   N_G1, "C0",  "o", "none", "full MoE, coarse (6 of 64)",        "MoE · coarse"),
-    ("tmp_g1",   TMP_G1,   N_G1, "C2",  "o", "none", "temporal, coarse (6 of 64)",        "temporal · coarse"),
-    ("moe_g3",   MOE_G3,   N_G3, "C0",  "o", "C0",   "full MoE, fine-grained (18 of 192)","MoE · fine"),
-    ("tmp_g3",   TMP_G3,   N_G3, "C2",  "o", "C2",   "temporal, fine-grained (18 of 192)","temporal · fine"),
-]
-LSTYLE = {"1e16": "--", "1e17": "-"}
+# color = method, shade = granularity (coarse normal / fine dark)
+DENSE_C = "#7f7f7f"
+MOE_COARSE, MOE_FINE = "#5aa0dd", "#0d3b66"
+TMP_COARSE, TMP_FINE = "#5cc85c", "#145a14"
+MK = {"1e16": "o", "1e17": "^"}   # marker = compute budget
 
-fig, ax = plt.subplots(figsize=(6.1, 4.2) if PAPER else (10.5, 6.6))
-for key, data, Ntab, color, mk, fc, label, short in SERIES:
-    lw = 1.4 if key == "dense_g1" else 1.9
+# data, N-table, color, lw, label, short-label (paper)
+SERIES = [
+    (DENSE_G1, N_G1, DENSE_C,    1.4, "dense baseline",                     "dense"),
+    (MOE_G1,   N_G1, MOE_COARSE, 1.9, "full MoE, coarse (6 of 64)",         "MoE · coarse"),
+    (MOE_G3,   N_G3, MOE_FINE,   1.9, "full MoE, fine-grained (18 of 192)", "MoE · fine"),
+    (TMP_G1,   N_G1, TMP_COARSE, 1.9, "temporal, coarse (6 of 64)",         "temporal · coarse"),
+    (TMP_G3,   N_G3, TMP_FINE,   1.9, "temporal, fine-grained (18 of 192)", "temporal · fine"),
+]
+
+fig, ax = plt.subplots(figsize=(6.1, 4.2) if PAPER else (10.0, 6.3))
+for data, Ntab, color, lw, label, short in SERIES:
     for b in ["1e16", "1e17"]:
         d = data[b]
-        xs = np.array([Ntab[k] for k in d]); ys = np.array([d[k] for k in d])
-        o = np.argsort(xs)
-        ax.plot(xs[o], ys[o], LSTYLE[b], color=color, marker=mk, mfc=fc, mec=color,
-                ms=7, mew=1.4, lw=lw, alpha=0.9,
-                label=((short if PAPER else label) if b == "1e17" else None))
+        xs = np.array([Ntab[k] for k in d]); ys = np.array([d[k] for k in d]); o = np.argsort(xs)
+        ax.plot(xs[o], ys[o], "-", color=color, marker=MK[b], mfc=color, mec=color,
+                ms=7, lw=lw, alpha=0.9)
 ax.set_xscale("log")
 ax.grid(True, which="both", ls=":", alpha=0.4)
+
+# legend: color+shade = method x granularity; then marker shape = budget
+handles = [Line2D([0], [0], color=s[2], lw=2.2) for s in SERIES]
+labels  = [(s[5] if PAPER else s[4]) for s in SERIES]
+handles += [Line2D([0], [0], color="0.4", marker="o", ls="", label="$10^{16}$"),
+            Line2D([0], [0], color="0.4", marker="^", ls="", label="$10^{17}$")]
+labels  += ["$10^{16}$ FLOPs", "$10^{17}$ FLOPs"]
 
 if PAPER:
     ax.set_xlabel("active params (M)")
     ax.set_ylabel("validation BPB")
     ax.set_title("Quality at fixed compute")
-    ax.legend(ncol=1, loc="lower left")   # lower-left is empty (1e17 curves start at ~4M params)
+    ax.legend(handles, labels, ncol=1, loc="lower left")
     fig.tight_layout()
     out = f"{REPO}/results/phase0/figures/fine_grained_vs_coarse_experts_isoflop_nocaption.png"
 else:
     ax.set_xlabel("active non-embedding params  N  (millions)")
     ax.set_ylabel("validation BPB  (bits/byte, lower better)")
-    ax.set_title("Splitting each expert 3x (coarse: 6 of 64  ->  fine-grained: 18 of 192 experts)\n"
-                 "full MoE and temporal (rolling residency) vs the dense baseline, across compute budgets")
-    ax.legend(fontsize=9, ncol=2, loc="upper left")
+    ax.set_title("IsoFLOP: coarse (6 of 64) vs fine-grained (18 of 192) experts, all methods")
+    ax.legend(handles, labels, ncol=2, loc="lower left")
     fig.text(0.5, 0.01,
-             "IsoFLOP curves: validation bits-per-byte (BPB, lower is better) vs active non-embedding "
-             "parameters N (millions, log x-axis). Dashed = 10^16 FLOPs, solid = 10^17 FLOPs. Color = method. "
-             "Bold filled squares = fine-grained experts (each of 64 experts split 3-ways into 192, top-18 "
-             "active); thin open circles = coarse experts (64 experts, top-6 active). 'temporal' = rolling "
-             "residency (keep top-k experts resident, swap 1 per token).", ha="center", fontsize=8, wrap=True)
-    fig.tight_layout(rect=[0, 0.07, 1, 1])
+             "IsoFLOP curves (validation BPB, lower is better, vs active non-embedding params). "
+             "Color = method (dense gray, MoE blue, temporal green); shade = granularity (coarse = "
+             "normal, fine-grained = dark); marker = compute budget (circle 10^16, triangle 10^17). "
+             "'temporal' = rolling residency (keep top-k experts resident, swap 1 per token).",
+             ha="center", fontsize=8, wrap=True)
+    fig.tight_layout(rect=[0, 0.06, 1, 1])
     out = f"{REPO}/results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png"
 fig.savefig(out, dpi=200 if PAPER else 140)
 print("wrote", out)

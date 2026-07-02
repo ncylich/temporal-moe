@@ -56,7 +56,7 @@ The compute-optimal size shifts s0(1.36M)@1e16 → s2(8.1M)@1e17, matching the l
 
 Two constant experts (top-5) vs one shared (top-6), FLOP-matched. Both parabolas reproduce the same
 minima (s2@1e17, s0@1e16). **The s-knob is negligible at B=1:** s=2 is ~+0.001 BPB @1e17, ~−0.01 BPB
-@1e16 — no meaningful quality change at per-token routing. (Plot: `figures/temporal_vs_dense_and_full_moe_isoflop.png`.) The
+@1e16 — no meaningful quality change at per-token routing. (Plot: `figures/fine_grained_vs_coarse_experts_isoflop.png`.) The
 constant-vs-routed tradeoff is expected to matter only under windowed routing (B>1) — the next phase.
 
 ## Caveats

@@ -6,7 +6,7 @@ non-embedding parameter count — by **~0.07 bits-per-byte at the compute-optima
 budget, and the gap *widens* as the models grow. This justifies the MoE's routing overhead: the
 sparsity buys real quality over a dense model you could have trained instead for the same cost.
 
-![dense baseline vs full MoE](figures/dense_floor_vs_full_moe_isoflop.png)
+![dense baseline vs full MoE](figures/fine_grained_vs_coarse_experts_isoflop.png)
 
 ## What "dense floor" means here
 
@@ -66,4 +66,4 @@ non-embedding params.
 driven by `drive.sh` over `dense_1e16.txt` / `dense_1e17.txt` (+ `dense_ext_*.txt` left-arm
 brackets). Env: `DENSE=1 CE_FUSION=1 TOKENIZER_MODEL=/abs/data/tok16k DATA_DIR=/abs/data/tok16k_full
 BPB_DIVISOR=2.7568` (absolute paths required — run.sh `cd`s into Megatron-LM before the tokenizer/data
-resolve). Plot: `plot_dense_vs_moe.py`.
+resolve). Plot: `plot_g3_curves.py`.

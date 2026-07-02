@@ -102,7 +102,7 @@ Each cell's BPB (success = inside the band, dense .. MoE: @1e16/s0 1.519..1.447,
 BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py results/phase0/runs/tmoe_lru_sh1_s2_1e17
 # ... repeat per cell: tmoe_{lru,minlogit}_sh{1,2}_{s0_1e16,s2_1e17}
 ```
-Then extend `scripts/phase0/plot_dense_vs_moe.py` with the temporal curve(s) — the matrix already covers both
+Then extend `scripts/phase0/plot_g3_curves.py` with the temporal curve(s) — the matrix already covers both
 budgets, so no extra back-fill is needed for the two-budget frontier figure.
 
 ## Risks / knobs the next agent should expect

@@ -7,7 +7,7 @@ recovers ~80% of MoE's quality gain over a dense model at every shape, both comp
 Metric is **bits-per-byte (BPB) = CE/(ln2·bytes_per_token)**, lower is better; all values measured
 (`log.md`). The temporal config below is **min_logit eviction, 1 shared expert** (the swept curve);
 `temporal_router.py` implements the rolling-residency router (single-launch Triton scan, verified
-bit-exact vs the reference at runtime). Figure: `figures/temporal_vs_dense_and_full_moe_isoflop.png`.
+bit-exact vs the reference at runtime). Figure: `figures/fine_grained_vs_coarse_experts_isoflop.png`.
 
 ## Full IsoFLOP curves (BPB) — dense floor vs full MoE (1 shared) vs temporal
 
@@ -76,4 +76,4 @@ signal. Paper scaling law: N\*∝C^0.69, D\*∝C^0.31.
 ## Repro
 `run.sh TEMPORAL=1 TEMPORAL_EVICT=min_logit` (+ `SHARED_MULT`/`TOPK` for the shared knob), driven by
 `temporal_matrix.sh` / `temporal_minlogit_1e17.sh` / `temporal_minlogit_sh1_sweep.txt`.
-Plot: `plot_temporal_final.py`.
+Plot: `plot_g3_curves.py`.

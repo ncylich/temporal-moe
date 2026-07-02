@@ -116,13 +116,14 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png}
   \end{minipage}
   \caption{\textbf{Left,} isoFLOP curves at fixed compute (validation BPB, lower is better; color =
-  method, $10^{16}$ dashed / $10^{17}$ solid, open circles = coarse experts, filled squares =
-  fine-grained). Temporal MoE (green) lands inside the dense-to-MoE band at every size and preserves
-  both baselines' compute-optimal shapes; recovery at the optima is 82\% coarse and 72--77\%
-  fine-grained, which tracks just above coarse at these token budgets. \textbf{Right,} paper-scale
-  points at $10^{18}$ FLOPs (validation cross-entropy).
-  Dense 4.137, fine-grained MoE 4.009, fine-grained temporal 3.977, coarse MoE 3.921. Temporal
-  recovers 74\% against the strongest MoE and here outperforms its equally fine-grained MoE counterpart.}
+  method, shade = granularity (coarse normal / fine-grained dark), marker = compute budget (circle
+  $10^{16}$, triangle $10^{17}$)). Temporal MoE (green) lands inside the dense-to-MoE band at every
+  size and preserves both baselines' compute-optimal shapes; recovery at the optima is 82\% coarse
+  and 72--77\% fine-grained, which tracks just above coarse at these token budgets. \textbf{Right,}
+  $10^{18}$-FLOP points (validation cross-entropy; colors as left). Dense 4.137, fine-grained MoE
+  4.009, fine-grained temporal 3.977, coarse MoE 3.921, coarse temporal 3.906; temporal recovers
+  74\% against the strongest MoE and beats its equally fine-grained MoE. Hatched bars (dense, coarse
+  temporal) are A6000 cross-data ($\pm$0.01 nats); the other three share one local split.}
   \label{fig:isoflop}
 \end{figure}
 
