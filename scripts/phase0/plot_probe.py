@@ -7,14 +7,22 @@
 Reads results/phase0/runs/<run>/router_log.pt. See docs/research/mechanistic-probe-results.md.
 """
 import os, sys
-import numpy as np, torch
+import numpy as np
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
-NO_CAPTION = "--no-caption" in sys.argv   # omit the baked-in captions; outputs get a _nocaption suffix
+# --no-caption = paper mode: drop the baked-in captions (detail goes in the LaTeX caption), use
+# compact figsizes + short titles/labels + large fonts so figures stay legible after downscaling
+# into a paper column. Outputs get a _nocaption suffix. Default mode is unchanged.
+NO_CAPTION = "--no-caption" in sys.argv
+PAPER = NO_CAPTION
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 RUNS = f"{REPO}/results/phase0/runs"; OUT = f"{REPO}/results/phase0/figures"
+if PAPER:
+    plt.rcParams.update({"font.size": 15, "axes.titlesize": 15, "axes.labelsize": 15,
+                         "xtick.labelsize": 13, "ytick.labelsize": 13, "legend.fontsize": 13})
 def outname(f): return f.replace(".png", "_nocaption.png") if NO_CAPTION else f
 def load(run):
+    import torch  # lazy: paper-mode learned-locality reads a CSV, so torch is only needed with raw logs
     d = torch.load(f"{RUNS}/{run}/router_log.pt", map_location="cpu")
     return {"temporal": d["temporal"],
             "layers": {ln: {"logits": r["logits"].float().numpy(),
@@ -39,26 +47,29 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
     panels = []
     if moe_run:
         m = load(moe_run); panels.append(("full MoE  (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
-    panels.append(("temporal  (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
-    panels.append(("temporal  (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
-    fig, axes = plt.subplots(len(panels), 1, figsize=(13, 2.5*len(panels)+0.6), sharex=True)
+    panels.append(("temporal (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
+    panels.append(("temporal (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
+    fig_w = 7.0 if PAPER else 13
+    fig, axes = plt.subplots(len(panels), 1, figsize=(fig_w, (1.5 if PAPER else 2.5)*len(panels)+0.6), sharex=True)
     if len(panels) == 1: axes = [axes]
     for ax, (title, M, c) in zip(axes, panels):
-        ys, xs = np.where(M.T); ax.scatter(xs, ys, s=6, c=c, marker="s")
-        ax.set_ylabel("expert"); ax.set_title(title, loc="left", fontsize=10)
+        ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(4 if PAPER else 6), c=c, marker="s")
+        ax.set_ylabel("expert"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
         ax.set_ylim(-1, E); ax.grid(True, ls=":", alpha=0.3)
-    axes[-1].set_xlabel(f"token position (sequence 0, MoE layer {L})")
-    fig.suptitle(f"Which experts are active at each token: {tag} (top-k = {k} of {E} experts)\n"
-                 "horizontal streaks = an expert stays active across consecutive tokens (temporal locality)")
-    if not NO_CAPTION:
+    axes[-1].set_xlabel("token position" if PAPER else f"token position (sequence 0, MoE layer {L})")
+    if PAPER:
+        fig.suptitle(f"Experts active per token ({k} of {E})", fontsize=16)
+    else:
+        fig.suptitle(f"Which experts are active at each token: {tag} (top-k = {k} of {E} experts)\n"
+                     "horizontal streaks = an expert stays active across consecutive tokens (temporal locality)")
         fig.text(0.5, 0.01,
                  "Each dot marks an expert (y-axis) that is active at a given token position (x-axis) in one "
                  "sequence, at the last Mixture-of-Experts layer. 'temporal' = rolling residency: keep the "
                  "top-k experts resident and swap at most one per token. Long horizontal streaks mean an "
                  "expert stays selected across many consecutive tokens (temporal locality); this is descriptive, "
                  "not better/worse.", ha="center", fontsize=8, wrap=True)
-    fig.tight_layout(rect=[0, 0 if NO_CAPTION else 0.06, 1, 1])
-    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
+    fig.tight_layout(rect=[0, 0, 1, 1] if PAPER else [0, 0.06, 1, 1])
+    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=200 if PAPER else 140); plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
 
 # ---------------- A3: learned-locality overlap vs scale ----------------
 def overlap(run):
@@ -70,6 +81,34 @@ def overlap(run):
     return float(np.mean(vals))
 
 def a3_scale():
+    if PAPER:   # read the committed exact series (no raw logs needed); coarse models = the plotted line
+        import csv
+        rows = []
+        with open(f"{REPO}/results/phase0/figure_data/learned_locality_vs_scale.csv") as f:
+            for r in csv.DictReader(f):
+                if "coarse" not in r["model"]:
+                    continue
+                rows.append((float(r["active_params_M"]), float(r["temporal_overlap_pct"]),
+                             float(r["full_moe_overlap_pct"]) if r["full_moe_overlap_pct"] else None,
+                             float(r["random_pct"])))
+        rows.sort()
+        xs = [r[0] for r in rows]
+        fig, ax = plt.subplots(figsize=(4.7, 3.9))
+        ax.plot(xs, [r[1] for r in rows], "o-", color="C2", lw=2, label="temporal")
+        mm = [(r[0], r[2]) for r in rows if r[2] is not None]
+        ax.plot([p[0] for p in mm], [p[1] for p in mm], "o-", color="C0", lw=2, label="full MoE")
+        ax.plot(xs, [rows[0][3]] * len(xs), ":", color="gray", label="random")
+        from matplotlib.ticker import FixedLocator, FixedFormatter
+        ax.set_xscale("log"); ax.set_xlabel("active params (M)")
+        ax.xaxis.set_major_locator(FixedLocator([1, 2, 5, 10, 20, 40]))
+        ax.xaxis.set_major_formatter(FixedFormatter(["1", "2", "5", "10", "20", "40"]))
+        ax.xaxis.set_minor_locator(plt.NullLocator())
+        ax.set_ylabel("same-set overlap (%)")
+        ax.set_title("Learned temporal locality")
+        ax.grid(True, which="both", ls=":", alpha=0.4); ax.legend()
+        fig.tight_layout()
+        out = f"{OUT}/{outname('learned_temporal_locality_vs_model_size.png')}"
+        fig.savefig(out, dpi=200); plt.close(fig); print("wrote", out); return
     print("A3  overlap( top-k(t), previous active set(t-1) )  vs scale:")
     xs, temp, moe, rnd = [], [], [], []
     for tag, N, tr, mr in PAIRS:
@@ -158,7 +197,14 @@ def graphs_BC():
         fig.savefig(f"{OUT}/{outname(fname)}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outname(fname)}")
 
 if __name__ == "__main__":
-    raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal, 8.1M active @ 10^17 FLOPs", "expert_selection_per_token_8M_model.png")
-    raster("tmoe_minlogit_sh1_s3_1e17", "v16k_sweep_s3_1e17", "full MoE vs temporal, 15M active @ 10^17 FLOPs", "expert_selection_per_token_15M_model.png")
-    raster("flame38m_temporal_minlogit", None, "temporal, 38M active @ 10^18 FLOPs", "expert_selection_per_token_38M_model.png")
-    a3_scale(); graphs_BC()
+    have_logs = os.path.exists(f"{RUNS}/tmoe_minlogit_sh1_s2_1e17/router_log.pt")
+    if PAPER and not have_logs:
+        # local run: learned-locality comes from the committed CSV; rasters need the raw logs (pod only)
+        a3_scale()
+        print("NOTE: expert_selection_per_token_* rasters need raw router_log.pt (pod only); "
+              "run `python scripts/phase0/plot_probe.py --no-caption` on the pod to regenerate them.")
+    else:
+        raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal, 8.1M active @ 10^17 FLOPs", "expert_selection_per_token_8M_model.png")
+        raster("tmoe_minlogit_sh1_s3_1e17", "v16k_sweep_s3_1e17", "full MoE vs temporal, 15M active @ 10^17 FLOPs", "expert_selection_per_token_15M_model.png")
+        raster("flame38m_temporal_minlogit", None, "temporal, 38M active @ 10^18 FLOPs", "expert_selection_per_token_38M_model.png")
+        a3_scale(); graphs_BC()
