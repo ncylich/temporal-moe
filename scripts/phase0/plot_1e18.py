@@ -21,16 +21,16 @@ if PAPER:
 
 # worst -> best CE (left -> right). Colors match the left isoFLOP figure: hue = method
 # (gray dense, blue MoE, green temporal), shade = granularity (coarse normal / fine dark).
-# hatched bars = A6000 cross-data (different val split, within ~0.01 nats); solid = one local split.
+# dense + temporal-coarse are A6000 cross-data (different val split, within ~0.01 nats) — noted
+# in the caption; the other three share one local split.
 ce     = [4.137, 4.0087, 3.9768, 3.9209, 3.906]
 colors = ["#7f7f7f", "#0d3b66", "#145a14", "#5aa0dd", "#5cc85c"]
-hatch  = ["//", "", "", "", "//"]                       # dense + temporal-coarse are cross-data
 labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "temporal\ncoarse"] if PAPER else
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
            "full MoE\ncoarse (6 of 64)", "temporal\ncoarse (6 of 64)"])
 
 fig, ax = plt.subplots(figsize=(5.4, 4.0) if PAPER else (8.6, 5.8))
-bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6, hatch=hatch)
+bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6)
 for b, v in zip(bars, ce):
     ax.text(b.get_x()+b.get_width()/2, v+0.004, f"{v:.3f}", ha="center",
             fontsize=(11 if PAPER else 10.5), fontweight="bold")
