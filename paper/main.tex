@@ -37,7 +37,7 @@ locality as a training-time constraint. A rolling-residency router keeps only th
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
 spanning $10^{16}$ to $10^{18}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
 quality uplift at compute-optimal sizes with 18 of 192 experts resident, a 5.7$\times$ reduction in
-resident memory. The trained router internalizes the constraint, roughly doubling its temporal
+resident memory. The trained router internalizes the constraint, nearly doubling its temporal
 self-consistency over vanilla routing, with recovery stable across the whole range. Trained
 temporal routing is a practical path toward MoE-quality models under
 memory-constrained serving.
@@ -99,7 +99,7 @@ computation, lengthening the masking window.
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
 a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 192, DeepSeek-style
 splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over model
-sizes (0.77M--14.8M active non-embedding parameters) with locked hyperparameters, reporting
+sizes (0.77M--15.1M active non-embedding parameters) with locked hyperparameters, reporting
 tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
 $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$. At $10^{18}$ FLOPs we replicate
@@ -142,9 +142,9 @@ its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats).
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
-next-token self-consistency roughly doubles over vanilla routing at every scale probed. The effect
-is streaming, not collapse. Over a 2048-token sequence a temporal model still touches 83--97\% of
-its expert pool, and no expert is resident more than 39\% of the time, so quality comes from
+next-token self-consistency nearly doubles over vanilla routing at every scale probed. The effect
+is streaming, not collapse. Over a 2048-token sequence a temporal model still touches 83--98\% of
+its expert pool, and no expert is resident more than 40\% of the time, so quality comes from
 time-multiplexed access to the full pool rather than a static subset.
 
 \begin{figure}[t]
@@ -173,8 +173,8 @@ Two early probes shape the roadmap. An explicit coherence loss pulling router lo
 resident set hurts monotonically at every weight scanned; the constraint is already internalized,
 and a backward-looking gradient adds no new information. And replaying logged routing through
 better eviction shows offline-optimal eviction is worth only +6--10 points of hit-rate over our
-greedy rule (LRU is 7 points worse), while an oracle selecting swaps by short-horizon \emph{future}
-demand gains +20--30 points. The headroom is anticipation, not cache policy.
+greedy rule (LRU is 4--8 points worse), while an oracle selecting swaps by short-horizon \emph{future}
+demand gains +18--30 points. The headroom is anticipation, not cache policy.
 
 The recovery deficit is therefore a stable, attackable 18--28\%, and we are pursuing it on two
 fronts. A swap margin on smoothed demand spends fewer, better swaps at decision time, and an
