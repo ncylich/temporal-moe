@@ -1,6 +1,7 @@
 # Paper — style & decisions (what Noah taught me)
 
-The Temporal-MoE short paper (`main.tex` → `main.pdf`, author: Noah Cylich). This file records the
+The Temporal-MoE short paper (`main.tex` → `main.pdf`, author: Noah Cylich, noahcylich@gmail.com —
+personal email on purpose, to avoid misattributing the work to an employer). This file records the
 guidance Noah gave while we built it, so future edits keep the same quality bar. Rules first, each
 with the reason it exists.
 
