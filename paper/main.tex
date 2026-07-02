@@ -32,14 +32,14 @@
 Mixture-of-Experts (MoE) models improve language model quality by activating only a small fraction
 of parameters per token, but serving them still requires the full expert pool in memory. We study
 \emph{temporal MoE}, which enforces expert reuse across neighboring tokens so serving memory can
-scale with active rather than total parameters. Unlike post-hoc caching or offloading, locality is
-imposed as a training-time constraint. A rolling-residency router keeps only the $k$ active experts
+scale with active rather than total parameters. Unlike post-hoc caching or offloading, we impose
+locality as a training-time constraint. A rolling-residency router keeps only the $k$ active experts
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
 spanning $10^{16}$ to $10^{18}$ FLOPs, temporal MoE recovers 72--82\% of the MoE-over-dense quality
 uplift at compute-optimal sizes with 6 of 64 experts resident, a 5.7$\times$ reduction in resident
 memory. The trained router internalizes the constraint, roughly doubling its temporal
-self-consistency over vanilla routing, and recovery is stable across three orders of magnitude of
-compute. Trained temporal routing is a practical path toward MoE-quality models under
+self-consistency over vanilla routing, with recovery stable across the whole range. Trained
+temporal routing is a practical path toward MoE-quality models under
 memory-constrained serving.
 \end{abstract}
 
@@ -54,8 +54,8 @@ is bandwidth-infeasible. Hiding one expert miss costs roughly the fast-to-slow b
 20--110 resident-expert computations on modern hardware, while only $k\!\approx\!6$--$8$ experts of
 work exist per layer to hide it behind. Caching lowers the miss rate, not the miss cost, and
 vanilla routers give it little to work with, as consecutive tokens share only about 20\% of their
-expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,zhu2025}. The locality serving needs
-will not be found after training. It must be trained in.
+expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,zhu2025}. The locality that serving
+needs will not be found after training. It must be trained in.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
 with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, and $10^{18}$ FLOPs
@@ -66,8 +66,8 @@ work from cache policy toward anticipation.
 
 \section{Method}
 
-Each MoE layer with $E$ routed experts keeps only its $k$ active experts resident, a set $S_t$
-with $|S_t|=k$. Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
+Each MoE layer with $E$ routed experts keeps only its $k$ active experts resident, the set $S_t$.
+Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
 non-resident expert $n_t=\arg\max_{e\notin S_{t-1}}R_t[e]$ and swaps it in only if it beats the
 worst resident, evicting that resident,
 \begin{equation}
@@ -77,11 +77,11 @@ S_t=
 S_{t-1}, & \text{otherwise.}
 \end{cases}
 \end{equation}
-At most one expert moves per token. The token is served by $S_t$ with gates from the softmax of
+The token is served by $S_t$ with gates from the softmax of
 resident logits, and $S_0$ cold-fills from the first token's top-$k$. Training uses the standard language
 modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
-receives ordinary gate gradients on every resident it scores, which trains the scoring function the
-swap rule reads. The selection scan runs as a single-launch Triton kernel, verified bit-exact
+receives ordinary gate gradients on every resident it scores, so the function the swap rule reads
+is trained normally. The selection scan runs as a single-launch Triton kernel, verified bit-exact
 against a unit-tested reference, adding under 50\% to step time at our scales.
 
 The single-swap budget is what lets the load hide behind compute. At small batch the expert FFN is
@@ -93,8 +93,8 @@ expert size $b$ cancels, so the condition depends only on the routing width, whi
 fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 6
 of 64 experts resident the routed-expert footprint shrinks 10.7$\times$ and whole-model resident
 memory 5.7$\times$. These calculations are theoretical. We need to also explore them in real
-kernels. We also plan to explore computing the router earlier in the network than its
-experts' computation, lengthening the window available to mask each load.
+kernels. A further direction is computing the router earlier in the network than its experts'
+computation, lengthening the masking window.
 
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
 a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 192, DeepSeek-style
@@ -134,8 +134,8 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
 MoE baselines, so the constraint does not distort scaling geometry.
 
 \textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 74\%
-against the strongest full MoE, consistent with the smaller budgets across three orders of
-magnitude of compute. In fact, sometimes the mechanism appears nearly lossless, here outperforming
+against the strongest full MoE, consistent with the smaller budgets. In fact, sometimes the
+mechanism appears nearly lossless, here outperforming
 its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats).
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
@@ -169,15 +169,15 @@ time-multiplexed access to the full pool rather than a static subset.
 
 Two early probes shape the roadmap. An explicit coherence loss pulling router logits toward the
 resident set hurts monotonically at every weight scanned; the constraint is already internalized,
-and a backward-looking gradient adds nothing the router lacks. And replaying logged routing through
+and a backward-looking gradient adds no new information. And replaying logged routing through
 better eviction shows offline-optimal eviction is worth only +6--10 points of hit-rate over our
 greedy rule (LRU is 7 points worse), while an oracle selecting swaps by short-horizon \emph{future}
 demand gains +20--30 points. The headroom is anticipation, not cache policy.
 
-The recovery deficit is therefore a stable, attackable 18--26\%, and we are pursuing it with
-decision-time mechanisms, a swap margin on smoothed demand to spend fewer, better swaps, and an
-anticipatory training loss whose targets are discounted future expert demand, new information
-rather than imitation of the past. We are also weighing auxiliary-loss-free, DeepSeek-inspired
+The recovery deficit is therefore a stable, attackable 18--26\%, and we are pursuing it on two
+fronts. A swap margin on smoothed demand spends fewer, better swaps at decision time, and an
+anticipatory training loss targets discounted future expert demand, injecting new information
+rather than imitating the past. We are also weighing auxiliary-loss-free, DeepSeek-inspired
 designs that replace routing losses with gradient-free selection biases \cite{wang2024auxfree}.
 Beyond closing the gap, the highest-leverage directions are converting released MoE checkpoints by
 router-only adaptation under the residency mask, and downstream task evaluation of the existing
