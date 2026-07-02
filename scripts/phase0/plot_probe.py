@@ -41,6 +41,21 @@ PAIRS = [("s0 @1e16", 1.36, "tmoe_minlogit_sh1_s0_1e16", "v16k_d_s0_1e16"),
 G3 = ("G3 s1@1e17", 3.91, "g3_tmoe_s1_1e17", None)
 
 # ---------------- A: per-token raster (2 or 3 panels) ----------------
+def _raster_csv(outfile, panels, k, E, L):
+    """Condensed data behind a raster: the active (token, expert) cells per panel — a few thousand
+    rows (~k per token), the tiny stand-in for the raw router_log.pt this raster was drawn from."""
+    import csv
+    figdata = OUT.replace("figures", "figure_data"); os.makedirs(figdata, exist_ok=True)
+    name = outfile.replace(".png", ".csv")            # caption-independent name
+    with open(f"{figdata}/{name}", "w", newline="") as f:
+        w = csv.writer(f); w.writerow(["panel", "token", "expert", "num_experts_E", "topk_k", "moe_layer"])
+        for title, M, _ in panels:                    # M is [W tokens, E experts] bool
+            tok, exp = np.where(M)
+            for tt, ee in zip(tok.tolist(), exp.tolist()):
+                w.writerow([title.strip(), tt, ee, E, k, L])
+    print("wrote", f"{figdata}/{name}")
+
+
 def raster(temporal_run, moe_run, tag, outfile, W=220):
     t = load(temporal_run); L = sorted(t["layers"])[-1]; k = t["layers"][L]["k"]
     E = t["layers"][L]["logits"].shape[-1]; b = 0
@@ -49,6 +64,7 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
         m = load(moe_run); panels.append(("full MoE  (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
     panels.append(("temporal (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
     panels.append(("temporal (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
+    _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
     fig_w = 7.0 if PAPER else 13
     fig, axes = plt.subplots(len(panels), 1, figsize=(fig_w, (1.5 if PAPER else 2.5)*len(panels)+0.6), sharex=True)
     if len(panels) == 1: axes = [axes]

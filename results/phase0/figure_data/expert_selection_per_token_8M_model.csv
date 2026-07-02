@@ -1,0 +1,3961 @@
+panel,token,expert,num_experts_E,topk_k,moe_layer
+full MoE  (top-k),0,3,64,6,6
+full MoE  (top-k),0,5,64,6,6
+full MoE  (top-k),0,9,64,6,6
+full MoE  (top-k),0,13,64,6,6
+full MoE  (top-k),0,48,64,6,6
+full MoE  (top-k),0,62,64,6,6
+full MoE  (top-k),1,4,64,6,6
+full MoE  (top-k),1,6,64,6,6
+full MoE  (top-k),1,8,64,6,6
+full MoE  (top-k),1,12,64,6,6
+full MoE  (top-k),1,27,64,6,6
+full MoE  (top-k),1,45,64,6,6
+full MoE  (top-k),2,4,64,6,6
+full MoE  (top-k),2,6,64,6,6
+full MoE  (top-k),2,38,64,6,6
+full MoE  (top-k),2,51,64,6,6
+full MoE  (top-k),2,54,64,6,6
+full MoE  (top-k),2,59,64,6,6
+full MoE  (top-k),3,0,64,6,6
+full MoE  (top-k),3,20,64,6,6
+full MoE  (top-k),3,25,64,6,6
+full MoE  (top-k),3,31,64,6,6
+full MoE  (top-k),3,51,64,6,6
+full MoE  (top-k),3,58,64,6,6
+full MoE  (top-k),4,24,64,6,6
+full MoE  (top-k),4,26,64,6,6
+full MoE  (top-k),4,37,64,6,6
+full MoE  (top-k),4,54,64,6,6
+full MoE  (top-k),4,56,64,6,6
+full MoE  (top-k),4,62,64,6,6
+full MoE  (top-k),5,10,64,6,6
+full MoE  (top-k),5,19,64,6,6
+full MoE  (top-k),5,26,64,6,6
+full MoE  (top-k),5,38,64,6,6
+full MoE  (top-k),5,39,64,6,6
+full MoE  (top-k),5,62,64,6,6
+full MoE  (top-k),6,6,64,6,6
+full MoE  (top-k),6,12,64,6,6
+full MoE  (top-k),6,36,64,6,6
+full MoE  (top-k),6,38,64,6,6
+full MoE  (top-k),6,44,64,6,6
+full MoE  (top-k),6,45,64,6,6
+full MoE  (top-k),7,5,64,6,6
+full MoE  (top-k),7,9,64,6,6
+full MoE  (top-k),7,18,64,6,6
+full MoE  (top-k),7,20,64,6,6
+full MoE  (top-k),7,31,64,6,6
+full MoE  (top-k),7,59,64,6,6
+full MoE  (top-k),8,5,64,6,6
+full MoE  (top-k),8,20,64,6,6
+full MoE  (top-k),8,28,64,6,6
+full MoE  (top-k),8,39,64,6,6
+full MoE  (top-k),8,47,64,6,6
+full MoE  (top-k),8,59,64,6,6
+full MoE  (top-k),9,0,64,6,6
+full MoE  (top-k),9,8,64,6,6
+full MoE  (top-k),9,20,64,6,6
+full MoE  (top-k),9,31,64,6,6
+full MoE  (top-k),9,58,64,6,6
+full MoE  (top-k),9,59,64,6,6
+full MoE  (top-k),10,1,64,6,6
+full MoE  (top-k),10,11,64,6,6
+full MoE  (top-k),10,25,64,6,6
+full MoE  (top-k),10,49,64,6,6
+full MoE  (top-k),10,61,64,6,6
+full MoE  (top-k),10,63,64,6,6
+full MoE  (top-k),11,16,64,6,6
+full MoE  (top-k),11,22,64,6,6
+full MoE  (top-k),11,34,64,6,6
+full MoE  (top-k),11,35,64,6,6
+full MoE  (top-k),11,52,64,6,6
+full MoE  (top-k),11,58,64,6,6
+full MoE  (top-k),12,0,64,6,6
+full MoE  (top-k),12,4,64,6,6
+full MoE  (top-k),12,10,64,6,6
+full MoE  (top-k),12,31,64,6,6
+full MoE  (top-k),12,51,64,6,6
+full MoE  (top-k),12,59,64,6,6
+full MoE  (top-k),13,2,64,6,6
+full MoE  (top-k),13,3,64,6,6
+full MoE  (top-k),13,7,64,6,6
+full MoE  (top-k),13,14,64,6,6
+full MoE  (top-k),13,23,64,6,6
+full MoE  (top-k),13,54,64,6,6
+full MoE  (top-k),14,5,64,6,6
+full MoE  (top-k),14,11,64,6,6
+full MoE  (top-k),14,17,64,6,6
+full MoE  (top-k),14,20,64,6,6
+full MoE  (top-k),14,48,64,6,6
+full MoE  (top-k),14,59,64,6,6
+full MoE  (top-k),15,24,64,6,6
+full MoE  (top-k),15,25,64,6,6
+full MoE  (top-k),15,26,64,6,6
+full MoE  (top-k),15,37,64,6,6
+full MoE  (top-k),15,56,64,6,6
+full MoE  (top-k),15,62,64,6,6
+full MoE  (top-k),16,2,64,6,6
+full MoE  (top-k),16,10,64,6,6
+full MoE  (top-k),16,26,64,6,6
+full MoE  (top-k),16,38,64,6,6
+full MoE  (top-k),16,56,64,6,6
+full MoE  (top-k),16,62,64,6,6
+full MoE  (top-k),17,26,64,6,6
+full MoE  (top-k),17,27,64,6,6
+full MoE  (top-k),17,30,64,6,6
+full MoE  (top-k),17,44,64,6,6
+full MoE  (top-k),17,49,64,6,6
+full MoE  (top-k),17,61,64,6,6
+full MoE  (top-k),18,1,64,6,6
+full MoE  (top-k),18,3,64,6,6
+full MoE  (top-k),18,30,64,6,6
+full MoE  (top-k),18,44,64,6,6
+full MoE  (top-k),18,47,64,6,6
+full MoE  (top-k),18,61,64,6,6
+full MoE  (top-k),19,2,64,6,6
+full MoE  (top-k),19,3,64,6,6
+full MoE  (top-k),19,7,64,6,6
+full MoE  (top-k),19,14,64,6,6
+full MoE  (top-k),19,23,64,6,6
+full MoE  (top-k),19,61,64,6,6
+full MoE  (top-k),20,2,64,6,6
+full MoE  (top-k),20,24,64,6,6
+full MoE  (top-k),20,26,64,6,6
+full MoE  (top-k),20,37,64,6,6
+full MoE  (top-k),20,56,64,6,6
+full MoE  (top-k),20,62,64,6,6
+full MoE  (top-k),21,14,64,6,6
+full MoE  (top-k),21,24,64,6,6
+full MoE  (top-k),21,30,64,6,6
+full MoE  (top-k),21,37,64,6,6
+full MoE  (top-k),21,49,64,6,6
+full MoE  (top-k),21,61,64,6,6
+full MoE  (top-k),22,9,64,6,6
+full MoE  (top-k),22,44,64,6,6
+full MoE  (top-k),22,47,64,6,6
+full MoE  (top-k),22,48,64,6,6
+full MoE  (top-k),22,49,64,6,6
+full MoE  (top-k),22,61,64,6,6
+full MoE  (top-k),23,14,64,6,6
+full MoE  (top-k),23,16,64,6,6
+full MoE  (top-k),23,22,64,6,6
+full MoE  (top-k),23,24,64,6,6
+full MoE  (top-k),23,52,64,6,6
+full MoE  (top-k),23,58,64,6,6
+full MoE  (top-k),24,10,64,6,6
+full MoE  (top-k),24,31,64,6,6
+full MoE  (top-k),24,40,64,6,6
+full MoE  (top-k),24,47,64,6,6
+full MoE  (top-k),24,49,64,6,6
+full MoE  (top-k),24,57,64,6,6
+full MoE  (top-k),25,24,64,6,6
+full MoE  (top-k),25,26,64,6,6
+full MoE  (top-k),25,37,64,6,6
+full MoE  (top-k),25,56,64,6,6
+full MoE  (top-k),25,61,64,6,6
+full MoE  (top-k),25,62,64,6,6
+full MoE  (top-k),26,10,64,6,6
+full MoE  (top-k),26,19,64,6,6
+full MoE  (top-k),26,38,64,6,6
+full MoE  (top-k),26,39,64,6,6
+full MoE  (top-k),26,56,64,6,6
+full MoE  (top-k),26,62,64,6,6
+full MoE  (top-k),27,2,64,6,6
+full MoE  (top-k),27,3,64,6,6
+full MoE  (top-k),27,23,64,6,6
+full MoE  (top-k),27,49,64,6,6
+full MoE  (top-k),27,60,64,6,6
+full MoE  (top-k),27,61,64,6,6
+full MoE  (top-k),28,5,64,6,6
+full MoE  (top-k),28,9,64,6,6
+full MoE  (top-k),28,20,64,6,6
+full MoE  (top-k),28,44,64,6,6
+full MoE  (top-k),28,48,64,6,6
+full MoE  (top-k),28,61,64,6,6
+full MoE  (top-k),29,5,64,6,6
+full MoE  (top-k),29,31,64,6,6
+full MoE  (top-k),29,32,64,6,6
+full MoE  (top-k),29,57,64,6,6
+full MoE  (top-k),29,59,64,6,6
+full MoE  (top-k),29,60,64,6,6
+full MoE  (top-k),30,11,64,6,6
+full MoE  (top-k),30,24,64,6,6
+full MoE  (top-k),30,25,64,6,6
+full MoE  (top-k),30,49,64,6,6
+full MoE  (top-k),30,61,64,6,6
+full MoE  (top-k),30,63,64,6,6
+full MoE  (top-k),31,7,64,6,6
+full MoE  (top-k),31,21,64,6,6
+full MoE  (top-k),31,23,64,6,6
+full MoE  (top-k),31,32,64,6,6
+full MoE  (top-k),31,47,64,6,6
+full MoE  (top-k),31,61,64,6,6
+full MoE  (top-k),32,4,64,6,6
+full MoE  (top-k),32,31,64,6,6
+full MoE  (top-k),32,32,64,6,6
+full MoE  (top-k),32,41,64,6,6
+full MoE  (top-k),32,50,64,6,6
+full MoE  (top-k),32,59,64,6,6
+full MoE  (top-k),33,1,64,6,6
+full MoE  (top-k),33,24,64,6,6
+full MoE  (top-k),33,25,64,6,6
+full MoE  (top-k),33,49,64,6,6
+full MoE  (top-k),33,58,64,6,6
+full MoE  (top-k),33,63,64,6,6
+full MoE  (top-k),34,1,64,6,6
+full MoE  (top-k),34,25,64,6,6
+full MoE  (top-k),34,30,64,6,6
+full MoE  (top-k),34,49,64,6,6
+full MoE  (top-k),34,58,64,6,6
+full MoE  (top-k),34,63,64,6,6
+full MoE  (top-k),35,6,64,6,6
+full MoE  (top-k),35,9,64,6,6
+full MoE  (top-k),35,20,64,6,6
+full MoE  (top-k),35,47,64,6,6
+full MoE  (top-k),35,48,64,6,6
+full MoE  (top-k),35,58,64,6,6
+full MoE  (top-k),36,24,64,6,6
+full MoE  (top-k),36,30,64,6,6
+full MoE  (top-k),36,49,64,6,6
+full MoE  (top-k),36,56,64,6,6
+full MoE  (top-k),36,61,64,6,6
+full MoE  (top-k),36,63,64,6,6
+full MoE  (top-k),37,10,64,6,6
+full MoE  (top-k),37,19,64,6,6
+full MoE  (top-k),37,38,64,6,6
+full MoE  (top-k),37,42,64,6,6
+full MoE  (top-k),37,56,64,6,6
+full MoE  (top-k),37,62,64,6,6
+full MoE  (top-k),38,6,64,6,6
+full MoE  (top-k),38,8,64,6,6
+full MoE  (top-k),38,12,64,6,6
+full MoE  (top-k),38,38,64,6,6
+full MoE  (top-k),38,44,64,6,6
+full MoE  (top-k),38,45,64,6,6
+full MoE  (top-k),39,6,64,6,6
+full MoE  (top-k),39,20,64,6,6
+full MoE  (top-k),39,41,64,6,6
+full MoE  (top-k),39,42,64,6,6
+full MoE  (top-k),39,51,64,6,6
+full MoE  (top-k),39,54,64,6,6
+full MoE  (top-k),40,1,64,6,6
+full MoE  (top-k),40,25,64,6,6
+full MoE  (top-k),40,30,64,6,6
+full MoE  (top-k),40,36,64,6,6
+full MoE  (top-k),40,58,64,6,6
+full MoE  (top-k),40,63,64,6,6
+full MoE  (top-k),41,0,64,6,6
+full MoE  (top-k),41,4,64,6,6
+full MoE  (top-k),41,31,64,6,6
+full MoE  (top-k),41,32,64,6,6
+full MoE  (top-k),41,51,64,6,6
+full MoE  (top-k),41,59,64,6,6
+full MoE  (top-k),42,11,64,6,6
+full MoE  (top-k),42,24,64,6,6
+full MoE  (top-k),42,25,64,6,6
+full MoE  (top-k),42,49,64,6,6
+full MoE  (top-k),42,61,64,6,6
+full MoE  (top-k),42,63,64,6,6
+full MoE  (top-k),43,32,64,6,6
+full MoE  (top-k),43,42,64,6,6
+full MoE  (top-k),43,49,64,6,6
+full MoE  (top-k),43,50,64,6,6
+full MoE  (top-k),43,59,64,6,6
+full MoE  (top-k),43,60,64,6,6
+full MoE  (top-k),44,1,64,6,6
+full MoE  (top-k),44,2,64,6,6
+full MoE  (top-k),44,25,64,6,6
+full MoE  (top-k),44,30,64,6,6
+full MoE  (top-k),44,58,64,6,6
+full MoE  (top-k),44,63,64,6,6
+full MoE  (top-k),45,0,64,6,6
+full MoE  (top-k),45,10,64,6,6
+full MoE  (top-k),45,31,64,6,6
+full MoE  (top-k),45,32,64,6,6
+full MoE  (top-k),45,41,64,6,6
+full MoE  (top-k),45,59,64,6,6
+full MoE  (top-k),46,24,64,6,6
+full MoE  (top-k),46,25,64,6,6
+full MoE  (top-k),46,49,64,6,6
+full MoE  (top-k),46,58,64,6,6
+full MoE  (top-k),46,61,64,6,6
+full MoE  (top-k),46,63,64,6,6
+full MoE  (top-k),47,10,64,6,6
+full MoE  (top-k),47,26,64,6,6
+full MoE  (top-k),47,38,64,6,6
+full MoE  (top-k),47,49,64,6,6
+full MoE  (top-k),47,56,64,6,6
+full MoE  (top-k),47,62,64,6,6
+full MoE  (top-k),48,6,64,6,6
+full MoE  (top-k),48,12,64,6,6
+full MoE  (top-k),48,36,64,6,6
+full MoE  (top-k),48,38,64,6,6
+full MoE  (top-k),48,44,64,6,6
+full MoE  (top-k),48,45,64,6,6
+full MoE  (top-k),49,10,64,6,6
+full MoE  (top-k),49,31,64,6,6
+full MoE  (top-k),49,41,64,6,6
+full MoE  (top-k),49,50,64,6,6
+full MoE  (top-k),49,51,64,6,6
+full MoE  (top-k),49,59,64,6,6
+full MoE  (top-k),50,1,64,6,6
+full MoE  (top-k),50,25,64,6,6
+full MoE  (top-k),50,30,64,6,6
+full MoE  (top-k),50,36,64,6,6
+full MoE  (top-k),50,39,64,6,6
+full MoE  (top-k),50,63,64,6,6
+full MoE  (top-k),51,6,64,6,6
+full MoE  (top-k),51,12,64,6,6
+full MoE  (top-k),51,27,64,6,6
+full MoE  (top-k),51,38,64,6,6
+full MoE  (top-k),51,44,64,6,6
+full MoE  (top-k),51,45,64,6,6
+full MoE  (top-k),52,10,64,6,6
+full MoE  (top-k),52,20,64,6,6
+full MoE  (top-k),52,32,64,6,6
+full MoE  (top-k),52,41,64,6,6
+full MoE  (top-k),52,46,64,6,6
+full MoE  (top-k),52,54,64,6,6
+full MoE  (top-k),53,11,64,6,6
+full MoE  (top-k),53,24,64,6,6
+full MoE  (top-k),53,25,64,6,6
+full MoE  (top-k),53,39,64,6,6
+full MoE  (top-k),53,49,64,6,6
+full MoE  (top-k),53,61,64,6,6
+full MoE  (top-k),54,9,64,6,6
+full MoE  (top-k),54,20,64,6,6
+full MoE  (top-k),54,32,64,6,6
+full MoE  (top-k),54,47,64,6,6
+full MoE  (top-k),54,48,64,6,6
+full MoE  (top-k),54,61,64,6,6
+full MoE  (top-k),55,2,64,6,6
+full MoE  (top-k),55,3,64,6,6
+full MoE  (top-k),55,11,64,6,6
+full MoE  (top-k),55,25,64,6,6
+full MoE  (top-k),55,30,64,6,6
+full MoE  (top-k),55,63,64,6,6
+full MoE  (top-k),56,3,64,6,6
+full MoE  (top-k),56,15,64,6,6
+full MoE  (top-k),56,31,64,6,6
+full MoE  (top-k),56,50,64,6,6
+full MoE  (top-k),56,57,64,6,6
+full MoE  (top-k),56,60,64,6,6
+full MoE  (top-k),57,2,64,6,6
+full MoE  (top-k),57,24,64,6,6
+full MoE  (top-k),57,26,64,6,6
+full MoE  (top-k),57,37,64,6,6
+full MoE  (top-k),57,56,64,6,6
+full MoE  (top-k),57,61,64,6,6
+full MoE  (top-k),58,2,64,6,6
+full MoE  (top-k),58,10,64,6,6
+full MoE  (top-k),58,19,64,6,6
+full MoE  (top-k),58,38,64,6,6
+full MoE  (top-k),58,56,64,6,6
+full MoE  (top-k),58,62,64,6,6
+full MoE  (top-k),59,2,64,6,6
+full MoE  (top-k),59,24,64,6,6
+full MoE  (top-k),59,26,64,6,6
+full MoE  (top-k),59,36,64,6,6
+full MoE  (top-k),59,56,64,6,6
+full MoE  (top-k),59,62,64,6,6
+full MoE  (top-k),60,8,64,6,6
+full MoE  (top-k),60,10,64,6,6
+full MoE  (top-k),60,12,64,6,6
+full MoE  (top-k),60,38,64,6,6
+full MoE  (top-k),60,44,64,6,6
+full MoE  (top-k),60,45,64,6,6
+full MoE  (top-k),61,31,64,6,6
+full MoE  (top-k),61,41,64,6,6
+full MoE  (top-k),61,42,64,6,6
+full MoE  (top-k),61,50,64,6,6
+full MoE  (top-k),61,59,64,6,6
+full MoE  (top-k),61,61,64,6,6
+full MoE  (top-k),62,16,64,6,6
+full MoE  (top-k),62,22,64,6,6
+full MoE  (top-k),62,24,64,6,6
+full MoE  (top-k),62,35,64,6,6
+full MoE  (top-k),62,39,64,6,6
+full MoE  (top-k),62,52,64,6,6
+full MoE  (top-k),63,16,64,6,6
+full MoE  (top-k),63,35,64,6,6
+full MoE  (top-k),63,42,64,6,6
+full MoE  (top-k),63,49,64,6,6
+full MoE  (top-k),63,52,64,6,6
+full MoE  (top-k),63,60,64,6,6
+full MoE  (top-k),64,2,64,6,6
+full MoE  (top-k),64,11,64,6,6
+full MoE  (top-k),64,24,64,6,6
+full MoE  (top-k),64,26,64,6,6
+full MoE  (top-k),64,49,64,6,6
+full MoE  (top-k),64,61,64,6,6
+full MoE  (top-k),65,18,64,6,6
+full MoE  (top-k),65,21,64,6,6
+full MoE  (top-k),65,27,64,6,6
+full MoE  (top-k),65,30,64,6,6
+full MoE  (top-k),65,44,64,6,6
+full MoE  (top-k),65,61,64,6,6
+full MoE  (top-k),66,3,64,6,6
+full MoE  (top-k),66,7,64,6,6
+full MoE  (top-k),66,30,64,6,6
+full MoE  (top-k),66,37,64,6,6
+full MoE  (top-k),66,54,64,6,6
+full MoE  (top-k),66,60,64,6,6
+full MoE  (top-k),67,6,64,6,6
+full MoE  (top-k),67,27,64,6,6
+full MoE  (top-k),67,37,64,6,6
+full MoE  (top-k),67,38,64,6,6
+full MoE  (top-k),67,54,64,6,6
+full MoE  (top-k),67,62,64,6,6
+full MoE  (top-k),68,7,64,6,6
+full MoE  (top-k),68,14,64,6,6
+full MoE  (top-k),68,21,64,6,6
+full MoE  (top-k),68,23,64,6,6
+full MoE  (top-k),68,37,64,6,6
+full MoE  (top-k),68,48,64,6,6
+full MoE  (top-k),69,5,64,6,6
+full MoE  (top-k),69,7,64,6,6
+full MoE  (top-k),69,17,64,6,6
+full MoE  (top-k),69,46,64,6,6
+full MoE  (top-k),69,48,64,6,6
+full MoE  (top-k),69,60,64,6,6
+full MoE  (top-k),70,2,64,6,6
+full MoE  (top-k),70,10,64,6,6
+full MoE  (top-k),70,24,64,6,6
+full MoE  (top-k),70,49,64,6,6
+full MoE  (top-k),70,56,64,6,6
+full MoE  (top-k),70,62,64,6,6
+full MoE  (top-k),71,10,64,6,6
+full MoE  (top-k),71,19,64,6,6
+full MoE  (top-k),71,24,64,6,6
+full MoE  (top-k),71,39,64,6,6
+full MoE  (top-k),71,56,64,6,6
+full MoE  (top-k),71,62,64,6,6
+full MoE  (top-k),72,2,64,6,6
+full MoE  (top-k),72,3,64,6,6
+full MoE  (top-k),72,30,64,6,6
+full MoE  (top-k),72,49,64,6,6
+full MoE  (top-k),72,60,64,6,6
+full MoE  (top-k),72,61,64,6,6
+full MoE  (top-k),73,2,64,6,6
+full MoE  (top-k),73,3,64,6,6
+full MoE  (top-k),73,7,64,6,6
+full MoE  (top-k),73,14,64,6,6
+full MoE  (top-k),73,33,64,6,6
+full MoE  (top-k),73,37,64,6,6
+full MoE  (top-k),74,2,64,6,6
+full MoE  (top-k),74,3,64,6,6
+full MoE  (top-k),74,7,64,6,6
+full MoE  (top-k),74,23,64,6,6
+full MoE  (top-k),74,33,64,6,6
+full MoE  (top-k),74,37,64,6,6
+full MoE  (top-k),75,2,64,6,6
+full MoE  (top-k),75,3,64,6,6
+full MoE  (top-k),75,7,64,6,6
+full MoE  (top-k),75,23,64,6,6
+full MoE  (top-k),75,54,64,6,6
+full MoE  (top-k),75,61,64,6,6
+full MoE  (top-k),76,2,64,6,6
+full MoE  (top-k),76,3,64,6,6
+full MoE  (top-k),76,7,64,6,6
+full MoE  (top-k),76,14,64,6,6
+full MoE  (top-k),76,23,64,6,6
+full MoE  (top-k),76,54,64,6,6
+full MoE  (top-k),77,6,64,6,6
+full MoE  (top-k),77,12,64,6,6
+full MoE  (top-k),77,27,64,6,6
+full MoE  (top-k),77,42,64,6,6
+full MoE  (top-k),77,44,64,6,6
+full MoE  (top-k),77,45,64,6,6
+full MoE  (top-k),78,1,64,6,6
+full MoE  (top-k),78,9,64,6,6
+full MoE  (top-k),78,11,64,6,6
+full MoE  (top-k),78,20,64,6,6
+full MoE  (top-k),78,48,64,6,6
+full MoE  (top-k),78,63,64,6,6
+full MoE  (top-k),79,5,64,6,6
+full MoE  (top-k),79,40,64,6,6
+full MoE  (top-k),79,46,64,6,6
+full MoE  (top-k),79,47,64,6,6
+full MoE  (top-k),79,48,64,6,6
+full MoE  (top-k),79,57,64,6,6
+full MoE  (top-k),80,10,64,6,6
+full MoE  (top-k),80,19,64,6,6
+full MoE  (top-k),80,38,64,6,6
+full MoE  (top-k),80,42,64,6,6
+full MoE  (top-k),80,56,64,6,6
+full MoE  (top-k),80,62,64,6,6
+full MoE  (top-k),81,9,64,6,6
+full MoE  (top-k),81,13,64,6,6
+full MoE  (top-k),81,28,64,6,6
+full MoE  (top-k),81,36,64,6,6
+full MoE  (top-k),81,44,64,6,6
+full MoE  (top-k),81,61,64,6,6
+full MoE  (top-k),82,16,64,6,6
+full MoE  (top-k),82,22,64,6,6
+full MoE  (top-k),82,23,64,6,6
+full MoE  (top-k),82,25,64,6,6
+full MoE  (top-k),82,35,64,6,6
+full MoE  (top-k),82,49,64,6,6
+full MoE  (top-k),83,10,64,6,6
+full MoE  (top-k),83,32,64,6,6
+full MoE  (top-k),83,46,64,6,6
+full MoE  (top-k),83,49,64,6,6
+full MoE  (top-k),83,60,64,6,6
+full MoE  (top-k),83,62,64,6,6
+full MoE  (top-k),84,1,64,6,6
+full MoE  (top-k),84,13,64,6,6
+full MoE  (top-k),84,23,64,6,6
+full MoE  (top-k),84,28,64,6,6
+full MoE  (top-k),84,30,64,6,6
+full MoE  (top-k),84,61,64,6,6
+full MoE  (top-k),85,6,64,6,6
+full MoE  (top-k),85,12,64,6,6
+full MoE  (top-k),85,27,64,6,6
+full MoE  (top-k),85,42,64,6,6
+full MoE  (top-k),85,44,64,6,6
+full MoE  (top-k),85,45,64,6,6
+full MoE  (top-k),86,0,64,6,6
+full MoE  (top-k),86,4,64,6,6
+full MoE  (top-k),86,10,64,6,6
+full MoE  (top-k),86,20,64,6,6
+full MoE  (top-k),86,31,64,6,6
+full MoE  (top-k),86,51,64,6,6
+full MoE  (top-k),87,1,64,6,6
+full MoE  (top-k),87,25,64,6,6
+full MoE  (top-k),87,30,64,6,6
+full MoE  (top-k),87,55,64,6,6
+full MoE  (top-k),87,58,64,6,6
+full MoE  (top-k),87,63,64,6,6
+full MoE  (top-k),88,6,64,6,6
+full MoE  (top-k),88,12,64,6,6
+full MoE  (top-k),88,32,64,6,6
+full MoE  (top-k),88,42,64,6,6
+full MoE  (top-k),88,45,64,6,6
+full MoE  (top-k),88,59,64,6,6
+full MoE  (top-k),89,0,64,6,6
+full MoE  (top-k),89,10,64,6,6
+full MoE  (top-k),89,20,64,6,6
+full MoE  (top-k),89,31,64,6,6
+full MoE  (top-k),89,46,64,6,6
+full MoE  (top-k),89,60,64,6,6
+full MoE  (top-k),90,24,64,6,6
+full MoE  (top-k),90,26,64,6,6
+full MoE  (top-k),90,37,64,6,6
+full MoE  (top-k),90,56,64,6,6
+full MoE  (top-k),90,61,64,6,6
+full MoE  (top-k),90,62,64,6,6
+full MoE  (top-k),91,10,64,6,6
+full MoE  (top-k),91,19,64,6,6
+full MoE  (top-k),91,38,64,6,6
+full MoE  (top-k),91,42,64,6,6
+full MoE  (top-k),91,56,64,6,6
+full MoE  (top-k),91,62,64,6,6
+full MoE  (top-k),92,24,64,6,6
+full MoE  (top-k),92,30,64,6,6
+full MoE  (top-k),92,49,64,6,6
+full MoE  (top-k),92,56,64,6,6
+full MoE  (top-k),92,61,64,6,6
+full MoE  (top-k),92,63,64,6,6
+full MoE  (top-k),93,8,64,6,6
+full MoE  (top-k),93,14,64,6,6
+full MoE  (top-k),93,21,64,6,6
+full MoE  (top-k),93,23,64,6,6
+full MoE  (top-k),93,47,64,6,6
+full MoE  (top-k),93,61,64,6,6
+full MoE  (top-k),94,5,64,6,6
+full MoE  (top-k),94,40,64,6,6
+full MoE  (top-k),94,47,64,6,6
+full MoE  (top-k),94,48,64,6,6
+full MoE  (top-k),94,49,64,6,6
+full MoE  (top-k),94,60,64,6,6
+full MoE  (top-k),95,27,64,6,6
+full MoE  (top-k),95,30,64,6,6
+full MoE  (top-k),95,35,64,6,6
+full MoE  (top-k),95,44,64,6,6
+full MoE  (top-k),95,49,64,6,6
+full MoE  (top-k),95,61,64,6,6
+full MoE  (top-k),96,2,64,6,6
+full MoE  (top-k),96,3,64,6,6
+full MoE  (top-k),96,7,64,6,6
+full MoE  (top-k),96,14,64,6,6
+full MoE  (top-k),96,33,64,6,6
+full MoE  (top-k),96,34,64,6,6
+full MoE  (top-k),97,4,64,6,6
+full MoE  (top-k),97,5,64,6,6
+full MoE  (top-k),97,17,64,6,6
+full MoE  (top-k),97,46,64,6,6
+full MoE  (top-k),97,47,64,6,6
+full MoE  (top-k),97,48,64,6,6
+full MoE  (top-k),98,11,64,6,6
+full MoE  (top-k),98,24,64,6,6
+full MoE  (top-k),98,56,64,6,6
+full MoE  (top-k),98,61,64,6,6
+full MoE  (top-k),98,62,64,6,6
+full MoE  (top-k),98,63,64,6,6
+full MoE  (top-k),99,8,64,6,6
+full MoE  (top-k),99,10,64,6,6
+full MoE  (top-k),99,19,64,6,6
+full MoE  (top-k),99,38,64,6,6
+full MoE  (top-k),99,56,64,6,6
+full MoE  (top-k),99,62,64,6,6
+full MoE  (top-k),100,6,64,6,6
+full MoE  (top-k),100,12,64,6,6
+full MoE  (top-k),100,36,64,6,6
+full MoE  (top-k),100,38,64,6,6
+full MoE  (top-k),100,44,64,6,6
+full MoE  (top-k),100,45,64,6,6
+full MoE  (top-k),101,9,64,6,6
+full MoE  (top-k),101,44,64,6,6
+full MoE  (top-k),101,47,64,6,6
+full MoE  (top-k),101,48,64,6,6
+full MoE  (top-k),101,49,64,6,6
+full MoE  (top-k),101,61,64,6,6
+full MoE  (top-k),102,5,64,6,6
+full MoE  (top-k),102,20,64,6,6
+full MoE  (top-k),102,31,64,6,6
+full MoE  (top-k),102,42,64,6,6
+full MoE  (top-k),102,47,64,6,6
+full MoE  (top-k),102,59,64,6,6
+full MoE  (top-k),103,2,64,6,6
+full MoE  (top-k),103,24,64,6,6
+full MoE  (top-k),103,25,64,6,6
+full MoE  (top-k),103,30,64,6,6
+full MoE  (top-k),103,49,64,6,6
+full MoE  (top-k),103,63,64,6,6
+full MoE  (top-k),104,6,64,6,6
+full MoE  (top-k),104,27,64,6,6
+full MoE  (top-k),104,42,64,6,6
+full MoE  (top-k),104,45,64,6,6
+full MoE  (top-k),104,48,64,6,6
+full MoE  (top-k),104,54,64,6,6
+full MoE  (top-k),105,5,64,6,6
+full MoE  (top-k),105,20,64,6,6
+full MoE  (top-k),105,31,64,6,6
+full MoE  (top-k),105,47,64,6,6
+full MoE  (top-k),105,51,64,6,6
+full MoE  (top-k),105,59,64,6,6
+full MoE  (top-k),106,11,64,6,6
+full MoE  (top-k),106,24,64,6,6
+full MoE  (top-k),106,25,64,6,6
+full MoE  (top-k),106,49,64,6,6
+full MoE  (top-k),106,61,64,6,6
+full MoE  (top-k),106,63,64,6,6
+full MoE  (top-k),107,27,64,6,6
+full MoE  (top-k),107,30,64,6,6
+full MoE  (top-k),107,42,64,6,6
+full MoE  (top-k),107,45,64,6,6
+full MoE  (top-k),107,49,64,6,6
+full MoE  (top-k),107,61,64,6,6
+full MoE  (top-k),108,6,64,6,6
+full MoE  (top-k),108,27,64,6,6
+full MoE  (top-k),108,37,64,6,6
+full MoE  (top-k),108,42,64,6,6
+full MoE  (top-k),108,45,64,6,6
+full MoE  (top-k),108,54,64,6,6
+full MoE  (top-k),109,5,64,6,6
+full MoE  (top-k),109,20,64,6,6
+full MoE  (top-k),109,25,64,6,6
+full MoE  (top-k),109,31,64,6,6
+full MoE  (top-k),109,59,64,6,6
+full MoE  (top-k),109,60,64,6,6
+full MoE  (top-k),110,3,64,6,6
+full MoE  (top-k),110,21,64,6,6
+full MoE  (top-k),110,23,64,6,6
+full MoE  (top-k),110,25,64,6,6
+full MoE  (top-k),110,30,64,6,6
+full MoE  (top-k),110,63,64,6,6
+full MoE  (top-k),111,4,64,6,6
+full MoE  (top-k),111,6,64,6,6
+full MoE  (top-k),111,12,64,6,6
+full MoE  (top-k),111,27,64,6,6
+full MoE  (top-k),111,45,64,6,6
+full MoE  (top-k),111,54,64,6,6
+full MoE  (top-k),112,5,64,6,6
+full MoE  (top-k),112,20,64,6,6
+full MoE  (top-k),112,31,64,6,6
+full MoE  (top-k),112,42,64,6,6
+full MoE  (top-k),112,59,64,6,6
+full MoE  (top-k),112,60,64,6,6
+full MoE  (top-k),113,11,64,6,6
+full MoE  (top-k),113,24,64,6,6
+full MoE  (top-k),113,49,64,6,6
+full MoE  (top-k),113,56,64,6,6
+full MoE  (top-k),113,61,64,6,6
+full MoE  (top-k),113,63,64,6,6
+full MoE  (top-k),114,10,64,6,6
+full MoE  (top-k),114,19,64,6,6
+full MoE  (top-k),114,38,64,6,6
+full MoE  (top-k),114,42,64,6,6
+full MoE  (top-k),114,56,64,6,6
+full MoE  (top-k),114,62,64,6,6
+full MoE  (top-k),115,6,64,6,6
+full MoE  (top-k),115,12,64,6,6
+full MoE  (top-k),115,36,64,6,6
+full MoE  (top-k),115,38,64,6,6
+full MoE  (top-k),115,44,64,6,6
+full MoE  (top-k),115,45,64,6,6
+full MoE  (top-k),116,4,64,6,6
+full MoE  (top-k),116,6,64,6,6
+full MoE  (top-k),116,12,64,6,6
+full MoE  (top-k),116,27,64,6,6
+full MoE  (top-k),116,38,64,6,6
+full MoE  (top-k),116,54,64,6,6
+full MoE  (top-k),117,16,64,6,6
+full MoE  (top-k),117,20,64,6,6
+full MoE  (top-k),117,31,64,6,6
+full MoE  (top-k),117,41,64,6,6
+full MoE  (top-k),117,43,64,6,6
+full MoE  (top-k),117,50,64,6,6
+full MoE  (top-k),118,11,64,6,6
+full MoE  (top-k),118,24,64,6,6
+full MoE  (top-k),118,39,64,6,6
+full MoE  (top-k),118,49,64,6,6
+full MoE  (top-k),118,61,64,6,6
+full MoE  (top-k),118,63,64,6,6
+full MoE  (top-k),119,20,64,6,6
+full MoE  (top-k),119,31,64,6,6
+full MoE  (top-k),119,32,64,6,6
+full MoE  (top-k),119,43,64,6,6
+full MoE  (top-k),119,51,64,6,6
+full MoE  (top-k),119,59,64,6,6
+full MoE  (top-k),120,11,64,6,6
+full MoE  (top-k),120,24,64,6,6
+full MoE  (top-k),120,25,64,6,6
+full MoE  (top-k),120,49,64,6,6
+full MoE  (top-k),120,58,64,6,6
+full MoE  (top-k),120,63,64,6,6
+full MoE  (top-k),121,18,64,6,6
+full MoE  (top-k),121,27,64,6,6
+full MoE  (top-k),121,30,64,6,6
+full MoE  (top-k),121,32,64,6,6
+full MoE  (top-k),121,44,64,6,6
+full MoE  (top-k),121,61,64,6,6
+full MoE  (top-k),122,2,64,6,6
+full MoE  (top-k),122,26,64,6,6
+full MoE  (top-k),122,30,64,6,6
+full MoE  (top-k),122,49,64,6,6
+full MoE  (top-k),122,61,64,6,6
+full MoE  (top-k),122,63,64,6,6
+full MoE  (top-k),123,17,64,6,6
+full MoE  (top-k),123,20,64,6,6
+full MoE  (top-k),123,25,64,6,6
+full MoE  (top-k),123,32,64,6,6
+full MoE  (top-k),123,59,64,6,6
+full MoE  (top-k),123,60,64,6,6
+full MoE  (top-k),124,11,64,6,6
+full MoE  (top-k),124,25,64,6,6
+full MoE  (top-k),124,30,64,6,6
+full MoE  (top-k),124,49,64,6,6
+full MoE  (top-k),124,61,64,6,6
+full MoE  (top-k),124,63,64,6,6
+full MoE  (top-k),125,10,64,6,6
+full MoE  (top-k),125,19,64,6,6
+full MoE  (top-k),125,38,64,6,6
+full MoE  (top-k),125,42,64,6,6
+full MoE  (top-k),125,56,64,6,6
+full MoE  (top-k),125,62,64,6,6
+full MoE  (top-k),126,4,64,6,6
+full MoE  (top-k),126,9,64,6,6
+full MoE  (top-k),126,20,64,6,6
+full MoE  (top-k),126,31,64,6,6
+full MoE  (top-k),126,44,64,6,6
+full MoE  (top-k),126,50,64,6,6
+full MoE  (top-k),127,2,64,6,6
+full MoE  (top-k),127,11,64,6,6
+full MoE  (top-k),127,24,64,6,6
+full MoE  (top-k),127,39,64,6,6
+full MoE  (top-k),127,49,64,6,6
+full MoE  (top-k),127,63,64,6,6
+full MoE  (top-k),128,4,64,6,6
+full MoE  (top-k),128,6,64,6,6
+full MoE  (top-k),128,12,64,6,6
+full MoE  (top-k),128,20,64,6,6
+full MoE  (top-k),128,44,64,6,6
+full MoE  (top-k),128,45,64,6,6
+full MoE  (top-k),129,20,64,6,6
+full MoE  (top-k),129,31,64,6,6
+full MoE  (top-k),129,41,64,6,6
+full MoE  (top-k),129,47,64,6,6
+full MoE  (top-k),129,51,64,6,6
+full MoE  (top-k),129,59,64,6,6
+full MoE  (top-k),130,2,64,6,6
+full MoE  (top-k),130,11,64,6,6
+full MoE  (top-k),130,24,64,6,6
+full MoE  (top-k),130,39,64,6,6
+full MoE  (top-k),130,49,64,6,6
+full MoE  (top-k),130,63,64,6,6
+full MoE  (top-k),131,9,64,6,6
+full MoE  (top-k),131,31,64,6,6
+full MoE  (top-k),131,32,64,6,6
+full MoE  (top-k),131,42,64,6,6
+full MoE  (top-k),131,47,64,6,6
+full MoE  (top-k),131,48,64,6,6
+full MoE  (top-k),132,2,64,6,6
+full MoE  (top-k),132,3,64,6,6
+full MoE  (top-k),132,11,64,6,6
+full MoE  (top-k),132,24,64,6,6
+full MoE  (top-k),132,49,64,6,6
+full MoE  (top-k),132,63,64,6,6
+full MoE  (top-k),133,0,64,6,6
+full MoE  (top-k),133,10,64,6,6
+full MoE  (top-k),133,31,64,6,6
+full MoE  (top-k),133,41,64,6,6
+full MoE  (top-k),133,51,64,6,6
+full MoE  (top-k),133,59,64,6,6
+full MoE  (top-k),134,11,64,6,6
+full MoE  (top-k),134,24,64,6,6
+full MoE  (top-k),134,25,64,6,6
+full MoE  (top-k),134,39,64,6,6
+full MoE  (top-k),134,49,64,6,6
+full MoE  (top-k),134,63,64,6,6
+full MoE  (top-k),135,25,64,6,6
+full MoE  (top-k),135,30,64,6,6
+full MoE  (top-k),135,39,64,6,6
+full MoE  (top-k),135,55,64,6,6
+full MoE  (top-k),135,58,64,6,6
+full MoE  (top-k),135,63,64,6,6
+full MoE  (top-k),136,1,64,6,6
+full MoE  (top-k),136,2,64,6,6
+full MoE  (top-k),136,3,64,6,6
+full MoE  (top-k),136,11,64,6,6
+full MoE  (top-k),136,13,64,6,6
+full MoE  (top-k),136,61,64,6,6
+full MoE  (top-k),137,6,64,6,6
+full MoE  (top-k),137,8,64,6,6
+full MoE  (top-k),137,27,64,6,6
+full MoE  (top-k),137,42,64,6,6
+full MoE  (top-k),137,45,64,6,6
+full MoE  (top-k),137,54,64,6,6
+full MoE  (top-k),138,2,64,6,6
+full MoE  (top-k),138,24,64,6,6
+full MoE  (top-k),138,26,64,6,6
+full MoE  (top-k),138,37,64,6,6
+full MoE  (top-k),138,54,64,6,6
+full MoE  (top-k),138,56,64,6,6
+full MoE  (top-k),139,10,64,6,6
+full MoE  (top-k),139,19,64,6,6
+full MoE  (top-k),139,38,64,6,6
+full MoE  (top-k),139,42,64,6,6
+full MoE  (top-k),139,56,64,6,6
+full MoE  (top-k),139,62,64,6,6
+full MoE  (top-k),140,6,64,6,6
+full MoE  (top-k),140,12,64,6,6
+full MoE  (top-k),140,36,64,6,6
+full MoE  (top-k),140,38,64,6,6
+full MoE  (top-k),140,44,64,6,6
+full MoE  (top-k),140,45,64,6,6
+full MoE  (top-k),141,2,64,6,6
+full MoE  (top-k),141,9,64,6,6
+full MoE  (top-k),141,16,64,6,6
+full MoE  (top-k),141,41,64,6,6
+full MoE  (top-k),141,48,64,6,6
+full MoE  (top-k),141,50,64,6,6
+full MoE  (top-k),142,5,64,6,6
+full MoE  (top-k),142,21,64,6,6
+full MoE  (top-k),142,23,64,6,6
+full MoE  (top-k),142,24,64,6,6
+full MoE  (top-k),142,47,64,6,6
+full MoE  (top-k),142,49,64,6,6
+full MoE  (top-k),143,9,64,6,6
+full MoE  (top-k),143,44,64,6,6
+full MoE  (top-k),143,47,64,6,6
+full MoE  (top-k),143,48,64,6,6
+full MoE  (top-k),143,49,64,6,6
+full MoE  (top-k),143,61,64,6,6
+full MoE  (top-k),144,2,64,6,6
+full MoE  (top-k),144,24,64,6,6
+full MoE  (top-k),144,39,64,6,6
+full MoE  (top-k),144,49,64,6,6
+full MoE  (top-k),144,56,64,6,6
+full MoE  (top-k),144,61,64,6,6
+full MoE  (top-k),145,4,64,6,6
+full MoE  (top-k),145,6,64,6,6
+full MoE  (top-k),145,12,64,6,6
+full MoE  (top-k),145,20,64,6,6
+full MoE  (top-k),145,44,64,6,6
+full MoE  (top-k),145,45,64,6,6
+full MoE  (top-k),146,4,64,6,6
+full MoE  (top-k),146,20,64,6,6
+full MoE  (top-k),146,31,64,6,6
+full MoE  (top-k),146,32,64,6,6
+full MoE  (top-k),146,44,64,6,6
+full MoE  (top-k),146,60,64,6,6
+full MoE  (top-k),147,1,64,6,6
+full MoE  (top-k),147,16,64,6,6
+full MoE  (top-k),147,25,64,6,6
+full MoE  (top-k),147,28,64,6,6
+full MoE  (top-k),147,58,64,6,6
+full MoE  (top-k),147,61,64,6,6
+full MoE  (top-k),148,20,64,6,6
+full MoE  (top-k),148,31,64,6,6
+full MoE  (top-k),148,32,64,6,6
+full MoE  (top-k),148,42,64,6,6
+full MoE  (top-k),148,51,64,6,6
+full MoE  (top-k),148,59,64,6,6
+full MoE  (top-k),149,0,64,6,6
+full MoE  (top-k),149,10,64,6,6
+full MoE  (top-k),149,31,64,6,6
+full MoE  (top-k),149,32,64,6,6
+full MoE  (top-k),149,40,64,6,6
+full MoE  (top-k),149,46,64,6,6
+full MoE  (top-k),150,11,64,6,6
+full MoE  (top-k),150,24,64,6,6
+full MoE  (top-k),150,25,64,6,6
+full MoE  (top-k),150,49,64,6,6
+full MoE  (top-k),150,61,64,6,6
+full MoE  (top-k),150,63,64,6,6
+full MoE  (top-k),151,10,64,6,6
+full MoE  (top-k),151,19,64,6,6
+full MoE  (top-k),151,38,64,6,6
+full MoE  (top-k),151,42,64,6,6
+full MoE  (top-k),151,56,64,6,6
+full MoE  (top-k),151,62,64,6,6
+full MoE  (top-k),152,6,64,6,6
+full MoE  (top-k),152,8,64,6,6
+full MoE  (top-k),152,12,64,6,6
+full MoE  (top-k),152,38,64,6,6
+full MoE  (top-k),152,44,64,6,6
+full MoE  (top-k),152,45,64,6,6
+full MoE  (top-k),153,31,64,6,6
+full MoE  (top-k),153,41,64,6,6
+full MoE  (top-k),153,43,64,6,6
+full MoE  (top-k),153,50,64,6,6
+full MoE  (top-k),153,56,64,6,6
+full MoE  (top-k),153,60,64,6,6
+full MoE  (top-k),154,1,64,6,6
+full MoE  (top-k),154,2,64,6,6
+full MoE  (top-k),154,24,64,6,6
+full MoE  (top-k),154,49,64,6,6
+full MoE  (top-k),154,61,64,6,6
+full MoE  (top-k),154,63,64,6,6
+full MoE  (top-k),155,0,64,6,6
+full MoE  (top-k),155,10,64,6,6
+full MoE  (top-k),155,31,64,6,6
+full MoE  (top-k),155,32,64,6,6
+full MoE  (top-k),155,41,64,6,6
+full MoE  (top-k),155,60,64,6,6
+full MoE  (top-k),156,1,64,6,6
+full MoE  (top-k),156,24,64,6,6
+full MoE  (top-k),156,25,64,6,6
+full MoE  (top-k),156,49,64,6,6
+full MoE  (top-k),156,58,64,6,6
+full MoE  (top-k),156,63,64,6,6
+full MoE  (top-k),157,1,64,6,6
+full MoE  (top-k),157,25,64,6,6
+full MoE  (top-k),157,30,64,6,6
+full MoE  (top-k),157,39,64,6,6
+full MoE  (top-k),157,58,64,6,6
+full MoE  (top-k),157,63,64,6,6
+full MoE  (top-k),158,6,64,6,6
+full MoE  (top-k),158,27,64,6,6
+full MoE  (top-k),158,42,64,6,6
+full MoE  (top-k),158,45,64,6,6
+full MoE  (top-k),158,51,64,6,6
+full MoE  (top-k),158,54,64,6,6
+full MoE  (top-k),159,4,64,6,6
+full MoE  (top-k),159,31,64,6,6
+full MoE  (top-k),159,32,64,6,6
+full MoE  (top-k),159,41,64,6,6
+full MoE  (top-k),159,50,64,6,6
+full MoE  (top-k),159,51,64,6,6
+full MoE  (top-k),160,4,64,6,6
+full MoE  (top-k),160,6,64,6,6
+full MoE  (top-k),160,41,64,6,6
+full MoE  (top-k),160,42,64,6,6
+full MoE  (top-k),160,43,64,6,6
+full MoE  (top-k),160,45,64,6,6
+full MoE  (top-k),161,4,64,6,6
+full MoE  (top-k),161,10,64,6,6
+full MoE  (top-k),161,41,64,6,6
+full MoE  (top-k),161,43,64,6,6
+full MoE  (top-k),161,50,64,6,6
+full MoE  (top-k),161,54,64,6,6
+full MoE  (top-k),162,2,64,6,6
+full MoE  (top-k),162,24,64,6,6
+full MoE  (top-k),162,29,64,6,6
+full MoE  (top-k),162,30,64,6,6
+full MoE  (top-k),162,49,64,6,6
+full MoE  (top-k),162,63,64,6,6
+full MoE  (top-k),163,10,64,6,6
+full MoE  (top-k),163,19,64,6,6
+full MoE  (top-k),163,38,64,6,6
+full MoE  (top-k),163,42,64,6,6
+full MoE  (top-k),163,56,64,6,6
+full MoE  (top-k),163,62,64,6,6
+full MoE  (top-k),164,6,64,6,6
+full MoE  (top-k),164,8,64,6,6
+full MoE  (top-k),164,12,64,6,6
+full MoE  (top-k),164,34,64,6,6
+full MoE  (top-k),164,38,64,6,6
+full MoE  (top-k),164,45,64,6,6
+full MoE  (top-k),165,4,64,6,6
+full MoE  (top-k),165,6,64,6,6
+full MoE  (top-k),165,32,64,6,6
+full MoE  (top-k),165,42,64,6,6
+full MoE  (top-k),165,51,64,6,6
+full MoE  (top-k),165,59,64,6,6
+full MoE  (top-k),166,15,64,6,6
+full MoE  (top-k),166,20,64,6,6
+full MoE  (top-k),166,31,64,6,6
+full MoE  (top-k),166,41,64,6,6
+full MoE  (top-k),166,50,64,6,6
+full MoE  (top-k),166,60,64,6,6
+full MoE  (top-k),167,1,64,6,6
+full MoE  (top-k),167,24,64,6,6
+full MoE  (top-k),167,25,64,6,6
+full MoE  (top-k),167,39,64,6,6
+full MoE  (top-k),167,49,64,6,6
+full MoE  (top-k),167,63,64,6,6
+full MoE  (top-k),168,6,64,6,6
+full MoE  (top-k),168,8,64,6,6
+full MoE  (top-k),168,12,64,6,6
+full MoE  (top-k),168,27,64,6,6
+full MoE  (top-k),168,32,64,6,6
+full MoE  (top-k),168,45,64,6,6
+full MoE  (top-k),169,5,64,6,6
+full MoE  (top-k),169,20,64,6,6
+full MoE  (top-k),169,31,64,6,6
+full MoE  (top-k),169,32,64,6,6
+full MoE  (top-k),169,41,64,6,6
+full MoE  (top-k),169,51,64,6,6
+full MoE  (top-k),170,11,64,6,6
+full MoE  (top-k),170,25,64,6,6
+full MoE  (top-k),170,29,64,6,6
+full MoE  (top-k),170,51,64,6,6
+full MoE  (top-k),170,58,64,6,6
+full MoE  (top-k),170,63,64,6,6
+full MoE  (top-k),171,20,64,6,6
+full MoE  (top-k),171,31,64,6,6
+full MoE  (top-k),171,32,64,6,6
+full MoE  (top-k),171,42,64,6,6
+full MoE  (top-k),171,52,64,6,6
+full MoE  (top-k),171,59,64,6,6
+full MoE  (top-k),172,31,64,6,6
+full MoE  (top-k),172,32,64,6,6
+full MoE  (top-k),172,41,64,6,6
+full MoE  (top-k),172,46,64,6,6
+full MoE  (top-k),172,51,64,6,6
+full MoE  (top-k),172,59,64,6,6
+full MoE  (top-k),173,0,64,6,6
+full MoE  (top-k),173,10,64,6,6
+full MoE  (top-k),173,31,64,6,6
+full MoE  (top-k),173,41,64,6,6
+full MoE  (top-k),173,46,64,6,6
+full MoE  (top-k),173,51,64,6,6
+full MoE  (top-k),174,11,64,6,6
+full MoE  (top-k),174,25,64,6,6
+full MoE  (top-k),174,29,64,6,6
+full MoE  (top-k),174,39,64,6,6
+full MoE  (top-k),174,58,64,6,6
+full MoE  (top-k),174,63,64,6,6
+full MoE  (top-k),175,19,64,6,6
+full MoE  (top-k),175,21,64,6,6
+full MoE  (top-k),175,22,64,6,6
+full MoE  (top-k),175,27,64,6,6
+full MoE  (top-k),175,35,64,6,6
+full MoE  (top-k),175,58,64,6,6
+full MoE  (top-k),176,4,64,6,6
+full MoE  (top-k),176,6,64,6,6
+full MoE  (top-k),176,8,64,6,6
+full MoE  (top-k),176,32,64,6,6
+full MoE  (top-k),176,42,64,6,6
+full MoE  (top-k),176,51,64,6,6
+full MoE  (top-k),177,20,64,6,6
+full MoE  (top-k),177,31,64,6,6
+full MoE  (top-k),177,32,64,6,6
+full MoE  (top-k),177,41,64,6,6
+full MoE  (top-k),177,51,64,6,6
+full MoE  (top-k),177,59,64,6,6
+full MoE  (top-k),178,1,64,6,6
+full MoE  (top-k),178,11,64,6,6
+full MoE  (top-k),178,25,64,6,6
+full MoE  (top-k),178,51,64,6,6
+full MoE  (top-k),178,58,64,6,6
+full MoE  (top-k),178,63,64,6,6
+full MoE  (top-k),179,10,64,6,6
+full MoE  (top-k),179,19,64,6,6
+full MoE  (top-k),179,38,64,6,6
+full MoE  (top-k),179,42,64,6,6
+full MoE  (top-k),179,56,64,6,6
+full MoE  (top-k),179,62,64,6,6
+full MoE  (top-k),180,6,64,6,6
+full MoE  (top-k),180,8,64,6,6
+full MoE  (top-k),180,12,64,6,6
+full MoE  (top-k),180,19,64,6,6
+full MoE  (top-k),180,28,64,6,6
+full MoE  (top-k),180,34,64,6,6
+full MoE  (top-k),181,10,64,6,6
+full MoE  (top-k),181,31,64,6,6
+full MoE  (top-k),181,32,64,6,6
+full MoE  (top-k),181,41,64,6,6
+full MoE  (top-k),181,46,64,6,6
+full MoE  (top-k),181,51,64,6,6
+full MoE  (top-k),182,24,64,6,6
+full MoE  (top-k),182,25,64,6,6
+full MoE  (top-k),182,26,64,6,6
+full MoE  (top-k),182,39,64,6,6
+full MoE  (top-k),182,49,64,6,6
+full MoE  (top-k),182,63,64,6,6
+full MoE  (top-k),183,4,64,6,6
+full MoE  (top-k),183,6,64,6,6
+full MoE  (top-k),183,12,64,6,6
+full MoE  (top-k),183,27,64,6,6
+full MoE  (top-k),183,32,64,6,6
+full MoE  (top-k),183,54,64,6,6
+full MoE  (top-k),184,10,64,6,6
+full MoE  (top-k),184,31,64,6,6
+full MoE  (top-k),184,32,64,6,6
+full MoE  (top-k),184,41,64,6,6
+full MoE  (top-k),184,51,64,6,6
+full MoE  (top-k),184,54,64,6,6
+full MoE  (top-k),185,1,64,6,6
+full MoE  (top-k),185,11,64,6,6
+full MoE  (top-k),185,24,64,6,6
+full MoE  (top-k),185,25,64,6,6
+full MoE  (top-k),185,39,64,6,6
+full MoE  (top-k),185,63,64,6,6
+full MoE  (top-k),186,1,64,6,6
+full MoE  (top-k),186,25,64,6,6
+full MoE  (top-k),186,26,64,6,6
+full MoE  (top-k),186,30,64,6,6
+full MoE  (top-k),186,55,64,6,6
+full MoE  (top-k),186,63,64,6,6
+full MoE  (top-k),187,4,64,6,6
+full MoE  (top-k),187,6,64,6,6
+full MoE  (top-k),187,12,64,6,6
+full MoE  (top-k),187,27,64,6,6
+full MoE  (top-k),187,44,64,6,6
+full MoE  (top-k),187,45,64,6,6
+full MoE  (top-k),188,10,64,6,6
+full MoE  (top-k),188,20,64,6,6
+full MoE  (top-k),188,31,64,6,6
+full MoE  (top-k),188,41,64,6,6
+full MoE  (top-k),188,46,64,6,6
+full MoE  (top-k),188,51,64,6,6
+full MoE  (top-k),189,11,64,6,6
+full MoE  (top-k),189,24,64,6,6
+full MoE  (top-k),189,49,64,6,6
+full MoE  (top-k),189,56,64,6,6
+full MoE  (top-k),189,61,64,6,6
+full MoE  (top-k),189,63,64,6,6
+full MoE  (top-k),190,10,64,6,6
+full MoE  (top-k),190,19,64,6,6
+full MoE  (top-k),190,26,64,6,6
+full MoE  (top-k),190,38,64,6,6
+full MoE  (top-k),190,56,64,6,6
+full MoE  (top-k),190,62,64,6,6
+full MoE  (top-k),191,6,64,6,6
+full MoE  (top-k),191,12,64,6,6
+full MoE  (top-k),191,36,64,6,6
+full MoE  (top-k),191,38,64,6,6
+full MoE  (top-k),191,44,64,6,6
+full MoE  (top-k),191,45,64,6,6
+full MoE  (top-k),192,6,64,6,6
+full MoE  (top-k),192,12,64,6,6
+full MoE  (top-k),192,32,64,6,6
+full MoE  (top-k),192,38,64,6,6
+full MoE  (top-k),192,45,64,6,6
+full MoE  (top-k),192,51,64,6,6
+full MoE  (top-k),193,20,64,6,6
+full MoE  (top-k),193,22,64,6,6
+full MoE  (top-k),193,25,64,6,6
+full MoE  (top-k),193,31,64,6,6
+full MoE  (top-k),193,41,64,6,6
+full MoE  (top-k),193,43,64,6,6
+full MoE  (top-k),194,1,64,6,6
+full MoE  (top-k),194,24,64,6,6
+full MoE  (top-k),194,25,64,6,6
+full MoE  (top-k),194,39,64,6,6
+full MoE  (top-k),194,49,64,6,6
+full MoE  (top-k),194,63,64,6,6
+full MoE  (top-k),195,4,64,6,6
+full MoE  (top-k),195,6,64,6,6
+full MoE  (top-k),195,12,64,6,6
+full MoE  (top-k),195,27,64,6,6
+full MoE  (top-k),195,44,64,6,6
+full MoE  (top-k),195,45,64,6,6
+full MoE  (top-k),196,4,64,6,6
+full MoE  (top-k),196,31,64,6,6
+full MoE  (top-k),196,41,64,6,6
+full MoE  (top-k),196,50,64,6,6
+full MoE  (top-k),196,51,64,6,6
+full MoE  (top-k),196,59,64,6,6
+full MoE  (top-k),197,1,64,6,6
+full MoE  (top-k),197,25,64,6,6
+full MoE  (top-k),197,29,64,6,6
+full MoE  (top-k),197,49,64,6,6
+full MoE  (top-k),197,54,64,6,6
+full MoE  (top-k),197,63,64,6,6
+full MoE  (top-k),198,1,64,6,6
+full MoE  (top-k),198,25,64,6,6
+full MoE  (top-k),198,30,64,6,6
+full MoE  (top-k),198,39,64,6,6
+full MoE  (top-k),198,58,64,6,6
+full MoE  (top-k),198,63,64,6,6
+full MoE  (top-k),199,4,64,6,6
+full MoE  (top-k),199,6,64,6,6
+full MoE  (top-k),199,32,64,6,6
+full MoE  (top-k),199,42,64,6,6
+full MoE  (top-k),199,45,64,6,6
+full MoE  (top-k),199,51,64,6,6
+full MoE  (top-k),200,15,64,6,6
+full MoE  (top-k),200,31,64,6,6
+full MoE  (top-k),200,41,64,6,6
+full MoE  (top-k),200,43,64,6,6
+full MoE  (top-k),200,50,64,6,6
+full MoE  (top-k),200,59,64,6,6
+full MoE  (top-k),201,24,64,6,6
+full MoE  (top-k),201,25,64,6,6
+full MoE  (top-k),201,49,64,6,6
+full MoE  (top-k),201,54,64,6,6
+full MoE  (top-k),201,58,64,6,6
+full MoE  (top-k),201,63,64,6,6
+full MoE  (top-k),202,10,64,6,6
+full MoE  (top-k),202,19,64,6,6
+full MoE  (top-k),202,38,64,6,6
+full MoE  (top-k),202,42,64,6,6
+full MoE  (top-k),202,56,64,6,6
+full MoE  (top-k),202,62,64,6,6
+full MoE  (top-k),203,6,64,6,6
+full MoE  (top-k),203,12,64,6,6
+full MoE  (top-k),203,36,64,6,6
+full MoE  (top-k),203,38,64,6,6
+full MoE  (top-k),203,44,64,6,6
+full MoE  (top-k),203,45,64,6,6
+full MoE  (top-k),204,15,64,6,6
+full MoE  (top-k),204,20,64,6,6
+full MoE  (top-k),204,31,64,6,6
+full MoE  (top-k),204,43,64,6,6
+full MoE  (top-k),204,51,64,6,6
+full MoE  (top-k),204,59,64,6,6
+full MoE  (top-k),205,1,64,6,6
+full MoE  (top-k),205,11,64,6,6
+full MoE  (top-k),205,25,64,6,6
+full MoE  (top-k),205,32,64,6,6
+full MoE  (top-k),205,49,64,6,6
+full MoE  (top-k),205,63,64,6,6
+full MoE  (top-k),206,6,64,6,6
+full MoE  (top-k),206,10,64,6,6
+full MoE  (top-k),206,25,64,6,6
+full MoE  (top-k),206,27,64,6,6
+full MoE  (top-k),206,38,64,6,6
+full MoE  (top-k),206,45,64,6,6
+full MoE  (top-k),207,4,64,6,6
+full MoE  (top-k),207,31,64,6,6
+full MoE  (top-k),207,41,64,6,6
+full MoE  (top-k),207,43,64,6,6
+full MoE  (top-k),207,51,64,6,6
+full MoE  (top-k),207,54,64,6,6
+full MoE  (top-k),208,1,64,6,6
+full MoE  (top-k),208,11,64,6,6
+full MoE  (top-k),208,25,64,6,6
+full MoE  (top-k),208,49,64,6,6
+full MoE  (top-k),208,51,64,6,6
+full MoE  (top-k),208,63,64,6,6
+full MoE  (top-k),209,20,64,6,6
+full MoE  (top-k),209,31,64,6,6
+full MoE  (top-k),209,32,64,6,6
+full MoE  (top-k),209,41,64,6,6
+full MoE  (top-k),209,43,64,6,6
+full MoE  (top-k),209,59,64,6,6
+full MoE  (top-k),210,1,64,6,6
+full MoE  (top-k),210,25,64,6,6
+full MoE  (top-k),210,26,64,6,6
+full MoE  (top-k),210,30,64,6,6
+full MoE  (top-k),210,58,64,6,6
+full MoE  (top-k),210,63,64,6,6
+full MoE  (top-k),211,10,64,6,6
+full MoE  (top-k),211,20,64,6,6
+full MoE  (top-k),211,32,64,6,6
+full MoE  (top-k),211,42,64,6,6
+full MoE  (top-k),211,59,64,6,6
+full MoE  (top-k),211,60,64,6,6
+full MoE  (top-k),212,24,64,6,6
+full MoE  (top-k),212,26,64,6,6
+full MoE  (top-k),212,49,64,6,6
+full MoE  (top-k),212,56,64,6,6
+full MoE  (top-k),212,61,64,6,6
+full MoE  (top-k),212,63,64,6,6
+full MoE  (top-k),213,10,64,6,6
+full MoE  (top-k),213,19,64,6,6
+full MoE  (top-k),213,26,64,6,6
+full MoE  (top-k),213,38,64,6,6
+full MoE  (top-k),213,56,64,6,6
+full MoE  (top-k),213,62,64,6,6
+full MoE  (top-k),214,16,64,6,6
+full MoE  (top-k),214,19,64,6,6
+full MoE  (top-k),214,27,64,6,6
+full MoE  (top-k),214,34,64,6,6
+full MoE  (top-k),214,42,64,6,6
+full MoE  (top-k),214,52,64,6,6
+full MoE  (top-k),215,11,64,6,6
+full MoE  (top-k),215,26,64,6,6
+full MoE  (top-k),215,29,64,6,6
+full MoE  (top-k),215,30,64,6,6
+full MoE  (top-k),215,42,64,6,6
+full MoE  (top-k),215,49,64,6,6
+full MoE  (top-k),216,16,64,6,6
+full MoE  (top-k),216,22,64,6,6
+full MoE  (top-k),216,25,64,6,6
+full MoE  (top-k),216,34,64,6,6
+full MoE  (top-k),216,35,64,6,6
+full MoE  (top-k),216,42,64,6,6
+full MoE  (top-k),217,4,64,6,6
+full MoE  (top-k),217,6,64,6,6
+full MoE  (top-k),217,32,64,6,6
+full MoE  (top-k),217,43,64,6,6
+full MoE  (top-k),217,51,64,6,6
+full MoE  (top-k),217,54,64,6,6
+full MoE  (top-k),218,31,64,6,6
+full MoE  (top-k),218,32,64,6,6
+full MoE  (top-k),218,41,64,6,6
+full MoE  (top-k),218,42,64,6,6
+full MoE  (top-k),218,50,64,6,6
+full MoE  (top-k),218,54,64,6,6
+full MoE  (top-k),219,1,64,6,6
+full MoE  (top-k),219,11,64,6,6
+full MoE  (top-k),219,25,64,6,6
+full MoE  (top-k),219,29,64,6,6
+full MoE  (top-k),219,49,64,6,6
+full MoE  (top-k),219,63,64,6,6
+temporal (resident set used),0,0,64,6,6
+temporal (resident set used),0,1,64,6,6
+temporal (resident set used),0,5,64,6,6
+temporal (resident set used),0,6,64,6,6
+temporal (resident set used),0,27,64,6,6
+temporal (resident set used),0,35,64,6,6
+temporal (resident set used),1,0,64,6,6
+temporal (resident set used),1,1,64,6,6
+temporal (resident set used),1,5,64,6,6
+temporal (resident set used),1,27,64,6,6
+temporal (resident set used),1,33,64,6,6
+temporal (resident set used),1,35,64,6,6
+temporal (resident set used),2,0,64,6,6
+temporal (resident set used),2,5,64,6,6
+temporal (resident set used),2,27,64,6,6
+temporal (resident set used),2,33,64,6,6
+temporal (resident set used),2,35,64,6,6
+temporal (resident set used),2,63,64,6,6
+temporal (resident set used),3,0,64,6,6
+temporal (resident set used),3,5,64,6,6
+temporal (resident set used),3,27,64,6,6
+temporal (resident set used),3,35,64,6,6
+temporal (resident set used),3,43,64,6,6
+temporal (resident set used),3,63,64,6,6
+temporal (resident set used),4,0,64,6,6
+temporal (resident set used),4,5,64,6,6
+temporal (resident set used),4,27,64,6,6
+temporal (resident set used),4,43,64,6,6
+temporal (resident set used),4,54,64,6,6
+temporal (resident set used),4,63,64,6,6
+temporal (resident set used),5,0,64,6,6
+temporal (resident set used),5,13,64,6,6
+temporal (resident set used),5,27,64,6,6
+temporal (resident set used),5,43,64,6,6
+temporal (resident set used),5,54,64,6,6
+temporal (resident set used),5,63,64,6,6
+temporal (resident set used),6,0,64,6,6
+temporal (resident set used),6,13,64,6,6
+temporal (resident set used),6,27,64,6,6
+temporal (resident set used),6,39,64,6,6
+temporal (resident set used),6,43,64,6,6
+temporal (resident set used),6,54,64,6,6
+temporal (resident set used),7,0,64,6,6
+temporal (resident set used),7,6,64,6,6
+temporal (resident set used),7,13,64,6,6
+temporal (resident set used),7,39,64,6,6
+temporal (resident set used),7,43,64,6,6
+temporal (resident set used),7,54,64,6,6
+temporal (resident set used),8,0,64,6,6
+temporal (resident set used),8,5,64,6,6
+temporal (resident set used),8,13,64,6,6
+temporal (resident set used),8,39,64,6,6
+temporal (resident set used),8,43,64,6,6
+temporal (resident set used),8,54,64,6,6
+temporal (resident set used),9,0,64,6,6
+temporal (resident set used),9,5,64,6,6
+temporal (resident set used),9,39,64,6,6
+temporal (resident set used),9,43,64,6,6
+temporal (resident set used),9,54,64,6,6
+temporal (resident set used),9,58,64,6,6
+temporal (resident set used),10,0,64,6,6
+temporal (resident set used),10,5,64,6,6
+temporal (resident set used),10,34,64,6,6
+temporal (resident set used),10,43,64,6,6
+temporal (resident set used),10,54,64,6,6
+temporal (resident set used),10,58,64,6,6
+temporal (resident set used),11,0,64,6,6
+temporal (resident set used),11,1,64,6,6
+temporal (resident set used),11,34,64,6,6
+temporal (resident set used),11,43,64,6,6
+temporal (resident set used),11,54,64,6,6
+temporal (resident set used),11,58,64,6,6
+temporal (resident set used),12,0,64,6,6
+temporal (resident set used),12,1,64,6,6
+temporal (resident set used),12,22,64,6,6
+temporal (resident set used),12,34,64,6,6
+temporal (resident set used),12,43,64,6,6
+temporal (resident set used),12,58,64,6,6
+temporal (resident set used),13,0,64,6,6
+temporal (resident set used),13,1,64,6,6
+temporal (resident set used),13,3,64,6,6
+temporal (resident set used),13,22,64,6,6
+temporal (resident set used),13,34,64,6,6
+temporal (resident set used),13,58,64,6,6
+temporal (resident set used),14,0,64,6,6
+temporal (resident set used),14,3,64,6,6
+temporal (resident set used),14,5,64,6,6
+temporal (resident set used),14,22,64,6,6
+temporal (resident set used),14,34,64,6,6
+temporal (resident set used),14,58,64,6,6
+temporal (resident set used),15,0,64,6,6
+temporal (resident set used),15,3,64,6,6
+temporal (resident set used),15,22,64,6,6
+temporal (resident set used),15,34,64,6,6
+temporal (resident set used),15,58,64,6,6
+temporal (resident set used),15,62,64,6,6
+temporal (resident set used),16,0,64,6,6
+temporal (resident set used),16,3,64,6,6
+temporal (resident set used),16,22,64,6,6
+temporal (resident set used),16,39,64,6,6
+temporal (resident set used),16,58,64,6,6
+temporal (resident set used),16,62,64,6,6
+temporal (resident set used),17,0,64,6,6
+temporal (resident set used),17,3,64,6,6
+temporal (resident set used),17,18,64,6,6
+temporal (resident set used),17,22,64,6,6
+temporal (resident set used),17,39,64,6,6
+temporal (resident set used),17,62,64,6,6
+temporal (resident set used),18,3,64,6,6
+temporal (resident set used),18,12,64,6,6
+temporal (resident set used),18,18,64,6,6
+temporal (resident set used),18,22,64,6,6
+temporal (resident set used),18,39,64,6,6
+temporal (resident set used),18,62,64,6,6
+temporal (resident set used),19,3,64,6,6
+temporal (resident set used),19,11,64,6,6
+temporal (resident set used),19,12,64,6,6
+temporal (resident set used),19,18,64,6,6
+temporal (resident set used),19,22,64,6,6
+temporal (resident set used),19,62,64,6,6
+temporal (resident set used),20,3,64,6,6
+temporal (resident set used),20,11,64,6,6
+temporal (resident set used),20,12,64,6,6
+temporal (resident set used),20,18,64,6,6
+temporal (resident set used),20,61,64,6,6
+temporal (resident set used),20,62,64,6,6
+temporal (resident set used),21,11,64,6,6
+temporal (resident set used),21,12,64,6,6
+temporal (resident set used),21,18,64,6,6
+temporal (resident set used),21,54,64,6,6
+temporal (resident set used),21,61,64,6,6
+temporal (resident set used),21,62,64,6,6
+temporal (resident set used),22,11,64,6,6
+temporal (resident set used),22,12,64,6,6
+temporal (resident set used),22,18,64,6,6
+temporal (resident set used),22,50,64,6,6
+temporal (resident set used),22,54,64,6,6
+temporal (resident set used),22,61,64,6,6
+temporal (resident set used),23,1,64,6,6
+temporal (resident set used),23,11,64,6,6
+temporal (resident set used),23,12,64,6,6
+temporal (resident set used),23,18,64,6,6
+temporal (resident set used),23,50,64,6,6
+temporal (resident set used),23,54,64,6,6
+temporal (resident set used),24,1,64,6,6
+temporal (resident set used),24,12,64,6,6
+temporal (resident set used),24,18,64,6,6
+temporal (resident set used),24,50,64,6,6
+temporal (resident set used),24,54,64,6,6
+temporal (resident set used),24,58,64,6,6
+temporal (resident set used),25,12,64,6,6
+temporal (resident set used),25,18,64,6,6
+temporal (resident set used),25,24,64,6,6
+temporal (resident set used),25,50,64,6,6
+temporal (resident set used),25,54,64,6,6
+temporal (resident set used),25,58,64,6,6
+temporal (resident set used),26,12,64,6,6
+temporal (resident set used),26,18,64,6,6
+temporal (resident set used),26,24,64,6,6
+temporal (resident set used),26,39,64,6,6
+temporal (resident set used),26,54,64,6,6
+temporal (resident set used),26,58,64,6,6
+temporal (resident set used),27,12,64,6,6
+temporal (resident set used),27,18,64,6,6
+temporal (resident set used),27,39,64,6,6
+temporal (resident set used),27,50,64,6,6
+temporal (resident set used),27,54,64,6,6
+temporal (resident set used),27,58,64,6,6
+temporal (resident set used),28,12,64,6,6
+temporal (resident set used),28,15,64,6,6
+temporal (resident set used),28,18,64,6,6
+temporal (resident set used),28,50,64,6,6
+temporal (resident set used),28,54,64,6,6
+temporal (resident set used),28,58,64,6,6
+temporal (resident set used),29,12,64,6,6
+temporal (resident set used),29,15,64,6,6
+temporal (resident set used),29,22,64,6,6
+temporal (resident set used),29,50,64,6,6
+temporal (resident set used),29,54,64,6,6
+temporal (resident set used),29,58,64,6,6
+temporal (resident set used),30,12,64,6,6
+temporal (resident set used),30,22,64,6,6
+temporal (resident set used),30,34,64,6,6
+temporal (resident set used),30,50,64,6,6
+temporal (resident set used),30,54,64,6,6
+temporal (resident set used),30,58,64,6,6
+temporal (resident set used),31,4,64,6,6
+temporal (resident set used),31,12,64,6,6
+temporal (resident set used),31,22,64,6,6
+temporal (resident set used),31,34,64,6,6
+temporal (resident set used),31,50,64,6,6
+temporal (resident set used),31,54,64,6,6
+temporal (resident set used),32,4,64,6,6
+temporal (resident set used),32,12,64,6,6
+temporal (resident set used),32,22,64,6,6
+temporal (resident set used),32,27,64,6,6
+temporal (resident set used),32,50,64,6,6
+temporal (resident set used),32,54,64,6,6
+temporal (resident set used),33,4,64,6,6
+temporal (resident set used),33,12,64,6,6
+temporal (resident set used),33,22,64,6,6
+temporal (resident set used),33,27,64,6,6
+temporal (resident set used),33,34,64,6,6
+temporal (resident set used),33,54,64,6,6
+temporal (resident set used),34,4,64,6,6
+temporal (resident set used),34,12,64,6,6
+temporal (resident set used),34,22,64,6,6
+temporal (resident set used),34,34,64,6,6
+temporal (resident set used),34,54,64,6,6
+temporal (resident set used),34,56,64,6,6
+temporal (resident set used),35,4,64,6,6
+temporal (resident set used),35,12,64,6,6
+temporal (resident set used),35,34,64,6,6
+temporal (resident set used),35,50,64,6,6
+temporal (resident set used),35,54,64,6,6
+temporal (resident set used),35,56,64,6,6
+temporal (resident set used),36,4,64,6,6
+temporal (resident set used),36,12,64,6,6
+temporal (resident set used),36,27,64,6,6
+temporal (resident set used),36,34,64,6,6
+temporal (resident set used),36,50,64,6,6
+temporal (resident set used),36,54,64,6,6
+temporal (resident set used),37,0,64,6,6
+temporal (resident set used),37,4,64,6,6
+temporal (resident set used),37,12,64,6,6
+temporal (resident set used),37,27,64,6,6
+temporal (resident set used),37,34,64,6,6
+temporal (resident set used),37,54,64,6,6
+temporal (resident set used),38,0,64,6,6
+temporal (resident set used),38,4,64,6,6
+temporal (resident set used),38,12,64,6,6
+temporal (resident set used),38,13,64,6,6
+temporal (resident set used),38,27,64,6,6
+temporal (resident set used),38,54,64,6,6
+temporal (resident set used),39,0,64,6,6
+temporal (resident set used),39,6,64,6,6
+temporal (resident set used),39,12,64,6,6
+temporal (resident set used),39,13,64,6,6
+temporal (resident set used),39,27,64,6,6
+temporal (resident set used),39,54,64,6,6
+temporal (resident set used),40,0,64,6,6
+temporal (resident set used),40,6,64,6,6
+temporal (resident set used),40,12,64,6,6
+temporal (resident set used),40,27,64,6,6
+temporal (resident set used),40,34,64,6,6
+temporal (resident set used),40,54,64,6,6
+temporal (resident set used),41,0,64,6,6
+temporal (resident set used),41,6,64,6,6
+temporal (resident set used),41,12,64,6,6
+temporal (resident set used),41,27,64,6,6
+temporal (resident set used),41,34,64,6,6
+temporal (resident set used),41,56,64,6,6
+temporal (resident set used),42,0,64,6,6
+temporal (resident set used),42,12,64,6,6
+temporal (resident set used),42,27,64,6,6
+temporal (resident set used),42,34,64,6,6
+temporal (resident set used),42,45,64,6,6
+temporal (resident set used),42,56,64,6,6
+temporal (resident set used),43,0,64,6,6
+temporal (resident set used),43,4,64,6,6
+temporal (resident set used),43,12,64,6,6
+temporal (resident set used),43,27,64,6,6
+temporal (resident set used),43,34,64,6,6
+temporal (resident set used),43,45,64,6,6
+temporal (resident set used),44,1,64,6,6
+temporal (resident set used),44,4,64,6,6
+temporal (resident set used),44,12,64,6,6
+temporal (resident set used),44,27,64,6,6
+temporal (resident set used),44,34,64,6,6
+temporal (resident set used),44,45,64,6,6
+temporal (resident set used),45,1,64,6,6
+temporal (resident set used),45,4,64,6,6
+temporal (resident set used),45,12,64,6,6
+temporal (resident set used),45,14,64,6,6
+temporal (resident set used),45,27,64,6,6
+temporal (resident set used),45,45,64,6,6
+temporal (resident set used),46,4,64,6,6
+temporal (resident set used),46,12,64,6,6
+temporal (resident set used),46,14,64,6,6
+temporal (resident set used),46,27,64,6,6
+temporal (resident set used),46,34,64,6,6
+temporal (resident set used),46,45,64,6,6
+temporal (resident set used),47,0,64,6,6
+temporal (resident set used),47,4,64,6,6
+temporal (resident set used),47,12,64,6,6
+temporal (resident set used),47,27,64,6,6
+temporal (resident set used),47,34,64,6,6
+temporal (resident set used),47,45,64,6,6
+temporal (resident set used),48,0,64,6,6
+temporal (resident set used),48,4,64,6,6
+temporal (resident set used),48,12,64,6,6
+temporal (resident set used),48,13,64,6,6
+temporal (resident set used),48,34,64,6,6
+temporal (resident set used),48,45,64,6,6
+temporal (resident set used),49,0,64,6,6
+temporal (resident set used),49,4,64,6,6
+temporal (resident set used),49,12,64,6,6
+temporal (resident set used),49,13,64,6,6
+temporal (resident set used),49,45,64,6,6
+temporal (resident set used),49,56,64,6,6
+temporal (resident set used),50,0,64,6,6
+temporal (resident set used),50,4,64,6,6
+temporal (resident set used),50,12,64,6,6
+temporal (resident set used),50,34,64,6,6
+temporal (resident set used),50,45,64,6,6
+temporal (resident set used),50,56,64,6,6
+temporal (resident set used),51,0,64,6,6
+temporal (resident set used),51,4,64,6,6
+temporal (resident set used),51,12,64,6,6
+temporal (resident set used),51,22,64,6,6
+temporal (resident set used),51,34,64,6,6
+temporal (resident set used),51,56,64,6,6
+temporal (resident set used),52,4,64,6,6
+temporal (resident set used),52,12,64,6,6
+temporal (resident set used),52,20,64,6,6
+temporal (resident set used),52,22,64,6,6
+temporal (resident set used),52,34,64,6,6
+temporal (resident set used),52,56,64,6,6
+temporal (resident set used),53,4,64,6,6
+temporal (resident set used),53,12,64,6,6
+temporal (resident set used),53,22,64,6,6
+temporal (resident set used),53,34,64,6,6
+temporal (resident set used),53,45,64,6,6
+temporal (resident set used),53,56,64,6,6
+temporal (resident set used),54,4,64,6,6
+temporal (resident set used),54,12,64,6,6
+temporal (resident set used),54,22,64,6,6
+temporal (resident set used),54,45,64,6,6
+temporal (resident set used),54,50,64,6,6
+temporal (resident set used),54,56,64,6,6
+temporal (resident set used),55,4,64,6,6
+temporal (resident set used),55,12,64,6,6
+temporal (resident set used),55,22,64,6,6
+temporal (resident set used),55,34,64,6,6
+temporal (resident set used),55,45,64,6,6
+temporal (resident set used),55,50,64,6,6
+temporal (resident set used),56,3,64,6,6
+temporal (resident set used),56,4,64,6,6
+temporal (resident set used),56,12,64,6,6
+temporal (resident set used),56,34,64,6,6
+temporal (resident set used),56,45,64,6,6
+temporal (resident set used),56,50,64,6,6
+temporal (resident set used),57,4,64,6,6
+temporal (resident set used),57,12,64,6,6
+temporal (resident set used),57,34,64,6,6
+temporal (resident set used),57,45,64,6,6
+temporal (resident set used),57,50,64,6,6
+temporal (resident set used),57,54,64,6,6
+temporal (resident set used),58,0,64,6,6
+temporal (resident set used),58,4,64,6,6
+temporal (resident set used),58,12,64,6,6
+temporal (resident set used),58,45,64,6,6
+temporal (resident set used),58,50,64,6,6
+temporal (resident set used),58,54,64,6,6
+temporal (resident set used),59,0,64,6,6
+temporal (resident set used),59,4,64,6,6
+temporal (resident set used),59,12,64,6,6
+temporal (resident set used),59,39,64,6,6
+temporal (resident set used),59,45,64,6,6
+temporal (resident set used),59,54,64,6,6
+temporal (resident set used),60,0,64,6,6
+temporal (resident set used),60,4,64,6,6
+temporal (resident set used),60,12,64,6,6
+temporal (resident set used),60,22,64,6,6
+temporal (resident set used),60,39,64,6,6
+temporal (resident set used),60,54,64,6,6
+temporal (resident set used),61,0,64,6,6
+temporal (resident set used),61,4,64,6,6
+temporal (resident set used),61,12,64,6,6
+temporal (resident set used),61,13,64,6,6
+temporal (resident set used),61,22,64,6,6
+temporal (resident set used),61,54,64,6,6
+temporal (resident set used),62,0,64,6,6
+temporal (resident set used),62,4,64,6,6
+temporal (resident set used),62,12,64,6,6
+temporal (resident set used),62,22,64,6,6
+temporal (resident set used),62,50,64,6,6
+temporal (resident set used),62,54,64,6,6
+temporal (resident set used),63,0,64,6,6
+temporal (resident set used),63,12,64,6,6
+temporal (resident set used),63,21,64,6,6
+temporal (resident set used),63,22,64,6,6
+temporal (resident set used),63,50,64,6,6
+temporal (resident set used),63,54,64,6,6
+temporal (resident set used),64,12,64,6,6
+temporal (resident set used),64,21,64,6,6
+temporal (resident set used),64,22,64,6,6
+temporal (resident set used),64,34,64,6,6
+temporal (resident set used),64,50,64,6,6
+temporal (resident set used),64,54,64,6,6
+temporal (resident set used),65,12,64,6,6
+temporal (resident set used),65,18,64,6,6
+temporal (resident set used),65,21,64,6,6
+temporal (resident set used),65,34,64,6,6
+temporal (resident set used),65,50,64,6,6
+temporal (resident set used),65,54,64,6,6
+temporal (resident set used),66,12,64,6,6
+temporal (resident set used),66,18,64,6,6
+temporal (resident set used),66,21,64,6,6
+temporal (resident set used),66,30,64,6,6
+temporal (resident set used),66,34,64,6,6
+temporal (resident set used),66,54,64,6,6
+temporal (resident set used),67,12,64,6,6
+temporal (resident set used),67,18,64,6,6
+temporal (resident set used),67,27,64,6,6
+temporal (resident set used),67,30,64,6,6
+temporal (resident set used),67,34,64,6,6
+temporal (resident set used),67,54,64,6,6
+temporal (resident set used),68,3,64,6,6
+temporal (resident set used),68,12,64,6,6
+temporal (resident set used),68,18,64,6,6
+temporal (resident set used),68,27,64,6,6
+temporal (resident set used),68,30,64,6,6
+temporal (resident set used),68,54,64,6,6
+temporal (resident set used),69,3,64,6,6
+temporal (resident set used),69,5,64,6,6
+temporal (resident set used),69,12,64,6,6
+temporal (resident set used),69,18,64,6,6
+temporal (resident set used),69,30,64,6,6
+temporal (resident set used),69,54,64,6,6
+temporal (resident set used),70,3,64,6,6
+temporal (resident set used),70,5,64,6,6
+temporal (resident set used),70,12,64,6,6
+temporal (resident set used),70,18,64,6,6
+temporal (resident set used),70,42,64,6,6
+temporal (resident set used),70,54,64,6,6
+temporal (resident set used),71,3,64,6,6
+temporal (resident set used),71,12,64,6,6
+temporal (resident set used),71,18,64,6,6
+temporal (resident set used),71,39,64,6,6
+temporal (resident set used),71,42,64,6,6
+temporal (resident set used),71,54,64,6,6
+temporal (resident set used),72,3,64,6,6
+temporal (resident set used),72,12,64,6,6
+temporal (resident set used),72,13,64,6,6
+temporal (resident set used),72,18,64,6,6
+temporal (resident set used),72,39,64,6,6
+temporal (resident set used),72,54,64,6,6
+temporal (resident set used),73,3,64,6,6
+temporal (resident set used),73,11,64,6,6
+temporal (resident set used),73,12,64,6,6
+temporal (resident set used),73,13,64,6,6
+temporal (resident set used),73,18,64,6,6
+temporal (resident set used),73,54,64,6,6
+temporal (resident set used),74,3,64,6,6
+temporal (resident set used),74,11,64,6,6
+temporal (resident set used),74,12,64,6,6
+temporal (resident set used),74,18,64,6,6
+temporal (resident set used),74,31,64,6,6
+temporal (resident set used),74,54,64,6,6
+temporal (resident set used),75,3,64,6,6
+temporal (resident set used),75,11,64,6,6
+temporal (resident set used),75,12,64,6,6
+temporal (resident set used),75,15,64,6,6
+temporal (resident set used),75,18,64,6,6
+temporal (resident set used),75,31,64,6,6
+temporal (resident set used),76,3,64,6,6
+temporal (resident set used),76,11,64,6,6
+temporal (resident set used),76,12,64,6,6
+temporal (resident set used),76,18,64,6,6
+temporal (resident set used),76,31,64,6,6
+temporal (resident set used),76,57,64,6,6
+temporal (resident set used),77,3,64,6,6
+temporal (resident set used),77,11,64,6,6
+temporal (resident set used),77,12,64,6,6
+temporal (resident set used),77,22,64,6,6
+temporal (resident set used),77,31,64,6,6
+temporal (resident set used),77,57,64,6,6
+temporal (resident set used),78,3,64,6,6
+temporal (resident set used),78,11,64,6,6
+temporal (resident set used),78,12,64,6,6
+temporal (resident set used),78,31,64,6,6
+temporal (resident set used),78,43,64,6,6
+temporal (resident set used),78,57,64,6,6
+temporal (resident set used),79,3,64,6,6
+temporal (resident set used),79,11,64,6,6
+temporal (resident set used),79,12,64,6,6
+temporal (resident set used),79,24,64,6,6
+temporal (resident set used),79,31,64,6,6
+temporal (resident set used),79,57,64,6,6
+temporal (resident set used),80,0,64,6,6
+temporal (resident set used),80,3,64,6,6
+temporal (resident set used),80,11,64,6,6
+temporal (resident set used),80,12,64,6,6
+temporal (resident set used),80,24,64,6,6
+temporal (resident set used),80,31,64,6,6
+temporal (resident set used),81,0,64,6,6
+temporal (resident set used),81,3,64,6,6
+temporal (resident set used),81,12,64,6,6
+temporal (resident set used),81,24,64,6,6
+temporal (resident set used),81,31,64,6,6
+temporal (resident set used),81,58,64,6,6
+temporal (resident set used),82,0,64,6,6
+temporal (resident set used),82,12,64,6,6
+temporal (resident set used),82,24,64,6,6
+temporal (resident set used),82,31,64,6,6
+temporal (resident set used),82,34,64,6,6
+temporal (resident set used),82,58,64,6,6
+temporal (resident set used),83,0,64,6,6
+temporal (resident set used),83,12,64,6,6
+temporal (resident set used),83,20,64,6,6
+temporal (resident set used),83,24,64,6,6
+temporal (resident set used),83,34,64,6,6
+temporal (resident set used),83,58,64,6,6
+temporal (resident set used),84,0,64,6,6
+temporal (resident set used),84,12,64,6,6
+temporal (resident set used),84,20,64,6,6
+temporal (resident set used),84,34,64,6,6
+temporal (resident set used),84,43,64,6,6
+temporal (resident set used),84,58,64,6,6
+temporal (resident set used),85,0,64,6,6
+temporal (resident set used),85,12,64,6,6
+temporal (resident set used),85,22,64,6,6
+temporal (resident set used),85,34,64,6,6
+temporal (resident set used),85,43,64,6,6
+temporal (resident set used),85,58,64,6,6
+temporal (resident set used),86,0,64,6,6
+temporal (resident set used),86,12,64,6,6
+temporal (resident set used),86,22,64,6,6
+temporal (resident set used),86,43,64,6,6
+temporal (resident set used),86,45,64,6,6
+temporal (resident set used),86,58,64,6,6
+temporal (resident set used),87,0,64,6,6
+temporal (resident set used),87,12,64,6,6
+temporal (resident set used),87,22,64,6,6
+temporal (resident set used),87,43,64,6,6
+temporal (resident set used),87,45,64,6,6
+temporal (resident set used),87,56,64,6,6
+temporal (resident set used),88,0,64,6,6
+temporal (resident set used),88,4,64,6,6
+temporal (resident set used),88,12,64,6,6
+temporal (resident set used),88,22,64,6,6
+temporal (resident set used),88,43,64,6,6
+temporal (resident set used),88,56,64,6,6
+temporal (resident set used),89,0,64,6,6
+temporal (resident set used),89,4,64,6,6
+temporal (resident set used),89,12,64,6,6
+temporal (resident set used),89,20,64,6,6
+temporal (resident set used),89,43,64,6,6
+temporal (resident set used),89,56,64,6,6
+temporal (resident set used),90,4,64,6,6
+temporal (resident set used),90,12,64,6,6
+temporal (resident set used),90,20,64,6,6
+temporal (resident set used),90,43,64,6,6
+temporal (resident set used),90,56,64,6,6
+temporal (resident set used),90,62,64,6,6
+temporal (resident set used),91,4,64,6,6
+temporal (resident set used),91,12,64,6,6
+temporal (resident set used),91,20,64,6,6
+temporal (resident set used),91,43,64,6,6
+temporal (resident set used),91,54,64,6,6
+temporal (resident set used),91,62,64,6,6
+temporal (resident set used),92,4,64,6,6
+temporal (resident set used),92,12,64,6,6
+temporal (resident set used),92,18,64,6,6
+temporal (resident set used),92,20,64,6,6
+temporal (resident set used),92,54,64,6,6
+temporal (resident set used),92,62,64,6,6
+temporal (resident set used),93,4,64,6,6
+temporal (resident set used),93,12,64,6,6
+temporal (resident set used),93,18,64,6,6
+temporal (resident set used),93,20,64,6,6
+temporal (resident set used),93,50,64,6,6
+temporal (resident set used),93,54,64,6,6
+temporal (resident set used),94,12,64,6,6
+temporal (resident set used),94,18,64,6,6
+temporal (resident set used),94,20,64,6,6
+temporal (resident set used),94,50,64,6,6
+temporal (resident set used),94,54,64,6,6
+temporal (resident set used),94,57,64,6,6
+temporal (resident set used),95,12,64,6,6
+temporal (resident set used),95,18,64,6,6
+temporal (resident set used),95,27,64,6,6
+temporal (resident set used),95,50,64,6,6
+temporal (resident set used),95,54,64,6,6
+temporal (resident set used),95,57,64,6,6
+temporal (resident set used),96,12,64,6,6
+temporal (resident set used),96,18,64,6,6
+temporal (resident set used),96,27,64,6,6
+temporal (resident set used),96,31,64,6,6
+temporal (resident set used),96,50,64,6,6
+temporal (resident set used),96,57,64,6,6
+temporal (resident set used),97,12,64,6,6
+temporal (resident set used),97,15,64,6,6
+temporal (resident set used),97,18,64,6,6
+temporal (resident set used),97,27,64,6,6
+temporal (resident set used),97,31,64,6,6
+temporal (resident set used),97,50,64,6,6
+temporal (resident set used),98,12,64,6,6
+temporal (resident set used),98,18,64,6,6
+temporal (resident set used),98,27,64,6,6
+temporal (resident set used),98,31,64,6,6
+temporal (resident set used),98,50,64,6,6
+temporal (resident set used),98,54,64,6,6
+temporal (resident set used),99,0,64,6,6
+temporal (resident set used),99,12,64,6,6
+temporal (resident set used),99,27,64,6,6
+temporal (resident set used),99,31,64,6,6
+temporal (resident set used),99,50,64,6,6
+temporal (resident set used),99,54,64,6,6
+temporal (resident set used),100,0,64,6,6
+temporal (resident set used),100,12,64,6,6
+temporal (resident set used),100,13,64,6,6
+temporal (resident set used),100,27,64,6,6
+temporal (resident set used),100,50,64,6,6
+temporal (resident set used),100,54,64,6,6
+temporal (resident set used),101,0,64,6,6
+temporal (resident set used),101,12,64,6,6
+temporal (resident set used),101,13,64,6,6
+temporal (resident set used),101,18,64,6,6
+temporal (resident set used),101,50,64,6,6
+temporal (resident set used),101,54,64,6,6
+temporal (resident set used),102,0,64,6,6
+temporal (resident set used),102,12,64,6,6
+temporal (resident set used),102,18,64,6,6
+temporal (resident set used),102,50,64,6,6
+temporal (resident set used),102,54,64,6,6
+temporal (resident set used),102,58,64,6,6
+temporal (resident set used),103,0,64,6,6
+temporal (resident set used),103,12,64,6,6
+temporal (resident set used),103,18,64,6,6
+temporal (resident set used),103,34,64,6,6
+temporal (resident set used),103,50,64,6,6
+temporal (resident set used),103,58,64,6,6
+temporal (resident set used),104,0,64,6,6
+temporal (resident set used),104,3,64,6,6
+temporal (resident set used),104,12,64,6,6
+temporal (resident set used),104,34,64,6,6
+temporal (resident set used),104,50,64,6,6
+temporal (resident set used),104,58,64,6,6
+temporal (resident set used),105,0,64,6,6
+temporal (resident set used),105,3,64,6,6
+temporal (resident set used),105,12,64,6,6
+temporal (resident set used),105,27,64,6,6
+temporal (resident set used),105,50,64,6,6
+temporal (resident set used),105,58,64,6,6
+temporal (resident set used),106,0,64,6,6
+temporal (resident set used),106,12,64,6,6
+temporal (resident set used),106,27,64,6,6
+temporal (resident set used),106,34,64,6,6
+temporal (resident set used),106,50,64,6,6
+temporal (resident set used),106,58,64,6,6
+temporal (resident set used),107,0,64,6,6
+temporal (resident set used),107,12,64,6,6
+temporal (resident set used),107,18,64,6,6
+temporal (resident set used),107,34,64,6,6
+temporal (resident set used),107,50,64,6,6
+temporal (resident set used),107,58,64,6,6
+temporal (resident set used),108,0,64,6,6
+temporal (resident set used),108,3,64,6,6
+temporal (resident set used),108,12,64,6,6
+temporal (resident set used),108,34,64,6,6
+temporal (resident set used),108,50,64,6,6
+temporal (resident set used),108,58,64,6,6
+temporal (resident set used),109,0,64,6,6
+temporal (resident set used),109,3,64,6,6
+temporal (resident set used),109,12,64,6,6
+temporal (resident set used),109,27,64,6,6
+temporal (resident set used),109,50,64,6,6
+temporal (resident set used),109,58,64,6,6
+temporal (resident set used),110,0,64,6,6
+temporal (resident set used),110,3,64,6,6
+temporal (resident set used),110,12,64,6,6
+temporal (resident set used),110,34,64,6,6
+temporal (resident set used),110,50,64,6,6
+temporal (resident set used),110,58,64,6,6
+temporal (resident set used),111,0,64,6,6
+temporal (resident set used),111,3,64,6,6
+temporal (resident set used),111,12,64,6,6
+temporal (resident set used),111,26,64,6,6
+temporal (resident set used),111,34,64,6,6
+temporal (resident set used),111,58,64,6,6
+temporal (resident set used),112,0,64,6,6
+temporal (resident set used),112,3,64,6,6
+temporal (resident set used),112,12,64,6,6
+temporal (resident set used),112,26,64,6,6
+temporal (resident set used),112,27,64,6,6
+temporal (resident set used),112,58,64,6,6
+temporal (resident set used),113,0,64,6,6
+temporal (resident set used),113,3,64,6,6
+temporal (resident set used),113,12,64,6,6
+temporal (resident set used),113,27,64,6,6
+temporal (resident set used),113,45,64,6,6
+temporal (resident set used),113,58,64,6,6
+temporal (resident set used),114,0,64,6,6
+temporal (resident set used),114,4,64,6,6
+temporal (resident set used),114,12,64,6,6
+temporal (resident set used),114,27,64,6,6
+temporal (resident set used),114,45,64,6,6
+temporal (resident set used),114,58,64,6,6
+temporal (resident set used),115,0,64,6,6
+temporal (resident set used),115,4,64,6,6
+temporal (resident set used),115,6,64,6,6
+temporal (resident set used),115,12,64,6,6
+temporal (resident set used),115,45,64,6,6
+temporal (resident set used),115,58,64,6,6
+temporal (resident set used),116,0,64,6,6
+temporal (resident set used),116,4,64,6,6
+temporal (resident set used),116,6,64,6,6
+temporal (resident set used),116,12,64,6,6
+temporal (resident set used),116,56,64,6,6
+temporal (resident set used),116,58,64,6,6
+temporal (resident set used),117,4,64,6,6
+temporal (resident set used),117,6,64,6,6
+temporal (resident set used),117,12,64,6,6
+temporal (resident set used),117,20,64,6,6
+temporal (resident set used),117,56,64,6,6
+temporal (resident set used),117,58,64,6,6
+temporal (resident set used),118,4,64,6,6
+temporal (resident set used),118,12,64,6,6
+temporal (resident set used),118,20,64,6,6
+temporal (resident set used),118,34,64,6,6
+temporal (resident set used),118,56,64,6,6
+temporal (resident set used),118,58,64,6,6
+temporal (resident set used),119,4,64,6,6
+temporal (resident set used),119,12,64,6,6
+temporal (resident set used),119,34,64,6,6
+temporal (resident set used),119,45,64,6,6
+temporal (resident set used),119,56,64,6,6
+temporal (resident set used),119,58,64,6,6
+temporal (resident set used),120,3,64,6,6
+temporal (resident set used),120,12,64,6,6
+temporal (resident set used),120,34,64,6,6
+temporal (resident set used),120,45,64,6,6
+temporal (resident set used),120,56,64,6,6
+temporal (resident set used),120,58,64,6,6
+temporal (resident set used),121,3,64,6,6
+temporal (resident set used),121,12,64,6,6
+temporal (resident set used),121,18,64,6,6
+temporal (resident set used),121,34,64,6,6
+temporal (resident set used),121,56,64,6,6
+temporal (resident set used),121,58,64,6,6
+temporal (resident set used),122,3,64,6,6
+temporal (resident set used),122,12,64,6,6
+temporal (resident set used),122,18,64,6,6
+temporal (resident set used),122,34,64,6,6
+temporal (resident set used),122,36,64,6,6
+temporal (resident set used),122,56,64,6,6
+temporal (resident set used),123,3,64,6,6
+temporal (resident set used),123,12,64,6,6
+temporal (resident set used),123,18,64,6,6
+temporal (resident set used),123,34,64,6,6
+temporal (resident set used),123,50,64,6,6
+temporal (resident set used),123,56,64,6,6
+temporal (resident set used),124,3,64,6,6
+temporal (resident set used),124,12,64,6,6
+temporal (resident set used),124,18,64,6,6
+temporal (resident set used),124,34,64,6,6
+temporal (resident set used),124,45,64,6,6
+temporal (resident set used),124,56,64,6,6
+temporal (resident set used),125,0,64,6,6
+temporal (resident set used),125,3,64,6,6
+temporal (resident set used),125,12,64,6,6
+temporal (resident set used),125,34,64,6,6
+temporal (resident set used),125,45,64,6,6
+temporal (resident set used),125,56,64,6,6
+temporal (resident set used),126,0,64,6,6
+temporal (resident set used),126,3,64,6,6
+temporal (resident set used),126,4,64,6,6
+temporal (resident set used),126,12,64,6,6
+temporal (resident set used),126,45,64,6,6
+temporal (resident set used),126,56,64,6,6
+temporal (resident set used),127,0,64,6,6
+temporal (resident set used),127,3,64,6,6
+temporal (resident set used),127,12,64,6,6
+temporal (resident set used),127,34,64,6,6
+temporal (resident set used),127,45,64,6,6
+temporal (resident set used),127,56,64,6,6
+temporal (resident set used),128,0,64,6,6
+temporal (resident set used),128,3,64,6,6
+temporal (resident set used),128,12,64,6,6
+temporal (resident set used),128,45,64,6,6
+temporal (resident set used),128,50,64,6,6
+temporal (resident set used),128,56,64,6,6
+temporal (resident set used),129,3,64,6,6
+temporal (resident set used),129,12,64,6,6
+temporal (resident set used),129,20,64,6,6
+temporal (resident set used),129,45,64,6,6
+temporal (resident set used),129,50,64,6,6
+temporal (resident set used),129,56,64,6,6
+temporal (resident set used),130,3,64,6,6
+temporal (resident set used),130,12,64,6,6
+temporal (resident set used),130,34,64,6,6
+temporal (resident set used),130,45,64,6,6
+temporal (resident set used),130,50,64,6,6
+temporal (resident set used),130,56,64,6,6
+temporal (resident set used),131,3,64,6,6
+temporal (resident set used),131,12,64,6,6
+temporal (resident set used),131,27,64,6,6
+temporal (resident set used),131,45,64,6,6
+temporal (resident set used),131,50,64,6,6
+temporal (resident set used),131,56,64,6,6
+temporal (resident set used),132,3,64,6,6
+temporal (resident set used),132,12,64,6,6
+temporal (resident set used),132,34,64,6,6
+temporal (resident set used),132,45,64,6,6
+temporal (resident set used),132,50,64,6,6
+temporal (resident set used),132,56,64,6,6
+temporal (resident set used),133,3,64,6,6
+temporal (resident set used),133,12,64,6,6
+temporal (resident set used),133,42,64,6,6
+temporal (resident set used),133,45,64,6,6
+temporal (resident set used),133,50,64,6,6
+temporal (resident set used),133,56,64,6,6
+temporal (resident set used),134,3,64,6,6
+temporal (resident set used),134,12,64,6,6
+temporal (resident set used),134,34,64,6,6
+temporal (resident set used),134,42,64,6,6
+temporal (resident set used),134,45,64,6,6
+temporal (resident set used),134,50,64,6,6
+temporal (resident set used),135,3,64,6,6
+temporal (resident set used),135,12,64,6,6
+temporal (resident set used),135,22,64,6,6
+temporal (resident set used),135,34,64,6,6
+temporal (resident set used),135,45,64,6,6
+temporal (resident set used),135,50,64,6,6
+temporal (resident set used),136,3,64,6,6
+temporal (resident set used),136,12,64,6,6
+temporal (resident set used),136,34,64,6,6
+temporal (resident set used),136,36,64,6,6
+temporal (resident set used),136,45,64,6,6
+temporal (resident set used),136,50,64,6,6
+temporal (resident set used),137,3,64,6,6
+temporal (resident set used),137,12,64,6,6
+temporal (resident set used),137,27,64,6,6
+temporal (resident set used),137,34,64,6,6
+temporal (resident set used),137,45,64,6,6
+temporal (resident set used),137,50,64,6,6
+temporal (resident set used),138,3,64,6,6
+temporal (resident set used),138,12,64,6,6
+temporal (resident set used),138,27,64,6,6
+temporal (resident set used),138,45,64,6,6
+temporal (resident set used),138,50,64,6,6
+temporal (resident set used),138,62,64,6,6
+temporal (resident set used),139,0,64,6,6
+temporal (resident set used),139,12,64,6,6
+temporal (resident set used),139,27,64,6,6
+temporal (resident set used),139,45,64,6,6
+temporal (resident set used),139,50,64,6,6
+temporal (resident set used),139,62,64,6,6
+temporal (resident set used),140,0,64,6,6
+temporal (resident set used),140,12,64,6,6
+temporal (resident set used),140,13,64,6,6
+temporal (resident set used),140,45,64,6,6
+temporal (resident set used),140,50,64,6,6
+temporal (resident set used),140,62,64,6,6
+temporal (resident set used),141,0,64,6,6
+temporal (resident set used),141,12,64,6,6
+temporal (resident set used),141,13,64,6,6
+temporal (resident set used),141,18,64,6,6
+temporal (resident set used),141,45,64,6,6
+temporal (resident set used),141,50,64,6,6
+temporal (resident set used),142,12,64,6,6
+temporal (resident set used),142,13,64,6,6
+temporal (resident set used),142,15,64,6,6
+temporal (resident set used),142,18,64,6,6
+temporal (resident set used),142,45,64,6,6
+temporal (resident set used),142,50,64,6,6
+temporal (resident set used),143,12,64,6,6
+temporal (resident set used),143,15,64,6,6
+temporal (resident set used),143,18,64,6,6
+temporal (resident set used),143,20,64,6,6
+temporal (resident set used),143,45,64,6,6
+temporal (resident set used),143,50,64,6,6
+temporal (resident set used),144,12,64,6,6
+temporal (resident set used),144,15,64,6,6
+temporal (resident set used),144,18,64,6,6
+temporal (resident set used),144,45,64,6,6
+temporal (resident set used),144,50,64,6,6
+temporal (resident set used),144,61,64,6,6
+temporal (resident set used),145,12,64,6,6
+temporal (resident set used),145,18,64,6,6
+temporal (resident set used),145,45,64,6,6
+temporal (resident set used),145,50,64,6,6
+temporal (resident set used),145,54,64,6,6
+temporal (resident set used),145,61,64,6,6
+temporal (resident set used),146,12,64,6,6
+temporal (resident set used),146,18,64,6,6
+temporal (resident set used),146,20,64,6,6
+temporal (resident set used),146,50,64,6,6
+temporal (resident set used),146,54,64,6,6
+temporal (resident set used),146,61,64,6,6
+temporal (resident set used),147,12,64,6,6
+temporal (resident set used),147,20,64,6,6
+temporal (resident set used),147,24,64,6,6
+temporal (resident set used),147,50,64,6,6
+temporal (resident set used),147,54,64,6,6
+temporal (resident set used),147,61,64,6,6
+temporal (resident set used),148,12,64,6,6
+temporal (resident set used),148,20,64,6,6
+temporal (resident set used),148,24,64,6,6
+temporal (resident set used),148,27,64,6,6
+temporal (resident set used),148,50,64,6,6
+temporal (resident set used),148,61,64,6,6
+temporal (resident set used),149,4,64,6,6
+temporal (resident set used),149,12,64,6,6
+temporal (resident set used),149,20,64,6,6
+temporal (resident set used),149,24,64,6,6
+temporal (resident set used),149,50,64,6,6
+temporal (resident set used),149,61,64,6,6
+temporal (resident set used),150,4,64,6,6
+temporal (resident set used),150,12,64,6,6
+temporal (resident set used),150,24,64,6,6
+temporal (resident set used),150,34,64,6,6
+temporal (resident set used),150,50,64,6,6
+temporal (resident set used),150,61,64,6,6
+temporal (resident set used),151,0,64,6,6
+temporal (resident set used),151,4,64,6,6
+temporal (resident set used),151,12,64,6,6
+temporal (resident set used),151,24,64,6,6
+temporal (resident set used),151,34,64,6,6
+temporal (resident set used),151,61,64,6,6
+temporal (resident set used),152,0,64,6,6
+temporal (resident set used),152,4,64,6,6
+temporal (resident set used),152,12,64,6,6
+temporal (resident set used),152,13,64,6,6
+temporal (resident set used),152,34,64,6,6
+temporal (resident set used),152,61,64,6,6
+temporal (resident set used),153,0,64,6,6
+temporal (resident set used),153,4,64,6,6
+temporal (resident set used),153,12,64,6,6
+temporal (resident set used),153,13,64,6,6
+temporal (resident set used),153,20,64,6,6
+temporal (resident set used),153,34,64,6,6
+temporal (resident set used),154,0,64,6,6
+temporal (resident set used),154,4,64,6,6
+temporal (resident set used),154,12,64,6,6
+temporal (resident set used),154,18,64,6,6
+temporal (resident set used),154,20,64,6,6
+temporal (resident set used),154,34,64,6,6
+temporal (resident set used),155,0,64,6,6
+temporal (resident set used),155,4,64,6,6
+temporal (resident set used),155,12,64,6,6
+temporal (resident set used),155,18,64,6,6
+temporal (resident set used),155,20,64,6,6
+temporal (resident set used),155,45,64,6,6
+temporal (resident set used),156,0,64,6,6
+temporal (resident set used),156,4,64,6,6
+temporal (resident set used),156,12,64,6,6
+temporal (resident set used),156,18,64,6,6
+temporal (resident set used),156,34,64,6,6
+temporal (resident set used),156,45,64,6,6
+temporal (resident set used),157,0,64,6,6
+temporal (resident set used),157,3,64,6,6
+temporal (resident set used),157,4,64,6,6
+temporal (resident set used),157,12,64,6,6
+temporal (resident set used),157,34,64,6,6
+temporal (resident set used),157,45,64,6,6
+temporal (resident set used),158,0,64,6,6
+temporal (resident set used),158,3,64,6,6
+temporal (resident set used),158,4,64,6,6
+temporal (resident set used),158,12,64,6,6
+temporal (resident set used),158,34,64,6,6
+temporal (resident set used),158,46,64,6,6
+temporal (resident set used),159,0,64,6,6
+temporal (resident set used),159,3,64,6,6
+temporal (resident set used),159,4,64,6,6
+temporal (resident set used),159,12,64,6,6
+temporal (resident set used),159,27,64,6,6
+temporal (resident set used),159,46,64,6,6
+temporal (resident set used),160,0,64,6,6
+temporal (resident set used),160,4,64,6,6
+temporal (resident set used),160,12,64,6,6
+temporal (resident set used),160,27,64,6,6
+temporal (resident set used),160,46,64,6,6
+temporal (resident set used),160,63,64,6,6
+temporal (resident set used),161,0,64,6,6
+temporal (resident set used),161,4,64,6,6
+temporal (resident set used),161,12,64,6,6
+temporal (resident set used),161,46,64,6,6
+temporal (resident set used),161,49,64,6,6
+temporal (resident set used),161,63,64,6,6
+temporal (resident set used),162,4,64,6,6
+temporal (resident set used),162,12,64,6,6
+temporal (resident set used),162,34,64,6,6
+temporal (resident set used),162,46,64,6,6
+temporal (resident set used),162,49,64,6,6
+temporal (resident set used),162,63,64,6,6
+temporal (resident set used),163,0,64,6,6
+temporal (resident set used),163,4,64,6,6
+temporal (resident set used),163,12,64,6,6
+temporal (resident set used),163,34,64,6,6
+temporal (resident set used),163,46,64,6,6
+temporal (resident set used),163,49,64,6,6
+temporal (resident set used),164,0,64,6,6
+temporal (resident set used),164,4,64,6,6
+temporal (resident set used),164,12,64,6,6
+temporal (resident set used),164,13,64,6,6
+temporal (resident set used),164,46,64,6,6
+temporal (resident set used),164,49,64,6,6
+temporal (resident set used),165,0,64,6,6
+temporal (resident set used),165,4,64,6,6
+temporal (resident set used),165,6,64,6,6
+temporal (resident set used),165,12,64,6,6
+temporal (resident set used),165,46,64,6,6
+temporal (resident set used),165,49,64,6,6
+temporal (resident set used),166,0,64,6,6
+temporal (resident set used),166,4,64,6,6
+temporal (resident set used),166,6,64,6,6
+temporal (resident set used),166,12,64,6,6
+temporal (resident set used),166,20,64,6,6
+temporal (resident set used),166,46,64,6,6
+temporal (resident set used),167,0,64,6,6
+temporal (resident set used),167,4,64,6,6
+temporal (resident set used),167,12,64,6,6
+temporal (resident set used),167,20,64,6,6
+temporal (resident set used),167,34,64,6,6
+temporal (resident set used),167,46,64,6,6
+temporal (resident set used),168,0,64,6,6
+temporal (resident set used),168,4,64,6,6
+temporal (resident set used),168,6,64,6,6
+temporal (resident set used),168,12,64,6,6
+temporal (resident set used),168,20,64,6,6
+temporal (resident set used),168,46,64,6,6
+temporal (resident set used),169,0,64,6,6
+temporal (resident set used),169,4,64,6,6
+temporal (resident set used),169,6,64,6,6
+temporal (resident set used),169,12,64,6,6
+temporal (resident set used),169,20,64,6,6
+temporal (resident set used),169,27,64,6,6
+temporal (resident set used),170,0,64,6,6
+temporal (resident set used),170,4,64,6,6
+temporal (resident set used),170,6,64,6,6
+temporal (resident set used),170,12,64,6,6
+temporal (resident set used),170,27,64,6,6
+temporal (resident set used),170,34,64,6,6
+temporal (resident set used),171,0,64,6,6
+temporal (resident set used),171,4,64,6,6
+temporal (resident set used),171,12,64,6,6
+temporal (resident set used),171,27,64,6,6
+temporal (resident set used),171,34,64,6,6
+temporal (resident set used),171,51,64,6,6
+temporal (resident set used),172,0,64,6,6
+temporal (resident set used),172,4,64,6,6
+temporal (resident set used),172,12,64,6,6
+temporal (resident set used),172,27,64,6,6
+temporal (resident set used),172,45,64,6,6
+temporal (resident set used),172,51,64,6,6
+temporal (resident set used),173,4,64,6,6
+temporal (resident set used),173,12,64,6,6
+temporal (resident set used),173,20,64,6,6
+temporal (resident set used),173,27,64,6,6
+temporal (resident set used),173,45,64,6,6
+temporal (resident set used),173,51,64,6,6
+temporal (resident set used),174,4,64,6,6
+temporal (resident set used),174,12,64,6,6
+temporal (resident set used),174,27,64,6,6
+temporal (resident set used),174,34,64,6,6
+temporal (resident set used),174,45,64,6,6
+temporal (resident set used),174,51,64,6,6
+temporal (resident set used),175,4,64,6,6
+temporal (resident set used),175,12,64,6,6
+temporal (resident set used),175,34,64,6,6
+temporal (resident set used),175,45,64,6,6
+temporal (resident set used),175,51,64,6,6
+temporal (resident set used),175,56,64,6,6
+temporal (resident set used),176,4,64,6,6
+temporal (resident set used),176,12,64,6,6
+temporal (resident set used),176,27,64,6,6
+temporal (resident set used),176,45,64,6,6
+temporal (resident set used),176,51,64,6,6
+temporal (resident set used),176,56,64,6,6
+temporal (resident set used),177,12,64,6,6
+temporal (resident set used),177,20,64,6,6
+temporal (resident set used),177,27,64,6,6
+temporal (resident set used),177,45,64,6,6
+temporal (resident set used),177,51,64,6,6
+temporal (resident set used),177,56,64,6,6
+temporal (resident set used),178,12,64,6,6
+temporal (resident set used),178,27,64,6,6
+temporal (resident set used),178,34,64,6,6
+temporal (resident set used),178,45,64,6,6
+temporal (resident set used),178,51,64,6,6
+temporal (resident set used),178,56,64,6,6
+temporal (resident set used),179,0,64,6,6
+temporal (resident set used),179,12,64,6,6
+temporal (resident set used),179,27,64,6,6
+temporal (resident set used),179,45,64,6,6
+temporal (resident set used),179,51,64,6,6
+temporal (resident set used),179,56,64,6,6
+temporal (resident set used),180,0,64,6,6
+temporal (resident set used),180,12,64,6,6
+temporal (resident set used),180,17,64,6,6
+temporal (resident set used),180,45,64,6,6
+temporal (resident set used),180,51,64,6,6
+temporal (resident set used),180,56,64,6,6
+temporal (resident set used),181,0,64,6,6
+temporal (resident set used),181,12,64,6,6
+temporal (resident set used),181,20,64,6,6
+temporal (resident set used),181,45,64,6,6
+temporal (resident set used),181,51,64,6,6
+temporal (resident set used),181,56,64,6,6
+temporal (resident set used),182,0,64,6,6
+temporal (resident set used),182,12,64,6,6
+temporal (resident set used),182,20,64,6,6
+temporal (resident set used),182,34,64,6,6
+temporal (resident set used),182,45,64,6,6
+temporal (resident set used),182,56,64,6,6
+temporal (resident set used),183,0,64,6,6
+temporal (resident set used),183,12,64,6,6
+temporal (resident set used),183,20,64,6,6
+temporal (resident set used),183,30,64,6,6
+temporal (resident set used),183,45,64,6,6
+temporal (resident set used),183,56,64,6,6
+temporal (resident set used),184,0,64,6,6
+temporal (resident set used),184,5,64,6,6
+temporal (resident set used),184,12,64,6,6
+temporal (resident set used),184,20,64,6,6
+temporal (resident set used),184,45,64,6,6
+temporal (resident set used),184,56,64,6,6
+temporal (resident set used),185,0,64,6,6
+temporal (resident set used),185,5,64,6,6
+temporal (resident set used),185,12,64,6,6
+temporal (resident set used),185,34,64,6,6
+temporal (resident set used),185,45,64,6,6
+temporal (resident set used),185,56,64,6,6
+temporal (resident set used),186,0,64,6,6
+temporal (resident set used),186,12,64,6,6
+temporal (resident set used),186,22,64,6,6
+temporal (resident set used),186,34,64,6,6
+temporal (resident set used),186,45,64,6,6
+temporal (resident set used),186,56,64,6,6
+temporal (resident set used),187,0,64,6,6
+temporal (resident set used),187,6,64,6,6
+temporal (resident set used),187,12,64,6,6
+temporal (resident set used),187,22,64,6,6
+temporal (resident set used),187,45,64,6,6
+temporal (resident set used),187,56,64,6,6
+temporal (resident set used),188,0,64,6,6
+temporal (resident set used),188,5,64,6,6
+temporal (resident set used),188,12,64,6,6
+temporal (resident set used),188,22,64,6,6
+temporal (resident set used),188,45,64,6,6
+temporal (resident set used),188,56,64,6,6
+temporal (resident set used),189,0,64,6,6
+temporal (resident set used),189,12,64,6,6
+temporal (resident set used),189,22,64,6,6
+temporal (resident set used),189,34,64,6,6
+temporal (resident set used),189,45,64,6,6
+temporal (resident set used),189,56,64,6,6
+temporal (resident set used),190,0,64,6,6
+temporal (resident set used),190,12,64,6,6
+temporal (resident set used),190,22,64,6,6
+temporal (resident set used),190,34,64,6,6
+temporal (resident set used),190,42,64,6,6
+temporal (resident set used),190,45,64,6,6
+temporal (resident set used),191,0,64,6,6
+temporal (resident set used),191,12,64,6,6
+temporal (resident set used),191,13,64,6,6
+temporal (resident set used),191,22,64,6,6
+temporal (resident set used),191,34,64,6,6
+temporal (resident set used),191,45,64,6,6
+temporal (resident set used),192,0,64,6,6
+temporal (resident set used),192,12,64,6,6
+temporal (resident set used),192,13,64,6,6
+temporal (resident set used),192,22,64,6,6
+temporal (resident set used),192,37,64,6,6
+temporal (resident set used),192,45,64,6,6
+temporal (resident set used),193,0,64,6,6
+temporal (resident set used),193,12,64,6,6
+temporal (resident set used),193,13,64,6,6
+temporal (resident set used),193,22,64,6,6
+temporal (resident set used),193,45,64,6,6
+temporal (resident set used),193,53,64,6,6
+temporal (resident set used),194,0,64,6,6
+temporal (resident set used),194,12,64,6,6
+temporal (resident set used),194,22,64,6,6
+temporal (resident set used),194,34,64,6,6
+temporal (resident set used),194,45,64,6,6
+temporal (resident set used),194,53,64,6,6
+temporal (resident set used),195,0,64,6,6
+temporal (resident set used),195,12,64,6,6
+temporal (resident set used),195,34,64,6,6
+temporal (resident set used),195,45,64,6,6
+temporal (resident set used),195,49,64,6,6
+temporal (resident set used),195,53,64,6,6
+temporal (resident set used),196,0,64,6,6
+temporal (resident set used),196,12,64,6,6
+temporal (resident set used),196,20,64,6,6
+temporal (resident set used),196,45,64,6,6
+temporal (resident set used),196,49,64,6,6
+temporal (resident set used),196,53,64,6,6
+temporal (resident set used),197,0,64,6,6
+temporal (resident set used),197,12,64,6,6
+temporal (resident set used),197,34,64,6,6
+temporal (resident set used),197,45,64,6,6
+temporal (resident set used),197,49,64,6,6
+temporal (resident set used),197,53,64,6,6
+temporal (resident set used),198,0,64,6,6
+temporal (resident set used),198,12,64,6,6
+temporal (resident set used),198,34,64,6,6
+temporal (resident set used),198,36,64,6,6
+temporal (resident set used),198,45,64,6,6
+temporal (resident set used),198,53,64,6,6
+temporal (resident set used),199,0,64,6,6
+temporal (resident set used),199,6,64,6,6
+temporal (resident set used),199,12,64,6,6
+temporal (resident set used),199,36,64,6,6
+temporal (resident set used),199,45,64,6,6
+temporal (resident set used),199,53,64,6,6
+temporal (resident set used),200,0,64,6,6
+temporal (resident set used),200,6,64,6,6
+temporal (resident set used),200,12,64,6,6
+temporal (resident set used),200,42,64,6,6
+temporal (resident set used),200,45,64,6,6
+temporal (resident set used),200,53,64,6,6
+temporal (resident set used),201,0,64,6,6
+temporal (resident set used),201,12,64,6,6
+temporal (resident set used),201,34,64,6,6
+temporal (resident set used),201,42,64,6,6
+temporal (resident set used),201,45,64,6,6
+temporal (resident set used),201,53,64,6,6
+temporal (resident set used),202,0,64,6,6
+temporal (resident set used),202,12,64,6,6
+temporal (resident set used),202,42,64,6,6
+temporal (resident set used),202,45,64,6,6
+temporal (resident set used),202,53,64,6,6
+temporal (resident set used),202,62,64,6,6
+temporal (resident set used),203,0,64,6,6
+temporal (resident set used),203,12,64,6,6
+temporal (resident set used),203,13,64,6,6
+temporal (resident set used),203,42,64,6,6
+temporal (resident set used),203,45,64,6,6
+temporal (resident set used),203,53,64,6,6
+temporal (resident set used),204,0,64,6,6
+temporal (resident set used),204,6,64,6,6
+temporal (resident set used),204,12,64,6,6
+temporal (resident set used),204,13,64,6,6
+temporal (resident set used),204,45,64,6,6
+temporal (resident set used),204,53,64,6,6
+temporal (resident set used),205,0,64,6,6
+temporal (resident set used),205,6,64,6,6
+temporal (resident set used),205,12,64,6,6
+temporal (resident set used),205,34,64,6,6
+temporal (resident set used),205,45,64,6,6
+temporal (resident set used),205,53,64,6,6
+temporal (resident set used),206,0,64,6,6
+temporal (resident set used),206,6,64,6,6
+temporal (resident set used),206,12,64,6,6
+temporal (resident set used),206,45,64,6,6
+temporal (resident set used),206,53,64,6,6
+temporal (resident set used),206,59,64,6,6
+temporal (resident set used),207,6,64,6,6
+temporal (resident set used),207,12,64,6,6
+temporal (resident set used),207,27,64,6,6
+temporal (resident set used),207,45,64,6,6
+temporal (resident set used),207,53,64,6,6
+temporal (resident set used),207,59,64,6,6
+temporal (resident set used),208,12,64,6,6
+temporal (resident set used),208,27,64,6,6
+temporal (resident set used),208,45,64,6,6
+temporal (resident set used),208,53,64,6,6
+temporal (resident set used),208,56,64,6,6
+temporal (resident set used),208,59,64,6,6
+temporal (resident set used),209,12,64,6,6
+temporal (resident set used),209,45,64,6,6
+temporal (resident set used),209,48,64,6,6
+temporal (resident set used),209,53,64,6,6
+temporal (resident set used),209,56,64,6,6
+temporal (resident set used),209,59,64,6,6
+temporal (resident set used),210,12,64,6,6
+temporal (resident set used),210,34,64,6,6
+temporal (resident set used),210,45,64,6,6
+temporal (resident set used),210,48,64,6,6
+temporal (resident set used),210,53,64,6,6
+temporal (resident set used),210,59,64,6,6
+temporal (resident set used),211,12,64,6,6
+temporal (resident set used),211,34,64,6,6
+temporal (resident set used),211,45,64,6,6
+temporal (resident set used),211,51,64,6,6
+temporal (resident set used),211,53,64,6,6
+temporal (resident set used),211,59,64,6,6
+temporal (resident set used),212,12,64,6,6
+temporal (resident set used),212,34,64,6,6
+temporal (resident set used),212,42,64,6,6
+temporal (resident set used),212,45,64,6,6
+temporal (resident set used),212,53,64,6,6
+temporal (resident set used),212,59,64,6,6
+temporal (resident set used),213,0,64,6,6
+temporal (resident set used),213,12,64,6,6
+temporal (resident set used),213,42,64,6,6
+temporal (resident set used),213,45,64,6,6
+temporal (resident set used),213,53,64,6,6
+temporal (resident set used),213,59,64,6,6
+temporal (resident set used),214,0,64,6,6
+temporal (resident set used),214,12,64,6,6
+temporal (resident set used),214,21,64,6,6
+temporal (resident set used),214,45,64,6,6
+temporal (resident set used),214,53,64,6,6
+temporal (resident set used),214,59,64,6,6
+temporal (resident set used),215,0,64,6,6
+temporal (resident set used),215,12,64,6,6
+temporal (resident set used),215,21,64,6,6
+temporal (resident set used),215,34,64,6,6
+temporal (resident set used),215,45,64,6,6
+temporal (resident set used),215,53,64,6,6
+temporal (resident set used),216,0,64,6,6
+temporal (resident set used),216,4,64,6,6
+temporal (resident set used),216,12,64,6,6
+temporal (resident set used),216,21,64,6,6
+temporal (resident set used),216,45,64,6,6
+temporal (resident set used),216,53,64,6,6
+temporal (resident set used),217,0,64,6,6
+temporal (resident set used),217,4,64,6,6
+temporal (resident set used),217,12,64,6,6
+temporal (resident set used),217,45,64,6,6
+temporal (resident set used),217,51,64,6,6
+temporal (resident set used),217,53,64,6,6
+temporal (resident set used),218,4,64,6,6
+temporal (resident set used),218,12,64,6,6
+temporal (resident set used),218,20,64,6,6
+temporal (resident set used),218,45,64,6,6
+temporal (resident set used),218,51,64,6,6
+temporal (resident set used),218,53,64,6,6
+temporal (resident set used),219,4,64,6,6
+temporal (resident set used),219,12,64,6,6
+temporal (resident set used),219,34,64,6,6
+temporal (resident set used),219,45,64,6,6
+temporal (resident set used),219,51,64,6,6
+temporal (resident set used),219,53,64,6,6
+temporal (unconstrained preference),0,0,64,6,6
+temporal (unconstrained preference),0,1,64,6,6
+temporal (unconstrained preference),0,5,64,6,6
+temporal (unconstrained preference),0,6,64,6,6
+temporal (unconstrained preference),0,27,64,6,6
+temporal (unconstrained preference),0,35,64,6,6
+temporal (unconstrained preference),1,0,64,6,6
+temporal (unconstrained preference),1,9,64,6,6
+temporal (unconstrained preference),1,10,64,6,6
+temporal (unconstrained preference),1,26,64,6,6
+temporal (unconstrained preference),1,33,64,6,6
+temporal (unconstrained preference),1,36,64,6,6
+temporal (unconstrained preference),2,0,64,6,6
+temporal (unconstrained preference),2,15,64,6,6
+temporal (unconstrained preference),2,24,64,6,6
+temporal (unconstrained preference),2,27,64,6,6
+temporal (unconstrained preference),2,36,64,6,6
+temporal (unconstrained preference),2,63,64,6,6
+temporal (unconstrained preference),3,0,64,6,6
+temporal (unconstrained preference),3,5,64,6,6
+temporal (unconstrained preference),3,7,64,6,6
+temporal (unconstrained preference),3,36,64,6,6
+temporal (unconstrained preference),3,43,64,6,6
+temporal (unconstrained preference),3,60,64,6,6
+temporal (unconstrained preference),4,24,64,6,6
+temporal (unconstrained preference),4,27,64,6,6
+temporal (unconstrained preference),4,36,64,6,6
+temporal (unconstrained preference),4,54,64,6,6
+temporal (unconstrained preference),4,61,64,6,6
+temporal (unconstrained preference),4,62,64,6,6
+temporal (unconstrained preference),5,13,64,6,6
+temporal (unconstrained preference),5,42,64,6,6
+temporal (unconstrained preference),5,43,64,6,6
+temporal (unconstrained preference),5,52,64,6,6
+temporal (unconstrained preference),5,54,64,6,6
+temporal (unconstrained preference),5,62,64,6,6
+temporal (unconstrained preference),6,0,64,6,6
+temporal (unconstrained preference),6,13,64,6,6
+temporal (unconstrained preference),6,22,64,6,6
+temporal (unconstrained preference),6,36,64,6,6
+temporal (unconstrained preference),6,39,64,6,6
+temporal (unconstrained preference),6,54,64,6,6
+temporal (unconstrained preference),7,6,64,6,6
+temporal (unconstrained preference),7,9,64,6,6
+temporal (unconstrained preference),7,13,64,6,6
+temporal (unconstrained preference),7,22,64,6,6
+temporal (unconstrained preference),7,39,64,6,6
+temporal (unconstrained preference),7,56,64,6,6
+temporal (unconstrained preference),8,5,64,6,6
+temporal (unconstrained preference),8,9,64,6,6
+temporal (unconstrained preference),8,39,64,6,6
+temporal (unconstrained preference),8,50,64,6,6
+temporal (unconstrained preference),8,56,64,6,6
+temporal (unconstrained preference),8,58,64,6,6
+temporal (unconstrained preference),9,27,64,6,6
+temporal (unconstrained preference),9,32,64,6,6
+temporal (unconstrained preference),9,40,64,6,6
+temporal (unconstrained preference),9,50,64,6,6
+temporal (unconstrained preference),9,56,64,6,6
+temporal (unconstrained preference),9,58,64,6,6
+temporal (unconstrained preference),10,27,64,6,6
+temporal (unconstrained preference),10,34,64,6,6
+temporal (unconstrained preference),10,45,64,6,6
+temporal (unconstrained preference),10,50,64,6,6
+temporal (unconstrained preference),10,56,64,6,6
+temporal (unconstrained preference),10,58,64,6,6
+temporal (unconstrained preference),11,1,64,6,6
+temporal (unconstrained preference),11,22,64,6,6
+temporal (unconstrained preference),11,32,64,6,6
+temporal (unconstrained preference),11,40,64,6,6
+temporal (unconstrained preference),11,56,64,6,6
+temporal (unconstrained preference),11,58,64,6,6
+temporal (unconstrained preference),12,1,64,6,6
+temporal (unconstrained preference),12,14,64,6,6
+temporal (unconstrained preference),12,22,64,6,6
+temporal (unconstrained preference),12,35,64,6,6
+temporal (unconstrained preference),12,50,64,6,6
+temporal (unconstrained preference),12,56,64,6,6
+temporal (unconstrained preference),13,1,64,6,6
+temporal (unconstrained preference),13,3,64,6,6
+temporal (unconstrained preference),13,30,64,6,6
+temporal (unconstrained preference),13,31,64,6,6
+temporal (unconstrained preference),13,35,64,6,6
+temporal (unconstrained preference),13,56,64,6,6
+temporal (unconstrained preference),14,3,64,6,6
+temporal (unconstrained preference),14,5,64,6,6
+temporal (unconstrained preference),14,27,64,6,6
+temporal (unconstrained preference),14,40,64,6,6
+temporal (unconstrained preference),14,50,64,6,6
+temporal (unconstrained preference),14,58,64,6,6
+temporal (unconstrained preference),15,9,64,6,6
+temporal (unconstrained preference),15,22,64,6,6
+temporal (unconstrained preference),15,36,64,6,6
+temporal (unconstrained preference),15,54,64,6,6
+temporal (unconstrained preference),15,56,64,6,6
+temporal (unconstrained preference),15,62,64,6,6
+temporal (unconstrained preference),16,0,64,6,6
+temporal (unconstrained preference),16,9,64,6,6
+temporal (unconstrained preference),16,39,64,6,6
+temporal (unconstrained preference),16,42,64,6,6
+temporal (unconstrained preference),16,54,64,6,6
+temporal (unconstrained preference),16,62,64,6,6
+temporal (unconstrained preference),17,0,64,6,6
+temporal (unconstrained preference),17,13,64,6,6
+temporal (unconstrained preference),17,18,64,6,6
+temporal (unconstrained preference),17,22,64,6,6
+temporal (unconstrained preference),17,39,64,6,6
+temporal (unconstrained preference),17,62,64,6,6
+temporal (unconstrained preference),18,3,64,6,6
+temporal (unconstrained preference),18,7,64,6,6
+temporal (unconstrained preference),18,12,64,6,6
+temporal (unconstrained preference),18,18,64,6,6
+temporal (unconstrained preference),18,36,64,6,6
+temporal (unconstrained preference),18,54,64,6,6
+temporal (unconstrained preference),19,3,64,6,6
+temporal (unconstrained preference),19,11,64,6,6
+temporal (unconstrained preference),19,12,64,6,6
+temporal (unconstrained preference),19,18,64,6,6
+temporal (unconstrained preference),19,36,64,6,6
+temporal (unconstrained preference),19,61,64,6,6
+temporal (unconstrained preference),20,12,64,6,6
+temporal (unconstrained preference),20,18,64,6,6
+temporal (unconstrained preference),20,27,64,6,6
+temporal (unconstrained preference),20,44,64,6,6
+temporal (unconstrained preference),20,54,64,6,6
+temporal (unconstrained preference),20,61,64,6,6
+temporal (unconstrained preference),21,12,64,6,6
+temporal (unconstrained preference),21,18,64,6,6
+temporal (unconstrained preference),21,44,64,6,6
+temporal (unconstrained preference),21,50,64,6,6
+temporal (unconstrained preference),21,54,64,6,6
+temporal (unconstrained preference),21,61,64,6,6
+temporal (unconstrained preference),22,12,64,6,6
+temporal (unconstrained preference),22,15,64,6,6
+temporal (unconstrained preference),22,18,64,6,6
+temporal (unconstrained preference),22,24,64,6,6
+temporal (unconstrained preference),22,50,64,6,6
+temporal (unconstrained preference),22,54,64,6,6
+temporal (unconstrained preference),23,1,64,6,6
+temporal (unconstrained preference),23,12,64,6,6
+temporal (unconstrained preference),23,15,64,6,6
+temporal (unconstrained preference),23,18,64,6,6
+temporal (unconstrained preference),23,50,64,6,6
+temporal (unconstrained preference),23,58,64,6,6
+temporal (unconstrained preference),24,1,64,6,6
+temporal (unconstrained preference),24,12,64,6,6
+temporal (unconstrained preference),24,14,64,6,6
+temporal (unconstrained preference),24,50,64,6,6
+temporal (unconstrained preference),24,54,64,6,6
+temporal (unconstrained preference),24,58,64,6,6
+temporal (unconstrained preference),25,12,64,6,6
+temporal (unconstrained preference),25,18,64,6,6
+temporal (unconstrained preference),25,24,64,6,6
+temporal (unconstrained preference),25,50,64,6,6
+temporal (unconstrained preference),25,54,64,6,6
+temporal (unconstrained preference),25,61,64,6,6
+temporal (unconstrained preference),26,0,64,6,6
+temporal (unconstrained preference),26,12,64,6,6
+temporal (unconstrained preference),26,13,64,6,6
+temporal (unconstrained preference),26,39,64,6,6
+temporal (unconstrained preference),26,42,64,6,6
+temporal (unconstrained preference),26,54,64,6,6
+temporal (unconstrained preference),27,0,64,6,6
+temporal (unconstrained preference),27,12,64,6,6
+temporal (unconstrained preference),27,18,64,6,6
+temporal (unconstrained preference),27,50,64,6,6
+temporal (unconstrained preference),27,54,64,6,6
+temporal (unconstrained preference),27,58,64,6,6
+temporal (unconstrained preference),28,12,64,6,6
+temporal (unconstrained preference),28,15,64,6,6
+temporal (unconstrained preference),28,22,64,6,6
+temporal (unconstrained preference),28,50,64,6,6
+temporal (unconstrained preference),28,54,64,6,6
+temporal (unconstrained preference),28,58,64,6,6
+temporal (unconstrained preference),29,4,64,6,6
+temporal (unconstrained preference),29,12,64,6,6
+temporal (unconstrained preference),29,15,64,6,6
+temporal (unconstrained preference),29,22,64,6,6
+temporal (unconstrained preference),29,31,64,6,6
+temporal (unconstrained preference),29,56,64,6,6
+temporal (unconstrained preference),30,12,64,6,6
+temporal (unconstrained preference),30,18,64,6,6
+temporal (unconstrained preference),30,27,64,6,6
+temporal (unconstrained preference),30,34,64,6,6
+temporal (unconstrained preference),30,50,64,6,6
+temporal (unconstrained preference),30,58,64,6,6
+temporal (unconstrained preference),31,4,64,6,6
+temporal (unconstrained preference),31,12,64,6,6
+temporal (unconstrained preference),31,18,64,6,6
+temporal (unconstrained preference),31,34,64,6,6
+temporal (unconstrained preference),31,43,64,6,6
+temporal (unconstrained preference),31,50,64,6,6
+temporal (unconstrained preference),32,12,64,6,6
+temporal (unconstrained preference),32,20,64,6,6
+temporal (unconstrained preference),32,27,64,6,6
+temporal (unconstrained preference),32,45,64,6,6
+temporal (unconstrained preference),32,54,64,6,6
+temporal (unconstrained preference),32,56,64,6,6
+temporal (unconstrained preference),33,12,64,6,6
+temporal (unconstrained preference),33,27,64,6,6
+temporal (unconstrained preference),33,34,64,6,6
+temporal (unconstrained preference),33,45,64,6,6
+temporal (unconstrained preference),33,56,64,6,6
+temporal (unconstrained preference),33,58,64,6,6
+temporal (unconstrained preference),34,12,64,6,6
+temporal (unconstrained preference),34,22,64,6,6
+temporal (unconstrained preference),34,34,64,6,6
+temporal (unconstrained preference),34,45,64,6,6
+temporal (unconstrained preference),34,56,64,6,6
+temporal (unconstrained preference),34,58,64,6,6
+temporal (unconstrained preference),35,4,64,6,6
+temporal (unconstrained preference),35,5,64,6,6
+temporal (unconstrained preference),35,12,64,6,6
+temporal (unconstrained preference),35,27,64,6,6
+temporal (unconstrained preference),35,50,64,6,6
+temporal (unconstrained preference),35,58,64,6,6
+temporal (unconstrained preference),36,12,64,6,6
+temporal (unconstrained preference),36,27,64,6,6
+temporal (unconstrained preference),36,34,64,6,6
+temporal (unconstrained preference),36,45,64,6,6
+temporal (unconstrained preference),36,54,64,6,6
+temporal (unconstrained preference),36,61,64,6,6
+temporal (unconstrained preference),37,0,64,6,6
+temporal (unconstrained preference),37,12,64,6,6
+temporal (unconstrained preference),37,27,64,6,6
+temporal (unconstrained preference),37,42,64,6,6
+temporal (unconstrained preference),37,54,64,6,6
+temporal (unconstrained preference),37,58,64,6,6
+temporal (unconstrained preference),38,0,64,6,6
+temporal (unconstrained preference),38,13,64,6,6
+temporal (unconstrained preference),38,22,64,6,6
+temporal (unconstrained preference),38,37,64,6,6
+temporal (unconstrained preference),38,39,64,6,6
+temporal (unconstrained preference),38,54,64,6,6
+temporal (unconstrained preference),39,3,64,6,6
+temporal (unconstrained preference),39,6,64,6,6
+temporal (unconstrained preference),39,12,64,6,6
+temporal (unconstrained preference),39,27,64,6,6
+temporal (unconstrained preference),39,44,64,6,6
+temporal (unconstrained preference),39,50,64,6,6
+temporal (unconstrained preference),40,4,64,6,6
+temporal (unconstrained preference),40,9,64,6,6
+temporal (unconstrained preference),40,12,64,6,6
+temporal (unconstrained preference),40,34,64,6,6
+temporal (unconstrained preference),40,56,64,6,6
+temporal (unconstrained preference),40,58,64,6,6
+temporal (unconstrained preference),41,4,64,6,6
+temporal (unconstrained preference),41,12,64,6,6
+temporal (unconstrained preference),41,22,64,6,6
+temporal (unconstrained preference),41,27,64,6,6
+temporal (unconstrained preference),41,56,64,6,6
+temporal (unconstrained preference),41,60,64,6,6
+temporal (unconstrained preference),42,12,64,6,6
+temporal (unconstrained preference),42,27,64,6,6
+temporal (unconstrained preference),42,34,64,6,6
+temporal (unconstrained preference),42,45,64,6,6
+temporal (unconstrained preference),42,56,64,6,6
+temporal (unconstrained preference),42,61,64,6,6
+temporal (unconstrained preference),43,4,64,6,6
+temporal (unconstrained preference),43,12,64,6,6
+temporal (unconstrained preference),43,14,64,6,6
+temporal (unconstrained preference),43,18,64,6,6
+temporal (unconstrained preference),43,43,64,6,6
+temporal (unconstrained preference),43,54,64,6,6
+temporal (unconstrained preference),44,1,64,6,6
+temporal (unconstrained preference),44,4,64,6,6
+temporal (unconstrained preference),44,12,64,6,6
+temporal (unconstrained preference),44,34,64,6,6
+temporal (unconstrained preference),44,36,64,6,6
+temporal (unconstrained preference),44,63,64,6,6
+temporal (unconstrained preference),45,4,64,6,6
+temporal (unconstrained preference),45,12,64,6,6
+temporal (unconstrained preference),45,14,64,6,6
+temporal (unconstrained preference),45,43,64,6,6
+temporal (unconstrained preference),45,45,64,6,6
+temporal (unconstrained preference),45,60,64,6,6
+temporal (unconstrained preference),46,4,64,6,6
+temporal (unconstrained preference),46,12,64,6,6
+temporal (unconstrained preference),46,27,64,6,6
+temporal (unconstrained preference),46,34,64,6,6
+temporal (unconstrained preference),46,43,64,6,6
+temporal (unconstrained preference),46,45,64,6,6
+temporal (unconstrained preference),47,0,64,6,6
+temporal (unconstrained preference),47,4,64,6,6
+temporal (unconstrained preference),47,12,64,6,6
+temporal (unconstrained preference),47,27,64,6,6
+temporal (unconstrained preference),47,42,64,6,6
+temporal (unconstrained preference),47,54,64,6,6
+temporal (unconstrained preference),48,0,64,6,6
+temporal (unconstrained preference),48,4,64,6,6
+temporal (unconstrained preference),48,12,64,6,6
+temporal (unconstrained preference),48,13,64,6,6
+temporal (unconstrained preference),48,36,64,6,6
+temporal (unconstrained preference),48,39,64,6,6
+temporal (unconstrained preference),49,4,64,6,6
+temporal (unconstrained preference),49,9,64,6,6
+temporal (unconstrained preference),49,12,64,6,6
+temporal (unconstrained preference),49,45,64,6,6
+temporal (unconstrained preference),49,56,64,6,6
+temporal (unconstrained preference),49,60,64,6,6
+temporal (unconstrained preference),50,4,64,6,6
+temporal (unconstrained preference),50,9,64,6,6
+temporal (unconstrained preference),50,12,64,6,6
+temporal (unconstrained preference),50,34,64,6,6
+temporal (unconstrained preference),50,45,64,6,6
+temporal (unconstrained preference),50,56,64,6,6
+temporal (unconstrained preference),51,0,64,6,6
+temporal (unconstrained preference),51,4,64,6,6
+temporal (unconstrained preference),51,12,64,6,6
+temporal (unconstrained preference),51,22,64,6,6
+temporal (unconstrained preference),51,56,64,6,6
+temporal (unconstrained preference),51,58,64,6,6
+temporal (unconstrained preference),52,4,64,6,6
+temporal (unconstrained preference),52,12,64,6,6
+temporal (unconstrained preference),52,14,64,6,6
+temporal (unconstrained preference),52,20,64,6,6
+temporal (unconstrained preference),52,27,64,6,6
+temporal (unconstrained preference),52,45,64,6,6
+temporal (unconstrained preference),53,4,64,6,6
+temporal (unconstrained preference),53,12,64,6,6
+temporal (unconstrained preference),53,18,64,6,6
+temporal (unconstrained preference),53,27,64,6,6
+temporal (unconstrained preference),53,34,64,6,6
+temporal (unconstrained preference),53,45,64,6,6
+temporal (unconstrained preference),54,4,64,6,6
+temporal (unconstrained preference),54,12,64,6,6
+temporal (unconstrained preference),54,20,64,6,6
+temporal (unconstrained preference),54,36,64,6,6
+temporal (unconstrained preference),54,45,64,6,6
+temporal (unconstrained preference),54,50,64,6,6
+temporal (unconstrained preference),55,3,64,6,6
+temporal (unconstrained preference),55,4,64,6,6
+temporal (unconstrained preference),55,12,64,6,6
+temporal (unconstrained preference),55,34,64,6,6
+temporal (unconstrained preference),55,36,64,6,6
+temporal (unconstrained preference),55,45,64,6,6
+temporal (unconstrained preference),56,3,64,6,6
+temporal (unconstrained preference),56,12,64,6,6
+temporal (unconstrained preference),56,34,64,6,6
+temporal (unconstrained preference),56,41,64,6,6
+temporal (unconstrained preference),56,50,64,6,6
+temporal (unconstrained preference),56,60,64,6,6
+temporal (unconstrained preference),57,12,64,6,6
+temporal (unconstrained preference),57,24,64,6,6
+temporal (unconstrained preference),57,36,64,6,6
+temporal (unconstrained preference),57,45,64,6,6
+temporal (unconstrained preference),57,54,64,6,6
+temporal (unconstrained preference),57,62,64,6,6
+temporal (unconstrained preference),58,0,64,6,6
+temporal (unconstrained preference),58,12,64,6,6
+temporal (unconstrained preference),58,39,64,6,6
+temporal (unconstrained preference),58,42,64,6,6
+temporal (unconstrained preference),58,54,64,6,6
+temporal (unconstrained preference),58,62,64,6,6
+temporal (unconstrained preference),59,0,64,6,6
+temporal (unconstrained preference),59,9,64,6,6
+temporal (unconstrained preference),59,12,64,6,6
+temporal (unconstrained preference),59,13,64,6,6
+temporal (unconstrained preference),59,39,64,6,6
+temporal (unconstrained preference),59,54,64,6,6
+temporal (unconstrained preference),60,0,64,6,6
+temporal (unconstrained preference),60,4,64,6,6
+temporal (unconstrained preference),60,12,64,6,6
+temporal (unconstrained preference),60,13,64,6,6
+temporal (unconstrained preference),60,22,64,6,6
+temporal (unconstrained preference),60,39,64,6,6
+temporal (unconstrained preference),61,3,64,6,6
+temporal (unconstrained preference),61,6,64,6,6
+temporal (unconstrained preference),61,9,64,6,6
+temporal (unconstrained preference),61,12,64,6,6
+temporal (unconstrained preference),61,13,64,6,6
+temporal (unconstrained preference),61,50,64,6,6
+temporal (unconstrained preference),62,1,64,6,6
+temporal (unconstrained preference),62,3,64,6,6
+temporal (unconstrained preference),62,12,64,6,6
+temporal (unconstrained preference),62,20,64,6,6
+temporal (unconstrained preference),62,44,64,6,6
+temporal (unconstrained preference),62,50,64,6,6
+temporal (unconstrained preference),63,3,64,6,6
+temporal (unconstrained preference),63,7,64,6,6
+temporal (unconstrained preference),63,12,64,6,6
+temporal (unconstrained preference),63,21,64,6,6
+temporal (unconstrained preference),63,50,64,6,6
+temporal (unconstrained preference),63,60,64,6,6
+temporal (unconstrained preference),64,12,64,6,6
+temporal (unconstrained preference),64,18,64,6,6
+temporal (unconstrained preference),64,20,64,6,6
+temporal (unconstrained preference),64,34,64,6,6
+temporal (unconstrained preference),64,54,64,6,6
+temporal (unconstrained preference),64,58,64,6,6
+temporal (unconstrained preference),65,12,64,6,6
+temporal (unconstrained preference),65,18,64,6,6
+temporal (unconstrained preference),65,27,64,6,6
+temporal (unconstrained preference),65,36,64,6,6
+temporal (unconstrained preference),65,49,64,6,6
+temporal (unconstrained preference),65,50,64,6,6
+temporal (unconstrained preference),66,3,64,6,6
+temporal (unconstrained preference),66,12,64,6,6
+temporal (unconstrained preference),66,18,64,6,6
+temporal (unconstrained preference),66,30,64,6,6
+temporal (unconstrained preference),66,36,64,6,6
+temporal (unconstrained preference),66,49,64,6,6
+temporal (unconstrained preference),67,12,64,6,6
+temporal (unconstrained preference),67,18,64,6,6
+temporal (unconstrained preference),67,27,64,6,6
+temporal (unconstrained preference),67,30,64,6,6
+temporal (unconstrained preference),67,35,64,6,6
+temporal (unconstrained preference),67,36,64,6,6
+temporal (unconstrained preference),68,3,64,6,6
+temporal (unconstrained preference),68,7,64,6,6
+temporal (unconstrained preference),68,12,64,6,6
+temporal (unconstrained preference),68,18,64,6,6
+temporal (unconstrained preference),68,26,64,6,6
+temporal (unconstrained preference),68,30,64,6,6
+temporal (unconstrained preference),69,5,64,6,6
+temporal (unconstrained preference),69,12,64,6,6
+temporal (unconstrained preference),69,35,64,6,6
+temporal (unconstrained preference),69,42,64,6,6
+temporal (unconstrained preference),69,45,64,6,6
+temporal (unconstrained preference),69,54,64,6,6
+temporal (unconstrained preference),70,12,64,6,6
+temporal (unconstrained preference),70,27,64,6,6
+temporal (unconstrained preference),70,41,64,6,6
+temporal (unconstrained preference),70,42,64,6,6
+temporal (unconstrained preference),70,54,64,6,6
+temporal (unconstrained preference),70,62,64,6,6
+temporal (unconstrained preference),71,0,64,6,6
+temporal (unconstrained preference),71,4,64,6,6
+temporal (unconstrained preference),71,12,64,6,6
+temporal (unconstrained preference),71,39,64,6,6
+temporal (unconstrained preference),71,42,64,6,6
+temporal (unconstrained preference),71,54,64,6,6
+temporal (unconstrained preference),72,12,64,6,6
+temporal (unconstrained preference),72,13,64,6,6
+temporal (unconstrained preference),72,18,64,6,6
+temporal (unconstrained preference),72,50,64,6,6
+temporal (unconstrained preference),72,54,64,6,6
+temporal (unconstrained preference),72,62,64,6,6
+temporal (unconstrained preference),73,11,64,6,6
+temporal (unconstrained preference),73,12,64,6,6
+temporal (unconstrained preference),73,18,64,6,6
+temporal (unconstrained preference),73,31,64,6,6
+temporal (unconstrained preference),73,50,64,6,6
+temporal (unconstrained preference),73,58,64,6,6
+temporal (unconstrained preference),74,3,64,6,6
+temporal (unconstrained preference),74,11,64,6,6
+temporal (unconstrained preference),74,12,64,6,6
+temporal (unconstrained preference),74,18,64,6,6
+temporal (unconstrained preference),74,31,64,6,6
+temporal (unconstrained preference),74,57,64,6,6
+temporal (unconstrained preference),75,3,64,6,6
+temporal (unconstrained preference),75,11,64,6,6
+temporal (unconstrained preference),75,12,64,6,6
+temporal (unconstrained preference),75,15,64,6,6
+temporal (unconstrained preference),75,18,64,6,6
+temporal (unconstrained preference),75,31,64,6,6
+temporal (unconstrained preference),76,3,64,6,6
+temporal (unconstrained preference),76,11,64,6,6
+temporal (unconstrained preference),76,12,64,6,6
+temporal (unconstrained preference),76,18,64,6,6
+temporal (unconstrained preference),76,31,64,6,6
+temporal (unconstrained preference),76,57,64,6,6
+temporal (unconstrained preference),77,3,64,6,6
+temporal (unconstrained preference),77,12,64,6,6
+temporal (unconstrained preference),77,22,64,6,6
+temporal (unconstrained preference),77,50,64,6,6
+temporal (unconstrained preference),77,57,64,6,6
+temporal (unconstrained preference),77,58,64,6,6
+temporal (unconstrained preference),78,3,64,6,6
+temporal (unconstrained preference),78,11,64,6,6
+temporal (unconstrained preference),78,12,64,6,6
+temporal (unconstrained preference),78,15,64,6,6
+temporal (unconstrained preference),78,43,64,6,6
+temporal (unconstrained preference),78,57,64,6,6
+temporal (unconstrained preference),79,3,64,6,6
+temporal (unconstrained preference),79,5,64,6,6
+temporal (unconstrained preference),79,12,64,6,6
+temporal (unconstrained preference),79,15,64,6,6
+temporal (unconstrained preference),79,24,64,6,6
+temporal (unconstrained preference),79,57,64,6,6
+temporal (unconstrained preference),80,0,64,6,6
+temporal (unconstrained preference),80,5,64,6,6
+temporal (unconstrained preference),80,12,64,6,6
+temporal (unconstrained preference),80,24,64,6,6
+temporal (unconstrained preference),80,27,64,6,6
+temporal (unconstrained preference),80,54,64,6,6
+temporal (unconstrained preference),81,0,64,6,6
+temporal (unconstrained preference),81,4,64,6,6
+temporal (unconstrained preference),81,12,64,6,6
+temporal (unconstrained preference),81,36,64,6,6
+temporal (unconstrained preference),81,37,64,6,6
+temporal (unconstrained preference),81,58,64,6,6
+temporal (unconstrained preference),82,0,64,6,6
+temporal (unconstrained preference),82,4,64,6,6
+temporal (unconstrained preference),82,12,64,6,6
+temporal (unconstrained preference),82,16,64,6,6
+temporal (unconstrained preference),82,34,64,6,6
+temporal (unconstrained preference),82,47,64,6,6
+temporal (unconstrained preference),83,0,64,6,6
+temporal (unconstrained preference),83,4,64,6,6
+temporal (unconstrained preference),83,12,64,6,6
+temporal (unconstrained preference),83,16,64,6,6
+temporal (unconstrained preference),83,20,64,6,6
+temporal (unconstrained preference),83,27,64,6,6
+temporal (unconstrained preference),84,0,64,6,6
+temporal (unconstrained preference),84,1,64,6,6
+temporal (unconstrained preference),84,12,64,6,6
+temporal (unconstrained preference),84,16,64,6,6
+temporal (unconstrained preference),84,18,64,6,6
+temporal (unconstrained preference),84,43,64,6,6
+temporal (unconstrained preference),85,4,64,6,6
+temporal (unconstrained preference),85,12,64,6,6
+temporal (unconstrained preference),85,22,64,6,6
+temporal (unconstrained preference),85,36,64,6,6
+temporal (unconstrained preference),85,49,64,6,6
+temporal (unconstrained preference),85,56,64,6,6
+temporal (unconstrained preference),86,12,64,6,6
+temporal (unconstrained preference),86,27,64,6,6
+temporal (unconstrained preference),86,43,64,6,6
+temporal (unconstrained preference),86,45,64,6,6
+temporal (unconstrained preference),86,56,64,6,6
+temporal (unconstrained preference),86,62,64,6,6
+temporal (unconstrained preference),87,12,64,6,6
+temporal (unconstrained preference),87,34,64,6,6
+temporal (unconstrained preference),87,36,64,6,6
+temporal (unconstrained preference),87,43,64,6,6
+temporal (unconstrained preference),87,45,64,6,6
+temporal (unconstrained preference),87,56,64,6,6
+temporal (unconstrained preference),88,4,64,6,6
+temporal (unconstrained preference),88,6,64,6,6
+temporal (unconstrained preference),88,12,64,6,6
+temporal (unconstrained preference),88,22,64,6,6
+temporal (unconstrained preference),88,49,64,6,6
+temporal (unconstrained preference),88,56,64,6,6
+temporal (unconstrained preference),89,6,64,6,6
+temporal (unconstrained preference),89,12,64,6,6
+temporal (unconstrained preference),89,20,64,6,6
+temporal (unconstrained preference),89,27,64,6,6
+temporal (unconstrained preference),89,43,64,6,6
+temporal (unconstrained preference),89,56,64,6,6
+temporal (unconstrained preference),90,12,64,6,6
+temporal (unconstrained preference),90,24,64,6,6
+temporal (unconstrained preference),90,27,64,6,6
+temporal (unconstrained preference),90,54,64,6,6
+temporal (unconstrained preference),90,61,64,6,6
+temporal (unconstrained preference),90,62,64,6,6
+temporal (unconstrained preference),91,0,64,6,6
+temporal (unconstrained preference),91,4,64,6,6
+temporal (unconstrained preference),91,12,64,6,6
+temporal (unconstrained preference),91,42,64,6,6
+temporal (unconstrained preference),91,54,64,6,6
+temporal (unconstrained preference),91,62,64,6,6
+temporal (unconstrained preference),92,12,64,6,6
+temporal (unconstrained preference),92,13,64,6,6
+temporal (unconstrained preference),92,18,64,6,6
+temporal (unconstrained preference),92,27,64,6,6
+temporal (unconstrained preference),92,34,64,6,6
+temporal (unconstrained preference),92,61,64,6,6
+temporal (unconstrained preference),93,4,64,6,6
+temporal (unconstrained preference),93,12,64,6,6
+temporal (unconstrained preference),93,15,64,6,6
+temporal (unconstrained preference),93,18,64,6,6
+temporal (unconstrained preference),93,50,64,6,6
+temporal (unconstrained preference),93,57,64,6,6
+temporal (unconstrained preference),94,12,64,6,6
+temporal (unconstrained preference),94,13,64,6,6
+temporal (unconstrained preference),94,20,64,6,6
+temporal (unconstrained preference),94,24,64,6,6
+temporal (unconstrained preference),94,50,64,6,6
+temporal (unconstrained preference),94,57,64,6,6
+temporal (unconstrained preference),95,12,64,6,6
+temporal (unconstrained preference),95,15,64,6,6
+temporal (unconstrained preference),95,18,64,6,6
+temporal (unconstrained preference),95,27,64,6,6
+temporal (unconstrained preference),95,36,64,6,6
+temporal (unconstrained preference),95,50,64,6,6
+temporal (unconstrained preference),96,4,64,6,6
+temporal (unconstrained preference),96,12,64,6,6
+temporal (unconstrained preference),96,18,64,6,6
+temporal (unconstrained preference),96,31,64,6,6
+temporal (unconstrained preference),96,50,64,6,6
+temporal (unconstrained preference),96,57,64,6,6
+temporal (unconstrained preference),97,4,64,6,6
+temporal (unconstrained preference),97,12,64,6,6
+temporal (unconstrained preference),97,15,64,6,6
+temporal (unconstrained preference),97,31,64,6,6
+temporal (unconstrained preference),97,37,64,6,6
+temporal (unconstrained preference),97,45,64,6,6
+temporal (unconstrained preference),98,4,64,6,6
+temporal (unconstrained preference),98,12,64,6,6
+temporal (unconstrained preference),98,18,64,6,6
+temporal (unconstrained preference),98,27,64,6,6
+temporal (unconstrained preference),98,45,64,6,6
+temporal (unconstrained preference),98,54,64,6,6
+temporal (unconstrained preference),99,0,64,6,6
+temporal (unconstrained preference),99,4,64,6,6
+temporal (unconstrained preference),99,12,64,6,6
+temporal (unconstrained preference),99,27,64,6,6
+temporal (unconstrained preference),99,39,64,6,6
+temporal (unconstrained preference),99,62,64,6,6
+temporal (unconstrained preference),100,0,64,6,6
+temporal (unconstrained preference),100,9,64,6,6
+temporal (unconstrained preference),100,12,64,6,6
+temporal (unconstrained preference),100,13,64,6,6
+temporal (unconstrained preference),100,36,64,6,6
+temporal (unconstrained preference),100,39,64,6,6
+temporal (unconstrained preference),101,4,64,6,6
+temporal (unconstrained preference),101,12,64,6,6
+temporal (unconstrained preference),101,13,64,6,6
+temporal (unconstrained preference),101,18,64,6,6
+temporal (unconstrained preference),101,36,64,6,6
+temporal (unconstrained preference),101,50,64,6,6
+temporal (unconstrained preference),102,9,64,6,6
+temporal (unconstrained preference),102,12,64,6,6
+temporal (unconstrained preference),102,27,64,6,6
+temporal (unconstrained preference),102,45,64,6,6
+temporal (unconstrained preference),102,50,64,6,6
+temporal (unconstrained preference),102,58,64,6,6
+temporal (unconstrained preference),103,3,64,6,6
+temporal (unconstrained preference),103,12,64,6,6
+temporal (unconstrained preference),103,34,64,6,6
+temporal (unconstrained preference),103,36,64,6,6
+temporal (unconstrained preference),103,50,64,6,6
+temporal (unconstrained preference),103,58,64,6,6
+temporal (unconstrained preference),104,3,64,6,6
+temporal (unconstrained preference),104,4,64,6,6
+temporal (unconstrained preference),104,12,64,6,6
+temporal (unconstrained preference),104,36,64,6,6
+temporal (unconstrained preference),104,58,64,6,6
+temporal (unconstrained preference),104,62,64,6,6
+temporal (unconstrained preference),105,12,64,6,6
+temporal (unconstrained preference),105,27,64,6,6
+temporal (unconstrained preference),105,31,64,6,6
+temporal (unconstrained preference),105,45,64,6,6
+temporal (unconstrained preference),105,50,64,6,6
+temporal (unconstrained preference),105,56,64,6,6
+temporal (unconstrained preference),106,12,64,6,6
+temporal (unconstrained preference),106,18,64,6,6
+temporal (unconstrained preference),106,27,64,6,6
+temporal (unconstrained preference),106,34,64,6,6
+temporal (unconstrained preference),106,45,64,6,6
+temporal (unconstrained preference),106,50,64,6,6
+temporal (unconstrained preference),107,3,64,6,6
+temporal (unconstrained preference),107,12,64,6,6
+temporal (unconstrained preference),107,18,64,6,6
+temporal (unconstrained preference),107,34,64,6,6
+temporal (unconstrained preference),107,50,64,6,6
+temporal (unconstrained preference),107,61,64,6,6
+temporal (unconstrained preference),108,3,64,6,6
+temporal (unconstrained preference),108,4,64,6,6
+temporal (unconstrained preference),108,12,64,6,6
+temporal (unconstrained preference),108,56,64,6,6
+temporal (unconstrained preference),108,57,64,6,6
+temporal (unconstrained preference),108,58,64,6,6
+temporal (unconstrained preference),109,3,64,6,6
+temporal (unconstrained preference),109,12,64,6,6
+temporal (unconstrained preference),109,27,64,6,6
+temporal (unconstrained preference),109,45,64,6,6
+temporal (unconstrained preference),109,56,64,6,6
+temporal (unconstrained preference),109,57,64,6,6
+temporal (unconstrained preference),110,3,64,6,6
+temporal (unconstrained preference),110,12,64,6,6
+temporal (unconstrained preference),110,34,64,6,6
+temporal (unconstrained preference),110,36,64,6,6
+temporal (unconstrained preference),110,50,64,6,6
+temporal (unconstrained preference),110,56,64,6,6
+temporal (unconstrained preference),111,12,64,6,6
+temporal (unconstrained preference),111,26,64,6,6
+temporal (unconstrained preference),111,27,64,6,6
+temporal (unconstrained preference),111,34,64,6,6
+temporal (unconstrained preference),111,56,64,6,6
+temporal (unconstrained preference),111,57,64,6,6
+temporal (unconstrained preference),112,12,64,6,6
+temporal (unconstrained preference),112,20,64,6,6
+temporal (unconstrained preference),112,27,64,6,6
+temporal (unconstrained preference),112,45,64,6,6
+temporal (unconstrained preference),112,56,64,6,6
+temporal (unconstrained preference),112,60,64,6,6
+temporal (unconstrained preference),113,4,64,6,6
+temporal (unconstrained preference),113,12,64,6,6
+temporal (unconstrained preference),113,34,64,6,6
+temporal (unconstrained preference),113,43,64,6,6
+temporal (unconstrained preference),113,45,64,6,6
+temporal (unconstrained preference),113,54,64,6,6
+temporal (unconstrained preference),114,0,64,6,6
+temporal (unconstrained preference),114,4,64,6,6
+temporal (unconstrained preference),114,9,64,6,6
+temporal (unconstrained preference),114,12,64,6,6
+temporal (unconstrained preference),114,27,64,6,6
+temporal (unconstrained preference),114,42,64,6,6
+temporal (unconstrained preference),115,0,64,6,6
+temporal (unconstrained preference),115,6,64,6,6
+temporal (unconstrained preference),115,12,64,6,6
+temporal (unconstrained preference),115,13,64,6,6
+temporal (unconstrained preference),115,22,64,6,6
+temporal (unconstrained preference),115,39,64,6,6
+temporal (unconstrained preference),116,4,64,6,6
+temporal (unconstrained preference),116,6,64,6,6
+temporal (unconstrained preference),116,9,64,6,6
+temporal (unconstrained preference),116,12,64,6,6
+temporal (unconstrained preference),116,22,64,6,6
+temporal (unconstrained preference),116,56,64,6,6
+temporal (unconstrained preference),117,6,64,6,6
+temporal (unconstrained preference),117,12,64,6,6
+temporal (unconstrained preference),117,13,64,6,6
+temporal (unconstrained preference),117,20,64,6,6
+temporal (unconstrained preference),117,27,64,6,6
+temporal (unconstrained preference),117,56,64,6,6
+temporal (unconstrained preference),118,3,64,6,6
+temporal (unconstrained preference),118,9,64,6,6
+temporal (unconstrained preference),118,12,64,6,6
+temporal (unconstrained preference),118,18,64,6,6
+temporal (unconstrained preference),118,34,64,6,6
+temporal (unconstrained preference),118,56,64,6,6
+temporal (unconstrained preference),119,0,64,6,6
+temporal (unconstrained preference),119,12,64,6,6
+temporal (unconstrained preference),119,14,64,6,6
+temporal (unconstrained preference),119,45,64,6,6
+temporal (unconstrained preference),119,49,64,6,6
+temporal (unconstrained preference),119,56,64,6,6
+temporal (unconstrained preference),120,3,64,6,6
+temporal (unconstrained preference),120,12,64,6,6
+temporal (unconstrained preference),120,34,64,6,6
+temporal (unconstrained preference),120,45,64,6,6
+temporal (unconstrained preference),120,56,64,6,6
+temporal (unconstrained preference),120,58,64,6,6
+temporal (unconstrained preference),121,12,64,6,6
+temporal (unconstrained preference),121,18,64,6,6
+temporal (unconstrained preference),121,27,64,6,6
+temporal (unconstrained preference),121,50,64,6,6
+temporal (unconstrained preference),121,56,64,6,6
+temporal (unconstrained preference),121,58,64,6,6
+temporal (unconstrained preference),122,3,64,6,6
+temporal (unconstrained preference),122,12,64,6,6
+temporal (unconstrained preference),122,18,64,6,6
+temporal (unconstrained preference),122,34,64,6,6
+temporal (unconstrained preference),122,36,64,6,6
+temporal (unconstrained preference),122,56,64,6,6
+temporal (unconstrained preference),123,12,64,6,6
+temporal (unconstrained preference),123,18,64,6,6
+temporal (unconstrained preference),123,45,64,6,6
+temporal (unconstrained preference),123,50,64,6,6
+temporal (unconstrained preference),123,56,64,6,6
+temporal (unconstrained preference),123,61,64,6,6
+temporal (unconstrained preference),124,12,64,6,6
+temporal (unconstrained preference),124,18,64,6,6
+temporal (unconstrained preference),124,34,64,6,6
+temporal (unconstrained preference),124,45,64,6,6
+temporal (unconstrained preference),124,56,64,6,6
+temporal (unconstrained preference),124,61,64,6,6
+temporal (unconstrained preference),125,0,64,6,6
+temporal (unconstrained preference),125,9,64,6,6
+temporal (unconstrained preference),125,12,64,6,6
+temporal (unconstrained preference),125,34,64,6,6
+temporal (unconstrained preference),125,39,64,6,6
+temporal (unconstrained preference),125,42,64,6,6
+temporal (unconstrained preference),126,0,64,6,6
+temporal (unconstrained preference),126,4,64,6,6
+temporal (unconstrained preference),126,9,64,6,6
+temporal (unconstrained preference),126,12,64,6,6
+temporal (unconstrained preference),126,45,64,6,6
+temporal (unconstrained preference),126,56,64,6,6
+temporal (unconstrained preference),127,3,64,6,6
+temporal (unconstrained preference),127,12,64,6,6
+temporal (unconstrained preference),127,18,64,6,6
+temporal (unconstrained preference),127,34,64,6,6
+temporal (unconstrained preference),127,45,64,6,6
+temporal (unconstrained preference),127,56,64,6,6
+temporal (unconstrained preference),128,0,64,6,6
+temporal (unconstrained preference),128,4,64,6,6
+temporal (unconstrained preference),128,12,64,6,6
+temporal (unconstrained preference),128,45,64,6,6
+temporal (unconstrained preference),128,50,64,6,6
+temporal (unconstrained preference),128,56,64,6,6
+temporal (unconstrained preference),129,12,64,6,6
+temporal (unconstrained preference),129,20,64,6,6
+temporal (unconstrained preference),129,27,64,6,6
+temporal (unconstrained preference),129,45,64,6,6
+temporal (unconstrained preference),129,50,64,6,6
+temporal (unconstrained preference),129,56,64,6,6
+temporal (unconstrained preference),130,3,64,6,6
+temporal (unconstrained preference),130,12,64,6,6
+temporal (unconstrained preference),130,34,64,6,6
+temporal (unconstrained preference),130,45,64,6,6
+temporal (unconstrained preference),130,50,64,6,6
+temporal (unconstrained preference),130,56,64,6,6
+temporal (unconstrained preference),131,12,64,6,6
+temporal (unconstrained preference),131,22,64,6,6
+temporal (unconstrained preference),131,27,64,6,6
+temporal (unconstrained preference),131,45,64,6,6
+temporal (unconstrained preference),131,50,64,6,6
+temporal (unconstrained preference),131,56,64,6,6
+temporal (unconstrained preference),132,3,64,6,6
+temporal (unconstrained preference),132,12,64,6,6
+temporal (unconstrained preference),132,34,64,6,6
+temporal (unconstrained preference),132,45,64,6,6
+temporal (unconstrained preference),132,50,64,6,6
+temporal (unconstrained preference),132,56,64,6,6
+temporal (unconstrained preference),133,3,64,6,6
+temporal (unconstrained preference),133,12,64,6,6
+temporal (unconstrained preference),133,27,64,6,6
+temporal (unconstrained preference),133,42,64,6,6
+temporal (unconstrained preference),133,45,64,6,6
+temporal (unconstrained preference),133,50,64,6,6
+temporal (unconstrained preference),134,3,64,6,6
+temporal (unconstrained preference),134,12,64,6,6
+temporal (unconstrained preference),134,34,64,6,6
+temporal (unconstrained preference),134,42,64,6,6
+temporal (unconstrained preference),134,45,64,6,6
+temporal (unconstrained preference),134,50,64,6,6
+temporal (unconstrained preference),135,3,64,6,6
+temporal (unconstrained preference),135,12,64,6,6
+temporal (unconstrained preference),135,22,64,6,6
+temporal (unconstrained preference),135,34,64,6,6
+temporal (unconstrained preference),135,45,64,6,6
+temporal (unconstrained preference),135,50,64,6,6
+temporal (unconstrained preference),136,3,64,6,6
+temporal (unconstrained preference),136,12,64,6,6
+temporal (unconstrained preference),136,27,64,6,6
+temporal (unconstrained preference),136,36,64,6,6
+temporal (unconstrained preference),136,45,64,6,6
+temporal (unconstrained preference),136,50,64,6,6
+temporal (unconstrained preference),137,3,64,6,6
+temporal (unconstrained preference),137,12,64,6,6
+temporal (unconstrained preference),137,14,64,6,6
+temporal (unconstrained preference),137,27,64,6,6
+temporal (unconstrained preference),137,45,64,6,6
+temporal (unconstrained preference),137,50,64,6,6
+temporal (unconstrained preference),138,12,64,6,6
+temporal (unconstrained preference),138,24,64,6,6
+temporal (unconstrained preference),138,27,64,6,6
+temporal (unconstrained preference),138,45,64,6,6
+temporal (unconstrained preference),138,54,64,6,6
+temporal (unconstrained preference),138,62,64,6,6
+temporal (unconstrained preference),139,0,64,6,6
+temporal (unconstrained preference),139,4,64,6,6
+temporal (unconstrained preference),139,12,64,6,6
+temporal (unconstrained preference),139,42,64,6,6
+temporal (unconstrained preference),139,54,64,6,6
+temporal (unconstrained preference),139,62,64,6,6
+temporal (unconstrained preference),140,0,64,6,6
+temporal (unconstrained preference),140,4,64,6,6
+temporal (unconstrained preference),140,12,64,6,6
+temporal (unconstrained preference),140,13,64,6,6
+temporal (unconstrained preference),140,39,64,6,6
+temporal (unconstrained preference),140,54,64,6,6
+temporal (unconstrained preference),141,9,64,6,6
+temporal (unconstrained preference),141,12,64,6,6
+temporal (unconstrained preference),141,13,64,6,6
+temporal (unconstrained preference),141,18,64,6,6
+temporal (unconstrained preference),141,27,64,6,6
+temporal (unconstrained preference),141,50,64,6,6
+temporal (unconstrained preference),142,3,64,6,6
+temporal (unconstrained preference),142,4,64,6,6
+temporal (unconstrained preference),142,12,64,6,6
+temporal (unconstrained preference),142,15,64,6,6
+temporal (unconstrained preference),142,50,64,6,6
+temporal (unconstrained preference),142,57,64,6,6
+temporal (unconstrained preference),143,5,64,6,6
+temporal (unconstrained preference),143,12,64,6,6
+temporal (unconstrained preference),143,15,64,6,6
+temporal (unconstrained preference),143,18,64,6,6
+temporal (unconstrained preference),143,20,64,6,6
+temporal (unconstrained preference),143,50,64,6,6
+temporal (unconstrained preference),144,12,64,6,6
+temporal (unconstrained preference),144,18,64,6,6
+temporal (unconstrained preference),144,34,64,6,6
+temporal (unconstrained preference),144,50,64,6,6
+temporal (unconstrained preference),144,54,64,6,6
+temporal (unconstrained preference),144,61,64,6,6
+temporal (unconstrained preference),145,4,64,6,6
+temporal (unconstrained preference),145,12,64,6,6
+temporal (unconstrained preference),145,13,64,6,6
+temporal (unconstrained preference),145,18,64,6,6
+temporal (unconstrained preference),145,54,64,6,6
+temporal (unconstrained preference),145,58,64,6,6
+temporal (unconstrained preference),146,3,64,6,6
+temporal (unconstrained preference),146,12,64,6,6
+temporal (unconstrained preference),146,18,64,6,6
+temporal (unconstrained preference),146,20,64,6,6
+temporal (unconstrained preference),146,24,64,6,6
+temporal (unconstrained preference),146,54,64,6,6
+temporal (unconstrained preference),147,4,64,6,6
+temporal (unconstrained preference),147,12,64,6,6
+temporal (unconstrained preference),147,15,64,6,6
+temporal (unconstrained preference),147,24,64,6,6
+temporal (unconstrained preference),147,36,64,6,6
+temporal (unconstrained preference),147,50,64,6,6
+temporal (unconstrained preference),148,4,64,6,6
+temporal (unconstrained preference),148,12,64,6,6
+temporal (unconstrained preference),148,27,64,6,6
+temporal (unconstrained preference),148,47,64,6,6
+temporal (unconstrained preference),148,49,64,6,6
+temporal (unconstrained preference),148,56,64,6,6
+temporal (unconstrained preference),149,4,64,6,6
+temporal (unconstrained preference),149,12,64,6,6
+temporal (unconstrained preference),149,20,64,6,6
+temporal (unconstrained preference),149,24,64,6,6
+temporal (unconstrained preference),149,45,64,6,6
+temporal (unconstrained preference),149,50,64,6,6
+temporal (unconstrained preference),150,4,64,6,6
+temporal (unconstrained preference),150,12,64,6,6
+temporal (unconstrained preference),150,18,64,6,6
+temporal (unconstrained preference),150,27,64,6,6
+temporal (unconstrained preference),150,34,64,6,6
+temporal (unconstrained preference),150,45,64,6,6
+temporal (unconstrained preference),151,0,64,6,6
+temporal (unconstrained preference),151,4,64,6,6
+temporal (unconstrained preference),151,12,64,6,6
+temporal (unconstrained preference),151,24,64,6,6
+temporal (unconstrained preference),151,27,64,6,6
+temporal (unconstrained preference),151,34,64,6,6
+temporal (unconstrained preference),152,0,64,6,6
+temporal (unconstrained preference),152,9,64,6,6
+temporal (unconstrained preference),152,12,64,6,6
+temporal (unconstrained preference),152,13,64,6,6
+temporal (unconstrained preference),152,27,64,6,6
+temporal (unconstrained preference),152,57,64,6,6
+temporal (unconstrained preference),153,0,64,6,6
+temporal (unconstrained preference),153,4,64,6,6
+temporal (unconstrained preference),153,9,64,6,6
+temporal (unconstrained preference),153,12,64,6,6
+temporal (unconstrained preference),153,20,64,6,6
+temporal (unconstrained preference),153,57,64,6,6
+temporal (unconstrained preference),154,0,64,6,6
+temporal (unconstrained preference),154,4,64,6,6
+temporal (unconstrained preference),154,12,64,6,6
+temporal (unconstrained preference),154,18,64,6,6
+temporal (unconstrained preference),154,34,64,6,6
+temporal (unconstrained preference),154,57,64,6,6
+temporal (unconstrained preference),155,4,64,6,6
+temporal (unconstrained preference),155,12,64,6,6
+temporal (unconstrained preference),155,14,64,6,6
+temporal (unconstrained preference),155,20,64,6,6
+temporal (unconstrained preference),155,27,64,6,6
+temporal (unconstrained preference),155,45,64,6,6
+temporal (unconstrained preference),156,3,64,6,6
+temporal (unconstrained preference),156,4,64,6,6
+temporal (unconstrained preference),156,12,64,6,6
+temporal (unconstrained preference),156,27,64,6,6
+temporal (unconstrained preference),156,34,64,6,6
+temporal (unconstrained preference),156,45,64,6,6
+temporal (unconstrained preference),157,3,64,6,6
+temporal (unconstrained preference),157,4,64,6,6
+temporal (unconstrained preference),157,12,64,6,6
+temporal (unconstrained preference),157,34,64,6,6
+temporal (unconstrained preference),157,36,64,6,6
+temporal (unconstrained preference),157,45,64,6,6
+temporal (unconstrained preference),158,3,64,6,6
+temporal (unconstrained preference),158,4,64,6,6
+temporal (unconstrained preference),158,12,64,6,6
+temporal (unconstrained preference),158,46,64,6,6
+temporal (unconstrained preference),158,58,64,6,6
+temporal (unconstrained preference),158,63,64,6,6
+temporal (unconstrained preference),159,4,64,6,6
+temporal (unconstrained preference),159,12,64,6,6
+temporal (unconstrained preference),159,20,64,6,6
+temporal (unconstrained preference),159,27,64,6,6
+temporal (unconstrained preference),159,44,64,6,6
+temporal (unconstrained preference),159,63,64,6,6
+temporal (unconstrained preference),160,6,64,6,6
+temporal (unconstrained preference),160,12,64,6,6
+temporal (unconstrained preference),160,27,64,6,6
+temporal (unconstrained preference),160,53,64,6,6
+temporal (unconstrained preference),160,55,64,6,6
+temporal (unconstrained preference),160,63,64,6,6
+temporal (unconstrained preference),161,4,64,6,6
+temporal (unconstrained preference),161,12,64,6,6
+temporal (unconstrained preference),161,20,64,6,6
+temporal (unconstrained preference),161,49,64,6,6
+temporal (unconstrained preference),161,53,64,6,6
+temporal (unconstrained preference),161,63,64,6,6
+temporal (unconstrained preference),162,4,64,6,6
+temporal (unconstrained preference),162,12,64,6,6
+temporal (unconstrained preference),162,18,64,6,6
+temporal (unconstrained preference),162,34,64,6,6
+temporal (unconstrained preference),162,45,64,6,6
+temporal (unconstrained preference),162,54,64,6,6
+temporal (unconstrained preference),163,0,64,6,6
+temporal (unconstrained preference),163,4,64,6,6
+temporal (unconstrained preference),163,12,64,6,6
+temporal (unconstrained preference),163,42,64,6,6
+temporal (unconstrained preference),163,46,64,6,6
+temporal (unconstrained preference),163,54,64,6,6
+temporal (unconstrained preference),164,0,64,6,6
+temporal (unconstrained preference),164,4,64,6,6
+temporal (unconstrained preference),164,12,64,6,6
+temporal (unconstrained preference),164,13,64,6,6
+temporal (unconstrained preference),164,46,64,6,6
+temporal (unconstrained preference),164,53,64,6,6
+temporal (unconstrained preference),165,6,64,6,6
+temporal (unconstrained preference),165,27,64,6,6
+temporal (unconstrained preference),165,46,64,6,6
+temporal (unconstrained preference),165,51,64,6,6
+temporal (unconstrained preference),165,62,64,6,6
+temporal (unconstrained preference),165,63,64,6,6
+temporal (unconstrained preference),166,4,64,6,6
+temporal (unconstrained preference),166,9,64,6,6
+temporal (unconstrained preference),166,12,64,6,6
+temporal (unconstrained preference),166,20,64,6,6
+temporal (unconstrained preference),166,53,64,6,6
+temporal (unconstrained preference),166,60,64,6,6
+temporal (unconstrained preference),167,4,64,6,6
+temporal (unconstrained preference),167,9,64,6,6
+temporal (unconstrained preference),167,12,64,6,6
+temporal (unconstrained preference),167,34,64,6,6
+temporal (unconstrained preference),167,45,64,6,6
+temporal (unconstrained preference),167,53,64,6,6
+temporal (unconstrained preference),168,4,64,6,6
+temporal (unconstrained preference),168,6,64,6,6
+temporal (unconstrained preference),168,12,64,6,6
+temporal (unconstrained preference),168,26,64,6,6
+temporal (unconstrained preference),168,49,64,6,6
+temporal (unconstrained preference),168,56,64,6,6
+temporal (unconstrained preference),169,4,64,6,6
+temporal (unconstrained preference),169,12,64,6,6
+temporal (unconstrained preference),169,20,64,6,6
+temporal (unconstrained preference),169,27,64,6,6
+temporal (unconstrained preference),169,45,64,6,6
+temporal (unconstrained preference),169,51,64,6,6
+temporal (unconstrained preference),170,4,64,6,6
+temporal (unconstrained preference),170,12,64,6,6
+temporal (unconstrained preference),170,34,64,6,6
+temporal (unconstrained preference),170,45,64,6,6
+temporal (unconstrained preference),170,51,64,6,6
+temporal (unconstrained preference),170,53,64,6,6
+temporal (unconstrained preference),171,12,64,6,6
+temporal (unconstrained preference),171,27,64,6,6
+temporal (unconstrained preference),171,51,64,6,6
+temporal (unconstrained preference),171,56,64,6,6
+temporal (unconstrained preference),171,60,64,6,6
+temporal (unconstrained preference),171,62,64,6,6
+temporal (unconstrained preference),172,6,64,6,6
+temporal (unconstrained preference),172,12,64,6,6
+temporal (unconstrained preference),172,20,64,6,6
+temporal (unconstrained preference),172,27,64,6,6
+temporal (unconstrained preference),172,43,64,6,6
+temporal (unconstrained preference),172,45,64,6,6
+temporal (unconstrained preference),173,12,64,6,6
+temporal (unconstrained preference),173,20,64,6,6
+temporal (unconstrained preference),173,27,64,6,6
+temporal (unconstrained preference),173,45,64,6,6
+temporal (unconstrained preference),173,51,64,6,6
+temporal (unconstrained preference),173,60,64,6,6
+temporal (unconstrained preference),174,12,64,6,6
+temporal (unconstrained preference),174,27,64,6,6
+temporal (unconstrained preference),174,34,64,6,6
+temporal (unconstrained preference),174,45,64,6,6
+temporal (unconstrained preference),174,51,64,6,6
+temporal (unconstrained preference),174,56,64,6,6
+temporal (unconstrained preference),175,4,64,6,6
+temporal (unconstrained preference),175,12,64,6,6
+temporal (unconstrained preference),175,34,64,6,6
+temporal (unconstrained preference),175,45,64,6,6
+temporal (unconstrained preference),175,51,64,6,6
+temporal (unconstrained preference),175,56,64,6,6
+temporal (unconstrained preference),176,6,64,6,6
+temporal (unconstrained preference),176,12,64,6,6
+temporal (unconstrained preference),176,20,64,6,6
+temporal (unconstrained preference),176,27,64,6,6
+temporal (unconstrained preference),176,51,64,6,6
+temporal (unconstrained preference),176,63,64,6,6
+temporal (unconstrained preference),177,12,64,6,6
+temporal (unconstrained preference),177,14,64,6,6
+temporal (unconstrained preference),177,20,64,6,6
+temporal (unconstrained preference),177,27,64,6,6
+temporal (unconstrained preference),177,45,64,6,6
+temporal (unconstrained preference),177,53,64,6,6
+temporal (unconstrained preference),178,12,64,6,6
+temporal (unconstrained preference),178,27,64,6,6
+temporal (unconstrained preference),178,34,64,6,6
+temporal (unconstrained preference),178,45,64,6,6
+temporal (unconstrained preference),178,51,64,6,6
+temporal (unconstrained preference),178,56,64,6,6
+temporal (unconstrained preference),179,0,64,6,6
+temporal (unconstrained preference),179,12,64,6,6
+temporal (unconstrained preference),179,22,64,6,6
+temporal (unconstrained preference),179,27,64,6,6
+temporal (unconstrained preference),179,42,64,6,6
+temporal (unconstrained preference),179,62,64,6,6
+temporal (unconstrained preference),180,0,64,6,6
+temporal (unconstrained preference),180,4,64,6,6
+temporal (unconstrained preference),180,12,64,6,6
+temporal (unconstrained preference),180,17,64,6,6
+temporal (unconstrained preference),180,24,64,6,6
+temporal (unconstrained preference),180,51,64,6,6
+temporal (unconstrained preference),181,4,64,6,6
+temporal (unconstrained preference),181,6,64,6,6
+temporal (unconstrained preference),181,9,64,6,6
+temporal (unconstrained preference),181,12,64,6,6
+temporal (unconstrained preference),181,20,64,6,6
+temporal (unconstrained preference),181,45,64,6,6
+temporal (unconstrained preference),182,0,64,6,6
+temporal (unconstrained preference),182,9,64,6,6
+temporal (unconstrained preference),182,12,64,6,6
+temporal (unconstrained preference),182,34,64,6,6
+temporal (unconstrained preference),182,45,64,6,6
+temporal (unconstrained preference),182,56,64,6,6
+temporal (unconstrained preference),183,0,64,6,6
+temporal (unconstrained preference),183,6,64,6,6
+temporal (unconstrained preference),183,12,64,6,6
+temporal (unconstrained preference),183,30,64,6,6
+temporal (unconstrained preference),183,48,64,6,6
+temporal (unconstrained preference),183,56,64,6,6
+temporal (unconstrained preference),184,5,64,6,6
+temporal (unconstrained preference),184,12,64,6,6
+temporal (unconstrained preference),184,20,64,6,6
+temporal (unconstrained preference),184,27,64,6,6
+temporal (unconstrained preference),184,43,64,6,6
+temporal (unconstrained preference),184,45,64,6,6
+temporal (unconstrained preference),185,12,64,6,6
+temporal (unconstrained preference),185,34,64,6,6
+temporal (unconstrained preference),185,43,64,6,6
+temporal (unconstrained preference),185,45,64,6,6
+temporal (unconstrained preference),185,48,64,6,6
+temporal (unconstrained preference),185,56,64,6,6
+temporal (unconstrained preference),186,12,64,6,6
+temporal (unconstrained preference),186,22,64,6,6
+temporal (unconstrained preference),186,34,64,6,6
+temporal (unconstrained preference),186,45,64,6,6
+temporal (unconstrained preference),186,48,64,6,6
+temporal (unconstrained preference),186,56,64,6,6
+temporal (unconstrained preference),187,6,64,6,6
+temporal (unconstrained preference),187,12,64,6,6
+temporal (unconstrained preference),187,16,64,6,6
+temporal (unconstrained preference),187,22,64,6,6
+temporal (unconstrained preference),187,30,64,6,6
+temporal (unconstrained preference),187,49,64,6,6
+temporal (unconstrained preference),188,4,64,6,6
+temporal (unconstrained preference),188,5,64,6,6
+temporal (unconstrained preference),188,12,64,6,6
+temporal (unconstrained preference),188,43,64,6,6
+temporal (unconstrained preference),188,45,64,6,6
+temporal (unconstrained preference),188,50,64,6,6
+temporal (unconstrained preference),189,4,64,6,6
+temporal (unconstrained preference),189,12,64,6,6
+temporal (unconstrained preference),189,34,64,6,6
+temporal (unconstrained preference),189,43,64,6,6
+temporal (unconstrained preference),189,45,64,6,6
+temporal (unconstrained preference),189,54,64,6,6
+temporal (unconstrained preference),190,0,64,6,6
+temporal (unconstrained preference),190,4,64,6,6
+temporal (unconstrained preference),190,9,64,6,6
+temporal (unconstrained preference),190,12,64,6,6
+temporal (unconstrained preference),190,42,64,6,6
+temporal (unconstrained preference),190,62,64,6,6
+temporal (unconstrained preference),191,0,64,6,6
+temporal (unconstrained preference),191,12,64,6,6
+temporal (unconstrained preference),191,13,64,6,6
+temporal (unconstrained preference),191,22,64,6,6
+temporal (unconstrained preference),191,39,64,6,6
+temporal (unconstrained preference),191,53,64,6,6
+temporal (unconstrained preference),192,4,64,6,6
+temporal (unconstrained preference),192,6,64,6,6
+temporal (unconstrained preference),192,12,64,6,6
+temporal (unconstrained preference),192,37,64,6,6
+temporal (unconstrained preference),192,49,64,6,6
+temporal (unconstrained preference),192,53,64,6,6
+temporal (unconstrained preference),193,6,64,6,6
+temporal (unconstrained preference),193,12,64,6,6
+temporal (unconstrained preference),193,27,64,6,6
+temporal (unconstrained preference),193,44,64,6,6
+temporal (unconstrained preference),193,53,64,6,6
+temporal (unconstrained preference),193,63,64,6,6
+temporal (unconstrained preference),194,5,64,6,6
+temporal (unconstrained preference),194,9,64,6,6
+temporal (unconstrained preference),194,12,64,6,6
+temporal (unconstrained preference),194,34,64,6,6
+temporal (unconstrained preference),194,45,64,6,6
+temporal (unconstrained preference),194,53,64,6,6
+temporal (unconstrained preference),195,5,64,6,6
+temporal (unconstrained preference),195,12,64,6,6
+temporal (unconstrained preference),195,26,64,6,6
+temporal (unconstrained preference),195,36,64,6,6
+temporal (unconstrained preference),195,49,64,6,6
+temporal (unconstrained preference),195,53,64,6,6
+temporal (unconstrained preference),196,5,64,6,6
+temporal (unconstrained preference),196,6,64,6,6
+temporal (unconstrained preference),196,12,64,6,6
+temporal (unconstrained preference),196,20,64,6,6
+temporal (unconstrained preference),196,45,64,6,6
+temporal (unconstrained preference),196,53,64,6,6
+temporal (unconstrained preference),197,12,64,6,6
+temporal (unconstrained preference),197,27,64,6,6
+temporal (unconstrained preference),197,34,64,6,6
+temporal (unconstrained preference),197,42,64,6,6
+temporal (unconstrained preference),197,45,64,6,6
+temporal (unconstrained preference),197,53,64,6,6
+temporal (unconstrained preference),198,12,64,6,6
+temporal (unconstrained preference),198,34,64,6,6
+temporal (unconstrained preference),198,36,64,6,6
+temporal (unconstrained preference),198,48,64,6,6
+temporal (unconstrained preference),198,53,64,6,6
+temporal (unconstrained preference),198,58,64,6,6
+temporal (unconstrained preference),199,6,64,6,6
+temporal (unconstrained preference),199,12,64,6,6
+temporal (unconstrained preference),199,22,64,6,6
+temporal (unconstrained preference),199,27,64,6,6
+temporal (unconstrained preference),199,53,64,6,6
+temporal (unconstrained preference),199,56,64,6,6
+temporal (unconstrained preference),200,12,64,6,6
+temporal (unconstrained preference),200,35,64,6,6
+temporal (unconstrained preference),200,42,64,6,6
+temporal (unconstrained preference),200,45,64,6,6
+temporal (unconstrained preference),200,53,64,6,6
+temporal (unconstrained preference),200,56,64,6,6
+temporal (unconstrained preference),201,12,64,6,6
+temporal (unconstrained preference),201,27,64,6,6
+temporal (unconstrained preference),201,34,64,6,6
+temporal (unconstrained preference),201,43,64,6,6
+temporal (unconstrained preference),201,45,64,6,6
+temporal (unconstrained preference),201,53,64,6,6
+temporal (unconstrained preference),202,0,64,6,6
+temporal (unconstrained preference),202,9,64,6,6
+temporal (unconstrained preference),202,12,64,6,6
+temporal (unconstrained preference),202,42,64,6,6
+temporal (unconstrained preference),202,53,64,6,6
+temporal (unconstrained preference),202,62,64,6,6
+temporal (unconstrained preference),203,0,64,6,6
+temporal (unconstrained preference),203,12,64,6,6
+temporal (unconstrained preference),203,13,64,6,6
+temporal (unconstrained preference),203,39,64,6,6
+temporal (unconstrained preference),203,46,64,6,6
+temporal (unconstrained preference),203,53,64,6,6
+temporal (unconstrained preference),204,6,64,6,6
+temporal (unconstrained preference),204,9,64,6,6
+temporal (unconstrained preference),204,12,64,6,6
+temporal (unconstrained preference),204,45,64,6,6
+temporal (unconstrained preference),204,56,64,6,6
+temporal (unconstrained preference),204,60,64,6,6
+temporal (unconstrained preference),205,9,64,6,6
+temporal (unconstrained preference),205,12,64,6,6
+temporal (unconstrained preference),205,34,64,6,6
+temporal (unconstrained preference),205,45,64,6,6
+temporal (unconstrained preference),205,53,64,6,6
+temporal (unconstrained preference),205,56,64,6,6
+temporal (unconstrained preference),206,4,64,6,6
+temporal (unconstrained preference),206,12,64,6,6
+temporal (unconstrained preference),206,36,64,6,6
+temporal (unconstrained preference),206,56,64,6,6
+temporal (unconstrained preference),206,58,64,6,6
+temporal (unconstrained preference),206,59,64,6,6
+temporal (unconstrained preference),207,6,64,6,6
+temporal (unconstrained preference),207,12,64,6,6
+temporal (unconstrained preference),207,27,64,6,6
+temporal (unconstrained preference),207,53,64,6,6
+temporal (unconstrained preference),207,56,64,6,6
+temporal (unconstrained preference),207,62,64,6,6
+temporal (unconstrained preference),208,12,64,6,6
+temporal (unconstrained preference),208,27,64,6,6
+temporal (unconstrained preference),208,34,64,6,6
+temporal (unconstrained preference),208,45,64,6,6
+temporal (unconstrained preference),208,53,64,6,6
+temporal (unconstrained preference),208,56,64,6,6
+temporal (unconstrained preference),209,12,64,6,6
+temporal (unconstrained preference),209,43,64,6,6
+temporal (unconstrained preference),209,48,64,6,6
+temporal (unconstrained preference),209,51,64,6,6
+temporal (unconstrained preference),209,53,64,6,6
+temporal (unconstrained preference),209,56,64,6,6
+temporal (unconstrained preference),210,12,64,6,6
+temporal (unconstrained preference),210,25,64,6,6
+temporal (unconstrained preference),210,34,64,6,6
+temporal (unconstrained preference),210,45,64,6,6
+temporal (unconstrained preference),210,48,64,6,6
+temporal (unconstrained preference),210,59,64,6,6
+temporal (unconstrained preference),211,12,64,6,6
+temporal (unconstrained preference),211,24,64,6,6
+temporal (unconstrained preference),211,34,64,6,6
+temporal (unconstrained preference),211,43,64,6,6
+temporal (unconstrained preference),211,51,64,6,6
+temporal (unconstrained preference),211,59,64,6,6
+temporal (unconstrained preference),212,12,64,6,6
+temporal (unconstrained preference),212,34,64,6,6
+temporal (unconstrained preference),212,42,64,6,6
+temporal (unconstrained preference),212,43,64,6,6
+temporal (unconstrained preference),212,45,64,6,6
+temporal (unconstrained preference),212,53,64,6,6
+temporal (unconstrained preference),213,0,64,6,6
+temporal (unconstrained preference),213,4,64,6,6
+temporal (unconstrained preference),213,9,64,6,6
+temporal (unconstrained preference),213,12,64,6,6
+temporal (unconstrained preference),213,42,64,6,6
+temporal (unconstrained preference),213,62,64,6,6
+temporal (unconstrained preference),214,0,64,6,6
+temporal (unconstrained preference),214,4,64,6,6
+temporal (unconstrained preference),214,12,64,6,6
+temporal (unconstrained preference),214,13,64,6,6
+temporal (unconstrained preference),214,21,64,6,6
+temporal (unconstrained preference),214,45,64,6,6
+temporal (unconstrained preference),215,9,64,6,6
+temporal (unconstrained preference),215,12,64,6,6
+temporal (unconstrained preference),215,18,64,6,6
+temporal (unconstrained preference),215,21,64,6,6
+temporal (unconstrained preference),215,28,64,6,6
+temporal (unconstrained preference),215,34,64,6,6
+temporal (unconstrained preference),216,4,64,6,6
+temporal (unconstrained preference),216,12,64,6,6
+temporal (unconstrained preference),216,21,64,6,6
+temporal (unconstrained preference),216,36,64,6,6
+temporal (unconstrained preference),216,45,64,6,6
+temporal (unconstrained preference),216,53,64,6,6
+temporal (unconstrained preference),217,6,64,6,6
+temporal (unconstrained preference),217,12,64,6,6
+temporal (unconstrained preference),217,20,64,6,6
+temporal (unconstrained preference),217,27,64,6,6
+temporal (unconstrained preference),217,51,64,6,6
+temporal (unconstrained preference),217,62,64,6,6
+temporal (unconstrained preference),218,9,64,6,6
+temporal (unconstrained preference),218,12,64,6,6
+temporal (unconstrained preference),218,14,64,6,6
+temporal (unconstrained preference),218,20,64,6,6
+temporal (unconstrained preference),218,45,64,6,6
+temporal (unconstrained preference),218,51,64,6,6
+temporal (unconstrained preference),219,12,64,6,6
+temporal (unconstrained preference),219,14,64,6,6
+temporal (unconstrained preference),219,21,64,6,6
+temporal (unconstrained preference),219,28,64,6,6
+temporal (unconstrained preference),219,34,64,6,6
+temporal (unconstrained preference),219,45,64,6,6

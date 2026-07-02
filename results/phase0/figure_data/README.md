@@ -26,6 +26,7 @@ lower swap-rate = better.
 | `e8_document_boundary.csv` | `document_boundary_churn` | hit-rate after-EOD vs within-document, per window |
 | `learned_locality_vs_scale.csv` | `learned_temporal_locality_vs_model_size` | temporal vs full-MoE vs random same-set overlap by model size |
 | `rolling_coverage_lifetime_vs_K.csv` | `routing_coverage_vs_resident_cache_size`, `expert_lifetime_vs_resident_cache_size` | rolling hit-rate + expert lifetime vs resident-cache size K/k |
+| `expert_selection_per_token_{8M,15M,38M}_model.csv` | `expert_selection_per_token_*_model` (rasters) | active `(token, expert)` cells per panel (full-MoE top-k / temporal resident / temporal preference), deepest MoE layer, sequence 0, first 220 tokens — one row per active dot |
 
-Not tabulated here: the three `expert_selection_per_token_*` rasters are per-token pictures whose data
-is the resident mask itself (in the raw logs), not an aggregate series.
+The raster CSVs are the direct condensed form of each raster: ~k rows per token (a few thousand rows,
+~0.15 MB each) fully reconstruct the plotted dots, vs the multi-MB raw logits the raster was drawn from.
