@@ -6,10 +6,14 @@
   C   expert lifetime vs K
 Reads results/phase0/runs/<run>/router_log.pt. See docs/research/mechanistic-probe-results.md.
 """
+import os, sys
 import numpy as np, torch
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
-RUNS = "/workspace/FLAME-MoE/results/phase0/runs"; OUT = "/workspace/FLAME-MoE/results/phase0/figures"
+NO_CAPTION = "--no-caption" in sys.argv   # omit the baked-in captions; outputs get a _nocaption suffix
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+RUNS = f"{REPO}/results/phase0/runs"; OUT = f"{REPO}/results/phase0/figures"
+def outname(f): return f.replace(".png", "_nocaption.png") if NO_CAPTION else f
 def load(run):
     d = torch.load(f"{RUNS}/{run}/router_log.pt", map_location="cpu")
     return {"temporal": d["temporal"],
@@ -46,13 +50,15 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
     axes[-1].set_xlabel(f"token position (sequence 0, MoE layer {L})")
     fig.suptitle(f"Which experts are active at each token: {tag} (top-k = {k} of {E} experts)\n"
                  "horizontal streaks = an expert stays active across consecutive tokens (temporal locality)")
-    fig.text(0.5, 0.01,
-             "Each dot marks an expert (y-axis) that is active at a given token position (x-axis) in one "
-             "sequence, at the last Mixture-of-Experts layer. 'temporal' = rolling residency: keep the "
-             "top-k experts resident and swap at most one per token. Long horizontal streaks mean an "
-             "expert stays selected across many consecutive tokens (temporal locality); this is descriptive, "
-             "not better/worse.", ha="center", fontsize=8, wrap=True)
-    fig.tight_layout(rect=[0, 0.06, 1, 1]); fig.savefig(f"{OUT}/{outfile}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outfile}")
+    if not NO_CAPTION:
+        fig.text(0.5, 0.01,
+                 "Each dot marks an expert (y-axis) that is active at a given token position (x-axis) in one "
+                 "sequence, at the last Mixture-of-Experts layer. 'temporal' = rolling residency: keep the "
+                 "top-k experts resident and swap at most one per token. Long horizontal streaks mean an "
+                 "expert stays selected across many consecutive tokens (temporal locality); this is descriptive, "
+                 "not better/worse.", ha="center", fontsize=8, wrap=True)
+    fig.tight_layout(rect=[0, 0 if NO_CAPTION else 0.06, 1, 1])
+    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
 
 # ---------------- A3: learned-locality overlap vs scale ----------------
 def overlap(run):
@@ -82,13 +88,15 @@ def a3_scale():
     ax.set_ylabel("overlap with previous active set  (%)  — higher = more temporally coherent")
     ax.set_title("The temporal router learns to prefer its resident set of experts (and it holds as models grow)")
     ax.grid(True, which="both", ls=":", alpha=0.4); ax.legend()
-    fig.text(0.5, 0.01,
-             "Overlap between a token's freely chosen top-k experts and the previous token's active expert "
-             "set, averaged over layers and tokens; higher (%) = more temporally coherent routing. "
-             "'temporal' = rolling residency (keep top-k experts resident, swap 1 per token). x-axis is "
-             "active non-embedding parameters N (millions, log scale). Random baseline = k / E (top-k over "
-             "E experts).", ha="center", fontsize=8, wrap=True)
-    fig.tight_layout(rect=[0, 0.08, 1, 1]); out = f"{OUT}/learned_temporal_locality_vs_model_size.png"
+    if not NO_CAPTION:
+        fig.text(0.5, 0.01,
+                 "Overlap between a token's freely chosen top-k experts and the previous token's active expert "
+                 "set, averaged over layers and tokens; higher (%) = more temporally coherent routing. "
+                 "'temporal' = rolling residency (keep top-k experts resident, swap 1 per token). x-axis is "
+                 "active non-embedding parameters N (millions, log scale). Random baseline = k / E (top-k over "
+                 "E experts).", ha="center", fontsize=8, wrap=True)
+    fig.tight_layout(rect=[0, 0 if NO_CAPTION else 0.08, 1, 1])
+    out = f"{OUT}/{outname('learned_temporal_locality_vs_model_size.png')}"
     fig.savefig(out, dpi=140); plt.close(fig)
     print("wrote", out)
 
@@ -144,8 +152,10 @@ def graphs_BC():
         ax.set_xlabel("resident cache size  K / k   (1 = current; →  larger resident cache)")
         ax.set_ylabel(ylab); ax.set_title(title); ax.grid(True, ls=":", alpha=0.4); ax.legend(fontsize=8)
         if idx == 1: ax.axhline(1.0, color="gray", lw=.8, ls=":")
-        fig.text(0.5, 0.01, cap, ha="center", fontsize=8, wrap=True)
-        fig.tight_layout(rect=[0, 0.08, 1, 1]); fig.savefig(f"{OUT}/{fname}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{fname}")
+        if not NO_CAPTION:
+            fig.text(0.5, 0.01, cap, ha="center", fontsize=8, wrap=True)
+        fig.tight_layout(rect=[0, 0 if NO_CAPTION else 0.08, 1, 1])
+        fig.savefig(f"{OUT}/{outname(fname)}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outname(fname)}")
 
 if __name__ == "__main__":
     raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal, 8.1M active @ 10^17 FLOPs", "expert_selection_per_token_8M_model.png")

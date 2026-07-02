@@ -5,9 +5,13 @@ Measured locally on one val split: MoE coarse (64), MoE fine (192), temporal fin
 reused from the A6000 baseline (4.137; same corpus/tokenizer, cross-data <~0.01 nats).
 Output: results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png
 """
+import os, sys
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+NO_CAPTION = "--no-caption" in sys.argv   # omit the baked-in caption; output gets a _nocaption suffix
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # worst -> best CE (left -> right); all four measured on one val split
 labels = ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
@@ -39,13 +43,14 @@ ax.set_ylabel("validation cross-entropy (nats, lower better)")
 ax.set_title("At 10^18 FLOPs (FLAME-MoE-38M scale): fine-graining hurts the full MoE,\n"
              "but temporal routing is robust — and stays inside the dense↔MoE band")
 ax.grid(True, axis="y", ls=":", alpha=0.4)
-fig.text(0.5, 0.005,
-         "Validation cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
-         "dclm). 'full MoE' = standard top-k routing at coarse (64 experts, top-6) or fine-grained (192 "
-         "experts, top-18) granularity; 'temporal' = rolling residency (keep top-k resident, swap 1/token); "
-         "'dense baseline' = plain feed-forward. Faded blue = fine-grained full MoE. All four measured on "
-         "one val split.", ha="center", fontsize=7.8, wrap=True)
-fig.tight_layout(rect=[0, 0.09, 1, 1])
-out = "/workspace/FLAME-MoE/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png"
+if not NO_CAPTION:
+    fig.text(0.5, 0.005,
+             "Validation cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
+             "dclm). 'full MoE' = standard top-k routing at coarse (64 experts, top-6) or fine-grained (192 "
+             "experts, top-18) granularity; 'temporal' = rolling residency (keep top-k resident, swap 1/token); "
+             "'dense baseline' = plain feed-forward. Faded blue = fine-grained full MoE. All four measured on "
+             "one val split.", ha="center", fontsize=7.8, wrap=True)
+fig.tight_layout(rect=[0, 0 if NO_CAPTION else 0.09, 1, 1])
+out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy{'_nocaption' if NO_CAPTION else ''}.png"
 fig.savefig(out, dpi=130)
 print("wrote", out)

@@ -6,10 +6,14 @@ Combined single-axes only: color = method, linestyle = budget (dashed 1e16, soli
 measured (results/phase0/log.md); lower is better. Each budget trimmed to the shapes all three curves
 share so an unmatched extreme doesn't stretch the y-scale.
 """
+import os, sys
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+NO_CAPTION = "--no-caption" in sys.argv   # omit the baked-in caption; output gets a _nocaption suffix
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 N = {"sm1": 0.770, "s0": 1.361, "s1": 3.812, "s2": 8.115, "s3": 14.774}
 
@@ -52,13 +56,14 @@ ax.set_title("Temporal routing (rolling residency: keep top-k experts resident, 
              "vs the dense baseline and full MoE, across compute budgets — temporal tracks just above full MoE")
 ax.grid(True, which="both", ls=":", alpha=0.4)
 ax.legend(fontsize=8.5, ncol=3, loc="upper left")
-fig.text(0.5, 0.01,
-         "IsoFLOP curves: validation bits-per-byte (BPB, lower is better) vs active non-embedding "
-         "parameters N (millions, log x-axis) at two compute budgets (dashed = 10^16 FLOPs, solid = 10^17 "
-         "FLOPs). 'temporal' = rolling residency (6 of 64 experts resident); 'full MoE' = standard top-k "
-         "routing; 'dense baseline' = a plain feed-forward model. Green labels mark the temporal minimum "
-         "at each budget.", ha="center", fontsize=8, wrap=True)
-fig.tight_layout(rect=[0, 0.06, 1, 1])
-out = "/workspace/FLAME-MoE/results/phase0/figures/temporal_vs_dense_and_full_moe_isoflop.png"
+if not NO_CAPTION:
+    fig.text(0.5, 0.01,
+             "IsoFLOP curves: validation bits-per-byte (BPB, lower is better) vs active non-embedding "
+             "parameters N (millions, log x-axis) at two compute budgets (dashed = 10^16 FLOPs, solid = 10^17 "
+             "FLOPs). 'temporal' = rolling residency (6 of 64 experts resident); 'full MoE' = standard top-k "
+             "routing; 'dense baseline' = a plain feed-forward model. Green labels mark the temporal minimum "
+             "at each budget.", ha="center", fontsize=8, wrap=True)
+fig.tight_layout(rect=[0, 0 if NO_CAPTION else 0.06, 1, 1])
+out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_full_moe_isoflop{'_nocaption' if NO_CAPTION else ''}.png"
 fig.savefig(out, dpi=130)
 print("wrote", out)

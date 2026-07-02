@@ -109,11 +109,11 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
   \centering
   \begin{minipage}[t]{0.555\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_full_moe_isoflop.png}
+    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_full_moe_isoflop_nocaption.png}
   \end{minipage}\hfill
   \begin{minipage}[t]{0.42\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy.png}
+    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png}
   \end{minipage}
   \caption{\textbf{Left,} isoFLOP curves at fixed compute ($10^{16}$ dashed, $10^{17}$ solid;
   validation BPB, lower is better). Temporal MoE (green, 6 of 64 resident) lands inside the
@@ -147,6 +147,8 @@ time-multiplexed access to the full pool rather than a static subset.
 
 \begin{figure}[t]
   \centering
+  % TODO: swap to the _nocaption variants once regenerated on the pod
+  % (needs the probe logs: .venv/bin/python scripts/phase0/plot_probe.py --no-caption)
   \begin{minipage}[t]{0.565\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/expert_selection_per_token_8M_model.png}
