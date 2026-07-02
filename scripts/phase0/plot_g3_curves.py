@@ -4,7 +4,7 @@
   linestyle = budget (dashed 1e16, solid 1e17)
   weight/marker = granularity (G1 6/64 thin+open circle+faded, G3 18/192 bold+filled square)
 All BPB measured (results/phase0/G3_RESULTS.md + baseline docs); lower is better.
-G3 temporal s1@1e17 still running on the A6000 -> omitted.
+All 12 G3 runs complete (G3 temporal s1@1e17 = 1.3065, the last A6000 point).
 """
 import numpy as np
 import matplotlib
@@ -23,15 +23,15 @@ MOE_G3   = {"1e16": {"sm1": 1.4786, "s0": 1.4585, "s1": 1.5352},
 TMP_G1   = {"1e16": {"sm1": 1.4891, "s0": 1.4599, "s1": 1.5488},
             "1e17": {"s1": 1.3039, "s2": 1.2821, "s3": 1.3073}}
 TMP_G3   = {"1e16": {"sm1": 1.4976, "s0": 1.4753, "s1": 1.5861},
-            "1e17": {"s2": 1.2873, "s3": 1.3129}}   # s1@1e17 running -> omitted
+            "1e17": {"s1": 1.3065, "s2": 1.2873, "s3": 1.3129}}
 
 # name, data, N-table, color, marker, facecolor, lw, alpha, label
 SERIES = [
-    ("dense_g1", DENSE_G1, N_G1, "0.55",     "x", "0.55",     1.3, 0.9, "dense floor (G1)"),
-    ("moe_g1",   MOE_G1,   N_G1, "C0",       "o", "none",     1.4, 0.55, "MoE  G1 (6/64)"),
-    ("tmp_g1",   TMP_G1,   N_G1, "C2",       "o", "none",     1.4, 0.55, "temporal  G1 (6/64)"),
-    ("moe_g3",   MOE_G3,   N_G3, "C0",       "s", "C0",       2.6, 1.0, "MoE  G3 (18/192)"),
-    ("tmp_g3",   TMP_G3,   N_G3, "C2",       "s", "C2",       2.6, 1.0, "temporal  G3 (18/192)"),
+    ("dense_g1", DENSE_G1, N_G1, "0.55",     "x", "0.55",     1.3, 0.9, "dense baseline"),
+    ("moe_g1",   MOE_G1,   N_G1, "C0",       "o", "none",     1.4, 0.55, "full MoE, coarse (6 of 64)"),
+    ("tmp_g1",   TMP_G1,   N_G1, "C2",       "o", "none",     1.4, 0.55, "temporal, coarse (6 of 64)"),
+    ("moe_g3",   MOE_G3,   N_G3, "C0",       "s", "C0",       2.6, 1.0, "full MoE, fine-grained (18 of 192)"),
+    ("tmp_g3",   TMP_G3,   N_G3, "C2",       "s", "C2",       2.6, 1.0, "temporal, fine-grained (18 of 192)"),
 ]
 LSTYLE = {"1e16": "--", "1e17": "-"}
 
@@ -46,11 +46,17 @@ for key, data, Ntab, color, mk, fc, lw, alpha, label in SERIES:
 ax.set_xscale("log")
 ax.set_xlabel("active non-embedding params  N  (millions)")
 ax.set_ylabel("validation BPB  (bits/byte, lower better)")
-ax.set_title("Fine-graining the experts (G1 6/64  →  G3 18/192): MoE & temporal vs dense floor\n"
-             "color = method,  dashed = 1e16 / solid = 1e17,  bold-square = G3 / thin-open = G1")
+ax.set_title("Splitting each expert 3x (coarse: 6 of 64  ->  fine-grained: 18 of 192 experts)\n"
+             "full MoE and temporal (rolling residency) vs the dense baseline, across compute budgets")
 ax.grid(True, which="both", ls=":", alpha=0.4)
 ax.legend(fontsize=9, ncol=2, loc="upper left")
-fig.tight_layout()
-out = "/workspace/FLAME-MoE/results/phase0/g3_vs_g1_combined.png"
+fig.text(0.5, 0.01,
+         "IsoFLOP curves: validation bits-per-byte (BPB, lower is better) vs active non-embedding "
+         "parameters N (millions, log x-axis). Dashed = 10^16 FLOPs, solid = 10^17 FLOPs. Color = method. "
+         "Bold filled squares = fine-grained experts (each of 64 experts split 3-ways into 192, top-18 "
+         "active); thin open circles = coarse experts (64 experts, top-6 active). 'temporal' = rolling "
+         "residency (keep top-k experts resident, swap 1 per token).", ha="center", fontsize=8, wrap=True)
+fig.tight_layout(rect=[0, 0.07, 1, 1])
+out = "/workspace/FLAME-MoE/results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png"
 fig.savefig(out, dpi=140)
 print("wrote", out)

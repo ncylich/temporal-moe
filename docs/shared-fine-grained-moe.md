@@ -81,7 +81,7 @@ already exists, so the shared volume auto-coordinates: neither machine will redo
 
 Both machines write to the shared `results/phase0/runs/`, so no copy needed. Once all 12 exist:
 ```bash
-BPB_DIVISOR=2.7600 .venv/bin/python scripts/phase0/plot_g3.py   # parabola figures + comparison table
+.venv/bin/python scripts/phase0/plot_g3_curves.py   # -> results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png
 ```
 
 ## Current results (measured, mb=64, TE 1.11; lower BPB better)

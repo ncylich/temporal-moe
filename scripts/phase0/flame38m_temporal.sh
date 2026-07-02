@@ -88,6 +88,16 @@ LOG_ARGS=(
 ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py
 [ "$DENSE" = "1" ] && ENTRY=pretrain_gpt.py
 cd Megatron-LM
-$ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
-  "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
-  2>&1 | tee "$OUT/train.log"
+if [ "${PROBE:-0}" = "1" ]; then
+  # Mechanistic router probe (see run.sh PROBE): load CKPT, log per-token routing on one fixed batch.
+  export ROUTER_LOG_OUT=$OUT/router_log.pt
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} \
+    $ROOT/scripts/phase0/router_probe.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 6 --lr-wsd-decay-iters 1 --save-interval 100000 --eval-iters 1 \
+    2>&1 | tee "$OUT/probe.log"
+else
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    2>&1 | tee "$OUT/train.log"
+fi

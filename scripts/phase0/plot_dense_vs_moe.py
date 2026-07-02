@@ -32,26 +32,32 @@ def pts(d):
 LSTYLE = {"1e16": "--", "1e17": "-"}
 fig, ax = plt.subplots(figsize=(9.5, 6.2))
 for budget in ["1e16", "1e17"]:
-    for label, data, color in [("MoE (FLAME)", MOE[budget], "C0"),
-                               ("dense floor", DENSE[budget], "C3")]:
+    for label, data, color in [("full MoE", MOE[budget], "C0"),
+                               ("dense baseline", DENSE[budget], "C3")]:
         x, y, names = pts(data)
         ax.plot(x, y, LSTYLE[budget], color=color, marker="o", lw=1.8, ms=6,
-                label=f"{label}  {budget}")
+                label=f"{label}  ({budget} FLOPs)")
         # parabola fit in log10(N) for a smooth guide + located minimum
         lx = np.log10(x)
         c = np.polyfit(lx, y, 2)
         xx = np.linspace(lx.min(), lx.max(), 100)
         ax.plot(10**xx, np.polyval(c, xx), ":", color=color, lw=1, alpha=0.4)
         imin = int(np.argmin(y))
-        ax.annotate(names[imin], (x[imin], y[imin]), textcoords="offset points",
+        ax.annotate(f"{N[names[imin]]:.2f}M active", (x[imin], y[imin]), textcoords="offset points",
                     xytext=(0, -14), ha="center", fontsize=8, color=color)
 ax.set_xscale("log")
 ax.set_xlabel("active non-embedding params N (millions)")
 ax.set_ylabel("validation BPB (bits/byte, lower better)")
-ax.set_title("FLAME-MoE beats the dense IsoFLOP floor at every shape (Phase 0, single A6000)\n"
-             "color = method, dashed = 1e16 / solid = 1e17; lower is better")
+ax.set_title("Full MoE beats the dense-baseline compute floor at every model size\n"
+             "IsoFLOP curves at two compute budgets; lower bits-per-byte is better")
 ax.grid(True, which="both", ls=":", alpha=0.4)
 ax.legend(fontsize=9, ncol=2)
-fig.tight_layout()
-fig.savefig("results/phase0/dense_vs_moe.png", dpi=130)
-print("wrote results/phase0/dense_vs_moe.png")
+fig.text(0.5, 0.01,
+         "IsoFLOP curves: validation bits-per-byte (BPB, lower is better) vs active non-embedding "
+         "parameters N (millions, log x-axis). Dashed = 10^16 FLOPs, solid = 10^17 FLOPs. 'full MoE' = "
+         "standard top-k routing; 'dense baseline' = a plain feed-forward model. Dotted lines are quadratic "
+         "fits; labels mark the best (minimum-BPB) model size on each curve.", ha="center", fontsize=8, wrap=True)
+fig.tight_layout(rect=[0, 0.07, 1, 1])
+out = "/workspace/FLAME-MoE/results/phase0/figures/dense_floor_vs_full_moe_isoflop.png"
+fig.savefig(out, dpi=130)
+print("wrote", out)

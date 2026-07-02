@@ -25,8 +25,8 @@ TEMPORAL = {  # rolling residency, min_logit eviction, 1 shared (K=6 resident of
     "1e16": {"sm1": 1.4891, "s0": 1.4599, "s1": 1.5488, "s2": 1.8260},
     "1e17": {"s1": 1.3039, "s2": 1.2821, "s3": 1.3073},
 }
-SERIES = [("dense", DENSE, "C3"), ("MoE (1 shared)", MOE, "C0"),
-          ("temporal (min_logit, 1 shared)", TEMPORAL, "C2")]
+SERIES = [("dense baseline", DENSE, "C3"), ("full MoE", MOE, "C0"),
+          ("temporal", TEMPORAL, "C2")]
 
 def pts(d):
     xs = np.array([N[k] for k in d]); ys = np.array([d[k] for k in d])
@@ -39,7 +39,7 @@ for name, data, color in SERIES:
     for b in ["1e16", "1e17"]:
         x, y = pts(data[b])
         ax.plot(x, y, STYLE[b] + "o", color=color, lw=1.8, ms=6,
-                label=f"{name}  {b}")
+                label=f"{name}  ({b} FLOPs)")
 for b in ["1e16", "1e17"]:
     # mark temporal minimum
     items = TEMPORAL[b]; smin = min(items, key=items.get)
@@ -48,10 +48,17 @@ for b in ["1e16", "1e17"]:
 ax.set_xscale("log")
 ax.set_xlabel("active non-embedding params N (millions)")
 ax.set_ylabel("validation BPB (bits/byte, lower better)")
-ax.set_title("Temporal MoE (6/64 experts resident) vs dense floor & full MoE — both budgets\n"
-             "dashed = 1e16, solid = 1e17;  temporal tracks just above MoE, well inside the band")
+ax.set_title("Temporal routing (rolling residency: keep top-k experts resident, swap 1 per token)\n"
+             "vs the dense baseline and full MoE, across compute budgets — temporal tracks just above full MoE")
 ax.grid(True, which="both", ls=":", alpha=0.4)
 ax.legend(fontsize=8.5, ncol=3, loc="upper left")
-fig.tight_layout()
-fig.savefig("results/phase0/temporal_minlogit_final_combined.png", dpi=130)
-print("wrote results/phase0/temporal_minlogit_final_combined.png")
+fig.text(0.5, 0.01,
+         "IsoFLOP curves: validation bits-per-byte (BPB, lower is better) vs active non-embedding "
+         "parameters N (millions, log x-axis) at two compute budgets (dashed = 10^16 FLOPs, solid = 10^17 "
+         "FLOPs). 'temporal' = rolling residency (6 of 64 experts resident); 'full MoE' = standard top-k "
+         "routing; 'dense baseline' = a plain feed-forward model. Green labels mark the temporal minimum "
+         "at each budget.", ha="center", fontsize=8, wrap=True)
+fig.tight_layout(rect=[0, 0.06, 1, 1])
+out = "/workspace/FLAME-MoE/results/phase0/figures/temporal_vs_dense_and_full_moe_isoflop.png"
+fig.savefig(out, dpi=130)
+print("wrote", out)
