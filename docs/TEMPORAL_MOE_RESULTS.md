@@ -69,15 +69,13 @@ iters = 4.45B tokens = 1e18 FLOPs) and swapped in the temporal router. Figure:
 |---|---|---|
 | dense floor (ffn 1422, matched active non-embed params) | **4.137** | measured, our setup |
 | **temporal** (6/64 resident, min_logit) | **3.906** | measured, our setup |
-| MoE (compute-optimal) | **≈3.78** | paper fitted scaling law |
 
 - **Temporal beats the dense floor by 0.231 nats** — fully measured (dense and temporal trained
   identically; only the router differs). A real, large step up from dense with 6/64 experts resident.
-- Recovers **~65%** of the dense→MoE gap. This fraction is softer than the dense↔temporal gap because the
-  MoE value is the paper's **scaling-law prediction on their val set**, not measured on ours (val-set +
-  extrapolation confounds). A same-setup MoE control run would make it exact.
-- Paper's fitted law: ℒ = A/N^α + B/D^β + L₀ (A 148.41, B 3.27e6, L₀ 2.24, α 0.2797, β 0.7155);
-  compute-optimal N\* ∝ C^0.69, D\* ∝ C^0.31.
+- Measured full-MoE controls at 1e18 (coarse 64-expert and fine-grained 192-expert) are in
+  `results/phase0/G3_RESULTS.md`; temporal lands inside that measured dense↔MoE band.
+- Model size follows the paper's compute-optimal rule (N\* ∝ C^0.69, D\* ∝ C^0.31); we replicate the
+  paper's published FLAME-MoE-38M shape exactly.
 
 Single-GPU adaptations vs the paper's 32-GPU (EP=8) setup — all numerically equivalent: EP=1 +
 `--moe-grouped-gemm`; TransformerEngine impl; mb 8 (temporal) / 32 (dense) + no CE-fusion (the 50k-vocab

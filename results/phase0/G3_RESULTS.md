@@ -57,10 +57,9 @@ different data. Script: `flame38m_run.sh` (dense / full-MoE / temporal × G1/G3)
 | **temporal (G3, 18/192)** | **3.9768** | measured (local) |
 | **MoE (G3, 18/192, full)** | **4.0087** | measured (local) |
 | **MoE (G1, 6/64, full)** | **3.9209** | measured (local) — best MoE |
-| MoE (G1) — paper scaling law | ≈3.78 | external ref |
 
-**Ordering (all local except dense xref): dense 4.137 > MoE-G3 4.009 > temporal-G3 3.977 > MoE-G1 3.921
-> MoE-law 3.78.** Two clean findings:
+**Ordering (all local except dense xref): dense 4.137 > MoE-G3 4.009 > temporal-G3 3.977 > MoE-G1 3.921.**
+Two clean findings:
 
 1. **Fine-graining HURTS the full MoE at 1e18** — coarse **MoE-G1 (3.921) beats fine-grained MoE-G3
    (4.009) by 0.088 nats**. Confirmed: 192 experts is over-fine for the 4.45B-token budget (~tens of M
