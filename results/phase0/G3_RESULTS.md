@@ -42,6 +42,34 @@ the headline holds at the shapes that matter (18-of-192 resident, single swap/to
 gain), with fine-graining costing a modest, consistent recovery penalty vs coarse experts. s1@1e17
 (the remaining point) will complete the 1e17 temporal parabola.
 
+## 1e18 (paper scale — FLAME-MoE-38M-100M, 50k pythia / CE)
+
+Extends the fine-graining test to the paper's real 1e18 budget (hidden 256 / 9 layers, gb 1024, WSD,
+2121 iters = 4.45B tokens, pythia-50k, **validation cross-entropy in nats**, seed 1234, mb=32). Run
+locally on a freshly-tokenized 50k dclm corpus so all points share one val split (self-consistent
+panel); the A6000 baseline's dense **4.137** / temporal-G1 **3.906** are an external cross-check on
+different data. Script: `flame38m_run.sh` (dense / full-MoE / temporal × G1/G3).
+
+| config | val-CE @1e18 | status |
+|---|---|---|
+| dense floor | **4.137** | A6000 baseline, reused as floor (cross-data, <~0.01 nats) |
+| **temporal (G3, 18/192)** | **3.9768** | measured (local) |
+| **MoE (G3, 18/192, full)** | **4.0087** | measured (local) |
+| MoE (G1, 6/64, full) | *pending* | running (local) |
+| MoE (G1) — paper scaling law | ≈3.78 | external ref |
+
+**Surprise vs 1e16/1e17:** at 1e18, G3-**temporal (3.9768) edges out the full G3-MoE (4.0087)** by
+~0.03 nats — train loss agrees (3.975 vs 4.011), so it's not a val fluke — the *opposite* of the lower
+budgets where temporal was always slightly worse than the MoE. Likely cause: **192 experts is over-fine
+for the 4.45B-token budget** (~tens of M tokens/expert), so the full MoE spreads routing thin across
+*undertrained* experts, while temporal's rolling residency concentrates each span on a small resident
+set → those experts see more tokens → train better → lower loss. The pending **G1-MoE (64 experts)**
+tests this (if it beats G3-MoE, fine-graining hurt the full MoE here). The floor is the A6000 dense
+**4.137** (same corpus + pythia-50k, different val split → within ~0.01 nats; a local dense re-run
+wasn't worth ~6–7h). So both temporal (3.977) and G3-MoE (4.009) sit well below the dense floor.
+Perf note: the local 1e18 runs are ~12.7s/iter — the 50k-vocab LM head (un-fused CE) dominates at this
+tiny 12M model, not the temporal scan.
+
 ## Remaining (A6000)
 
 `g3_tmoe_s0_1e16` ✅ (1.4753) and `g3_tmoe_s1_1e16` ✅ (1.5861) done on the A6000 and filled in above.
