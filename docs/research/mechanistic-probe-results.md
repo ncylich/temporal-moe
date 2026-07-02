@@ -38,9 +38,12 @@ G3 experts live longer per swap (more experts, each churned less often).
    constraint is largely internalized, not imposed against the router's will. → an explicit
    churn/coherence loss or straight-through swap has *less* to fix than expected; worth testing whether a
    little extra temporal-coherence pressure closes the residual gap (esp. for G3).
-2. **A larger resident cache is a cheap, high-leverage lever** (B, C): K=k→2k roughly halves the routing
-   miss — motivating the one remaining *training* experiment, **D (BPB vs K)**: does K>k headroom buy back
-   the MoE-quality gap (and close the G3 dip)?
+2. **A larger resident cache closes routing misses fast** (B, C): K=k→2k roughly halves the miss.
+   **Deferred — future direction, final optimization round only.** Experiment **D (BPB vs K)** would
+   measure whether K>k headroom buys back the MoE-quality gap (and the G3 dip), but even if it does,
+   the extra resident RAM is likely not worth it against the hyper-optimized K=k footprint this method
+   targets; its natural role is *opportunistic* — spend K>k only on hosts with spare RAM to absorb it
+   dynamically.
 3. **G3 is consistently a touch less cacheable/self-consistent than G1**, matching the quality recovery dip
    — finer experts specialize harder and tolerate residency slightly worse.
 
