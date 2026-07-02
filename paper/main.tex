@@ -5,7 +5,7 @@
 
 \IfFileExists{neurips_2024.sty}
   {\usepackage[preprint]{neurips_2024}}
-  {\usepackage[hmargin=1in,vmargin=0.85in]{geometry}}
+  {\usepackage[hmargin=1in,vmargin=0.78in]{geometry}}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -109,19 +109,20 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
   \centering
   \begin{minipage}[t]{0.555\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_full_moe_isoflop_nocaption.png}
+    \includegraphics[width=\linewidth]{figures/fine_grained_vs_coarse_experts_isoflop_nocaption.png}
   \end{minipage}\hfill
   \begin{minipage}[t]{0.42\linewidth}
     \centering
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png}
   \end{minipage}
-  \caption{\textbf{Left,} isoFLOP curves at fixed compute ($10^{16}$ dashed, $10^{17}$ solid;
-  validation BPB, lower is better). Temporal MoE (green, 6 of 64 resident) lands inside the
-  dense-to-MoE band at every size, tracks 0.01--0.02 BPB above the full MoE, and preserves both
-  baselines' compute-optimal shapes; recovery at the optima is 82\%. \textbf{Right,} paper-scale
-  points at $10^{18}$ FLOPs (validation cross-entropy). Dense 4.137, fine-grained MoE 4.009,
-  fine-grained temporal 3.977, coarse MoE 3.921. Temporal recovers 74\% against the strongest MoE
-  and here outperforms its equally fine-grained MoE counterpart.}
+  \caption{\textbf{Left,} isoFLOP curves at fixed compute (validation BPB, lower is better; color =
+  method, $10^{16}$ dashed / $10^{17}$ solid, open circles = coarse experts, filled squares =
+  fine-grained). Temporal MoE (green) lands inside the dense-to-MoE band at every size and preserves
+  both baselines' compute-optimal shapes; recovery at the optima is 82\% coarse and 72--77\%
+  fine-grained, which tracks just above coarse at these token budgets. \textbf{Right,} paper-scale
+  points at $10^{18}$ FLOPs (validation cross-entropy).
+  Dense 4.137, fine-grained MoE 4.009, fine-grained temporal 3.977, coarse MoE 3.921. Temporal
+  recovers 74\% against the strongest MoE and here outperforms its equally fine-grained MoE counterpart.}
   \label{fig:isoflop}
 \end{figure}
 
