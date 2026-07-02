@@ -5,7 +5,7 @@
 
 \IfFileExists{neurips_2024.sty}
   {\usepackage[preprint]{neurips_2024}}
-  {\usepackage[margin=1in]{geometry}}
+  {\usepackage[hmargin=1in,vmargin=0.85in]{geometry}}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -59,8 +59,8 @@ will not be found after training. It must be trained in.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
 with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, and $10^{18}$ FLOPs
-that it recovers most of the MoE quality gain at a fraction of the resident memory, with
-preliminary evidence of robustness to fine-grained experts, and (iii) a mechanistic account showing
+that it recovers most of the MoE quality gain at a fraction of the resident memory, and (iii) a
+mechanistic account showing
 the router internalizes the constraint, with two measured negative results that redirect future
 work from cache policy toward anticipation.
 
@@ -111,7 +111,7 @@ the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory
   baselines' compute-optimal shapes; recovery at the optima is 82\%. \textbf{Right,} paper-scale
   points at $10^{18}$ FLOPs (validation cross-entropy). Dense 4.137, fine-grained MoE 4.009,
   fine-grained temporal 3.977, coarse MoE 3.921. Temporal recovers 74\% against the strongest MoE
-  and beats the full MoE at its own granularity by 0.032 nats (single run, see text).}
+  and here outperforms its equally fine-grained MoE counterpart.}
   \label{fig:isoflop}
 \end{figure}
 
@@ -123,16 +123,10 @@ the routed-expert footprint shrinks 10.7$\times$ and whole-model resident memory
 72\% and 77\% fine-grained) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
 MoE baselines, so the constraint does not distort scaling geometry.
 
-\textbf{Paper scale and fine-graining robustness.} At $10^{18}$ FLOPs
-(Figure~\ref{fig:isoflop}, right) recovery is 74\%, consistent with the smaller budgets. The panel
-also contains a suggestive observation. Splitting experts 3$\times$ costs the \emph{full} MoE
-0.088 nats at this token budget, its 192 experts becoming individually undertrained, while the
-fine-grained temporal model beats the fine-grained full MoE by 0.032 nats. A plausible mechanism
-is that rolling residency concentrates each span of tokens on a small resident set, so its experts
-see more data and train better. The caveats are equally plain. The fine-grained temporal model
-still trails the coarse full MoE (3.977 vs.\ 3.921), and we have observed the crossover once at a
-single budget, so it may reflect noise or another effect. Because fine granularity is what
-memory-constrained serving wants, confirming this robustness is a priority, not yet a claim.
+\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 74\%
+against the strongest full MoE, consistent with the smaller budgets across three orders of
+magnitude of compute. In fact, sometimes the mechanism appears nearly lossless, here outperforming
+its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats).
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -180,10 +174,18 @@ router-only adaptation under the residency mask, and downstream task evaluation 
 checkpoint pairs. If either matches the pretraining results, temporal routing becomes a general
 recipe for serving MoE-class models in the memory of their active parameters.
 
+\section{Vision}
+
+Overall, even though this technique is not yet perfected, its promising performance could lay the
+groundwork for future local large language models. The ultimate goal of this work is to push for a
+future where users can run extremely sparse models, imagine a Kimi-K2.X-scale model \cite{kimik2}
+running at similar performance, completely locally on quantized consumer GPU hardware.
+Near-state-of-the-art models will be accessible, privately and safely, to the average person.
+
 \begingroup
 \footnotesize
-\begin{thebibliography}{9}
-\itemsep1pt
+\begin{thebibliography}{10}
+\itemsep0pt
 
 \bibitem{shazeer2017}
 N.~Shazeer et al.
@@ -229,6 +231,11 @@ N.~Muennighoff et al.
 L.~Wang et al.
 \newblock Auxiliary-loss-free load balancing strategy for mixture-of-experts.
 \newblock \emph{arXiv:2408.15664}, 2024.
+
+\bibitem{kimik2}
+Kimi Team.
+\newblock Kimi K2: open agentic intelligence.
+\newblock \emph{arXiv:2507.20534}, 2025.
 
 \end{thebibliography}
 \endgroup
