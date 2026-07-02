@@ -61,9 +61,10 @@ For each temporal model, from the logged resident sets:
   experts over time than fit in RAM); if ~≤15 → the model collapsed to a small effective pool and
   a static small-E MoE would match it.
 - **Per-expert residency fraction**: for each expert, fraction of tokens it is resident. Plot the
-  distribution per layer. **Bimodality check**: experts with residency >0.8 are de-facto pinned
-  (the s2 raster shows one, ≈ expert 12 at layer 6) — list them per layer/model. These are the
-  candidates for an explicit pinned-slot architecture later.
+  distribution per layer. **Degeneracy check**: experts with residency >0.8 are de-facto permanent
+  (the s2 raster shows one, ≈ expert 12 at layer 6) — list them per layer/model. A permanent
+  resident is a routed slot behaving like a shared expert, i.e., wasted dynamic capacity; if
+  common, that argues for shifting capacity into the shared expert, NOT for pinning slots.
 - **Effective expert count**: exp(entropy) of the residency marginal per layer.
 - Also compute per-expert *token-service* counts (tokens each expert actually served) — the
   concentration statistic behind the 1e18 "temporal beats full G3-MoE via better-trained experts"
@@ -100,6 +101,11 @@ resident mass > τ_p). K=k, cap-1, min_logit eviction.
 
 **Why:** quality-per-swap is concave (dropping marginal swaps should be nearly free), and τ is a
 zero-training, deploy-time knob. τ\* feeds a later single training cell (train-with-τ).
+
+Caveat (applies to E4/E5/E7 alike): replay is **off-policy screening** — the logged demand stream
+is held fixed, so it prices selection policies but cannot produce quality numbers. **Optional GPU
+step:** validate the chosen τ\* with one `EVAL_ONLY=1` pass patching the margin into the trigger on
+an existing checkpoint — real BPB, closed-loop hidden states, still zero training.
 
 ## E5 — Belady replay (the policy-headroom bound)
 
