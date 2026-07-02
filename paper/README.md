@@ -61,6 +61,13 @@ with the reason it exists.
 - **Reuse that same hue+shade scheme on other quality graphs** (e.g. the 1e18 bars, `plot_1e18.py`):
   solid bars, no hatching (reads as noise); note any cross-data / different-split bars in the caption.
 
+## Camera-ready TODO (deferred by Noah — not before final revisions)
+- **Three seeds per 1e18 column** (all five Figure-1-right configs, including a LOCAL dense run):
+  upgrades the error bars from two-seed ranges / method-matched estimates to real standard
+  deviations, and the local dense run removes the last cross-data caveat. Deferred because the
+  measured spreads are already tiny (temporal ±0.0024, MoE ±0.0064 nats) — the conclusion cannot
+  flip; ~10-13 extra 1e18 runs (~2-3 days of H100) is only worth spending for camera-ready.
+
 ## Build
 `cd paper && pdflatex main.tex` twice (uses `neurips_2024.sty` if present, else a plain-article
 fallback). Figures are the `*_nocaption.png` variants from `scripts/phase0/plot_*.py --no-caption`.
