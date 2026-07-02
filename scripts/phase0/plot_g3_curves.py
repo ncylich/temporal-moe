@@ -35,24 +35,27 @@ TMP_G1   = {"1e16": {"sm1": 1.4891, "s0": 1.4599, "s1": 1.5488},
 TMP_G3   = {"1e16": {"sm1": 1.4976, "s0": 1.4753, "s1": 1.5861},
             "1e17": {"s1": 1.3065, "s2": 1.2873, "s3": 1.3129}}
 
-# name, data, N-table, color, marker, facecolor, lw, alpha, label, short-label (paper)
+# Balanced encoding: color = method, dashed/solid = budget, marker FILL = granularity
+# (open = coarse, filled = fine). Equal line weight + opacity so neither grain overpowers the other.
+# name, data, N-table, color, marker, facecolor, label, short-label (paper)
 SERIES = [
-    ("dense_g1", DENSE_G1, N_G1, "0.55", "x", "0.55", 1.3, 0.9,  "dense baseline",                    "dense"),
-    ("moe_g1",   MOE_G1,   N_G1, "C0",   "o", "none", 1.4, 0.55, "full MoE, coarse (6 of 64)",        "MoE · coarse"),
-    ("tmp_g1",   TMP_G1,   N_G1, "C2",   "o", "none", 1.4, 0.55, "temporal, coarse (6 of 64)",        "temporal · coarse"),
-    ("moe_g3",   MOE_G3,   N_G3, "C0",   "s", "C0",   2.6, 1.0,  "full MoE, fine-grained (18 of 192)","MoE · fine"),
-    ("tmp_g3",   TMP_G3,   N_G3, "C2",   "s", "C2",   2.6, 1.0,  "temporal, fine-grained (18 of 192)","temporal · fine"),
+    ("dense_g1", DENSE_G1, N_G1, "0.5", "x", "0.5",  "dense baseline",                    "dense"),
+    ("moe_g1",   MOE_G1,   N_G1, "C0",  "o", "none", "full MoE, coarse (6 of 64)",        "MoE · coarse"),
+    ("tmp_g1",   TMP_G1,   N_G1, "C2",  "o", "none", "temporal, coarse (6 of 64)",        "temporal · coarse"),
+    ("moe_g3",   MOE_G3,   N_G3, "C0",  "o", "C0",   "full MoE, fine-grained (18 of 192)","MoE · fine"),
+    ("tmp_g3",   TMP_G3,   N_G3, "C2",  "o", "C2",   "temporal, fine-grained (18 of 192)","temporal · fine"),
 ]
 LSTYLE = {"1e16": "--", "1e17": "-"}
 
 fig, ax = plt.subplots(figsize=(6.1, 4.2) if PAPER else (10.5, 6.6))
-for key, data, Ntab, color, mk, fc, lw, alpha, label, short in SERIES:
+for key, data, Ntab, color, mk, fc, label, short in SERIES:
+    lw = 1.4 if key == "dense_g1" else 1.9
     for b in ["1e16", "1e17"]:
         d = data[b]
         xs = np.array([Ntab[k] for k in d]); ys = np.array([d[k] for k in d])
         o = np.argsort(xs)
-        ax.plot(xs[o], ys[o], LSTYLE[b], color=color, marker=mk, mfc=fc,
-                ms=(6 if PAPER else 6.5), lw=(lw*0.8 if PAPER else lw), alpha=alpha,
+        ax.plot(xs[o], ys[o], LSTYLE[b], color=color, marker=mk, mfc=fc, mec=color,
+                ms=7, mew=1.4, lw=lw, alpha=0.9,
                 label=((short if PAPER else label) if b == "1e17" else None))
 ax.set_xscale("log")
 ax.grid(True, which="both", ls=":", alpha=0.4)
