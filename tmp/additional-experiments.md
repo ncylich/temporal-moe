@@ -43,6 +43,10 @@ From each temporal probe log, compute the realized swap statistics under the shi
   (Context: router-early placement — computing the router before attention — roughly doubles these
   budgets by adding attention+dense compute to the hiding window; see `cce/FINDINGS.md` for the
   ~17-expert-equivalents accounting. Report the measured rate against both budgets.)
+- **Re-reference distance histogram**: for each swap, how many tokens ago was the incoming expert
+  last evicted (∞ if never resident)? If a large share of swaps re-load recently-evicted experts
+  (oscillation), a small RAM "victim cache" of recently-evicted experts would absorb most SSD
+  traffic at zero quality cost — report the victim-cache hit-rate vs. victim-cache size (in experts).
 - Output: table (model × layer → mean swap rate, p95 burst length, margin vs. `s_max`).
 
 **Why:** decides whether the cap-1 policy is bandwidth-feasible as-is at each grain, and how much
