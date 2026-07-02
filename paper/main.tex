@@ -147,15 +147,13 @@ time-multiplexed access to the full pool rather than a static subset.
 
 \begin{figure}[t]
   \centering
-  % TODO: swap to the _nocaption variants once regenerated on the pod
-  % (needs the probe logs: .venv/bin/python scripts/phase0/plot_probe.py --no-caption)
   \begin{minipage}[t]{0.565\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/expert_selection_per_token_8M_model.png}
+    \includegraphics[width=\linewidth]{figures/expert_selection_per_token_8M_model_nocaption.png}
   \end{minipage}\hfill
   \begin{minipage}[t]{0.41\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/learned_temporal_locality_vs_model_size.png}
+    \includegraphics[width=\linewidth]{figures/learned_temporal_locality_vs_model_size_nocaption.png}
   \end{minipage}
   \caption{\textbf{The router learns the locality it is constrained to. Left,} experts active per
   token (8.1M model, deepest MoE layer). The vanilla MoE (top) scatters, the temporal resident set
