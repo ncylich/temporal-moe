@@ -56,20 +56,27 @@ different data. Script: `flame38m_run.sh` (dense / full-MoE / temporal × G1/G3)
 | dense floor | **4.137** | A6000 baseline, reused as floor (cross-data, <~0.01 nats) |
 | **temporal (G3, 18/192)** | **3.9768** | measured (local) |
 | **MoE (G3, 18/192, full)** | **4.0087** | measured (local) |
-| MoE (G1, 6/64, full) | *pending* | running (local) |
+| **MoE (G1, 6/64, full)** | **3.9209** | measured (local) — best MoE |
 | MoE (G1) — paper scaling law | ≈3.78 | external ref |
 
-**Surprise vs 1e16/1e17:** at 1e18, G3-**temporal (3.9768) edges out the full G3-MoE (4.0087)** by
-~0.03 nats — train loss agrees (3.975 vs 4.011), so it's not a val fluke — the *opposite* of the lower
-budgets where temporal was always slightly worse than the MoE. Likely cause: **192 experts is over-fine
-for the 4.45B-token budget** (~tens of M tokens/expert), so the full MoE spreads routing thin across
-*undertrained* experts, while temporal's rolling residency concentrates each span on a small resident
-set → those experts see more tokens → train better → lower loss. The pending **G1-MoE (64 experts)**
-tests this (if it beats G3-MoE, fine-graining hurt the full MoE here). The floor is the A6000 dense
-**4.137** (same corpus + pythia-50k, different val split → within ~0.01 nats; a local dense re-run
-wasn't worth ~6–7h). So both temporal (3.977) and G3-MoE (4.009) sit well below the dense floor.
-Perf note: the local 1e18 runs are ~12.7s/iter — the 50k-vocab LM head (un-fused CE) dominates at this
-tiny 12M model, not the temporal scan.
+**Ordering (all local except dense xref): dense 4.137 > MoE-G3 4.009 > temporal-G3 3.977 > MoE-G1 3.921
+> MoE-law 3.78.** Two clean findings:
+
+1. **Fine-graining HURTS the full MoE at 1e18** — coarse **MoE-G1 (3.921) beats fine-grained MoE-G3
+   (4.009) by 0.088 nats**. Confirmed: 192 experts is over-fine for the 4.45B-token budget (~tens of M
+   tokens/expert → experts undertrained). This is the *opposite* of 1e16/1e17, where fine-graining was
+   quality-neutral for the MoE — because those budgets are so token-starved the coarse MoE is *also*
+   undertrained, hiding the effect; at 1e18 there are enough tokens for coarse experts to benefit.
+2. **Temporal is robust to over-fine-graining.** G3-**temporal (3.977) beats its own-granularity full
+   MoE (4.009)** by 0.032 (train loss agrees: 3.975 vs 4.011) — rolling residency concentrates each
+   span on a small resident set, so those experts see more tokens and train better than the full MoE's
+   thinly-spread 192. Against the *true* MoE quality (coarse MoE-G1 3.921) and the dense floor (4.137),
+   temporal-G3 recovers **~74%** of the dense→MoE gap — consistent with the ~66–77% at 1e16/1e17.
+
+Floor = A6000 dense **4.137** (same corpus + pythia-50k, different val split → within ~0.01 nats; a
+local dense re-run wasn't worth ~6–7h). Perf note: local 1e18 runs are ~7–13s/iter (G1 64-expert ~7s,
+G3 192-expert ~13s) — the 50k-vocab LM head (un-fused CE) is the fixed cost at this tiny 12M model, the
+extra experts add on top; the temporal scan is negligible.
 
 ## Complete (A6000)
 
