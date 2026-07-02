@@ -14,6 +14,9 @@ with the reason it exists.
   fine-grained full MoE was a *single, unexplained* observation → at most one hedged clause
   ("sometimes the mechanism appears nearly lossless, outperforming its equally fine-grained MoE
   counterpart"), no proposed mechanism, no "robustness" framing.
+- **Granularity framing (Noah):** the coarse model (6 of 64) is the head-to-head comparison with
+  FLAME-MoE; the fine-grained model (18 of 192) carries the transition-to-target-sparsity story.
+  Weight fine-grained slightly more in the narrative; keep actual-hardware specifics light.
 - **Don't overstate; check the numbers before writing them.** Recovery is 72–82% (not a vague
   "65%"); at 1e18 temporal *recovers ~74%*, it does **not** "match" the full MoE. Re-verify claims
   when new controls/data land instead of jumping to a conclusion.

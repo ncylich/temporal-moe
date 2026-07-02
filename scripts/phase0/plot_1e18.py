@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """1e18 (FLAME-MoE-38M-100M scale): dense floor vs full MoE (coarse & fine-grained) vs temporal.
 Validation cross-entropy (nats, lower better), pythia-50k tokenizer, our dclm val split. Single axes.
-Measured locally on one val split: MoE coarse (64), MoE fine (192), temporal fine (18/192). Dense floor
-reused from the A6000 baseline (4.137; same corpus/tokenizer, cross-data <~0.01 nats).
+Measured locally on one val split: MoE coarse (6/64, 2 seeds), temporal coarse (6/64, 2 seeds),
+MoE fine (18/192), temporal fine (18/192). Coarse bars show the two-seed mean with individual seed
+dots. Dense floor reused from the A6000 baseline (4.137; same corpus/tokenizer, cross-data <~0.01
+nats). Seed curves: results/phase0/figure_data/t18_coarse_{temporal,moe}.csv (val@2121 lines).
 Output: results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png
 """
 import os, sys
@@ -21,9 +23,11 @@ if PAPER:
 
 # worst -> best CE (left -> right). Colors match the left isoFLOP figure: hue = method
 # (gray dense, blue MoE, green temporal), shade = granularity (coarse normal / fine dark).
-# dense + temporal-coarse are A6000 cross-data (different val split, within ~0.01 nats) — noted
-# in the caption; the other three share one local split.
-ce     = [4.137, 4.0087, 3.9768, 3.9209, 3.906]
+# Only dense is A6000 cross-data (different val split, within ~0.01 nats) — noted in the caption;
+# the other four are local, one shared split. Coarse arms: two seeds each (val@2121 basis),
+# bar = seed mean, dots = individual seeds.
+SEEDS  = {3: [3.9209, 3.9336], 4: [3.9121, 3.9074]}   # bar index -> seed values
+ce     = [4.137, 4.0087, 3.9768, 3.9273, 3.9098]      # coarse bars = two-seed means
 colors = ["#7f7f7f", "#0d3b66", "#145a14", "#5aa0dd", "#5cc85c"]
 labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "temporal\ncoarse"] if PAPER else
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
@@ -31,9 +35,13 @@ labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "tem
 
 fig, ax = plt.subplots(figsize=(5.4, 4.0) if PAPER else (8.6, 5.8))
 bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6)
-for b, v in zip(bars, ce):
-    ax.text(b.get_x()+b.get_width()/2, v+0.004, f"{v:.3f}", ha="center",
+for i, (b, v) in enumerate(zip(bars, ce)):
+    lab_y = max([v] + SEEDS.get(i, [])) + 0.004
+    ax.text(b.get_x()+b.get_width()/2, lab_y, f"{v:.3f}", ha="center",
             fontsize=(11 if PAPER else 10.5), fontweight="bold")
+    if i in SEEDS:
+        xc = b.get_x() + b.get_width()/2
+        ax.plot([xc]*len(SEEDS[i]), SEEDS[i], "o", color="k", ms=4, zorder=5)
 ax.grid(True, axis="y", ls=":", alpha=0.4)
 
 if PAPER:
@@ -43,16 +51,16 @@ if PAPER:
     fig.tight_layout()
     out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png"
 else:
-    # finding 1: fine-graining hurts the full MoE (fine 4.009 -> coarse 3.921)
-    ax.annotate("", xy=(3, 3.9209), xytext=(1, 4.0087),
+    # finding 1: fine-graining hurts the full MoE (fine 4.009 -> coarse 3.927 mean)
+    ax.annotate("", xy=(3, 3.9273), xytext=(1, 4.0087),
                 arrowprops=dict(arrowstyle="->", color="darkred", lw=1.4))
     ax.text(2.0, 4.15, "fine-graining hurts the full MoE  (−0.088 nats)", ha="center", fontsize=8.5, color="darkred")
     # finding 2: temporal (fine) beats its own-granularity full MoE
     ax.annotate("", xy=(2, 3.9768), xytext=(1, 4.0087),
                 arrowprops=dict(arrowstyle="->", color="green", lw=1.2))
     ax.text(2.55, 4.05, "temporal beats its own-granularity full MoE", ha="left", fontsize=8, color="green")
-    rec = (4.137 - 3.9768) / (4.137 - 3.9209) * 100
-    ax.text(0.985, 0.06, f"temporal (fine) recovers ~{rec:.0f}% of the\ndense→(coarse full-MoE) gap;\nall four measured, everything beats the dense floor",
+    rec = (4.137 - 3.9768) / (4.137 - 3.9273) * 100
+    ax.text(0.985, 0.06, f"temporal (fine) recovers ~{rec:.0f}% of the\ndense→(coarse full-MoE) gap; coarse temporal\nbeats coarse MoE on BOTH seeds (dots)",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8.3, color="dimgray")
     ax.set_ylim(3.6, 4.25)
     ax.set_ylabel("validation cross-entropy (nats, lower better)")
@@ -61,9 +69,9 @@ else:
     fig.text(0.5, 0.005,
              "Validation cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
              "dclm). Hue = method (dense gray, MoE blue, temporal green); shade = granularity (coarse normal, "
-             "fine-grained dark). 'temporal' = rolling residency (keep top-k resident, swap 1/token). Hatched "
-             "bars (dense, coarse temporal) are A6000 cross-data (different val split, within ~0.01 nats); the "
-             "other three share one local split.", ha="center", fontsize=7.8, wrap=True)
+             "fine-grained dark). 'temporal' = rolling residency (keep top-k resident, swap 1/token). Coarse "
+             "bars = two-seed means with individual seeds as dots; dense is A6000 cross-data (different val "
+             "split, within ~0.01 nats); the other four share one local split.", ha="center", fontsize=7.8, wrap=True)
     fig.tight_layout(rect=[0, 0.09, 1, 1])
     out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png"
 fig.savefig(out, dpi=200)

@@ -5,7 +5,7 @@
 
 \IfFileExists{neurips_2024.sty}
   {\usepackage[preprint]{neurips_2024}}
-  {\usepackage[hmargin=1in,vmargin=0.78in]{geometry}}
+  {\usepackage[hmargin=1in,vmargin=0.75in]{geometry}}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -120,10 +120,10 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
   $10^{16}$, triangle $10^{17}$)). Temporal MoE (green) lands inside the dense-to-MoE band at every
   size and preserves both baselines' compute-optimal shapes; recovery at the optima is 72--77\%
   fine-grained and 82\% coarse. \textbf{Right,}
-  $10^{18}$-FLOP points (validation cross-entropy; colors as left). Dense 4.137, fine-grained MoE
-  4.009, fine-grained temporal 3.977, coarse MoE 3.921, coarse temporal 3.906; temporal recovers
-  74\% against the strongest MoE and beats its equally fine-grained MoE. Dense and coarse temporal
-  are A6000 cross-data ($\pm$0.01 nats); the other three share one local split.}
+  $10^{18}$-FLOP points (validation cross-entropy; colors as left; dots = seeds on the two-seed
+  coarse bars). Dense 4.137, fine-grained MoE 4.009, fine-grained temporal 3.977, coarse MoE
+  3.927, coarse temporal 3.910; temporal matches or exceeds its full-MoE counterpart at both
+  granularities. Only dense is A6000 cross-data ($\pm$0.01 nats); the rest share one local split.}
   \label{fig:isoflop}
 \end{figure}
 
@@ -135,10 +135,12 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
 82\% coarse at both budgets) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
 MoE baselines, so the constraint does not distort scaling geometry.
 
-\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 74\%
+\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 76\%
 against the strongest full MoE, consistent with the smaller budgets. In fact, sometimes the
 mechanism appears nearly lossless, here outperforming
-its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats).
+its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, run
+with two seeds per arm, it appears to surpass the strongest full MoE outright: every temporal
+seed lands below every MoE seed (3.907--3.912 vs.\ 3.921--3.934 nats).
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -176,11 +178,11 @@ better eviction shows offline-optimal eviction is worth only +6--10 points of hi
 greedy rule (LRU is 4--8 points worse), while an oracle selecting swaps by short-horizon \emph{future}
 demand gains +18--30 points. The headroom is anticipation, not cache policy.
 
-The recovery deficit is therefore a stable, attackable 18--28\%, and we are pursuing it on two
-fronts. A swap margin on smoothed demand spends fewer, better swaps at decision time, and an
-anticipatory training loss targets discounted future expert demand, injecting new information
-rather than imitating the past. We are also weighing auxiliary-loss-free, DeepSeek-inspired
-designs that replace routing losses with gradient-free selection biases \cite{wang2024auxfree}.
+The recovery deficit at matched granularity is therefore a stable, attackable 18--28\%, and we
+are pursuing it on two fronts: auxiliary-loss-free, DeepSeek-inspired routing that replaces
+balancing losses with gradient-free selection biases \cite{wang2024auxfree}, and an anticipatory
+training loss that targets discounted future expert demand, injecting new information rather
+than imitating the past.
 Beyond closing the gap, the highest-leverage directions are converting released MoE checkpoints by
 router-only adaptation under the residency mask, and downstream task evaluation of the existing
 checkpoint pairs. If either matches the pretraining results, temporal routing becomes a general
