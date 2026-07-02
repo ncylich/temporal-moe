@@ -1,0 +1,119 @@
+model,resident_cache_K_over_k,hit_rate,mean_lifetime_tokens
+"1.4M active, coarse (6 of 64 experts)",1.000,0.32493,5.991
+"1.4M active, coarse (6 of 64 experts)",1.500,0.40310,9.044
+"1.4M active, coarse (6 of 64 experts)",2.000,0.46788,12.213
+"1.4M active, coarse (6 of 64 experts)",2.500,0.52443,15.539
+"1.4M active, coarse (6 of 64 experts)",3.000,0.57459,19.104
+"1.4M active, coarse (6 of 64 experts)",3.500,0.62047,23.018
+"1.4M active, coarse (6 of 64 experts)",4.000,0.66244,27.334
+"1.4M active, coarse (6 of 64 experts)",4.500,0.70270,32.337
+"1.4M active, coarse (6 of 64 experts)",5.000,0.73951,38.223
+"1.4M active, coarse (6 of 64 experts)",5.500,0.77346,45.320
+"1.4M active, coarse (6 of 64 experts)",6.000,0.80459,53.881
+"1.4M active, coarse (6 of 64 experts)",6.500,0.83396,64.939
+"1.4M active, coarse (6 of 64 experts)",7.000,0.86188,79.164
+"1.4M active, coarse (6 of 64 experts)",7.500,0.88765,98.819
+"1.4M active, coarse (6 of 64 experts)",8.000,0.91074,126.301
+"1.4M active, coarse (6 of 64 experts)",8.500,0.93233,166.401
+"1.4M active, coarse (6 of 64 experts)",9.000,0.95269,236.297
+"1.4M active, coarse (6 of 64 experts)",9.500,0.97003,363.293
+"1.4M active, coarse (6 of 64 experts)",10.000,0.98518,636.369
+"1.4M active, coarse (6 of 64 experts)",10.500,0.99689,1355.947
+"8.1M active, coarse (6 of 64 experts)",1.000,0.36235,5.994
+"8.1M active, coarse (6 of 64 experts)",1.500,0.44446,9.082
+"8.1M active, coarse (6 of 64 experts)",2.000,0.50750,12.320
+"8.1M active, coarse (6 of 64 experts)",2.500,0.55929,15.754
+"8.1M active, coarse (6 of 64 experts)",3.000,0.60534,19.490
+"8.1M active, coarse (6 of 64 experts)",3.500,0.64634,23.622
+"8.1M active, coarse (6 of 64 experts)",4.000,0.68455,28.243
+"8.1M active, coarse (6 of 64 experts)",4.500,0.71988,33.489
+"8.1M active, coarse (6 of 64 experts)",5.000,0.75368,39.731
+"8.1M active, coarse (6 of 64 experts)",5.500,0.78429,47.084
+"8.1M active, coarse (6 of 64 experts)",6.000,0.81349,56.096
+"8.1M active, coarse (6 of 64 experts)",6.500,0.84118,67.743
+"8.1M active, coarse (6 of 64 experts)",7.000,0.86789,83.026
+"8.1M active, coarse (6 of 64 experts)",7.500,0.89266,104.071
+"8.1M active, coarse (6 of 64 experts)",8.000,0.91543,133.660
+"8.1M active, coarse (6 of 64 experts)",8.500,0.93605,176.497
+"8.1M active, coarse (6 of 64 experts)",9.000,0.95495,248.165
+"8.1M active, coarse (6 of 64 experts)",9.500,0.97142,375.277
+"8.1M active, coarse (6 of 64 experts)",10.000,0.98529,610.540
+"8.1M active, coarse (6 of 64 experts)",10.500,0.99678,1322.229
+"14.8M active, coarse (6 of 64 experts)",1.000,0.32478,5.992
+"14.8M active, coarse (6 of 64 experts)",1.500,0.40082,9.065
+"14.8M active, coarse (6 of 64 experts)",2.000,0.46043,12.272
+"14.8M active, coarse (6 of 64 experts)",2.500,0.51080,15.630
+"14.8M active, coarse (6 of 64 experts)",3.000,0.55546,19.167
+"14.8M active, coarse (6 of 64 experts)",3.500,0.59685,23.032
+"14.8M active, coarse (6 of 64 experts)",4.000,0.63531,27.256
+"14.8M active, coarse (6 of 64 experts)",4.500,0.67188,32.025
+"14.8M active, coarse (6 of 64 experts)",5.000,0.70661,37.543
+"14.8M active, coarse (6 of 64 experts)",5.500,0.73996,44.086
+"14.8M active, coarse (6 of 64 experts)",6.000,0.77096,51.829
+"14.8M active, coarse (6 of 64 experts)",6.500,0.80119,61.546
+"14.8M active, coarse (6 of 64 experts)",7.000,0.83008,74.082
+"14.8M active, coarse (6 of 64 experts)",7.500,0.85757,90.569
+"14.8M active, coarse (6 of 64 experts)",8.000,0.88381,113.894
+"14.8M active, coarse (6 of 64 experts)",8.500,0.90888,148.229
+"14.8M active, coarse (6 of 64 experts)",9.000,0.93279,201.078
+"14.8M active, coarse (6 of 64 experts)",9.500,0.95521,293.492
+"14.8M active, coarse (6 of 64 experts)",10.000,0.97646,496.767
+"14.8M active, coarse (6 of 64 experts)",10.500,0.99496,1131.561
+"3.9M active, fine-grained (18 of 192 experts)",1.000,0.32356,17.852
+"3.9M active, fine-grained (18 of 192 experts)",1.556,0.41103,27.644
+"3.9M active, fine-grained (18 of 192 experts)",2.111,0.48136,37.372
+"3.9M active, fine-grained (18 of 192 experts)",2.667,0.54074,47.079
+"3.9M active, fine-grained (18 of 192 experts)",3.222,0.59240,56.846
+"3.9M active, fine-grained (18 of 192 experts)",3.778,0.63909,66.764
+"3.9M active, fine-grained (18 of 192 experts)",4.333,0.68220,77.096
+"3.9M active, fine-grained (18 of 192 experts)",4.889,0.72241,88.144
+"3.9M active, fine-grained (18 of 192 experts)",5.444,0.75820,99.931
+"3.9M active, fine-grained (18 of 192 experts)",6.000,0.79238,113.616
+"3.9M active, fine-grained (18 of 192 experts)",6.556,0.82440,129.797
+"3.9M active, fine-grained (18 of 192 experts)",7.111,0.85413,149.885
+"3.9M active, fine-grained (18 of 192 experts)",7.667,0.88215,176.401
+"3.9M active, fine-grained (18 of 192 experts)",8.222,0.90777,213.253
+"3.9M active, fine-grained (18 of 192 experts)",8.778,0.93144,270.925
+"3.9M active, fine-grained (18 of 192 experts)",9.333,0.95387,369.568
+"3.9M active, fine-grained (18 of 192 experts)",9.889,0.97446,552.513
+"3.9M active, fine-grained (18 of 192 experts)",10.444,0.99363,1099.136
+"38.0M active, coarse (6 of 64 experts)",1.000,0.30457,5.989
+"38.0M active, coarse (6 of 64 experts)",1.500,0.38113,9.032
+"38.0M active, coarse (6 of 64 experts)",2.000,0.44429,12.172
+"38.0M active, coarse (6 of 64 experts)",2.500,0.49920,15.451
+"38.0M active, coarse (6 of 64 experts)",3.000,0.54818,18.924
+"38.0M active, coarse (6 of 64 experts)",3.500,0.59286,22.672
+"38.0M active, coarse (6 of 64 experts)",4.000,0.63349,26.725
+"38.0M active, coarse (6 of 64 experts)",4.500,0.67163,31.241
+"38.0M active, coarse (6 of 64 experts)",5.000,0.70788,36.386
+"38.0M active, coarse (6 of 64 experts)",5.500,0.74234,42.350
+"38.0M active, coarse (6 of 64 experts)",6.000,0.77480,49.496
+"38.0M active, coarse (6 of 64 experts)",6.500,0.80526,58.105
+"38.0M active, coarse (6 of 64 experts)",7.000,0.83495,69.073
+"38.0M active, coarse (6 of 64 experts)",7.500,0.86278,83.649
+"38.0M active, coarse (6 of 64 experts)",8.000,0.88955,104.071
+"38.0M active, coarse (6 of 64 experts)",8.500,0.91405,132.829
+"38.0M active, coarse (6 of 64 experts)",9.000,0.93744,178.934
+"38.0M active, coarse (6 of 64 experts)",9.500,0.95891,260.771
+"38.0M active, coarse (6 of 64 experts)",10.000,0.97850,446.313
+"38.0M active, coarse (6 of 64 experts)",10.500,0.99521,1115.310
+"full MoE, 8.1M active",1.000,0.17713,5.986
+"full MoE, 8.1M active",1.500,0.24259,8.974
+"full MoE, 8.1M active",2.000,0.30328,11.977
+"full MoE, 8.1M active",2.500,0.36125,15.008
+"full MoE, 8.1M active",3.000,0.41511,18.108
+"full MoE, 8.1M active",3.500,0.46741,21.350
+"full MoE, 8.1M active",4.000,0.51672,24.768
+"full MoE, 8.1M active",4.500,0.56401,28.413
+"full MoE, 8.1M active",5.000,0.61021,32.420
+"full MoE, 8.1M active",5.500,0.65388,36.910
+"full MoE, 8.1M active",6.000,0.69610,42.086
+"full MoE, 8.1M active",6.500,0.73597,48.236
+"full MoE, 8.1M active",7.000,0.77360,55.702
+"full MoE, 8.1M active",7.500,0.81090,65.388
+"full MoE, 8.1M active",8.000,0.84621,78.407
+"full MoE, 8.1M active",8.500,0.87934,96.750
+"full MoE, 8.1M active",9.000,0.91085,125.373
+"full MoE, 8.1M active",9.500,0.94028,177.096
+"full MoE, 8.1M active",10.000,0.96774,297.475
+"full MoE, 8.1M active",10.500,0.99259,860.061

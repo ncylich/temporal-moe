@@ -1,0 +1,6 @@
+model,active_params_M,temporal_overlap_pct,full_moe_overlap_pct,random_pct
+"1.4M active, coarse (6 of 64 experts)",1.36,33.22,19.36,9.38
+"8.1M active, coarse (6 of 64 experts)",8.12,38.19,21.32,9.38
+"14.8M active, coarse (6 of 64 experts)",14.77,33.51,20.24,9.38
+"38.0M active, coarse (6 of 64 experts)",38,30.42,,9.38
+"3.9M active, fine-grained (18 of 192 experts)",3.91,34.72,,9.38

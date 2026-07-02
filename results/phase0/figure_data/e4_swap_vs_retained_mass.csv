@@ -1,0 +1,22 @@
+model,tau,swap_rate,retained_mass
+"8.1M active, coarse (6 of 64 experts)",0,0.99782,0.42063
+"8.1M active, coarse (6 of 64 experts)",0.25,0.98829,0.42106
+"8.1M active, coarse (6 of 64 experts)",0.5,0.95987,0.42104
+"8.1M active, coarse (6 of 64 experts)",1,0.81925,0.41567
+"8.1M active, coarse (6 of 64 experts)",2,0.40446,0.36595
+"8.1M active, coarse (6 of 64 experts)",4,0.04307,0.20243
+"8.1M active, coarse (6 of 64 experts)",8,0.00027,0.10133
+"3.9M active, fine-grained (18 of 192 experts)",0,1.00000,0.39108
+"3.9M active, fine-grained (18 of 192 experts)",0.25,0.99996,0.39108
+"3.9M active, fine-grained (18 of 192 experts)",0.5,0.99955,0.39109
+"3.9M active, fine-grained (18 of 192 experts)",1,0.99058,0.39096
+"3.9M active, fine-grained (18 of 192 experts)",2,0.84433,0.38240
+"3.9M active, fine-grained (18 of 192 experts)",4,0.28558,0.28938
+"3.9M active, fine-grained (18 of 192 experts)",8,0.00414,0.12019
+"38.0M active, coarse (6 of 64 experts)",0,0.99937,0.34359
+"38.0M active, coarse (6 of 64 experts)",0.25,0.99667,0.34367
+"38.0M active, coarse (6 of 64 experts)",0.5,0.98937,0.34381
+"38.0M active, coarse (6 of 64 experts)",1,0.93842,0.34403
+"38.0M active, coarse (6 of 64 experts)",2,0.62318,0.32963
+"38.0M active, coarse (6 of 64 experts)",4,0.09191,0.23686
+"38.0M active, coarse (6 of 64 experts)",8,0.00011,0.11774

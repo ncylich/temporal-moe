@@ -1,0 +1,6 @@
+model,num_experts,union_mean,union_std,union_frac_of_E,effective_experts,mean_experts_over_0.8_resident_per_layer,max_residency_frac
+"1.4M active, coarse (6 of 64 experts)",64,62.77,2.10,0.9808,58.90,0.00,0.2054
+"8.1M active, coarse (6 of 64 experts)",64,62.20,2.73,0.9719,61.18,0.00,0.2015
+"14.8M active, coarse (6 of 64 experts)",64,62.81,1.87,0.9814,61.60,0.00,0.2048
+"3.9M active, fine-grained (18 of 192 experts)",192,158.77,14.94,0.8269,176.60,0.00,0.2527
+"38.0M active, coarse (6 of 64 experts)",64,62.33,1.65,0.9739,53.68,0.00,0.3906

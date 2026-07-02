@@ -1,0 +1,13 @@
+model,ema_beta,swap_rate,set_coverage,mass_coverage
+"8.1M active, coarse (6 of 64 experts)",1,0.99782,0.38197,0.42063
+"8.1M active, coarse (6 of 64 experts)",0.5,0.97405,0.57440,0.62455
+"8.1M active, coarse (6 of 64 experts)",0.25,0.86516,0.74579,0.78114
+"8.1M active, coarse (6 of 64 experts)",0.1,0.56472,0.88728,0.90440
+"3.9M active, fine-grained (18 of 192 experts)",1,1.00000,0.34746,0.39108
+"3.9M active, fine-grained (18 of 192 experts)",0.5,0.99993,0.50247,0.56257
+"3.9M active, fine-grained (18 of 192 experts)",0.25,0.99705,0.67072,0.71837
+"3.9M active, fine-grained (18 of 192 experts)",0.1,0.91701,0.87297,0.89513
+"38.0M active, coarse (6 of 64 experts)",1,0.99937,0.30424,0.34359
+"38.0M active, coarse (6 of 64 experts)",0.5,0.98973,0.49824,0.55581
+"38.0M active, coarse (6 of 64 experts)",0.25,0.93061,0.68083,0.72381
+"38.0M active, coarse (6 of 64 experts)",0.1,0.69153,0.84812,0.86925

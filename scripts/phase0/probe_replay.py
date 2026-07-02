@@ -29,10 +29,20 @@ import numpy as np
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plot_probe import load, topk_ids, OUT, rolling  # reuse helpers/paths
+from plot_probe import load, topk_ids, OUT, rolling, overlap, sweep, PAIRS, G3  # reuse helpers/paths
 
 CACHE = "/workspace/FLAME-MoE/results/phase0/probe_batch_cache"
+FIGDATA = "/workspace/FLAME-MoE/results/phase0/figure_data"   # small CSVs behind every figure
 RAM_RATIO = 32.0                              # r_ram / r (SSD->RAM bandwidth ratio) for s_max budget
+
+
+def _csv(name, header, rows):
+    """Write one tidy CSV of the exact series behind a figure (small; committed to the repo)."""
+    import csv
+    os.makedirs(FIGDATA, exist_ok=True)
+    with open(f"{FIGDATA}/{name}", "w", newline="") as f:
+        w = csv.writer(f); w.writerow(header); w.writerows(rows)
+    print("wrote", f"{FIGDATA}/{name}")
 
 # ---- run registry (active non-embedding params in millions; matched full-MoE pair; grain) ----
 META = {
@@ -775,17 +785,72 @@ def _fig_e8(out):
 
 
 # =====================================================================================
+def _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
+                        e5_table, e6_perlayer, e7_curves, e8_out):
+    """Write the small, tidy CSV behind every figure to results/phase0/figure_data/.
+    These are the concise, committed stand-in for the (large) raw router_log.pt tensors."""
+    _csv("e1_swap_rate_by_layer.csv", ["model", "layer", "mean_swap_rate", "p95_burst_len"],
+         [[label(r), ln, f"{sr:.5f}", f"{p95:.2f}"] for (r, ln, sr, p95) in e1_rows])
+    _csv("e1_victim_cache_hitrate.csv", ["model", "cache_size_experts", "reload_hitrate"],
+         [[label(r), int(c), f"{h:.5f}"] for r, (sizes, hit) in e1_victim.items()
+          for c, h in zip(sizes, hit)])
+    _csv("e2_streamed_diversity.csv",
+         ["model", "num_experts", "union_mean", "union_std", "union_frac_of_E",
+          "effective_experts", "mean_experts_over_0.8_resident_per_layer", "max_residency_frac"],
+         [[label(r), s["E"], f"{s['union_mean']:.2f}", f"{s['union_std']:.2f}",
+           f"{s['union_frac']:.4f}", f"{s['effN']:.2f}", f"{s['pinned']:.2f}", f"{s['maxres']:.4f}"]
+          for r, s in e2_summary.items()])
+    _csv("e3_mass_vs_set_consistency.csv", ["model", "routing", "set_consistency", "mass_consistency"],
+         [[label(r), kind, f"{sh:.5f}", f"{mh:.5f}"] for (r, kind, sh, mh) in e3_rows])
+    _csv("e4_swap_vs_retained_mass.csv", ["model", "tau", "swap_rate", "retained_mass"],
+         [[label(r), f"{tt:g}", f"{ss:.5f}", f"{mm:.5f}"]
+          for r, (taus, sr, rm) in e4_curves.items() for tt, ss, mm in zip(taus, sr, rm)])
+    _csv("e5_eviction_policy_headroom.csv", ["model", "policy", "set_coverage", "mass_coverage"],
+         [[label(r), pol, f"{sc:.5f}", f"{mc:.5f}"]
+          for r, res in e5_table.items() for pol, (sc, mc) in res.items()])
+    _csv("e6_per_layer_ranking.csv", ["model", "layer", "hit_rate", "swap_rate", "lifetime_tokens"],
+         [[label(r), ln, f"{d[ln]['hit']:.5f}", f"{d[ln]['swap']:.5f}", f"{d[ln]['life']:.3f}"]
+          for r, d in e6_perlayer.items() for ln in sorted(d)])
+    _csv("e7_demand_smoothing.csv", ["model", "ema_beta", "swap_rate", "set_coverage", "mass_coverage"],
+         [[label(r), f"{bb:g}", f"{ss:.5f}", f"{cc:.5f}", f"{mm:.5f}"]
+          for r, (betas, sr, sc, mc) in e7_curves.items() for bb, ss, cc, mm in zip(betas, sr, sc, mc)])
+    _csv("e8_document_boundary.csv",
+         ["model", "batch", "window_tokens", "hit_after_eod", "hit_within_doc",
+          "frac_tokens_after", "deficit"],
+         [[label(r), o["batch"], w, f"{dd['hit_after']:.5f}", f"{dd['hit_within']:.5f}",
+           f"{dd['frac_tokens_after']:.5f}", f"{dd['deficit']:.5f}"]
+          for r, o in e8_out.items() for w, dd in o["windows"].items()])
+    # plot_probe.py headline figures (learned-locality-vs-scale + rolling coverage/lifetime vs K)
+    rows = []
+    for tag, N, tr, mr in list(PAIRS) + [G3]:
+        rec = next(iter(load(tr)["layers"].values())); k, E = rec["k"], rec["logits"].shape[-1]
+        rows.append([label(tr), f"{N:g}", f"{overlap(tr)*100:.2f}",
+                     (f"{overlap(mr)*100:.2f}" if mr else ""), f"{100.0*k/E:.2f}"])
+    _csv("learned_locality_vs_scale.csv",
+         ["model", "active_params_M", "temporal_overlap_pct", "full_moe_overlap_pct", "random_pct"], rows)
+    rows = []
+    for r in ALL_TEMPORAL + ["v16k_sweep_s2_1e17"]:
+        Ks, cov, life, k = sweep(r)
+        for K, c, l in zip(Ks, cov, life):
+            rows.append([label(r) if r in META else "full MoE, 8.1M active",
+                         f"{K/k:.3f}", f"{c:.5f}", f"{l:.3f}"])
+    _csv("rolling_coverage_lifetime_vs_K.csv",
+         ["model", "resident_cache_K_over_k", "hit_rate", "mean_lifetime_tokens"], rows)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
-    e1()
-    e2()
-    e3()
-    curves, taustar = e4()
-    e5(taustar)
-    e6()
-    _, ident = e7()
+    e1_rows, e1_victim = e1()
+    e2_summary, _ = e2()
+    e3_rows = e3()
+    e4_curves, taustar = e4()
+    e5_table = e5(taustar)
+    e6_perlayer = e6()
+    e7_curves, ident = e7()
     print(f"\n[E7 identity check] beta=1.0 reproduces baseline exactly: {'PASS' if ident else 'FAIL'}")
-    e8()
+    e8_out = e8()
+    _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
+                        e5_table, e6_perlayer, e7_curves, e8_out)
     print("\nprobe_replay complete.")
 
 

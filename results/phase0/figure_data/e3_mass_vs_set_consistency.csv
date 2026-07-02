@@ -1,0 +1,9 @@
+model,routing,set_consistency,mass_consistency
+"1.4M active, coarse (6 of 64 experts)",temporal,0.33212,0.35937
+"1.4M active, coarse (6 of 64 experts)",full MoE,0.19356,0.20439
+"8.1M active, coarse (6 of 64 experts)",temporal,0.38197,0.42063
+"8.1M active, coarse (6 of 64 experts)",full MoE,0.21314,0.22773
+"14.8M active, coarse (6 of 64 experts)",temporal,0.33507,0.36719
+"14.8M active, coarse (6 of 64 experts)",full MoE,0.20245,0.21288
+"3.9M active, fine-grained (18 of 192 experts)",temporal,0.34746,0.39108
+"38.0M active, coarse (6 of 64 experts)",temporal,0.30424,0.34359
