@@ -92,7 +92,8 @@ is, once $k-1$ approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM o
 expert size $b$ cancels, so the condition depends only on the routing width, which DeepSeek-style
 fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 6
 of 64 experts resident the routed-expert footprint shrinks 10.7$\times$ and whole-model resident
-memory 5.7$\times$. We also plan to explore computing the router earlier in the network than its
+memory 5.7$\times$. These calculations are theoretical. We need to also explore them in real
+kernels. We also plan to explore computing the router earlier in the network than its
 experts' computation, lengthening the window available to mask each load.
 
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
