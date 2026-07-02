@@ -35,9 +35,9 @@ of parameters per token, but serving them still requires the full expert pool in
 scale with active rather than total parameters. Unlike post-hoc caching or offloading, we impose
 locality as a training-time constraint. A rolling-residency router keeps only the $k$ active experts
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
-spanning $10^{16}$ to $10^{18}$ FLOPs, temporal MoE recovers 72--82\% of the MoE-over-dense quality
-uplift at compute-optimal sizes with 6 of 64 experts resident, a 5.7$\times$ reduction in resident
-memory. The trained router internalizes the constraint, roughly doubling its temporal
+spanning $10^{16}$ to $10^{18}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
+quality uplift at compute-optimal sizes with 18 of 192 experts resident, a 5.7$\times$ reduction in
+resident memory. The trained router internalizes the constraint, roughly doubling its temporal
 self-consistency over vanilla routing, with recovery stable across the whole range. Trained
 temporal routing is a practical path toward MoE-quality models under
 memory-constrained serving.
@@ -90,9 +90,9 @@ fast memory while the incoming expert streams its $b$ bytes from slower storage,
 fully masked when $b/\mathrm{BW}_{\mathrm{slow}}\le(k-1)\,b/\mathrm{BW}_{\mathrm{fast}}$, that
 is, once $k-1$ approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM over NVMe). The
 expert size $b$ cancels, so the condition depends only on the routing width, which DeepSeek-style
-fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 6
-of 64 experts resident the routed-expert footprint shrinks 10.7$\times$ and whole-model resident
-memory 5.7$\times$. These calculations are theoretical. We need to also explore them in real
+fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 18
+of 192 experts resident (the same fraction as 6 of 64 in the coarse model) the routed-expert
+footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$. These calculations are theoretical. We need to also explore them in real
 kernels. A further direction is computing the router earlier in the network than its experts'
 computation, lengthening the masking window.
 
@@ -118,8 +118,8 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
   \caption{\textbf{Left,} isoFLOP curves at fixed compute (validation BPB, lower is better; color =
   method, shade = granularity (coarse normal / fine-grained dark), marker = compute budget (circle
   $10^{16}$, triangle $10^{17}$)). Temporal MoE (green) lands inside the dense-to-MoE band at every
-  size and preserves both baselines' compute-optimal shapes; recovery at the optima is 82\% coarse
-  and 72--77\% fine-grained, which tracks just above coarse at these token budgets. \textbf{Right,}
+  size and preserves both baselines' compute-optimal shapes; recovery at the optima is 72--77\%
+  fine-grained and 82\% coarse. \textbf{Right,}
   $10^{18}$-FLOP points (validation cross-entropy; colors as left). Dense 4.137, fine-grained MoE
   4.009, fine-grained temporal 3.977, coarse MoE 3.921, coarse temporal 3.906; temporal recovers
   74\% against the strongest MoE and beats its equally fine-grained MoE. Dense and coarse temporal
@@ -131,8 +131,8 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
 
 \textbf{IsoFLOP bands.} Across every model size and both sweep budgets
 (Figure~\ref{fig:isoflop}, left), temporal MoE sits well inside the dense-to-MoE band, recovering
-72--82\% of the MoE uplift at compute-optimal sizes (82\% for the coarse model at both budgets,
-72\% and 77\% fine-grained) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
+72--82\% of the MoE uplift at compute-optimal sizes (72\% and 77\% for the fine-grained model,
+82\% coarse at both budgets) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
 MoE baselines, so the constraint does not distort scaling geometry.
 
 \textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 74\%
@@ -176,7 +176,7 @@ better eviction shows offline-optimal eviction is worth only +6--10 points of hi
 greedy rule (LRU is 7 points worse), while an oracle selecting swaps by short-horizon \emph{future}
 demand gains +20--30 points. The headroom is anticipation, not cache policy.
 
-The recovery deficit is therefore a stable, attackable 18--26\%, and we are pursuing it on two
+The recovery deficit is therefore a stable, attackable 18--28\%, and we are pursuing it on two
 fronts. A swap margin on smoothed demand spends fewer, better swaps at decision time, and an
 anticipatory training loss targets discounted future expert demand, injecting new information
 rather than imitating the past. We are also weighing auxiliary-loss-free, DeepSeek-inspired
