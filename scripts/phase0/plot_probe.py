@@ -56,20 +56,15 @@ def _raster_csv(outfile, panels, k, E, L):
     print("wrote", f"{figdata}/{name}")
 
 
-def raster(temporal_run, moe_run, tag, outfile, W=220):
-    t = load(temporal_run); L = sorted(t["layers"])[-1]; k = t["layers"][L]["k"]
-    E = t["layers"][L]["logits"].shape[-1]; b = 0
-    panels = []
-    if moe_run:
-        m = load(moe_run); panels.append(("full MoE  (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
-    panels.append(("temporal (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
-    panels.append(("temporal (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
-    _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
+def _draw_raster(panels, k, E, L, tag, outfile):
+    # paper mode: taller panels + small markers so 64 expert rows don't blur into blobs when the
+    # figure is downscaled into a paper column; edgeless squares keep small dots crisp.
     fig_w = 7.0 if PAPER else 13
-    fig, axes = plt.subplots(len(panels), 1, figsize=(fig_w, (1.5 if PAPER else 2.5)*len(panels)+0.6), sharex=True)
+    per_panel = 2.0 if PAPER else 2.5
+    fig, axes = plt.subplots(len(panels), 1, figsize=(fig_w, per_panel*len(panels)+0.6), sharex=True)
     if len(panels) == 1: axes = [axes]
     for ax, (title, M, c) in zip(axes, panels):
-        ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(4 if PAPER else 6), c=c, marker="s")
+        ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(1.5 if PAPER else 6), c=c, marker="s", linewidths=0)
         ax.set_ylabel("expert"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
         ax.set_ylim(-1, E); ax.grid(True, ls=":", alpha=0.3)
     axes[-1].set_xlabel("token position" if PAPER else f"token position (sequence 0, MoE layer {L})")
@@ -86,6 +81,34 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
                  "not better/worse.", ha="center", fontsize=8, wrap=True)
     fig.tight_layout(rect=[0, 0, 1, 1] if PAPER else [0, 0.06, 1, 1])
     fig.savefig(f"{OUT}/{outname(outfile)}", dpi=200 if PAPER else 140); plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
+
+def raster(temporal_run, moe_run, tag, outfile, W=220):
+    t = load(temporal_run); L = sorted(t["layers"])[-1]; k = t["layers"][L]["k"]
+    E = t["layers"][L]["logits"].shape[-1]; b = 0
+    panels = []
+    if moe_run:
+        m = load(moe_run); panels.append(("full MoE  (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
+    panels.append(("temporal (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
+    panels.append(("temporal (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
+    _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
+    _draw_raster(panels, k, E, L, tag, outfile)
+
+def raster_from_csv(csv_name, outfile):
+    """Redraw a raster from its condensed CSV (no raw logs needed) — same draw path as raster()."""
+    import csv
+    figdata = OUT.replace("figures", "figure_data")
+    by_panel = {}; E = k = L = None
+    with open(f"{figdata}/{csv_name}") as f:
+        for r in csv.DictReader(f):
+            E, k, L = int(r["num_experts_E"]), int(r["topk_k"]), r["moe_layer"]
+            by_panel.setdefault(r["panel"], []).append((int(r["token"]), int(r["expert"])))
+    W = 1 + max(tok for cells in by_panel.values() for tok, _ in cells)
+    panels = []
+    for title, cells in by_panel.items():              # dict preserves CSV (panel) order
+        M = np.zeros((W, E), bool)
+        for tok, exp in cells: M[tok, exp] = True
+        panels.append((title, M, "C0" if title.startswith("full MoE") else "C2"))
+    _draw_raster(panels, k, E, L, "", outfile)
 
 # ---------------- A3: learned-locality overlap vs scale ----------------
 def overlap(run):
@@ -215,10 +238,12 @@ def graphs_BC():
 if __name__ == "__main__":
     have_logs = os.path.exists(f"{RUNS}/tmoe_minlogit_sh1_s2_1e17/router_log.pt")
     if PAPER and not have_logs:
-        # local run: learned-locality comes from the committed CSV; rasters need the raw logs (pod only)
+        # local run without raw logs: redraw rasters + learned-locality from the committed CSVs
+        for csvf, out in [("expert_selection_per_token_8M_model.csv",  "expert_selection_per_token_8M_model.png"),
+                          ("expert_selection_per_token_15M_model.csv", "expert_selection_per_token_15M_model.png"),
+                          ("expert_selection_per_token_38M_model.csv", "expert_selection_per_token_38M_model.png")]:
+            raster_from_csv(csvf, out)
         a3_scale()
-        print("NOTE: expert_selection_per_token_* rasters need raw router_log.pt (pod only); "
-              "run `python scripts/phase0/plot_probe.py --no-caption` on the pod to regenerate them.")
     else:
         raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal, 8.1M active @ 10^17 FLOPs", "expert_selection_per_token_8M_model.png")
         raster("tmoe_minlogit_sh1_s3_1e17", "v16k_sweep_s3_1e17", "full MoE vs temporal, 15M active @ 10^17 FLOPs", "expert_selection_per_token_15M_model.png")
