@@ -131,12 +131,23 @@ baseline-identical except through `S`; `[ROUTE]` is trained only by the window i
 
 Keep `K = k` experts resident per layer and **stream one expert at a time** instead of
 swapping a whole set at a boundary: each token routes normally; any expert entering its
-top-`k` that isn't resident is loaded, evicting the one that left (LRU). The set slides with
+top-`k` that isn't resident is loaded, evicting one resident (policy below). The set slides with
 the stream. Cold start is free — the first token is fixed (BOS), so the model **ships with
 that token's top-`k` preloaded**. This removes the macro-router, the `[ROUTE]` token, and the
 `B`-ahead prediction: the horizon is a single expert's load latency (`b/r ≈ 3.5 ms ≪ t_tok`,
 `b` = bytes/expert), so the ordinary per-token router decides early enough. Runs zero-shot on
-a trained MoE; cache-aware finetuning (§7) is optional.
+a trained MoE; cache-aware finetuning (§7) is optional. Training stays well-conditioned: the
+discrete swap (`argmax` over non-resident logits) is non-differentiable, but the router still
+receives the full ordinary gate-weight gradient on the `K` resident experts it scores each
+token, so `W_g` — and thus the swap-scoring function riding on it — is trained normally.
+
+**Eviction policy** (which resident leaves on a swap) is a tunable knob. *LRU* removes the
+expert resident longest without re-selection; this adds hysteresis — a just-loaded expert is
+protected from immediate eviction, so fewer swaps — and is neutral to the router's scores,
+leaving the load-balancing loss undisturbed. *Least-wanted* removes the lowest-scoring
+resident, exactly the "worst resident" the swap already compares the candidate against; this
+keeps the set greedily closest to the token's true top-`k` (consistent, quality-aligned) but
+couples eviction to the same scores the aux loss balances and can re-evict a just-loaded expert.
 
 **Masking condition (the one equation).** Per token you read `k` resident experts from RAM
 and stream `s` new ones from SSD; streaming hides under compute when
