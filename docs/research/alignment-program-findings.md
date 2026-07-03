@@ -170,6 +170,21 @@ eff-experts ≥ 170, max-residency < 40%, pinned = 0. Passing all five = off the
 strict for a mechanism whose premise is concentrating compute on fewer experts? (Likely moot for
 aux-free given its s2 BPB penalty, but relevant to any future alignment lever.)
 
+## Local-consistency/global-diversity program (afternoon 2026-07-03; plan: local-global-plan.md)
+
+Reframe: the goal state is *bursty demand with a uniform stationary marginal* (autocorrelation
+and marginal are independent properties, so the frontier is not a law). Three mechanisms tested;
+full verdicts in `docs/research/local-global-plan.md`. Summary: LG1 log-ratio momentum achieved
+the zero-time-average design (diversity-safe, union even rises) but is A3-inert on the healthy
+substrate — momentum's alignment power was always the aux-free substrate's artifact. LG2 bursty
+window loss is the program's worst Goodhart collapse (A3 79% via eff 33/192, max-res 100%, BPB
++0.045, loss never minimized). LG3 block-local routing declined by free replay (freezing on stale
+demand costs 16–35pt retained mass at every block size). Meta-pattern across both programs:
+loss-based demand shaping always Goodharts into collapse; selection-based shaping is
+diversity-safe but alignment-inert on healthy substrates. Nothing moves off the frontier — the
+frontier, its equilibrium interpretation (~30% A3 as the price of streamed diversity), and the
+two clean Goodhart negatives are the paper-ready findings.
+
 ## Open directions (not started; Noah to arbitrate)
 
 - **Karen re-tune** (Noah approved in principle, discussion first): softer β and/or shorter momentum

@@ -58,6 +58,28 @@ construction. With T ≥ k the cap-1 swap/token budget covers a full set turnove
   promote (run,T) if retained gate-mass ≥ rolling-baseline − 2pt AND eff ≥ 90% of plain AND
   amortized swaps ≤ 1/token. Trained cell is a separate later decision (bigger code change).
 
+## VERDICTS (2026-07-03, program complete)
+
+| rung | mechanism | result | gates |
+|---|---|---|---|
+| LG1 | log-ratio momentum (β=0.25, plain) | **diversity-safe but A3-inert** — A3 28.6% ≈ L0 29.6%; union UP (164.6 vs 160.8), eff 182.2, 0 pinned; BPB 1.4714 seed-1 (pairing below) | FAIL (A3 only) |
+| LG2 | bursty window loss (λ=0.02, W=32, plain) | **catastrophic Goodhart** — eff 183.9→33.2, max-res 100%, 5 pinned/layer, BPB +0.045; loss never minimized (rising-plateau anticipatory fingerprint) | FAIL (4/5) |
+| LG3 | block-local routing (replay) | **not promoted** — freezing on prev-block demand loses 16–35pt retained gate-mass at every T on all 10 logs (structural, not tunable); diversity half works (karen max-res 88→62 at T=9) | free test declines |
+
+**LG1 seed pair:** seed-1 test BPB 1.4714 / seed-2 PENDING (~21:03 UTC; judged as 2-seed mean vs
+L0 1.4753, family spread ~0.006–0.009).
+
+**Program synthesis (now over every trained cell in both programs):** LOSS-based demand shaping
+(coherence, anticipatory, bursty) always Goodharts — the gradient finds pool collapse as the
+cheapest optimum regardless of how the objective is phrased (predictive, self-referential, or
+structural), and the tuned global aux is too weak a counterweight at any useful λ.
+SELECTION-based shaping (add/double/logratio momentum) is diversity-safe on a healthy substrate
+but A3-inert there — its apparent alignment power was always the aux-free substrate's
+degeneracy. The zero-time-average design goal (bursty demand, flat marginal) was achieved
+mechanically by LG1 — burstiness just doesn't increase, because the router's demand turnover is
+already at its equilibrium. **No mechanism moves off the alignment↔diversity frontier; the
+frontier itself (plus its two clean Goodhart negatives) is the publishable finding.**
+
 ## Schedule (deadline 21:00 UTC / 2pm PDT)
 - ~17:45 both replays dispatched (no new code needed; throwaway scripts).
 - ~18:15 momr-replay done → beta* → H100 trains LG1 (~50 min) then LG2 (~50 min);
