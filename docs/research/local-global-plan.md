@@ -66,8 +66,12 @@ construction. With T ≥ k the cap-1 swap/token budget covers a full set turnove
 | LG2 | bursty window loss (λ=0.02, W=32, plain) | **catastrophic Goodhart** — eff 183.9→33.2, max-res 100%, 5 pinned/layer, BPB +0.045; loss never minimized (rising-plateau anticipatory fingerprint) | FAIL (4/5) |
 | LG3 | block-local routing (replay) | **not promoted** — freezing on prev-block demand loses 16–35pt retained gate-mass at every T on all 10 logs (structural, not tunable); diversity half works (karen max-res 88→62 at T=9) | free test declines |
 
-**LG1 seed pair:** seed-1 test BPB 1.4714 / seed-2 PENDING (~21:03 UTC; judged as 2-seed mean vs
-L0 1.4753, family spread ~0.006–0.009).
+**LG1 seed pair (final):** seed-1 1.4714 / seed-2 1.4782, |Δ| = 0.0068 (inside family spread);
+**2-seed mean 1.4748 vs L0 1.4753 = parity.** A3 reproduces at ~28.7% (baseline-level), diversity
+reproduces at full (eff ~183, max-res ~20%, 0 pinned). LG1 clears the two gates Karen failed and
+fails the one Karen passed — the mirror image: Karen buys alignment by spending diversity; LG1
+keeps diversity and buys no alignment. The two levers are antagonistic on this substrate — the
+local-vs-global tension, stated as a measured result.
 
 **Program synthesis (now over every trained cell in both programs):** LOSS-based demand shaping
 (coherence, anticipatory, bursty) always Goodharts — the gradient finds pool collapse as the
