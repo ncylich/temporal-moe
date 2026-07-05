@@ -61,35 +61,38 @@ from the model's own input embeddings: the current token alone, $x_{\mathrm{tok}
 and the surrounding context with the current token excluded,
 $x_{\mathrm{ctx}}(t) = \mathrm{mean}\{ E[x_{t'}] : 0 < |t' - t| \le w \}$. The exclusion is the
 essential control, preventing context features from encoding the token itself. We set the window
-to the residency lifetime, $w = \lfloor k/2 \rfloor$: under one swap per token an expert survives
-in the cache for about $k$ tokens, so this is precisely the context the resident set can exploit
-(a wider $w = 32$ gives the same conclusions, see below). For each expert we fit two logistic
-classifiers, $y_e \sim x_{\mathrm{tok}}$ and $y_e \sim x_{\mathrm{ctx}}$, on the first 70% of
-tokens and report held-out AUC on the last 30%: $A_{\mathrm{tok}}(e)$ and $A_{\mathrm{ctx}}(e)$.
-An expert bound to token identity yields high $A_{\mathrm{tok}}$, an expert bound to context
-yields high $A_{\mathrm{ctx}}$.
+to one full residency lifetime, $w = k$: under one swap per token an expert admitted to the cache
+survives about $k$ tokens, so this is precisely the context the resident set can exploit. For
+each expert we fit two logistic classifiers, $y_e \sim x_{\mathrm{tok}}$ and
+$y_e \sim x_{\mathrm{ctx}}$, on the first 70% of tokens and report held-out AUC on the last 30%:
+$A_{\mathrm{tok}}(e)$ and $A_{\mathrm{ctx}}(e)$. An expert bound to token identity yields high
+$A_{\mathrm{tok}}$, an expert bound to context yields high $A_{\mathrm{ctx}}$.
 
 | model | median $A_{\mathrm{tok}}$ | median $A_{\mathrm{ctx}}$ | context dominated |
 |---|---|---|---|
-| unconstrained (192E, $w{=}9$) | 0.94 | 0.66 | 1% |
-| temporal (192E, $w{=}9$) | 0.62 | 0.76 | 94% |
-| unconstrained (64E, $w{=}3$) | 0.84 | 0.63 | 2% |
-| temporal (64E, $w{=}3$) | 0.60 | 0.67 | 86% |
+| unconstrained (192E, $w{=}18$) | 0.94 | 0.63 | 0% |
+| temporal (192E, $w{=}18$) | 0.62 | 0.77 | 91% |
+| unconstrained (64E, $w{=}6$) | 0.84 | 0.59 | 1% |
+| temporal (64E, $w{=}6$) | 0.60 | 0.68 | 85% |
 
 The unconstrained router implements a near deterministic token-to-expert lookup: the current
 token predicts expert firing at AUC 0.84 to 0.94, and context never overtakes it for more than
-2% of experts. The temporal model cannot implement that lookup, because a token must be served
+1% of experts. The temporal model cannot implement that lookup, because a token must be served
 by whichever experts are resident, and its token AUC collapses to 0.60 to 0.62 at both scales.
-Freed from token identity, its experts become context predictable: 86 to 94% of temporal experts
+Freed from token identity, its experts become context predictable: 85 to 91% of temporal experts
 are better predicted by their surroundings than by the token they process, with the effect
 growing monotonically with depth. We call this *de-lexicalization*. Context is the transferable
 feature, autocorrelated within documents and shared across surface forms, and we identify this as
 the regularization behind the loss improvement at scale. It equally explains why temporal routing
 demand is far more predictable from history (AUC 0.85 vs 0.64 in our demand forecasting
 analysis): context persists across neighboring tokens, token identity does not. The result is
-robust to the window choice: at $w = 32$ the fine pair is unchanged and the coarse pair reads
-balanced rather than context dominant, because a window ten times the cache lifetime dilutes the
-near context that carries the signal. Token AUC is window independent by construction.
+robust to the window choice. Across a sweep $w \in \{\lfloor k/2 \rfloor, k, 32\}$ the fine pair
+is essentially flat (context dominated 88 to 94%), and the coarse pair is context dominant at
+both residency-scale windows (85 to 86%, with context AUC peaking at $w = k$), washing out to
+balanced only at $w = 32$, a window five times its cache lifetime that dilutes the near context
+carrying the signal. The coarse model's context specialization lives within one residency
+lifetime, exactly where the cache can exploit it. Token AUC is window independent by
+construction.
 
 ## Reading experts through the output vocabulary (P4)
 
