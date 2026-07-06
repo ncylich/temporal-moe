@@ -114,16 +114,16 @@ models, because averaging unactivated columns cancels their directions and mid-n
 projections are rotated relative to the output basis. All comparisons are therefore data
 weighted and within layer.
 
-| model (192E) | mean $V_{\mathrm{eff}}$ | sharpest decile | no-signal reference |
+| model (192E) | median $V_{\mathrm{eff}}$ | sharpest decile | no-signal reference |
 |---|---|---|---|
 | baseline | 14,612 | 9,683 | 15,990 |
 | temporal | 15,932 | 15,342 | 15,990 |
 
 Baseline experts promote markedly narrower vocabularies (about 1,400 effective words of lexical
-preference at the mean and over 6,000 in the sharpest decile, whose top promoted tokens read as
+preference at the median and over 6,000 in the sharpest decile, whose top promoted tokens read as
 coherent lexical clusters). Temporal experts are barely distinguishable from no signal (about 60
-at the mean) and contain no word-list experts even in their extreme tail. One expert's write is
-a nudge rather than a full prediction, so the mean shifts are modest, but input side, output
+at the median) and contain no word-list experts even in their extreme tail. One expert's write is
+a nudge rather than a full prediction, so the median shifts are modest, but input side, output
 side, and structure now agree.
 
 ## 5. The mechanism is load-bearing and dose-tunable
