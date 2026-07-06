@@ -204,12 +204,16 @@ helps. Measurement protocols and full tables are in Appendix~\ref{app:mechanism}
   \label{fig:delex}
 \end{figure}
 
-\textbf{Traffic, not experts.} The constraint redistributes usage without changing what experts
-are. The median full-MoE expert draws on 30\% of the token stream, and under 2\% of experts are
-generalists serving most of it; the median temporal expert draws on 66\%, with 65\% generalists,
-under flatter routing. Expert weights stay equally distinct and near orthogonal in both regimes,
-and independent seeds and a sigmoid-router control reproduce every gap. If a temporal expert
-does not own a slice of tokens, what does it own?
+\textbf{Usage concentration.} We measure each expert's usage breadth as the effective fraction
+of evaluation tokens it serves, the normalized inverse Simpson concentration of its routing
+mass, which is 1 under uniform usage and near 0 when usage concentrates on a few recurring
+tokens. The median full-MoE expert serves an effective 30\% of the token stream and almost no
+expert serves a majority of it; the median temporal expert serves 66\%, and two thirds of
+temporal experts serve a majority. Expert weights are, in contrast, nearly unaffected, remaining
+equally distinct and near orthogonal in both regimes, with independent seeds and a
+sigmoid-router control reproducing every gap (Appendix~\ref{app:mechanism}). The constraint
+therefore changes how experts are used rather than what they compute, and the rest of this
+section identifies the specialization that replaces token ownership.
 
 \textbf{Token to context.} For each expert, two logistic probes predict its firing, one from the
 model's embedding of the current token alone and one from the surrounding window with the token
@@ -217,29 +221,25 @@ excluded, sized to one residency lifetime. Figure~\ref{fig:delex} (left) plots e
 Full-MoE routing is close to a token lookup, with the token alone predicting firing at median
 AUC 0.93 and context dominant for under 1\% of experts. Temporal routing inverts the picture,
 token AUC falling to 0.62 and context dominating for 85--91\% of experts. We call this
-\emph{de-lexicalization}. The same contrast holds prospectively. Next-step expert demand is
-predictable from routing history at AUC 0.85 in temporal models against 0.64 for the full MoE,
+\emph{de-lexicalization}. The shift is also visible forward in time: a probe predicting which
+experts the router will select at the next token, from the preceding tokens' routing record
+alone, reaches AUC 0.85 on temporal models against 0.64 for the full MoE at matched granularity,
 because context persists across neighboring tokens and token identity does not. A data-weighted
-logit lens \cite{logitlens} agrees on the output side, where full-MoE experts promote narrowed
-vocabularies and temporal experts are indistinguishable from no signal.
+logit lens \cite{logitlens} agrees on the output side, where full-MoE experts promote coherent
+clusters of specific vocabulary words and temporal experts show no detectable vocabulary
+preference.
 
-\textbf{Constraint swap.} If de-lexicalization were a removable training-time trick, a temporal
-model should serve well unmasked. Evaluating every trained model under the other regime hurts in
-both directions (Table~\ref{tab:swap}), so mask and weights co-adapt. Unmasking costs +0.10 to
-+0.49, at $10^{18}$ FLOPs falling past the dense floor, while imposing residency on a trained
-full MoE costs two to five times more, the asymmetry token-bound experts predict, since a token
-denied its bespoke expert has nowhere to go while a contextual expert serves its neighborhood
-regardless. This quantifies the introduction's claim that the locality serving needs must be
-trained in. Tokens per expert per update are identical across regimes, rejecting a
-gradient-concentration explanation.
-
-\textbf{Residency dose.} Decoupling the cache size $R$ from the active $k$ interpolates between
-the shipped constraint ($R = k$) and the full-MoE recipe ($R = E$) at identical FLOPs. Trained
-from scratch at $10^{16}$ FLOPs, held-out BPB falls monotonically as the cache grows
-(Figure~\ref{fig:delex}, right), so at this budget the constraint is a pure, tunable quality
-cost. Because $R$ is the number of experts held in fast memory, the same curve is the serving
-memory--quality frontier, the maximal constraint costing +0.023 BPB at roughly a tenth of the
-routed-expert memory.
+\textbf{Constraint strength.} Although rolling residency restricts the router relative to its
+unconstrained preferences, each model performs best under the regime it was trained in: unmasking
+a trained temporal model and imposing residency on a trained full MoE both degrade quality
+(Table~\ref{tab:swap}), so the routing organization above is trained into the weights rather
+than removable at inference. The strength of the constraint is, moreover, a continuous dial.
+Decoupling the cache size $R$ from the active $k$ interpolates between the shipped constraint
+($R = k$) and the full-MoE recipe ($R = E$) at identical FLOPs, and held-out BPB falls
+monotonically as the cache grows (Figure~\ref{fig:delex}, right), so at this budget the
+constraint is a pure, tunable quality cost. Because $R$ is the number of experts held in fast
+memory, the same curve is the serving memory--quality frontier, the maximal constraint costing
++0.023 BPB at roughly a tenth of the routed-expert memory.
 
 In sum, a free router binds experts to token identities, and rolling residency makes that
 binding unrepresentable without touching what experts can compute. The router reorganizes
@@ -385,8 +385,11 @@ autocorrelation), gives $0.500 \pm 0.002$ everywhere. At $w = k$, median token A
 consistent at every MoE layer (89--92\% context-dominated by depth for the fine temporal model).
 Across $w \in \{k/2,\, k,\, 32\}$ the fine pair stays context-dominated (88--94\%), and the
 coarse pair is context-dominated at both residency-scale windows, washing out only at $w = 32$,
-five times its cache lifetime. The demand-prediction AUCs fit the same classifier family to
-next-step expert demand from routing history alone.
+five times its cache lifetime. The demand-prediction probe is causal and history-only: features
+at token $t$ are the current gate values and a short demand history (lags $t$ to $t{-}3$ and
+fast and slow exponential averages), with no hidden states, and the label is whether an expert
+is in the router's selection at the next token. AUC is 0.85--0.87 across temporal models and
+0.64 for the full MoE at matched granularity.
 
 \textbf{Output lens.} Averaging each expert's output vectors over the tokens actually routed to
 it and projecting through the final norm and unembedding gives the vocabulary distribution the
@@ -412,10 +415,13 @@ median 15{,}932, with no word-list experts even in the tail.
   \caption{Constraint swap. Unmasking makes every expert resident for a trained temporal model;
   imposing puts a trained full MoE under rolling residency. Held-out BPB except the $10^{18}$
   row, which is validation CE on the analysis batch (its native value accordingly differs from
-  Figure~\ref{fig:isoflop}'s full-split 3.910 by 0.006). The fine-grained full-MoE row is the
-  sigmoid-router control, whose artifacts were preserved. For the gradient control, top-$k$
-  routing fixes each expert's expected share of the batch in any regime, and measured tokens per
-  expert per update are identical across regimes (12{,}288 fine, 3{,}072 coarse).}
+  Figure~\ref{fig:isoflop}'s full-split 3.910 by 0.006). Imposing costs two to five times more
+  than unmasking, the asymmetry expected if full-MoE experts are token-bound: a token denied its
+  bespoke expert has nowhere to go, while a contextual expert serves its neighborhood
+  regardless. The fine-grained full-MoE row is the sigmoid-router control, whose artifacts were
+  preserved. For the gradient control, top-$k$ routing fixes each expert's expected share of the
+  batch in any regime, and measured tokens per expert per update are identical across regimes
+  (12{,}288 fine, 3{,}072 coarse).}
   \label{tab:swap}
 \end{table}
 
