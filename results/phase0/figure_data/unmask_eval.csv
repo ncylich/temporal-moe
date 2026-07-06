@@ -1,0 +1,6 @@
+cell,scale,trained_paradigm,metric,native_regime,native_value,cross_regime,cross_value,delta
+L0,s0_1e16,temporal,test_BPB,masked_R18,1.4750,unmasked_R192,1.5744,+0.0994
+minlogit,s2_1e17,temporal,test_BPB,masked_R6,1.2821,unmasked_R64,1.4063,+0.1242
+flame38m,1e18_50k,temporal,val_CE,masked_R6,3.9037,unmasked_R64,4.3890,+0.4853
+a0ctl_sigmoid,s0_1e16,full_moe,test_BPB,unconstrained,1.4499,imposed_R18,1.6902,+0.2403
+v16k,s2_1e17,full_moe,test_BPB,unconstrained,1.2690,imposed_R6,1.8789,+0.6099

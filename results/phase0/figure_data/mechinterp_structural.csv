@@ -1,0 +1,9 @@
+label,run,kind,E,k,PR_median,generalist_frac,router_entropy,eff_rank,strong_corr_pairs,dist2centroid_mean,pairwise_cos_med,pairwise_cos_p99
+s0_TEMPORAL(L0),g3_tmoe_s0_1e16,temporal,192,18,0.6572,0.6458,0.9494,11.47,68,0.8775,0.01,0.0363
+s0_FULL(a0ctl_sig),g3_moe_s0_1e16_sigmoid,full,192,18,0.284,0.0469,0.8688,12.48,66,0.8947,0.0059,0.0327
+s0_FULL(A1_auxfree),g3_moe_s0_1e16_auxfree,full,192,18,0.2478,0.1146,0.8463,12.7,37,0.8745,0.0101,0.052
+s2_TEMPORAL(minlogit),tmoe_minlogit_sh1_s2_1e17,temporal,64,6,0.5236,0.5375,0.9257,16.53,0,0.8352,0.0117,0.0227
+s2_FULL(v16k),v16k_sweep_s2_1e17,full,64,6,0.341,0.1344,0.8641,11.62,3,0.8424,0.0093,0.0233
+s0_TEMPORAL(L0_seed3),g3_tmoe_s0_1e16_seed3,temporal,192,18,0.6502,0.6667,0.9523,12.14,36,0.8713,0.0115,0.0381
+s0_FULL(a0ctl_sig_seed2),g3_moe_s0_1e16_sigmoid_seed2,full,192,18,0.2741,0.0451,0.8689,13.09,63,0.8909,0.0068,0.0348
+s0_SOFTMAX_BASELINE,g3_moe_s0_1e16,full,192,18,0.3039,0.0174,0.8782,13.56,24,0.8999,0.0049,0.0313

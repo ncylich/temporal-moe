@@ -1,0 +1,17 @@
+model,feature,null_type,median_AUC_floor,n_experts
+s0_TEMPORAL,token,circular,0.5004,504
+s0_TEMPORAL,token,iid,0.4998,511
+s0_TEMPORAL,context,circular,0.4976,504
+s0_TEMPORAL,context,iid,0.5003,511
+s0_FULL,token,circular,0.4987,576
+s0_FULL,token,iid,0.5005,576
+s0_FULL,context,circular,0.5008,576
+s0_FULL,context,iid,0.4998,576
+s2_TEMPORAL,token,circular,0.5008,320
+s2_TEMPORAL,token,iid,0.5006,320
+s2_TEMPORAL,context,circular,0.5005,320
+s2_TEMPORAL,context,iid,0.4997,320
+s2_FULL,token,circular,0.4993,320
+s2_FULL,token,iid,0.4976,320
+s2_FULL,context,circular,0.5024,320
+s2_FULL,context,iid,0.5002,320
