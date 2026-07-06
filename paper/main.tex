@@ -70,7 +70,7 @@ results redirecting future work from cache policy toward anticipation.
 
 Each MoE layer with $E$ routed experts keeps only its $k$ active experts resident, the set $S_t$.
 Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
-non-resident expert $n_t=\arg\max_{e\notin S_{t-1}}R_t[e]$ and swaps it in only if it beats the
+non-resident expert, $n_t=\arg\max_{e\notin S_{t-1}}R_t[e]$, and swaps it in only if it beats the
 worst resident, which is \mbox{evicted},
 \begin{equation}
 S_t=
