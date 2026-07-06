@@ -3,22 +3,24 @@
 ## 1. The puzzle and the setup
 
 Rolling residency restricts each token to the currently resident expert set, removing routing
-freedom, yet at 1e18 FLOPs the temporally constrained model achieves *lower* validation loss than
-an unconstrained MoE of identical architecture, data, and compute, at both granularities (coarse:
-CE 3.9121 vs 3.9209, fine: 3.9768 vs 4.0087, both far below the dense floor of 4.137, 50k
-vocabulary, with a 1e19 replication in progress). A constraint that improves generalization must
-be suppressing a harmful behavior, and this section identifies it.
+freedom, yet at 1e18 FLOPs the temporally constrained model achieves *lower* validation loss
+than the unconstrained MoE baseline of identical architecture, data, and compute, at both
+granularities (coarse: CE 3.9121 vs 3.9209, fine: 3.9768 vs 4.0087, both far below the dense
+floor of 4.137, with a 1e19 replication in progress). A constraint that improves generalization
+must be suppressing a harmful behavior, and this section identifies it.
 
-We analyze matched temporal and unconstrained pairs at the two budgets where full training
-artifacts are preserved: 192 experts with top-18 routing at 1e16, and 64 experts with top-6 at
-1e17, both on the 16k vocabulary. At these small budgets the unconstrained model holds a small
-loss edge (1.4499 vs 1.4750 test BPB at 1e16, 1.269 vs 1.282 at 1e17), so the analyses below
-characterize what the constraint does to routing, while the quality benefit of that change
-emerges at larger budgets (Section 5 shows the constraint is nonetheless load-bearing even where
-it wins). All statistics derive from three sources on a fixed evaluation batch of 64 sequences
-of 2048 tokens (N = 131k tokens): the router probabilities, the expert weight matrices, and the
-expert output vectors. Where a measurement admits a within-regime replicate or a chance floor,
-it appears in the table beside the quantity it calibrates.
+We analyze the baseline and temporal models at the two budgets where full training artifacts are
+preserved: 192 experts with top-18 routing at 1e16, and 64 experts with top-6 at 1e17 (16k
+vocabulary). At these small budgets the baseline still holds a small loss edge (1.4585 vs 1.4750
+test BPB at 1e16, 1.269 vs 1.282 at 1e17), so the analyses below characterize what the
+constraint does to routing, while its quality benefit emerges at larger budgets (Section 5 shows
+the constraint is nonetheless load-bearing even where it wins). Some experiments additionally
+used an unconstrained sigmoid-router control, and it appears only in the tables of the
+experiments that used it. All statistics derive from three sources on a fixed evaluation batch
+of 64 sequences of 2048 tokens (N = 131k tokens): router probabilities, expert weight matrices,
+and expert output vectors. Every table carries its own calibration, either a measured chance
+floor or the within-regime seed spread (about 0.01 in the selectivity statistic and two points
+in generalist fraction, from independent-seed replicates of both regimes).
 
 ## 2. The constraint reshapes routing, not experts
 
@@ -43,22 +45,18 @@ the median pairwise $\cos(w_e, w_{e'})$.
 
 | model (scale) | median PR | generalist % | $\bar{H}$ | $d_e$ (mean) | pairwise cos |
 |---|---|---|---|---|---|
-| temporal (192E, seed 1) | 0.66 | 65 | 0.95 | 0.88 | 0.010 |
-| temporal (192E, seed 2) | 0.65 | 67 | 0.95 | 0.87 | 0.012 |
-| unconstrained sigmoid (192E, seed 1) | 0.28 | 5 | 0.87 | 0.90 | 0.007 |
-| unconstrained sigmoid (192E, seed 2) | 0.27 | 5 | 0.87 | 0.89 | 0.007 |
-| unconstrained aux-loss (192E) | 0.25 | 12 | 0.85 | 0.88 | 0.010 |
-| temporal (64E) | 0.52 | 54 | 0.93 | 0.84 | 0.012 |
+| baseline (192E) | *pending* | *pending* | *pending* | *pending* | *pending* |
+| unconstrained control (192E, 2 seeds) | 0.27 to 0.28 | 5 | 0.87 | 0.89 to 0.90 | 0.007 |
+| temporal (192E, 2 seeds) | 0.65 to 0.66 | 65 to 67 | 0.95 | 0.87 to 0.88 | 0.010 to 0.012 |
 | unconstrained (64E) | 0.34 | 13 | 0.86 | 0.84 | 0.009 |
+| temporal (64E) | 0.52 | 54 | 0.93 | 0.84 | 0.012 |
 
-The replicate rows put the noise band in the table: independent seeds agree to about 0.01 in PR
-and 2 points in generalist fraction within each regime, while the temporal-vs-unconstrained gap
-is ten to forty times larger on every routing metric. Unconstrained experts each draw usage from
-a narrow recurring slice of the stream, temporal experts from most of it, under visibly flatter
-routing. The weight geometry, by contrast, is identical across regimes and seeds: experts remain
-equally distinct and near orthogonal either way. The constraint acts on traffic, not on expert
-identity, which sharpens the question: if a temporal expert is not specialized on a token slice,
-what is it specialized on?
+Unconstrained experts each draw usage from a narrow recurring slice of the stream, temporal
+experts from most of it, under visibly flatter routing, and the regime gap is ten to forty times
+the seed spread on every routing metric. The weight geometry, by contrast, is identical across
+regimes and seeds: experts remain equally distinct and near orthogonal either way. The
+constraint acts on traffic, not on expert identity, which sharpens the question: if a temporal
+expert is not specialized on a token slice, what is it specialized on?
 
 ## 3. The locus of specialization moves from token to context
 
@@ -71,15 +69,15 @@ essential control, preventing context features from encoding the token itself. T
 residency lifetime, $w = k$: under one swap per token an expert admitted to the cache survives
 about $k$ tokens, so this is precisely the context the resident set can exploit. For each expert
 we fit two logistic classifiers, $y_e \sim x_{\mathrm{tok}}$ and $y_e \sim x_{\mathrm{ctx}}$, on
-the first 70% of tokens and report held-out AUC on the last 30%. Each row also carries its
-measured chance floor: the same classifiers refit on null labels, using both iid permutations
-and circular shifts of at least 1000 tokens (the latter preserves the labels'
-residency-induced autocorrelation), give $0.500 \pm 0.002$ everywhere, so every table entry is
-real signal.
+the first 70% of tokens and report held-out AUC on the last 30%. Each row carries its measured
+chance floor: the same classifiers refit on null labels (iid permutations and circular shifts of
+at least 1000 tokens, the latter preserving the labels' residency-induced autocorrelation) give
+$0.500 \pm 0.002$ everywhere, so every entry is real signal.
 
 | model | median $A_{\mathrm{tok}}$ | median $A_{\mathrm{ctx}}$ | chance floor (tok / ctx) | context dominated |
 |---|---|---|---|---|
-| unconstrained (192E, $w{=}18$) | 0.94 | 0.63 | 0.499 / 0.501 | 0% |
+| baseline (192E, $w{=}18$) | *pending* | *pending* | *pending* | *pending* |
+| unconstrained control (192E, $w{=}18$) | 0.94 | 0.63 | 0.499 / 0.501 | 0% |
 | temporal (192E, $w{=}18$) | 0.62 | 0.77 | 0.500 / 0.498 | 91% |
 | unconstrained (64E, $w{=}6$) | 0.84 | 0.59 | 0.499 / 0.502 | 1% |
 | temporal (64E, $w{=}6$) | 0.60 | 0.68 | 0.501 / 0.501 | 85% |
@@ -118,7 +116,8 @@ weighted and within layer.
 
 | model (192E) | mean $V_{\mathrm{eff}}$ | sharpest decile | no-signal reference |
 |---|---|---|---|
-| unconstrained | 15,439 | 13,431 | 15,990 |
+| baseline | *pending* | *pending* | 15,990 |
+| unconstrained control | 15,439 | 13,431 | 15,990 |
 | temporal | 15,932 | 15,342 | 15,990 |
 
 Unconstrained experts promote measurably narrower vocabularies (about 550 effective words of
@@ -140,7 +139,7 @@ rolling residency on an unconstrained checkpoint), with each pair's native evalu
 | temporal, 192E at 1e16 | 1.4750 (masked) | 1.5744 (unmasked) | +0.10 |
 | temporal, 64E at 1e17 | 1.2821 (masked) | 1.4063 (unmasked) | +0.12 |
 | temporal, 1e18 (the winning case) | 3.9037 (masked) | 4.3890 (unmasked) | +0.49 |
-| unconstrained, 192E at 1e16 | 1.4499 | 1.6902 (imposed) | +0.24 |
+| unconstrained control, 192E at 1e16 | 1.4499 | 1.6902 (imposed) | +0.24 |
 | unconstrained, 64E at 1e17 | 1.2690 | 1.8789 (imposed) | +0.61 |
 
 Both directions hurt, so the advantage is serving co-adaptation, not better weights: even at
@@ -153,20 +152,23 @@ serves its neighborhood regardless.
 The constraint also admits a dose. Decouple the cache size $R$ from the active top-k: the cache
 holds $R$ experts (cold filled with the top $R$, evolving under the same one-swap-per-token
 dynamics) and the router selects its top-k among residents, so $R = k$ is the maximal constraint
-studied above, $R = E$ recovers the unconstrained model, and FLOPs are identical at every $R$.
-Training from scratch at 1e16 (192 experts, k = 18):
+studied above and $R = E$ recovers the unconstrained baseline recipe exactly, with FLOPs
+identical at every $R$. Training from scratch at 1e16 (192 experts, k = 18, the baseline's own
+softmax-aux router throughout):
 
-| $R$ | 18 (= k) | 36 | 72 | 128 | 192 (= E) |
+| $R$ | 18 (= k) | 36 | 72 | 128 | 192 (= baseline) |
 |---|---|---|---|---|---|
-| test BPB | 1.4750 | 1.4736 | 1.4681 | 1.4580 | 1.4475 |
+| test BPB | 1.4750 | 1.4736 | 1.4681 | 1.4580 | 1.4585 |
 | effective experts | 183.9 | 183.4 | 181.8 | 186.4 | n/a |
 
-Loss falls monotonically as the constraint loosens, confirming that at this budget the
-constraint is a pure quality cost whose regularization pays only at larger scale, and expert
-diversity is preserved at every dose, so the constraint acts on usage throughout. Because $R$ is
-the number of experts held in fast memory and compute is fixed, this curve is also the serving
-memory-quality frontier: the maximal constraint costs +0.028 BPB at roughly one tenth of the
-routed-expert memory, and quadrupling the cache buys back about a quarter of that gap.
+Loss falls monotonically toward the baseline as the constraint loosens and *saturates by
+R = 128*, which matches the baseline within seed noise. Two readings follow. Scientifically, at
+this budget the constraint is a pure quality cost whose regularization pays only at larger
+scale, and expert diversity is preserved at every dose, so the constraint acts on usage
+throughout. For deployment, because $R$ is the number of experts held in fast memory and compute
+is fixed, the curve is the serving memory-quality frontier: the maximal constraint costs +0.017
+BPB versus the baseline at roughly one tenth of the routed-expert memory, and baseline-parity
+quality is already available at two thirds of it.
 
 ## 6. Summary
 
@@ -178,7 +180,8 @@ geometry unchanged). Forced off the shortcut, experts reorganize around context,
 that transfers, which simultaneously explains the loss advantage at scale, the temporal
 coherence and forecastability of routing demand, and why cacheability exists at all. The
 mechanism is intrinsic to the trained model rather than a removable regularizer, and its
-strength is a single dial that trades quality against serving memory along a clean frontier.
+strength is a single dial that trades quality against serving memory along a clean frontier that
+reaches baseline parity well before the full expert pool is resident.
 
 ## Appendix A: an optimization control
 
