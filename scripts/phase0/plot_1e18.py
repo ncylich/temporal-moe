@@ -19,7 +19,7 @@ PAPER = "--no-caption" in sys.argv
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if PAPER:
     plt.rcParams.update({"font.size": 15, "axes.titlesize": 15, "axes.labelsize": 15,
-                         "xtick.labelsize": 12, "ytick.labelsize": 13})
+                         "xtick.labelsize": 10.5, "ytick.labelsize": 12})
 
 # worst -> best CE (left -> right). Colors match the left isoFLOP figure: hue = method
 # (gray dense, blue MoE, green temporal), shade = granularity (coarse normal / fine dark).
@@ -35,7 +35,7 @@ labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "tem
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
            "full MoE\ncoarse (6 of 64)", "temporal\ncoarse (6 of 64)"])
 
-fig, ax = plt.subplots(figsize=(5.4, 4.0) if PAPER else (8.6, 5.8))
+fig, ax = plt.subplots(figsize=(4.6, 3.6) if PAPER else (8.6, 5.8))
 bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6,
               yerr=yerr, capsize=(4 if PAPER else 5), error_kw=dict(lw=1.3, ecolor="k", zorder=5))
 for b, v, e in zip(bars, ce, yerr):
