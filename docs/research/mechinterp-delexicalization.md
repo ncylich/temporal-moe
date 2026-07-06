@@ -42,16 +42,19 @@ function or remain distinct.
 
 | model (scale) | median PR | generalist % | $\bar{H}$ | $d_e$ (mean) | pairwise cos (median) |
 |---|---|---|---|---|---|
-| temporal (192E) | 0.66 | 65 | 0.95 | 0.88 | 0.010 |
-| unconstrained (192E) | 0.25 to 0.28 | 5 to 12 | 0.85 to 0.87 | 0.88 to 0.90 | 0.006 to 0.010 |
+| temporal (192E, seed 1) | 0.66 | 65 | 0.95 | 0.88 | 0.010 |
+| temporal (192E, seed 2) | 0.65 | 67 | 0.95 | 0.87 | 0.012 |
+| unconstrained sigmoid (192E, seed 1) | 0.28 | 5 | 0.87 | 0.90 | 0.007 |
+| unconstrained sigmoid (192E, seed 2) | 0.27 | 5 | 0.87 | 0.89 | 0.007 |
+| unconstrained aux-loss (192E) | 0.25 | 12 | 0.85 | 0.88 | 0.010 |
 | temporal (64E) | 0.52 | 54 | 0.93 | 0.84 | 0.012 |
 | unconstrained (64E) | 0.34 | 13 | 0.86 | 0.84 | 0.009 |
 
-Within-regime seed noise calibrates these gaps: two independent seeds of the temporal 192-expert
-model give median PR 0.657 and 0.650 with generalist fractions 64.6% and 66.7%, so seed-to-seed
-variation is about 0.01 in PR against a 0.25-vs-0.66 regime gap, roughly forty times the noise.
-The weight geometry is indistinguishable across regimes: experts remain equally distinct and
-near orthogonal either way. What changes is traffic. Unconstrained experts each draw their usage
+The replicate rows put the noise band in the table itself: independent seeds agree to about 0.01
+in PR, 2 points in generalist fraction, and 0.003 in routing entropy *within* each regime, while
+the temporal-vs-unconstrained gap is ten to forty times larger on every routing metric. The
+weight geometry is indistinguishable across regimes and seeds alike: experts remain equally
+distinct and near orthogonal either way. What changes is traffic. Unconstrained experts each draw their usage
 from a narrow recurring subset of the stream, while temporal experts draw from most of it, under
 visibly flatter routing. The constraint therefore acts on routing statistics, not on expert
 identity, which narrows the question: if a temporal expert is not specialized on a slice of
@@ -72,18 +75,17 @@ $y_e \sim x_{\mathrm{ctx}}$, on the first 70% of tokens and report held-out AUC 
 $A_{\mathrm{tok}}(e)$ and $A_{\mathrm{ctx}}(e)$. An expert bound to token identity yields high
 $A_{\mathrm{tok}}$, an expert bound to context yields high $A_{\mathrm{ctx}}$.
 
-| model | median $A_{\mathrm{tok}}$ | median $A_{\mathrm{ctx}}$ | context dominated |
-|---|---|---|---|
-| unconstrained (192E, $w{=}18$) | 0.94 | 0.63 | 0% |
-| temporal (192E, $w{=}18$) | 0.62 | 0.77 | 91% |
-| unconstrained (64E, $w{=}6$) | 0.84 | 0.59 | 1% |
-| temporal (64E, $w{=}6$) | 0.60 | 0.68 | 85% |
+| model | median $A_{\mathrm{tok}}$ | median $A_{\mathrm{ctx}}$ | chance floor (shuffled labels) | context dominated |
+|---|---|---|---|---|
+| unconstrained (192E, $w{=}18$) | 0.94 | 0.63 | 0.499 / 0.501 | 0% |
+| temporal (192E, $w{=}18$) | 0.62 | 0.77 | 0.500 / 0.498 | 91% |
+| unconstrained (64E, $w{=}6$) | 0.84 | 0.59 | 0.499 / 0.502 | 1% |
+| temporal (64E, $w{=}6$) | 0.60 | 0.68 | 0.501 / 0.501 | 85% |
 
-All AUCs are calibrated against a permutation floor: refitting the same classifiers on null
-labels (both iid permutations and circular shifts of at least 1000 tokens, the latter preserving
-the labels' residency-induced autocorrelation) yields median AUC $0.500 \pm 0.002$ in every
-model, feature set, and null type, so chance is exactly 0.5 and every entry in the table is real
-signal. The unconstrained router implements a near deterministic token-to-expert lookup: the
+Every row of the table carries its own measured chance floor (token / context columns): the same
+classifiers refit on null labels, using both iid permutations and circular shifts of at least
+1000 tokens, the latter preserving the labels' residency-induced autocorrelation. All floors are
+$0.500 \pm 0.002$, so chance is exactly 0.5 and every entry is real signal. The unconstrained router implements a near deterministic token-to-expert lookup: the
 current token predicts expert firing at AUC 0.84 to 0.94 (+0.34 to +0.44 above floor), and
 context never overtakes it for more than 1% of experts. The temporal model cannot implement that
 lookup, because a token must be served by whichever experts are resident, and its token AUC
@@ -124,14 +126,17 @@ the output basis. We take this unconditioned value as the no-signal reference: a
 carrying no lexical preference at all reads about 15,990 of 16,000. All comparisons are
 within layer and data weighted.
 
-Against that reference, unconstrained experts promote measurably narrower vocabularies, mean
-$V_{\mathrm{eff}}$ 15,439 (about 550 effective words of lexical preference) vs 15,932 for
-temporal (about 60, barely distinguishable from no signal). The contrast concentrates in the
-tail: the sharpest decile of unconstrained experts reaches $V_{\mathrm{eff}} = 13{,}431$, and
-their top promoted tokens read as coherent lexical clusters, while the sharpest temporal decile
-only reaches 15,342, so the temporal model contains no word-list experts even in its extreme
-tail. One expert's write is a nudge rather than a full prediction, so the shifts are small in
-absolute terms, but the direction agrees with both preceding analyses. Input side, output side, and structure thus converge on a single
+| model (192E) | mean $V_{\mathrm{eff}}$ | sharpest decile | no-signal reference |
+|---|---|---|---|
+| unconstrained | 15,439 | 13,431 | 15,990 |
+| temporal | 15,932 | 15,342 | 15,990 |
+
+Against the reference column, unconstrained experts promote measurably narrower vocabularies
+(about 550 effective words of lexical preference at the mean, over 2,500 in the sharpest decile,
+whose top promoted tokens read as coherent lexical clusters), while temporal experts are barely
+distinguishable from no signal (about 60 at the mean) and contain no word-list experts even in
+their extreme tail. One expert's write is a nudge rather than a full prediction, so the shifts
+are small in absolute terms, but the direction agrees with both preceding analyses. Input side, output side, and structure thus converge on a single
 mechanism: the residency constraint removes the router's lexical shortcut, and the experts
 reorganize around context.
 
