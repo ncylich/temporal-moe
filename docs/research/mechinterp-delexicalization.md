@@ -3,7 +3,8 @@
 Rolling residency restricts each token to the currently resident expert set, yet at 1e18 FLOPs
 the temporally constrained model achieves *lower* validation loss than an unconstrained MoE of
 identical architecture and compute, at both granularities (coarse: CE 3.9121 vs 3.9209, fine:
-3.9768 vs 4.0087, 50k vocabulary; a 1e19 replication is in progress). A constraint that improves
+3.9768 vs 4.0087, both far below the dense floor of 4.137, 50k vocabulary; a 1e19 replication is
+in progress). A constraint that improves
 generalization must be suppressing a harmful behavior. This section identifies that behavior. We
 analyze matched temporal and unconstrained pairs at the two smaller budgets where full training
 artifacts are preserved: 192 experts top-18 at 1e16 and 64 experts top-6 at 1e17, both on the 16k
@@ -46,6 +47,9 @@ function or remain distinct.
 | temporal (64E) | 0.52 | 54 | 0.93 | 0.84 | 0.012 |
 | unconstrained (64E) | 0.34 | 13 | 0.86 | 0.84 | 0.009 |
 
+Within-regime seed noise calibrates these gaps: two independent seeds of the temporal 192-expert
+model give median PR 0.657 and 0.650 with generalist fractions 64.6% and 66.7%, so seed-to-seed
+variation is about 0.01 in PR against a 0.25-vs-0.66 regime gap, roughly forty times the noise.
 The weight geometry is indistinguishable across regimes: experts remain equally distinct and
 near orthogonal either way. What changes is traffic. Unconstrained experts each draw their usage
 from a narrow recurring subset of the stream, while temporal experts draw from most of it, under
@@ -75,13 +79,20 @@ $A_{\mathrm{tok}}$, an expert bound to context yields high $A_{\mathrm{ctx}}$.
 | unconstrained (64E, $w{=}6$) | 0.84 | 0.59 | 1% |
 | temporal (64E, $w{=}6$) | 0.60 | 0.68 | 85% |
 
-The unconstrained router implements a near deterministic token-to-expert lookup: the current
-token predicts expert firing at AUC 0.84 to 0.94, and context never overtakes it for more than
-1% of experts. The temporal model cannot implement that lookup, because a token must be served
-by whichever experts are resident, and its token AUC collapses to 0.60 to 0.62 at both scales.
-Freed from token identity, its experts become context predictable: 85 to 91% of temporal experts
-are better predicted by their surroundings than by the token they process, with the effect
-growing monotonically with depth. We call this *de-lexicalization*. Context is the transferable
+All AUCs are calibrated against a permutation floor: refitting the same classifiers on null
+labels (both iid permutations and circular shifts of at least 1000 tokens, the latter preserving
+the labels' residency-induced autocorrelation) yields median AUC $0.500 \pm 0.002$ in every
+model, feature set, and null type, so chance is exactly 0.5 and every entry in the table is real
+signal. The unconstrained router implements a near deterministic token-to-expert lookup: the
+current token predicts expert firing at AUC 0.84 to 0.94 (+0.34 to +0.44 above floor), and
+context never overtakes it for more than 1% of experts. The temporal model cannot implement that
+lookup, because a token must be served by whichever experts are resident, and its token AUC
+falls to 0.60 to 0.62 at both scales. Against the floor this is a reduction, not an erasure:
+temporal experts retain a weak but genuine lexical signal (+0.10 to +0.12), roughly a quarter of
+the unconstrained model's, while their contextual signal (+0.26) clearly dominates it. Freed
+from token identity, temporal experts become context predictable: 85 to 91% are better predicted
+by their surroundings than by the token they process, with the effect growing monotonically with
+depth. We call this *de-lexicalization*. Context is the transferable
 feature, autocorrelated within documents and shared across surface forms, and we identify this as
 the regularization behind the loss improvement at scale. It equally explains why temporal routing
 demand is far more predictable from history (AUC 0.85 vs 0.64 in our demand forecasting
@@ -106,18 +117,21 @@ vocabulary size (16k here, no lexical preference at all). A lexical expert shoul
 a word cluster (low $V_{\mathrm{eff}}$, and its promoted words should overlap its trigger
 tokens), while a contextual expert should be diffuse.
 
-Data weighting matters: projecting raw weight columns with uniform weights yields near uniform
-distributions for every expert in both models, because averaging unactivated columns cancels
-their directions and mid-network projections are rotated relative to the output basis. All
-comparisons are therefore within layer and data weighted.
+Data weighting matters: projecting raw weight columns with uniform weights yields
+$V_{\mathrm{eff}} \approx 15{,}990$ for every expert in *both* models, because averaging
+unactivated columns cancels their directions and mid-network projections are rotated relative to
+the output basis. We take this unconditioned value as the no-signal reference: a projection
+carrying no lexical preference at all reads about 15,990 of 16,000. All comparisons are
+within layer and data weighted.
 
-Unconstrained experts promote measurably narrower vocabularies, mean $V_{\mathrm{eff}}$ 15,439
-vs 15,932 for temporal, and the contrast concentrates in the tail: the sharpest decile of
-unconstrained experts reaches $V_{\mathrm{eff}} = 13{,}431$, and their top promoted tokens read
-as coherent lexical clusters, while the sharpest temporal decile only reaches 15,342, so the
-temporal model contains no word-list experts even in its extreme tail. The absolute shifts are
-small, as one expert's write is a nudge rather than a full prediction, but the direction agrees
-with both preceding analyses. Input side, output side, and structure thus converge on a single
+Against that reference, unconstrained experts promote measurably narrower vocabularies, mean
+$V_{\mathrm{eff}}$ 15,439 (about 550 effective words of lexical preference) vs 15,932 for
+temporal (about 60, barely distinguishable from no signal). The contrast concentrates in the
+tail: the sharpest decile of unconstrained experts reaches $V_{\mathrm{eff}} = 13{,}431$, and
+their top promoted tokens read as coherent lexical clusters, while the sharpest temporal decile
+only reaches 15,342, so the temporal model contains no word-list experts even in its extreme
+tail. One expert's write is a nudge rather than a full prediction, so the shifts are small in
+absolute terms, but the direction agrees with both preceding analyses. Input side, output side, and structure thus converge on a single
 mechanism: the residency constraint removes the router's lexical shortcut, and the experts
 reorganize around context.
 
