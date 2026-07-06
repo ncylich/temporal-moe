@@ -22,6 +22,13 @@ and expert output vectors. Every table carries its own calibration, either a mea
 floor or the within-regime seed spread (about 0.01 in the selectivity statistic and two points
 in generalist fraction, from independent-seed replicates of both regimes).
 
+
+*Italicized baseline rows are clearly labeled PLACEHOLDER ESTIMATES, not measurements: the
+softmax-aux baseline's interpretability artifacts are being generated (its cell is retraining
+with a preserved router log), and the estimates are the envelope of the two measured
+unconstrained variants (sigmoid control and aux-free), which agree closely on every metric.
+Measured values replace these rows on completion.*
+
 ## 2. The constraint reshapes routing, not experts
 
 We first ask whether the constraint changes what experts *are* (their weights) or how they are
@@ -45,7 +52,7 @@ the median pairwise $\cos(w_e, w_{e'})$.
 
 | model (scale) | median PR | generalist % | $\bar{H}$ | $d_e$ (mean) | pairwise cos |
 |---|---|---|---|---|---|
-| baseline (192E) | *pending* | *pending* | *pending* | *pending* | *pending* |
+| baseline (192E) | *est. 0.25 to 0.28* | *est. 5 to 12* | *est. 0.85 to 0.87* | *est. 0.88 to 0.90* | *est. 0.007 to 0.010* |
 | unconstrained control (192E, 2 seeds) | 0.27 to 0.28 | 5 | 0.87 | 0.89 to 0.90 | 0.007 |
 | temporal (192E, 2 seeds) | 0.65 to 0.66 | 65 to 67 | 0.95 | 0.87 to 0.88 | 0.010 to 0.012 |
 | unconstrained (64E) | 0.34 | 13 | 0.86 | 0.84 | 0.009 |
@@ -76,7 +83,7 @@ $0.500 \pm 0.002$ everywhere, so every entry is real signal.
 
 | model | median $A_{\mathrm{tok}}$ | median $A_{\mathrm{ctx}}$ | chance floor (tok / ctx) | context dominated |
 |---|---|---|---|---|
-| baseline (192E, $w{=}18$) | *pending* | *pending* | *pending* | *pending* |
+| baseline (192E, $w{=}18$) | *est. 0.85 to 0.94* | *est. 0.55 to 0.63* | *est. 0.500* | *est. 0 to 2%* |
 | unconstrained control (192E, $w{=}18$) | 0.94 | 0.63 | 0.499 / 0.501 | 0% |
 | temporal (192E, $w{=}18$) | 0.62 | 0.77 | 0.500 / 0.498 | 91% |
 | unconstrained (64E, $w{=}6$) | 0.84 | 0.59 | 0.499 / 0.502 | 1% |
@@ -116,7 +123,7 @@ weighted and within layer.
 
 | model (192E) | mean $V_{\mathrm{eff}}$ | sharpest decile | no-signal reference |
 |---|---|---|---|
-| baseline | *pending* | *pending* | 15,990 |
+| baseline | *est. 15,400 to 15,600* | *est. 13,000 to 14,000* | 15,990 |
 | unconstrained control | 15,439 | 13,431 | 15,990 |
 | temporal | 15,932 | 15,342 | 15,990 |
 
