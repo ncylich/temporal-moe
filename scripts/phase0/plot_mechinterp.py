@@ -53,7 +53,7 @@ SERIES = [  # (points, color, label)
     (read("mechinterp_locus_kfull.csv", "s0_TEMPORAL"), "#145a14", "temporal 18/192"),
     (read("mechinterp_locus_kfull.csv", "s2_TEMPORAL"), "#5cc85c", "temporal 6/64"),
 ]
-fig, ax = plt.subplots(figsize=(5.0, 4.6) if PAPER else (7.2, 6.6))
+fig, ax = plt.subplots(figsize=(4.5, 4.15) if PAPER else (7.2, 6.6))
 lo, hi = 0.35, 1.0
 ax.plot([lo, hi], [lo, hi], ls="--", color="0.45", lw=1.2, zorder=1)
 ax.axhline(0.5, ls=":", color="0.75", lw=0.9, zorder=0)
@@ -92,7 +92,7 @@ R, bpb = [], []
 with open(os.path.join(DATA, "rsweep.csv")) as f:
     for r in csv.DictReader(f):
         R.append(int(r["R"])); bpb.append(float(r["test_bpb"]))
-fig, ax = plt.subplots(figsize=(5.0, 4.6) if PAPER else (6.6, 5.2))
+fig, ax = plt.subplots(figsize=(4.5, 4.15) if PAPER else (6.6, 5.2))
 ax.plot(R, bpb, "-", color="#145a14", lw=2.0, zorder=2)
 ax.scatter(R[:-1], bpb[:-1], s=64, color="#145a14", zorder=3, label="temporal, cache $R$")
 ax.scatter(R[-1:], bpb[-1:], s=74, color="#0d3b66", marker="s", zorder=3, label="full MoE ($R{=}E$)")
