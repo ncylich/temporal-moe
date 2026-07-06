@@ -217,7 +217,7 @@ section identifies the specialization that replaces token ownership.
 
 \textbf{Token to context.} For each expert, two logistic probes predict its firing, one from the
 model's embedding of the current token alone and one from the surrounding window with the token
-excluded, sized to one residency lifetime. Figure~\ref{fig:delex} (left) plots every expert.
+excluded, sized to one residency lifetime, the number of active experts. Figure~\ref{fig:delex} (left) plots every expert.
 Full-MoE routing is close to a token lookup, with the token alone predicting firing at median
 AUC 0.93 and context dominant for under 1\% of experts. Temporal routing inverts the picture,
 token AUC falling to 0.62 and context dominating for 85--91\% of experts. We call this
@@ -238,8 +238,8 @@ Decoupling the cache size $R$ from the active $k$ interpolates between the shipp
 ($R = k$) and the full-MoE recipe ($R = E$) at identical FLOPs, and held-out BPB falls
 monotonically as the cache grows (Figure~\ref{fig:delex}, right), so at this budget the
 constraint is a pure, tunable quality cost. Because $R$ is the number of experts held in fast
-memory, the same curve is the serving memory--quality frontier, the maximal constraint costing
-+0.023 BPB at roughly a tenth of the routed-expert memory.
+memory, RAM, the same curve is the serving memory--quality frontier, the maximal constraint
+costing +0.023 BPB at roughly a tenth of the routed-expert memory.
 
 In sum, a free router binds experts to token identities, and rolling residency makes that
 binding unrepresentable without touching what experts can compute. The router reorganizes
