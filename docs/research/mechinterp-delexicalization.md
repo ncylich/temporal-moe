@@ -135,6 +135,50 @@ absolute terms, but the direction agrees with both preceding analyses. Input sid
 mechanism: the residency constraint removes the router's lexical shortcut, and the experts
 reorganize around context.
 
+## Consequences: the mechanism is load-bearing at inference
+
+If de-lexicalization were a pure training-time regularizer, the residency mask should be
+removable at inference. We test this with a constraint swap: evaluate every trained model under
+the *other* regime, using each pair's native evaluation protocol. Removing the mask from a
+temporal model is implemented by setting the residency cache to the full pool (every expert
+always resident, selection unconstrained), and the converse imposes the rolling-residency
+mechanism on an unconstrained checkpoint.
+
+| trained model | native loss | cross regime | delta |
+|---|---|---|---|
+| temporal, 192E at 1e16 | 1.4750 (masked) | 1.5744 (unmasked) | +0.10 |
+| temporal, 64E at 1e17 | 1.2821 (masked) | 1.4063 (unmasked) | +0.12 |
+| temporal, 1e18 (the winning case) | 3.9037 (masked) | 4.3890 (unmasked) | +0.49 |
+| unconstrained, 192E at 1e16 | 1.4499 | 1.6902 (imposed) | +0.24 |
+| unconstrained, 64E at 1e17 | 1.2690 | 1.8789 (imposed) | +0.61 |
+
+Both directions hurt, so neither regime transfers: the advantage is serving co-adaptation, not
+better weights. Even at 1e18, where the temporal model wins, unmasking it collapses the model
+below both its masked self and the unconstrained baseline. The asymmetry makes the mechanism
+causal rather than correlational: imposing residency on lexical routers costs two to five times
+more than unmasking contextual ones, exactly as the locus analysis predicts, since a token
+denied its bespoke expert has nowhere to go, while a contextual expert serves its neighborhood
+regardless.
+
+Finally, the constraint admits a dose. Decouple the cache size $R$ from the active top-k: the
+cache holds $R$ experts (cold filled with the top $R$, evolving under the same one-swap-per-token
+dynamics) and the router selects its top-k among residents, so $R = k$ is the maximal constraint
+studied above, $R = E$ recovers the unconstrained model, and FLOPs are identical at every $R$.
+Training from scratch at 1e16 (192 experts, k = 18) across the dose:
+
+| $R$ | 18 (= k) | 36 | 72 | 128 | 192 (= E) |
+|---|---|---|---|---|---|
+| test BPB | 1.4750 | 1.4736 | 1.4681 | 1.4580 | 1.4475 |
+| effective experts | 183.9 | 183.4 | 181.8 | 186.4 | n/a |
+
+Loss falls monotonically as the constraint loosens, confirming that at this scale the constraint
+is a pure quality cost whose regularization pays only at larger budgets, and expert diversity is
+preserved at every dose, so the constraint acts on usage, never on expert identity. Because $R$
+is the number of experts held in fast memory and compute is fixed, this curve *is* the serving
+memory-quality frontier: the maximal constraint costs +0.028 BPB at roughly one tenth of the
+routed-expert memory, and a system can buy back about a quarter of that gap by quadrupling the
+cache.
+
 ## Appendix: an optimization control (P3)
 
 A mundane alternative explanation is optimization noise: if temporal sequences use fewer distinct
