@@ -1,2 +1,2 @@
-cell,run,test_ce,eff_experts,max_load_pct,load_gini,gate_PR,gate_eff_k,selfcons_set_pct,selfcons_mass_pct,num_experts,topk
-moe_coarse@1e19,moe_coarse_1e19,3.131040,63.94,10.67,0.023,4.758,5.248,19.20,21.08,64,6
+cell,run,test_ce,eff_experts,max_load_pct,load_gini,gate_PR,gate_eff_k,selfcons_set_pct,selfcons_mass_pct,num_experts,topk,test_ce_bpb
+moe_coarse@1e19,moe_coarse_1e19,3.131040,63.94,10.67,0.023,4.758,5.248,19.20,21.08,64,6,1.0514
