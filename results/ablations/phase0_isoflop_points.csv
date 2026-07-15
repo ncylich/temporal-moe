@@ -1,0 +1,52 @@
+# Per-point final losses for the Phase-0 1e16/1e17 isoFLOP program (FINDINGS.md sections 2-6).
+# val_ce_runlog/val_bpb_runlog = final val eval from results/phase0/log.md (temporal-moe-impl@66f786b7), BPB=CE/2.7568 (16k-BPE).
+# published_bpb = value in FINDINGS.md/plot_g3_curves.py; where it exceeds the run-log by ~+0.004 CE, comms indicate it is a test-split eval.
+run,method,grain,n_shared_or_const,evict,shape,N_active_M,budget,seed,val_ce_runlog,val_bpb_runlog,bpb_divisor,published_bpb,source,note
+v16k_sweep_s1_1e17,moe,1,1,,s1,3.812,1e17,1234,3.5296,1.2803,2.7568,1.284,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+v16k_sweep_s2_1e17,moe,1,1,,s2,8.115,1e17,1234,3.4985,1.269,2.7568,1.269,log.md (temporal-moe-impl@66f786b7),
+v16k_sweep_s3_1e17,moe,1,1,,s3,14.774,1e17,1234,3.5543,1.2893,2.7568,1.289,log.md (temporal-moe-impl@66f786b7),
+v16k_sweep_s2_1e17_seed2,moe,1,1,,s2,8.115,1e17,2,3.5004,1.2697,2.7568,,log.md (temporal-moe-impl@66f786b7),"seed-2 repro run; PASS.md quotes CE 3.5075 (|d|=0.0090 vs seed-1) but run-log val final is 3.5004 (|d|=0.0019) - likely test-split eval, both pass the 0.03 bar"
+v16k_d_sm1_1e16,moe,1,1,,sm1,0.77,1e16,1234,4.0706,1.4766,2.7568,1.478,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+v16k_d_s0_1e16,moe,1,1,,s0,1.361,1e16,1234,3.988,1.4466,2.7568,1.447,log.md (temporal-moe-impl@66f786b7),
+v16k_d_s1_1e16,moe,1,1,,s1,3.812,1e16,1234,4.2449,1.5398,2.7568,1.54,log.md (temporal-moe-impl@66f786b7),
+v16k_d_s2_1e16,moe,1,1,,s2,8.115,1e16,1234,5.0143,1.8189,2.7568,,log.md (temporal-moe-impl@66f786b7),
+v16k_d_s3_1e16,moe,1,1,,s3,14.774,1e16,1234,6.028,2.1866,2.7568,,log.md (temporal-moe-impl@66f786b7),
+s2e_s1_1e17,moe,1,2,,s1,3.812,1e17,1234,3.5311,1.2809,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_s2_1e17,moe,1,2,,s2,8.115,1e17,1234,3.5011,1.27,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_s3_1e17,moe,1,2,,s3,14.774,1e17,1234,3.538,1.2834,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_d_sm1_1e16,moe,1,2,,sm1,0.77,1e16,1234,4.066,1.4749,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_d_s0_1e16,moe,1,2,,s0,1.361,1e16,1234,3.9928,1.4483,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_d_s1_1e16,moe,1,2,,s1,3.812,1e16,1234,4.2148,1.5289,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_d_s2_1e16,moe,1,2,,s2,8.115,1e16,1234,4.9859,1.8086,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+s2e_d_s3_1e16,moe,1,2,,s3,14.774,1e16,1234,5.9823,2.17,2.7568,,log.md (temporal-moe-impl@66f786b7),"s=2 variant: 2 constant experts, top-5, FLOP-matched"
+dense_sm1_1e16,dense,1,0,,sm1,0.77,1e16,1234,4.2289,1.534,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s0_1e16,dense,1,0,,s0,1.361,1e16,1234,4.1881,1.5192,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s1_1e16,dense,1,0,,s1,3.812,1e16,1234,4.3869,1.5913,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s2_1e16,dense,1,0,,s2,8.115,1e16,1234,5.0934,1.8476,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s1_1e17,dense,1,0,,s1,3.812,1e17,1234,3.7525,1.3612,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s2_1e17,dense,1,0,,s2,8.115,1e17,1234,3.6964,1.3408,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s3_1e17,dense,1,0,,s3,14.774,1e17,1234,3.8827,1.4084,2.7568,,log.md (temporal-moe-impl@66f786b7),
+dense_s4_1e17,dense,1,0,,s4,24.29,1e17,1234,4.0948,1.4853,2.7568,,log.md (temporal-moe-impl@66f786b7),
+tmoe_minlogit_sh1_sm1_1e16,temporal,1,1,min_logit,sm1,0.77,1e16,1234,4.1,1.4872,2.7568,1.4891,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+tmoe_minlogit_sh1_s0_1e16,temporal,1,1,min_logit,s0,1.361,1e16,1234,4.0247,1.4599,2.7568,1.4599,log.md (temporal-moe-impl@66f786b7),
+tmoe_lru_sh1_s0_1e16,temporal,1,1,lru,s0,1.361,1e16,1234,4.0361,1.4641,2.7568,,log.md (temporal-moe-impl@66f786b7),eviction-policy ablation (lru vs min_logit)
+tmoe_minlogit_sh2_s0_1e16,temporal,1,2,min_logit,s0,1.361,1e16,1234,4.0165,1.4569,2.7568,,log.md (temporal-moe-impl@66f786b7),2-shared K=5 spot-check (doc quotes 1.4569)
+tmoe_lru_sh2_s0_1e16,temporal,1,2,lru,s0,1.361,1e16,1234,4.0336,1.4632,2.7568,,log.md (temporal-moe-impl@66f786b7),"eviction-policy ablation, 2-shared"
+tmoe_minlogit_sh1_s1_1e16,temporal,1,1,min_logit,s1,3.812,1e16,1234,4.2657,1.5473,2.7568,1.5488,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+tmoe_minlogit_sh1_s2_1e16,temporal,1,1,min_logit,s2,8.115,1e16,1234,5.0307,1.8248,2.7568,1.826,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+tmoe_minlogit_sh1_s1_1e17,temporal,1,1,min_logit,s1,3.812,1e17,1234,3.5912,1.3027,2.7568,1.3039,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+tmoe_minlogit_sh1_s3_1e17,temporal,1,1,min_logit,s3,14.774,1e17,1234,3.6006,1.3061,2.7568,1.3073,log.md (temporal-moe-impl@66f786b7),published BPB ~+0.004 CE above run-log val final; comms label such values test-split evals
+tmoe_minlogit_sh2_s2_1e17,temporal,1,2,min_logit,s2,8.115,1e17,1234,3.5539,1.2891,2.7568,,log.md (temporal-moe-impl@66f786b7),2-shared K=5 spot-check (doc quotes 1.2903)
+tmoe_minlogit_sh1_s2_1e17,temporal,1,1,min_logit,s2,8.115,1e17,1234,,,2.7568,1.2821,TEMPORAL_RESULTS/plot_g3_curves.py,"run-log SUMMARY line stale (evals=0); comms cite 1.2821 as test BPB, ckpt iter_0003917"
+g3_moe_sm1_1e16,moe,3,1,,sm1,0.81,1e16,1234,,,2.7600,1.4786,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_tmoe_sm1_1e16,temporal,3,1,min_logit,sm1,0.81,1e16,1234,,,2.7600,1.4976,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_moe_s0_1e16,moe,3,1,,s0,1.42,1e16,1234,,,2.7600,1.4585,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_tmoe_s0_1e16,temporal,3,1,min_logit,s0,1.42,1e16,1234,,,2.7600,1.4753,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_moe_s1_1e16,moe,3,1,,s1,3.91,1e16,1234,,,2.7600,1.5352,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_tmoe_s1_1e16,temporal,3,1,min_logit,s1,3.91,1e16,1234,,,2.7600,1.5861,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_moe_s1_1e17,moe,3,1,,s1,3.91,1e17,1234,,,2.7600,1.2846,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_tmoe_s1_1e17,temporal,3,1,min_logit,s1,3.91,1e17,1234,,,2.7600,1.3065,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_moe_s2_1e17,moe,3,1,,s2,8.23,1e17,1234,,,2.7600,1.2708,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_tmoe_s2_1e17,temporal,3,1,min_logit,s2,8.23,1e17,1234,,,2.7600,1.2873,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_moe_s3_1e17,moe,3,1,,s3,15.09,1e17,1234,,,2.7600,1.2815,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git
+g3_tmoe_s3_1e17,temporal,3,1,min_logit,s3,15.09,1e17,1234,,,2.7600,1.3129,G3_RESULTS/plot_g3_curves.py,run dir on pod; no run-log CE in git

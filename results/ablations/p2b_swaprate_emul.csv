@@ -15,7 +15,7 @@
 # parallel-residency optimization, which raised all configs ~+10; relative shape unchanged).
 emulated_swap_rate_p,tok_s,stderr,note
 0.00,164.35,0.84,hypothetical perfect cache (no weight movement)
-0.29,159.75,0.95,fine-grained tau=4 (retained_mass -26%, not worth it)
+0.29,159.75,0.95,"fine-grained tau=4 (retained_mass -26%, not worth it)"
 0.40,158.76,0.89,coarse-8M tau=2
 0.62,156.75,1.04,coarse-38M tau=2
 0.844,155.12,0.94,fine-grained tau=2 (minor quality cost; within noise of p=1.0 -- curve flat at top)

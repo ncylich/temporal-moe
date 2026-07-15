@@ -1,0 +1,10 @@
+# LR selection + cross-size stability runs behind the locked peak-LR 3e-3 (FINDINGS.md section 1).
+# From results/phase0/log.md (temporal-moe-impl@66f786b7); lr1e-2 diverged (no eval). BPB=CE/2.7568.
+run,shape,budget,peak_lr,val_ce,val_bpb,note
+v16k_s2_1e16_lr1e-3,s2,1e16,1e-3,4.9355,1.7903,
+v16k_s2_1e16_lr6e-3,s2,1e16,6e-3,5.6725,2.0576,
+v16k_s2_3e16_lr1e-3,s2,3e16,1e-3,3.9897,1.4472,
+v16k_s2_3e16_lr3e-3,s2,3e16,3e-3,3.8685,1.4033,
+v16k_s4_3e16_lr3e-3,s4,3e16,3e-3,5.2666,1.9104,
+v16k_s6_3e16_lr3e-3,s6,3e16,3e-3,6.1813,2.2422,
+v16k_s2_1e16_lr1e-2,s2,1e16,1e-2,,,diverged/no eval (evals=0)

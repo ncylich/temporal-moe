@@ -3,10 +3,12 @@
 One consolidated narrative of the Phase-0 ablation program (single-GPU A6000/H100). Combines the
 former `results/phase0/{RESULTS,DENSE_BASELINES,PASS,TEMPORAL_RESULTS,G3_RESULTS}.md` (verbatim
 numbers; duplication removed; stale status lines fixed — those originals live in this branch's
-history). **The 1e16/1e17 sweep tables below (§2–§6) are the canonical record of those runs** —
-they predate the relay CSV pipeline and were distilled from the A6000's run logs; no per-point CSV
-exists. The later 1e18/1e19 programs DO have CSVs — see [README.md](README.md).
-Figures: `../phase0/figures/`.
+history). Per-point data: `phase0_isoflop_points.csv` (finals for every §2–§6 run, extracted from the raw
+run log `results/phase0/log.md` on `temporal-moe-impl@66f786b7`) + `phase0_lr_tuning.csv` (§1) +
+`flame38m_1e18_cells.csv` (§7); later 1e18/1e19 programs have their own CSVs — see
+[README.md](README.md). **Split caveat:** for 7 of the points the published BPB below is ~+0.004 CE
+above the run-log val final — comms label such values test-split evals; both values are recorded in
+`phase0_isoflop_points.csv`. Figures: `../phase0/figures/`.
 
 **Metrics.** `BPB = CE_nats / (ln2 · bytes_per_token)` — bits-per-byte, tokenizer-invariant, lower
 is better (needed because Phase-0 sweeps use a custom 16k-BPE; divisor 2.7568 for bpe-16k,

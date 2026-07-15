@@ -25,6 +25,7 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `e8_document_boundary.csv` | Routing churn at document (EOD) boundaries. | a6000@cd588fd6, h100@cd588fd6 |
 | `expert_selection_per_token.csv` | Per-token expert selections (full-MoE vs temporal) for the 8/15/38M models (model in active_params_M col). | a6000@53aa24ba, h100@53aa24ba |
 | `flame192_leftflank_1e18.csv` | 1e18 isoFLOP LEFT-flank (hidden-192/~26M) 5-cell final CE panel: dense + {MoE,temporal}×{coarse,fine}. | a6000@ee73c64d, h100@5ed5a240 |
+| `flame38m_1e18_cells.csv` | 1e18 38M-middle 5-cell panel finals (dense/MoE/temporal × coarse/fine); coarse per-seed curves in t18_1e18_curves.csv. | temporal-moe-impl@66f786b7, h100@60b0e351/e53596d6 |
 | `flame512_1e18_rightflank.csv` | 1e18 isoFLOP RIGHT-flank (hidden-512/98M) 5-cell final CE panel. | h100@d4827a1e |
 | `flame512_1e18_rightflank_curves.csv` | Per-iteration training curves for the 1e18 right-flank cells. | h100@d4827a1e |
 | `karen_center_replay.csv` | 'Karen' (aux-free momentum) center-of-mass replay — A3/eff/union/swap per seed. | a6000@91855c19 |
@@ -47,6 +48,8 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `p3c_overlap.csv` | P3c copy-overlap decode variants — tok/s, VRAM, correctness. | a6000@edc6bb7c |
 | `p3d_fair.csv` | P3d fair-comparison decode variants — tok/s, VRAM, correctness. | a6000@d6f9b879 |
 | `perf_baseline.csv` | Training perf baseline — s/iter, TFLOPs/GPU, peak GB per shape/mode. | a6000@eba7d3f4 |
+| `phase0_isoflop_points.csv` | Per-point final CE/BPB for the 1e16/1e17 isoFLOP program (dense/MoE/temporal × coarse/fine × shapes, incl. s=2 and eviction variants); records run-log val values AND published (test-split) values where they differ. | temporal-moe-impl@66f786b7 (log.md), main (plot_g3_curves.py) |
+| `phase0_lr_tuning.csv` | LR-selection + cross-size stability runs behind the locked peak-LR 3e-3. | temporal-moe-impl@66f786b7 (log.md) |
 | `rolling_coverage_lifetime_vs_K.csv` | Rolling-residency hit-rate & expert lifetime vs resident-cache size K/k. | a6000@cd588fd6, h100@cd588fd6 |
 | `rsweep.csv` | Resident-set-size (R) sweep — BPB + A3/coverage/eff-experts/swap-rate per cell. | a6000@b65454d8 |
 | `seed_replicates.csv` | Seed-replicate CE/BPB across temporal & full-MoE variants (a6000+h100 combined; box col marks source). | a6000@89028580, h100@0562e4a4 |

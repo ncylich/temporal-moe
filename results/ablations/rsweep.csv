@@ -3,4 +3,4 @@ L0,18,1.0,1.4750,29.57,29.57,183.87,158.12,18.21,0,1.000,R=k endpoint (shipped)
 R36,36,2.0,1.4736,41.85,49.68,183.43,164.48,44.74,0,1.000,
 R72,72,4.0,1.4681,57.52,63.67,181.79,188.26,89.22,0,1.000,
 R128,128,7.1,1.4580,78.08,81.74,186.35,191.93,99.93,1,1.000,2E/3
-softmax_baseline,192,10.7,1.4519,,,,,,,,R=E endpoint (SOFTMAX baseline RETRAINED seed 1234; definitive, vs recorded 1.4585)
+softmax_baseline,192,10.7,1.4519,,,,,,,,"R=E endpoint (SOFTMAX baseline RETRAINED seed 1234; definitive, vs recorded 1.4585)"

@@ -1,0 +1,11 @@
+# 1e18 38M-middle (hidden-256/L9, 2121 iters, pythia-50k, CE nats) 5-cell panel finals (FINDINGS.md section 7).
+# Coarse (G1) cells have per-seed val/test finals + full curves in t18_1e18_curves.csv; this file is the panel summary.
+run,method,grain,experts,topk,seed,val_ce,test_ce,source,note
+flame38m_dense,dense,1,,,1234,4.1373,,log.md (temporal-moe-impl@66f786b7),a6000; ffn 1422 param-matched dense floor
+flame38m_temporal_minlogit,temporal,1,64,6,1234,3.9045,,log.md (temporal-moe-impl@66f786b7),a6000 original run (docs round-quote 3.906)
+flame38m_g1_moe,moe,1,64,6,1234,3.914069,3.918414,t18_1e18_curves.csv (h100@60b0e351),"h100 re-run, local self-consistent split; G3_RESULTS quotes 3.9209 (matches neither seed exactly); plot_1e18.py 2-seed mean 3.9273 vs computed 3.9234 - unreconciled"
+flame38m_g1_moe_s2,moe,1,64,6,2,3.932836,3.93021,t18_1e18_curves.csv (h100@e53596d6),seed replicate
+flame38m_g1_temporal,temporal,1,64,6,1234,,3.91209,t18_1e18_curves.csv (h100@60b0e351),h100 re-run; source row lacked val_ce column
+flame38m_g1_temporal_s2,temporal,1,64,6,2,3.906799,,t18_1e18_curves.csv (h100@e53596d6),seed replicate
+flame38m_g3_moe,moe,3,192,18,1234,4.0087,,G3_RESULTS/plot_1e18.py,h100 local; fine-graining hurts full MoE at 1e18
+flame38m_g3_temporal,temporal,3,192,18,1234,3.9768,,G3_RESULTS/plot_1e18.py,h100 local; temporal robust to over-fine-graining
