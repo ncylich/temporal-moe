@@ -1,3 +1,0 @@
-label,run,kind,E,k,PR_median,generalist_frac,router_entropy,eff_rank,strong_corr_pairs,dist2centroid_mean,pairwise_cos_med,pairwise_cos_p99
-s0_TEMPORAL(L0_seed3),g3_tmoe_s0_1e16_seed3,temporal,192,18,0.6502,0.6667,0.9523,12.14,36,0.8713,0.0115,0.0381
-s0_FULL(a0ctl_sig_seed2),g3_moe_s0_1e16_sigmoid_seed2,full,192,18,0.2741,0.0451,0.8689,13.09,63,0.8909,0.0068,0.0348

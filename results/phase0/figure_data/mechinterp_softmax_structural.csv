@@ -1,2 +1,0 @@
-label,run,kind,E,k,PR_median,generalist_frac,router_entropy,eff_rank,strong_corr_pairs,dist2centroid_mean,pairwise_cos_med,pairwise_cos_p99
-s0_SOFTMAX_BASELINE,g3_moe_s0_1e16,full,192,18,0.3039,0.0174,0.8782,13.56,24,0.8999,0.0049,0.0313
