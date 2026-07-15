@@ -1,5 +1,0 @@
-run,family,score_function,seed,val_ce,test_ce,val_bpb,test_bpb,source
-g3_moe_s0_1e16_sigmoid,sigmoid_auxkept,sigmoid,1234,,,1.4475,,A0 single-seed (orch ref 0028)
-g3_moe_s0_1e16_sigmoid_seed2,sigmoid_auxkept,sigmoid,2,3.991858,3.999837,1.4463,1.4492,measured (h100)
-g3_tmoe_s0_1e16_mom,momentum_plain(b2.0),softmax,1234,4.062668,4.061975,1.4720,1.4717,measured (h100)
-g3_tmoe_s0_1e16_mom_seed2,momentum_plain(b2.0),softmax,2,4.078737,4.086547,1.4778,1.4806,measured (h100)

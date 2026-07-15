@@ -1,16 +1,19 @@
-cell,run_name,method,seed,budget,bpb_divisor,test_lm_loss,test_bpb,val_lm_loss,val_bpb
-g3_s0_1e16,g3_tmoe_s0_1e16,temporal_fine_grained,1234,1e16,2.7600,4.0720,1.4754,4.0762,1.4769
-g3_s0_1e16,g3_tmoe_s0_1e16_seed2,temporal_fine_grained,2,1e16,2.7600,4.0732,1.4758,4.0695,1.4744
-g1_s2_1e17,tmoe_minlogit_sh1_s2_1e17,temporal_coarse,1234,1e17,2.7568,3.5342,1.2821,,
-g1_s2_1e17,tmoe_minlogit_sh1_s2_1e17_seed2,temporal_coarse,2,1e17,2.7568,3.5407,1.2844,3.5310,1.2808
-g3_s0_1e16_karen,g3_tmoe_s0_1e16_karen,temporal_auxfree_momentum,1234,1e16,2.7600,4.0631,1.4722,4.0742,1.4762
-g3_s0_1e16_karen,g3_tmoe_s0_1e16_karen_seed2,temporal_auxfree_momentum,2,1e16,2.7600,4.0740,1.4761,4.0728,1.4756
-g3_s0_1e16_momr,g3_tmoe_s0_1e16_momr,temporal_logratio_momentum,1234,1e16,2.7600,4.0611,1.4714,4.0616,1.4716
-g3_s0_1e16_momr,g3_tmoe_s0_1e16_momr_seed2,temporal_logratio_momentum,2,1e16,2.7600,4.0799,1.4782,4.0792,1.4780
-g3_s0_1e16_karensoft,g3_tmoe_s0_1e16_karen_soft,temporal_auxfree_gentlemom,1234,1e16,2.7600,4.0581,1.4703,4.0723,1.4755
-g3_s0_1e16_karensoft,g3_tmoe_s0_1e16_karen_soft_seed2,temporal_auxfree_gentlemom,2,1e16,2.7600,4.0780,1.4775,4.0769,1.4771
-g3_s0_1e16,g3_tmoe_s0_1e16_seed3,temporal_fine_grained,3,1e16,2.7600,4.0674,1.4737,4.0657,1.4731
-g3_s0_1e16_a1,g3_moe_s0_1e16_auxfree,fullmoe_auxfree,1234,1e16,2.7600,4.0006,1.4495,,
-g3_s0_1e16_a1,g3_moe_s0_1e16_auxfree_seed2,fullmoe_auxfree,2,1e16,2.7600,4.0180,1.4558,4.0172,1.4555
-g3_s0_1e16_a0ctl,g3_moe_s0_1e16_sigmoid,fullmoe_sigmoid,1234,1e16,2.7600,3.9951,1.4475,,
-g3_s0_1e16_a0ctl,g3_moe_s0_1e16_sigmoid_seed2,fullmoe_sigmoid,2,1e16,2.7600,4.0083,1.4523,4.0083,1.4523
+cell,run_name,method,seed,budget,bpb_divisor,val_ce,test_ce,val_bpb,test_bpb,box,note
+g3_s0_1e16,g3_tmoe_s0_1e16,temporal_fine_grained,1234,1e16,2.7600,4.0762,4.0720,1.4769,1.4754,a6000,
+g3_s0_1e16,g3_tmoe_s0_1e16_seed2,temporal_fine_grained,2,1e16,2.7600,4.0695,4.0732,1.4744,1.4758,a6000,
+g1_s2_1e17,tmoe_minlogit_sh1_s2_1e17,temporal_coarse,1234,1e17,2.7568,,3.5342,,1.2821,a6000,
+g1_s2_1e17,tmoe_minlogit_sh1_s2_1e17_seed2,temporal_coarse,2,1e17,2.7568,3.5310,3.5407,1.2808,1.2844,a6000,
+g3_s0_1e16_karen,g3_tmoe_s0_1e16_karen,temporal_auxfree_momentum,1234,1e16,2.7600,4.0742,4.0631,1.4762,1.4722,a6000,
+g3_s0_1e16_karen,g3_tmoe_s0_1e16_karen_seed2,temporal_auxfree_momentum,2,1e16,2.7600,4.0728,4.0740,1.4756,1.4761,a6000,
+g3_s0_1e16_momr,g3_tmoe_s0_1e16_momr,temporal_logratio_momentum,1234,1e16,2.7600,4.0616,4.0611,1.4716,1.4714,a6000,
+g3_s0_1e16_momr,g3_tmoe_s0_1e16_momr_seed2,temporal_logratio_momentum,2,1e16,2.7600,4.0792,4.0799,1.4780,1.4782,a6000,
+g3_s0_1e16_karensoft,g3_tmoe_s0_1e16_karen_soft,temporal_auxfree_gentlemom,1234,1e16,2.7600,4.0723,4.0581,1.4755,1.4703,a6000,
+g3_s0_1e16_karensoft,g3_tmoe_s0_1e16_karen_soft_seed2,temporal_auxfree_gentlemom,2,1e16,2.7600,4.0769,4.0780,1.4771,1.4775,a6000,
+g3_s0_1e16,g3_tmoe_s0_1e16_seed3,temporal_fine_grained,3,1e16,2.7600,4.0657,4.0674,1.4731,1.4737,a6000,
+g3_s0_1e16_a1,g3_moe_s0_1e16_auxfree,fullmoe_auxfree,1234,1e16,2.7600,,4.0006,,1.4495,a6000,
+g3_s0_1e16_a1,g3_moe_s0_1e16_auxfree_seed2,fullmoe_auxfree,2,1e16,2.7600,4.0172,4.0180,1.4555,1.4558,a6000,
+g3_s0_1e16_a0ctl,g3_moe_s0_1e16_sigmoid,fullmoe_sigmoid,1234,1e16,2.7600,,3.9951,,1.4475,a6000,
+g3_s0_1e16_a0ctl,g3_moe_s0_1e16_sigmoid_seed2,fullmoe_sigmoid,2,1e16,2.7600,4.0083,4.0083,1.4523,1.4523,a6000,
+g3_s0_1e16_a0ctl,g3_moe_s0_1e16_sigmoid_seed2,fullmoe_sigmoid,2,1e16,2.7600,3.9919,3.9998,1.4463,1.4492,h100,"3rd sigmoid replicate (h100, different val split)"
+g3_s0_1e16_mom,g3_tmoe_s0_1e16_mom,temporal_momentum_plain_b2.0,1234,1e16,2.7600,4.0627,4.0620,1.4720,1.4717,h100,h100-unique variant (plain momentum beta=2.0)
+g3_s0_1e16_mom,g3_tmoe_s0_1e16_mom_seed2,temporal_momentum_plain_b2.0,2,1e16,2.7600,4.0787,4.0865,1.4778,1.4806,h100,h100-unique variant (plain momentum beta=2.0)
