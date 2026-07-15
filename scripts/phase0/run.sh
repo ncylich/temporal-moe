@@ -28,6 +28,7 @@ case $SHAPE in
   s4) H=384; L=8;  FFN=2052; MOE_FFN=264;;
   s5) H=448; L=9;  FFN=2394; MOE_FFN=308;;
   s6) H=512; L=10; FFN=2736; MOE_FFN=352;;
+  s19opt) H=800; L=14; FFN=4272; MOE_FFN=550;;  # 1e19 compute-optimal (t19 panel), N_active ~184.1M
   *) echo "bad SHAPE $SHAPE"; exit 1;;
 esac
 MOE_LAYER_FREQ="[0]+[1]*$((L-1))"
@@ -58,6 +59,7 @@ if [ "${DENSE:-0}" = "1" ]; then
   case $SHAPE in
     sm1) FFN=540;;  s0) FFN=716;;  s1) FFN=1068;; s2) FFN=1420;;
     s3) FFN=1772;;  s4) FFN=2124;; s5) FFN=2476;; s6) FFN=2828;;
+    s19opt) FFN=4410;;
   esac
 fi
 
@@ -65,6 +67,11 @@ fi
 read N TRAIN_ITERS < <(.venv/bin/python scripts/phase0/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
 WARMUP_ITERS=$(.venv/bin/python -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
 MIN_LR=$(.venv/bin/python -c "print($PEAK_LR*0.1)")
+# LR_DECAY_STYLE=WSD: flame-family schedule (stable then decay over the last ~10% of iters),
+# for t18/t19 curve continuity. Default cosine == shipped behavior.
+LR_DECAY_STYLE=${LR_DECAY_STYLE:-cosine}
+WSD_ARGS=""
+[ "$LR_DECAY_STYLE" = "WSD" ] && WSD_ARGS="--lr-wsd-decay-iters ${WSD_DECAY_ITERS:-$((TRAIN_ITERS / 10))}"
 # Sweep runs (0c/0d) need eval@iters/10 to read the 1e16 point from the 1e17 run; HP runs only
 # need the final val loss -> EVAL_AT_END=1 evaluates once at the end (saves ~9 intermediate evals).
 if [ "${EVAL_AT_END:-0}" = "1" ]; then
@@ -100,12 +107,26 @@ export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_L
 export PATH=$ROOT/.venv/bin:$PATH
 
 # MoE-specific args (omitted entirely when DENSE=1 -> a plain dense SwiGLU transformer).
+# Router scoring / aux-free paradigm (alignment program Track A):
+#   default            : FLAME stock — pre-softmax softmax scoring + aux loss (unchanged behavior).
+#   SIGMOID_SCORE=1    : sigmoid scoring, aux loss kept (the A0 attribution control).
+#   AUXFREE=1          : DeepSeek-V3 aux-loss-free — sigmoid scoring (required by Megatron) +
+#                        per-expert bias in SELECTION only, sign-updated per step
+#                        (--moe-router-bias-update-rate, AUXFREE_U, default 1e-3). Callers should
+#                        also set AUX_COEFF to the small backstop (e.g. 0.001) per the plan.
+ROUTER_SCORE_ARGS="--moe-router-pre-softmax --moe-router-score-function softmax"
+if [ "${AUXFREE:-0}" = "1" ]; then
+  ROUTER_SCORE_ARGS="--moe-router-score-function sigmoid --moe-router-enable-expert-bias --moe-router-bias-update-rate ${AUXFREE_U:-1e-3}"
+elif [ "${SIGMOID_SCORE:-0}" = "1" ]; then
+  ROUTER_SCORE_ARGS="--moe-router-score-function sigmoid"
+fi
+
 MOE_ARGS=()
 if [ "${DENSE:-0}" != "1" ]; then
   MOE_ARGS=(
     --moe-ffn-hidden-size $MOE_FFN --num-experts $NUM_EXPERTS --moe-router-topk $TOPK
     --moe-shared-expert-intermediate-size $SHARED_INT --moe-layer-freq "$MOE_LAYER_FREQ"
-    --moe-router-dtype fp32 --moe-router-pre-softmax --moe-router-score-function softmax
+    --moe-router-dtype fp32 $ROUTER_SCORE_ARGS
     --moe-aux-loss-coeff $AUX_COEFF --moe-z-loss-coeff 0.001
     # --moe-grouped-gemm: batch the 64 local experts (EP=1) into one grouped GEMM (numerically
     # equivalent to FLAME's EP=8 sequential-per-GPU experts; required for throughput).
@@ -115,6 +136,7 @@ if [ "${DENSE:-0}" != "1" ]; then
     ${MOE_PERMUTE_FUSION:+--moe-permute-fusion}
   )
 fi
+
 MODEL_ARGS=(
   --hidden-size $H --ffn-hidden-size $FFN --num-layers $L --num-attention-heads $NHEADS
   --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
@@ -134,7 +156,7 @@ INFRA_ARGS=(
 [ "${DENSE:-0}" != "1" ] && INFRA_ARGS+=(--moe-token-dispatcher-type alltoall)
 TRAIN_ARGS=(
   --micro-batch-size $MICRO_BATCH --global-batch-size $GLOBAL_BATCH
-  --lr $PEAK_LR --min-lr $MIN_LR --lr-decay-style cosine
+  --lr $PEAK_LR --min-lr $MIN_LR --lr-decay-style $LR_DECAY_STYLE $WSD_ARGS
   --lr-warmup-iters $WARMUP_ITERS --lr-decay-iters $TRAIN_ITERS --train-iters $TRAIN_ITERS
   --weight-decay 0.01 --clip-grad 1.0 --seed $SEED
 )
@@ -143,7 +165,9 @@ LOG_ARGS=(
   --log-interval 10 --log-throughput
   --save "$CKPT" --save-interval $SAVE_INTERVAL --load "$CKPT"
   --eval-interval $EVAL_INTERVAL --eval-iters 20
-)
+  --tensorboard-dir "$OUT/tb"     # sets a writer so track_moe_metrics logs each aux loss
+)                                 # (load_balancing_loss, z_loss, coherence_loss) individually in
+                                  # the train log + tensorboard, separate from (not summed into) 'lm loss'.
 [ "${DENSE:-0}" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
 
 cd Megatron-LM
@@ -163,11 +187,24 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   export EXPERT_LOAD_OUT=$OUT/expert_load.json
   # --finetune: load only model weights (reset iter/optim/sampler) -> run a few forward passes of the
   # trained model so the router hook records per-expert load. Tail args override the TRAIN/LOG arrays.
+  # TEMPORAL=1: expert_load.py's forward patch never installs (and would override) the temporal
+  # router, so a temporal checkpoint would SILENTLY eval as a full MoE. Route through
+  # pretrain_temporal.py instead (installs the residency router + TEMPORAL_RHO/TEMPORAL_EMA_BETA
+  # knobs; no load counting). EVAL_ITERS overrides eval length (default 1, unchanged).
+  # NOTE: with --finetune the iteration counter resets, so the "warmup" train iters run at ~PEAK
+  # LR (not min-LR as an earlier comment claimed) — 10 such iters measurably corrupt a checkpoint
+  # before eval (smoke: BPB 1.93 vs 1.4753 baseline). The temporal eval path therefore freezes
+  # weights outright (--lr 0 --min-lr 0): routers/banners still fire, eval is of the true ckpt.
+  EVAL_ENTRY=$ROOT/scripts/phase0/expert_load.py; EVAL_LOG=expert_load.log; EVAL_FREEZE=""
+  if [ "${TEMPORAL:-0}" = "1" ]; then
+    EVAL_ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
+    EVAL_FREEZE="--lr 0 --min-lr 0"
+  fi
   $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
-    $ROOT/scripts/phase0/expert_load.py \
+    $EVAL_ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
-    --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
-    2>&1 | tee "$OUT/expert_load.log"
+    --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
+    2>&1 | tee "$OUT/$EVAL_LOG"
 else
   # TEMPORAL=1: rolling-residency MoE -> run via pretrain_temporal.py (installs the router patch,
   # then the identical pretrain loop). Same model args; only the expert selection differs.

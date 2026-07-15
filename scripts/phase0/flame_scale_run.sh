@@ -24,12 +24,12 @@ TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
 # fine-grained MoE knobs (shared expert intermediate stays 352 = 2*176, unchanged)
 NUM_EXPERTS=$((64 * GRAIN))
 TOPK=$((6 * GRAIN))
-MOE_FFN=$(.venv/bin/python -c "print(2*round((176/$GRAIN)/2))")
-SHARED_INT=352
+MOE_FFN=$(.venv/bin/python -c "print(2*round((${MOE_FFN_BASE:-176}/$GRAIN)/2))")
+SHARED_INT=${SHARED_INT:-352}
 
-if [ "$DENSE" = "1" ]; then FFN=1422; MODE=dense
-elif [ "$MOE_FULL" = "1" ]; then FFN=1368; MODE=moe
-else FFN=1368; MODE=temporal; fi
+if [ "$DENSE" = "1" ]; then FFN=${FFN_DENSE:-1422}; MODE=dense
+elif [ "$MOE_FULL" = "1" ]; then FFN=${FFN_MOE:-1368}; MODE=moe
+else FFN=${FFN_MOE:-1368}; MODE=temporal; fi
 RUN_NAME=${RUN_NAME:-flame38m_g${GRAIN}_${MODE}$([ "$MODE" = temporal ] && echo _${TEMPORAL_EVICT})}
 WSD_DECAY=$(.venv/bin/python -c "print(max(1,$TRAIN_ITERS//10))")
 EVAL_INTERVAL=${EVAL_INTERVAL:-$TRAIN_ITERS}
@@ -63,7 +63,7 @@ if [ "$MODE" != "dense" ]; then
   )
 fi
 MODEL_ARGS=(
-  --hidden-size 256 --ffn-hidden-size $FFN --num-layers 9 --num-attention-heads 16
+  --hidden-size ${HIDDEN_SIZE:-256} --ffn-hidden-size $FFN --num-layers ${N_LAYERS:-9} --num-attention-heads ${N_HEADS:-16}
   --swiglu --max-position-embeddings 2048 --normalization RMSNorm --norm-epsilon 1e-6
   --untie-embeddings-and-output-weights --position-embedding-type rope --disable-bias-linear
   "${MOE_ARGS[@]}"
@@ -81,7 +81,7 @@ TRAIN_ARGS=(
   --micro-batch-size $MICRO_BATCH --global-batch-size 1024
   --lr 3e-4 --min-lr 3e-5 --lr-decay-style WSD --lr-warmup-fraction $WARMUP_FRAC
   --lr-wsd-decay-iters $WSD_DECAY --train-iters $TRAIN_ITERS
-  --weight-decay 0.01 --clip-grad 1.0 --seed ${SEED:-1234}
+  --weight-decay 0.01 --clip-grad 1.0 --seed 1234
 )
 DATA_ARGS=( --seq-length 2048 --data-path $DATA_PATH --split 90,5,5 )
 LOG_ARGS=(

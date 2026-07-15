@@ -74,7 +74,7 @@ TRAIN_ARGS=(
   --micro-batch-size ${MICRO_BATCH:-8} --global-batch-size 1024
   --lr 3e-4 --min-lr 3e-5 --lr-decay-style WSD --lr-warmup-fraction $WARMUP_FRAC
   --lr-wsd-decay-iters $WSD_DECAY --train-iters $TRAIN_ITERS
-  --weight-decay 0.01 --clip-grad 1.0 --seed 1234
+  --weight-decay 0.01 --clip-grad 1.0 --seed ${SEED:-1234}
 )
 DATA_ARGS=( --seq-length 2048 --data-path $DATA_PATH --split 90,5,5 )
 LOG_ARGS=(

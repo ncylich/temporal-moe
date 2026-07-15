@@ -81,7 +81,8 @@ def _prep(lg, k):
     return order, dm, wfull
 
 
-def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swaps=False):
+def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swaps=False,
+           eval_lg=None):
     """Roll the shipped K=k, cap-1 residency policy over logged logits [S,B,E].
 
     evict: 'min_logit' (shipped) | 'lru' | 'belady' (offline-optimal: evict farthest next demand) |
@@ -89,11 +90,17 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
     tau:      hysteresis margin (logit space): swap iff best_nonresident > worst_resident + tau.
     prefetch: h>0 -> nominate for demand h tokens in the FUTURE (prescient prefetch bound).
     gamma:    discount for evict='discounted'.
+    eval_lg:  if given, coverage (setcov/masscov) is scored against THIS stream's demand/gates
+              while the trigger runs on `lg` — use for shaped triggers (EMA/momentum) so coverage
+              measures service of the RAW demand, not the shaped stream's own (self-referential).
     Returns dict: setcov[S,B], masscov[S,B] (both PRE-swap), swaprate[S,B] (bool);
     if record_swaps also nominee[S,B], evicted[S,B] expert indices (-1 == no swap).
     """
     S, B, E = lg.shape
     order, dm, w = _prep(lg, k)
+    dm_e, w_e = dm, w                  # coverage-scoring stream (defaults to the trigger stream)
+    if eval_lg is not None:
+        _, dm_e, w_e = _prep(eval_lg, k)   # score coverage vs raw demand; policy stays on lg
     NEG, POS = -np.inf, np.inf
 
     fut = Y = None
@@ -124,8 +131,8 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
     for t in range(1, S):
         lt = lg[t]
         # coverage measured on ENTRY (pre-swap): demand[t] vs current resident
-        setcov[t] = (dm[t] & res).sum(1) / k
-        masscov[t] = (w[t] * res).sum(1)
+        setcov[t] = (dm_e[t] & res).sum(1) / k
+        masscov[t] = (w_e[t] * res).sum(1)
         if evict == "discounted":
             yt = Y[t]
             nom_i = np.where(res, NEG, yt).argmax(1)
@@ -527,6 +534,114 @@ def e8():
     return out
 
 
+# =====================================================================================
+#  A1 (mechanisms plan Tier A) — combined tau-margin x EMA-smoothing trigger, per grain.
+#  Composes E4 (tau) and E7 (EMA) exactly as shipped: smooth the trigger's logits with _ema,
+#  then replay with a hysteresis margin tau on the smoothed stream. beta=1.0 tau=0 == baseline.
+# =====================================================================================
+def a1_tau_ema(taus=(0.0, 1.0, 2.0, 4.0), betas=(1.0, 0.5, 0.25, 0.1)):
+    print("\n=== A1  combined tau x EMA trigger-shaping replay ===")
+    rows = []   # (run, tau, beta, swaprate, setcov, masscov, s_max_budget)
+    for run in HEADLINERS:
+        r = load(run)
+        budget = None
+        for beta in betas:
+            for tau in taus:
+                per = {}
+                for ln, rec in r["layers"].items():
+                    k = rec["k"]; budget = s_max(k)
+                    raw = rec["logits"]
+                    per[ln] = replay(_ema(raw, beta), k, evict="min_logit", tau=tau, eval_lg=raw)
+                sr, sc, mc = agg(per, "swaps"), agg(per, "setcov"), agg(per, "masscov")
+                rows.append((run, tau, beta, sr, sc, mc, budget))
+        feasible = [x for x in rows if x[0] == run and x[3] <= budget]
+        best = max(feasible, key=lambda x: x[5]) if feasible else None
+        if best:
+            print(f"  {label(run):40s} budget={budget:.3f}  best-feasible: "
+                  f"tau={best[1]:.0f} beta={best[2]:.2f} -> swap={best[3]:.3f} mass={best[5]*100:.1f}%")
+        else:
+            print(f"  {label(run):40s} budget={budget:.3f}  NO (tau,beta) in this grid reaches budget")
+    _csv("a1_tau_ema_grid.csv",
+         ["run", "tau", "beta", "swaprate", "setcov", "masscov", "s_max_budget"], rows)
+    return rows
+
+
+# =====================================================================================
+#  A2 (mechanisms plan Tier A) — additive momentum trigger score vs pure EMA (A1's winner).
+#  score_t = p_t + beta_m * M_{t-1},  M_t = (1-gamma_m) M_{t-1} + gamma_m p_t   (p = softmax(logits))
+#  Causal (M_{t-1} only), cold-start M_{-1} = p_0 (no bonus at t=0). Feed the shaped score into
+#  the SAME replay() used everywhere else -- only the input array differs from _ema's output.
+# =====================================================================================
+def _softmax_full(lg):
+    z = lg - lg.max(-1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(-1, keepdims=True)
+
+
+def _momentum_scores(lg, beta_m, gamma_m, alpha_m=0.0, gamma_q=0.015625, mode="add"):
+    # alpha_m>0 = Karen's full double-momentum (slow-EMA penalty Q; anti-pinning). mode="logratio"
+    # = popularity-normalized momentum on RAW-LOGIT base (LG1). Mirrors
+    # temporal_router.momentum_shaped_scores; keep the two in sync (cross-framework test).
+    p = _softmax_full(lg)
+    M = np.empty_like(p)
+    M[0] = p[0]
+    for t in range(1, p.shape[0]):
+        M[t] = (1 - gamma_m) * M[t - 1] + gamma_m * p[t]
+    if mode == "logratio" or alpha_m > 0:
+        Q = np.empty_like(p)
+        Q[0] = p[0]
+        for t in range(1, p.shape[0]):
+            Q[t] = (1 - gamma_q) * Q[t - 1] + gamma_q * p[t]
+    if mode == "logratio":
+        eps = 1.0 / lg.shape[-1]
+        score = lg.astype(np.float32).copy()
+        score[1:] = lg[1:] + beta_m * np.log((M[:-1] + eps) / (Q[:-1] + eps))
+        return score
+    score = p.copy()
+    score[1:] = p[1:] + beta_m * M[:-1]
+    if alpha_m > 0:
+        score[1:] -= alpha_m * Q[:-1]
+    return score
+
+
+def a2_beta_m(gammas=(1 / 8, 1 / 16, 1 / 32), betas=(0.5, 1.0, 2.0)):
+    print("\n=== A2  additive-momentum trigger vs pure EMA (A1 winner) ===")
+    rows = []   # (run, gamma_m, beta_m, swaprate, setcov, masscov)
+    ema_ref = {}  # run -> best EMA-only (tau=0) point at comparable swap rate, from A1's beta grid
+    for run in HEADLINERS:
+        r = load(run)
+        # EMA-only reference curve (tau=0) at the same betas A1 swept, for an apples-to-apples read
+        ema_pts = []
+        for beta in (1.0, 0.5, 0.25, 0.1):
+            per = {}
+            for ln, rec in r["layers"].items():
+                k = rec["k"]; raw = rec["logits"]
+                per[ln] = replay(_ema(raw, beta), k, evict="min_logit", eval_lg=raw)
+            ema_pts.append((agg(per, "swaps"), agg(per, "masscov")))
+        best_mom = None
+        for gm in gammas:
+            for bm in betas:
+                per = {}
+                for ln, rec in r["layers"].items():
+                    k = rec["k"]
+                    raw = rec["logits"]
+                    per[ln] = replay(_momentum_scores(raw, bm, gm), k, evict="min_logit", eval_lg=raw)
+                sr, sc, mc = agg(per, "swaps"), agg(per, "setcov"), agg(per, "masscov")
+                rows.append((run, gm, bm, sr, sc, mc))
+                if best_mom is None or mc > best_mom[3]:
+                    best_mom = (gm, bm, sr, mc)
+        # compare best momentum point vs the closest-swap-rate EMA-only point
+        closest_ema = min(ema_pts, key=lambda x: abs(x[0] - best_mom[2]))
+        beats = best_mom[3] > closest_ema[1]
+        print(f"  {label(run):40s} momentum best: gamma_m={best_mom[0]:.4f} beta_m={best_mom[1]:.1f} "
+              f"swap={best_mom[2]:.3f} mass={best_mom[3]*100:.1f}%  |  "
+              f"closest EMA-only swap={closest_ema[0]:.3f} mass={closest_ema[1]*100:.1f}%  "
+              f"-> momentum {'WINS' if beats else 'loses'} ({(best_mom[3]-closest_ema[1])*100:+.1f}pt)")
+    _csv("a2_momentum_grid.csv",
+         ["run", "gamma_m", "beta_m", "swaprate", "setcov", "masscov"], rows)
+    return rows
+
+
 def _split_rate(per, eod, S, w, key):
     after_n = after_d = within_n = within_d = 0.0
     for p in per.values():
@@ -840,6 +955,12 @@ def _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    if "--a1" in sys.argv:
+        a1_tau_ema()
+        return
+    if "--a2" in sys.argv:
+        a2_beta_m()
+        return
     e1_rows, e1_victim = e1()
     e2_summary, _ = e2()
     e3_rows = e3()

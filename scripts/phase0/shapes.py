@@ -16,6 +16,9 @@ SHAPES = {
     "s4": dict(h=384, L=8,  ffn=2052, moe_ffn=264),
     "s5": dict(h=448, L=9,  ffn=2394, moe_ffn=308),
     "s6": dict(h=512, L=10, ffn=2736, moe_ffn=352),
+    # 1e19 compute-optimal point (t19 panel): N_active ~184.1M, between the paper-alpha (~159M)
+    # and strict-empirical (~288M) extrapolations; flame aspect (L=h/64+2, ffn~5.34h, moe~0.6875h).
+    "s19opt": dict(h=800, L=14, ffn=4272, moe_ffn=550),
 }
 import os
 # GRAIN>1: fine-grain the ROUTED experts (see run.sh). num_experts and top-k scale by GRAIN; each
