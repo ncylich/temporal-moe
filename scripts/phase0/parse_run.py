@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
-"""Parse a Phase-0 train.log: final val loss, val loss at the 1e16 iter (iters/10),
+"""Parse a Phase-0 train.log: final eval loss, val loss at the 1e16 iter (iters/10),
 NaN check, and last train loss. Prints a one-line summary + JSON.
+
+Note: Megatron prints three end-of-run eval lines all prefixed "validation loss at" —
+the during-training val eval, then "on validation set" and "on test set" full evals.
+The last matching line (what "final" below captures) is therefore the END-OF-TRAINING
+TEST-SET eval when present; the summary labels it final_test_CE accordingly (the field
+was misnamed final_val_CE before 2026-07).
 
 Usage: parse_run.py <run_dir>
 """
@@ -40,6 +46,7 @@ def main():
     last_train = float(tl[-1]) if tl else None
 
     final_val = vals[-1][1] if vals else None
+    final_key = "final_test" if (vals and "test set" in vals[-1][2]) else "final_val"
     # val at 1e16 point: closest logged iter to iters_1e16
     val_1e16 = None
     if iters_1e16 and vals:
@@ -49,17 +56,18 @@ def main():
             val_1e16 = {"iter": cand[0][2], "loss": cand[0][1]}
 
     out = dict(run=os.path.basename(run), total_iters=total_iters,
-               iters_1e16=iters_1e16, final_val_loss=final_val,
-               final_val_bpb=bpb(final_val),
-               final_val_ppl=(round(math.exp(min(20, final_val)),1) if final_val else None),
-               val_at_1e16=val_1e16,
+               iters_1e16=iters_1e16)
+    out[f"{final_key}_loss"] = final_val
+    out[f"{final_key}_bpb"] = bpb(final_val)
+    out[f"{final_key}_ppl"] = round(math.exp(min(20, final_val)), 1) if final_val else None
+    out.update(val_at_1e16=val_1e16,
                val_at_1e16_bpb=(bpb(val_1e16["loss"]) if val_1e16 else None),
                last_train_loss=last_train,
                nan=nan, n_val_evals=len(vals), bpb_divisor=BPB_DIVISOR)
     print(json.dumps(out))
     fv = f"{final_val:.4f} (BPB {bpb(final_val):.4f})" if final_val else "NA"
     v16 = f"{val_1e16['loss']:.4f} (BPB {bpb(val_1e16['loss']):.4f})@it{val_1e16['iter']}" if val_1e16 else "NA"
-    print(f"SUMMARY {out['run']}: final_val_CE={fv}  val@iters/10={v16}  nan={nan}  evals={len(vals)}")
+    print(f"SUMMARY {out['run']}: {final_key}_CE={fv}  val@iters/10={v16}  nan={nan}  evals={len(vals)}")
 
 if __name__ == "__main__":
     main()

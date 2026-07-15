@@ -6,13 +6,12 @@ numbers; duplication removed; stale status lines fixed — those originals live 
 history). Per-point data: `phase0_isoflop_points.csv` (finals for every §2–§6 run, extracted from the raw
 run log `results/phase0/log.md` on `temporal-moe-impl@66f786b7`) + `phase0_lr_tuning.csv` (§1) +
 `flame38m_1e18_cells.csv` (§7); later 1e18/1e19 programs have their own CSVs — see
-[README.md](README.md). **Eval-split caveat (resolved via raw train.log forensics):** the tables
-below mix two eval lines — some cells are the during-training **val** eval (20-batch subsample,
-occasionally pre-final iteration), others the end-of-training **test-set** eval, which is what
-`parse_run.py`'s mislabeled `final_val` field actually captures. Differences are ~0.004 CE, smaller
-than seed noise; no conclusion changes. `phase0_isoflop_points.csv` records both per point, with the
-protocol-consistent `ce_test_final` column (end-of-training test eval, final weights, same protocol
-for all runs) as the preferred series. Figures: `../phase0/figures/`.
+[README.md](README.md). **Eval protocol:** all §2–§6 quality numbers below are the
+**end-of-training test-set eval** (`ce_test_final`) — final weights, held-out split, identical
+protocol for every run. The original write-ups sometimes quoted during-training val evals ~0.004 CE
+higher (20-batch subsample, occasionally pre-final iteration); both series are preserved per point
+in `phase0_isoflop_points.csv`. One value (temporal s2@1e17, 1.2821) has no surviving train.log and
+keeps its published figure. Figures: `../phase0/figures/`.
 
 **Metrics.** `BPB = CE_nats / (ln2 · bytes_per_token)` — bits-per-byte, tokenizer-invariant, lower
 is better (needed because Phase-0 sweeps use a custom 16k-BPE; divisor 2.7568 for bpe-16k,
@@ -62,8 +61,8 @@ FLAME scaling law predicts.
 | 1e16 | **s0 (1.36M active)** | 1.447 | 1.48M |
 | 1e17 | **s2 (8.12M active)** | 1.269 | 7.74M |
 
-Measured frontiers (val BPB): **@1e17** s1 1.284 · **s2 1.269 (min)** · s3 1.289.
-**@1e16** (dedicated annealed runs incl. sub-s1 shapes) s₋₁ 1.478 · **s0 1.447 (min)** · s1 1.540 ·
+Measured frontiers (test BPB): **@1e17** s1 1.2803 · **s2 1.269 (min)** · s3 1.289.
+**@1e16** (dedicated annealed runs incl. sub-s1 shapes) s₋₁ 1.4766 · **s0 1.447 (min)** · s1 1.540 ·
 s2 1.819 · s3 2.187 (monotone-increasing across s1–s6).
 
 These are **the (B=1, s=1) temporal-reference baselines**: 1e17 → 1.269 BPB / CE 3.4985 nats (s2),
@@ -81,7 +80,7 @@ instead" floor.
 **@1e16 (BPB):**
 | shape | N_active | dense | MoE | MoE − dense |
 |---|---|---|---|---|
-| sm1 (=s₋₁) | 0.77M | 1.534 | 1.478 | **−0.056** |
+| sm1 (=s₋₁) | 0.77M | 1.534 | 1.4766 | **−0.057** |
 | **s0** | 1.36M | **1.519 (min)** | **1.447 (min)** | **−0.072** |
 | s1 | 3.81M | 1.591 | 1.540 | −0.051 |
 | s2 | 8.12M | 1.848 | 1.819 | −0.029 |
@@ -89,7 +88,7 @@ instead" floor.
 **@1e17 (BPB):**
 | shape | N_active | dense | MoE | MoE − dense |
 |---|---|---|---|---|
-| s1 | 3.81M | 1.361 | 1.284 | −0.077 |
+| s1 | 3.81M | 1.361 | 1.2803 | −0.081 |
 | **s2** | 8.12M | **1.341 (min)** | **1.269 (min)** | **−0.072** |
 | s3 | 14.77M | 1.408 | 1.289 | −0.119 |
 | s4 | 24.29M | 1.485 | — | — |
@@ -99,7 +98,7 @@ instead" floor.
 Findings: (1) **MoE wins everywhere** (−0.03 to −0.12 BPB; no shape where dense catches up).
 (2) **Same compute-optimal shape** — both parabolas bottom out at s0@1e16 / s2@1e17 and the optimum
 shifts right identically: MoE lowers the curve without changing the dense scaling geometry.
-(3) **The MoE advantage grows with size** (@1e17: −0.077 at s1 → −0.119 at s3); the 1e16 right arm
+(3) **The MoE advantage grows with size** (@1e17: −0.081 at s1 → −0.119 at s3); the 1e16 right arm
 is far past optimum and noisier. Headline: **~0.072 BPB MoE gain at the compute-optimal shape of
 both budgets.** Repro: `run.sh` with `DENSE=1`, configs `dense_1e16.txt`/`dense_1e17.txt`
 (+ `dense_ext_*.txt`); note `DENSE=1` needs absolute `TOKENIZER_MODEL`/`DATA_DIR` paths (run.sh
@@ -113,7 +112,7 @@ FLAME-law CE targets → BPB bars (÷2.978): **≤1.645 @1e17, ≤2.149 @1e16** 
    beat the law's pessimistic 1e16 extrapolation by ~0.8 BPB).
 2. **Curve shape — PASS.** @1e17 parabola, min at s2 (within s1–s3); @1e16 parabola, min at s0,
    monotone-increasing s1–s6.
-3. **Reproducible — PASS.** s2@1e17 seed-2 CE 3.5075 vs seed-1 3.4985 → |Δ| = 0.0090 nats ≤ 0.03.
+3. **Reproducible — PASS.** s2@1e17 seed-2 test CE 3.5004 vs seed-1 3.4985 → |Δ| = 0.0019 nats ≤ 0.03.
 4. **Healthy routing — PASS.** s2@1e17 per-MoE-layer max/mean expert load 1.44–2.07× (worst
    2.07× ≪ 8×); aux-loss converged.
 
@@ -132,19 +131,19 @@ expert; `temporal_router.py` (single-launch Triton scan, verified bit-exact vs t
 **@1e16 (BPB; compute-optimal = s0):**
 | shape | N_active | dense | MoE (1sh) | **temporal** | recovery |
 |---|---|---|---|---|---|
-| sm1 | 0.77M | 1.534 | 1.478 | 1.4891 | 80% |
+| sm1 | 0.77M | 1.534 | 1.4766 | 1.4872 | 82% |
 | **s0** | 1.36M | 1.519 | **1.447** | **1.4599** | **82%** |
-| s1 | 3.81M | 1.591 | 1.540 | 1.5488 | 83% |
-| s2 | 8.12M | 1.848 | 1.819 | 1.8260 | 76% |
+| s1 | 3.81M | 1.591 | 1.540 | 1.5473 | 85% |
+| s2 | 8.12M | 1.848 | 1.819 | 1.8248 | 79% |
 
 **@1e17 (BPB; compute-optimal = s2):**
 | shape | N_active | dense | MoE (1sh) | **temporal** | recovery |
 |---|---|---|---|---|---|
-| s1 | 3.81M | 1.361 | 1.284 | 1.3039 | 74% |
+| s1 | 3.81M | 1.361 | 1.2803 | 1.3027 | 72% |
 | **s2** | 8.12M | 1.341 | **1.269** | **1.2821** | **82%** |
-| s3 | 14.77M | 1.408 | 1.289 | 1.3073 | 85% |
+| s3 | 14.77M | 1.408 | 1.289 | 1.3061 | 86% |
 
-Findings: (1) temporal sits **inside the dense↔MoE band at every shape**, tracking ~0.009–0.020 BPB
+Findings: (1) temporal sits **inside the dense↔MoE band at every shape**, tracking ~0.006–0.022 BPB
 above the MoE and far below dense. (2) **Same compute-optimal shape and parabola as MoE/dense**
 (s0@1e16, s2@1e17) — temporal preserves the scaling geometry. (3) Eviction: min_logit ≳ lru, small
 (≤0.006 BPB), consistent at 1e16. (4) Shared-expert knob negligible/inconsistent at B=1 (2-shared
@@ -170,12 +169,12 @@ scaling geometry (same compute-optimal shape per budget).
 **Temporal (G3) vs the dense↔MoE band** (dense floor = G=1 dense; active params identical):
 | budget | shape | N_active | dense (G1) | MoE (G3) | **temporal (G3)** | recovery | vs G1 temporal |
 |---|---|---|---|---|---|---|---|
-| 1e16 | sm1 | 0.81M | 1.534 | 1.4786 | **1.4976** | 66% | 1.4891 |
+| 1e16 | sm1 | 0.81M | 1.534 | 1.4786 | **1.4976** | 66% | 1.4872 |
 | 1e16 | **s0** | 1.42M | 1.519 | 1.4585 | **1.4753** | 72% | 1.4599 |
-| 1e16 | s1 | 3.91M | 1.591 | 1.5352 | **1.5861** | 9% | 1.5488 |
-| 1e17 | s1 | 3.91M | 1.361 | 1.2846 | **1.3065** | 71% | 1.3039 |
+| 1e16 | s1 | 3.91M | 1.591 | 1.5352 | **1.5861** | 9% | 1.5473 |
+| 1e17 | s1 | 3.91M | 1.361 | 1.2846 | **1.3065** | 71% | 1.3027 |
 | 1e17 | **s2** | 8.23M | 1.341 | 1.2708 | **1.2873** | 77% | 1.2821 |
-| 1e17 | s3 | 15.09M | 1.408 | 1.2815 | **1.3129** | 75% | 1.3073 |
+| 1e17 | s3 | 15.09M | 1.408 | 1.2815 | **1.3129** | 75% | 1.3061 |
 
 At the compute-optimal shapes temporal lands solidly inside the band (**72% @1e16-s0, 77%
 @1e17-s2**, costing only ~+0.017 BPB over the full MoE) — below G=1's ~82% at the same shapes: a consistent **~5–10-pt hint that finer experts
