@@ -1,8 +1,8 @@
 # 1e18 38M-middle (hidden-256/L9, 2121 iters, pythia-50k, CE nats) 5-cell panel finals (FINDINGS.md section 7).
 # Coarse (G1) cells have per-seed val/test finals + full curves in t18_1e18_curves.csv; this file is the panel summary.
 run,method,grain,experts,topk,seed,val_ce,test_ce,source,note,val_ce_bpb,test_ce_bpb
-flame38m_dense,dense,1,,,1234,4.1373,,log.md (temporal-moe-impl@66f786b7),a6000; ffn 1422 param-matched dense floor,1.3893,
-flame38m_temporal_minlogit,temporal,1,64,6,1234,3.9045,,log.md (temporal-moe-impl@66f786b7),a6000 original run (docs round-quote 3.906),1.3111,
+flame38m_dense,dense,1,,,1234,4.1373,4.1373,log.md (temporal-moe-impl@66f786b7),"a6000; ffn 1422 param-matched dense floor. train.log-verified: val_ce=during-training val 4.137277, test_ce=end-of-run test 4.137313 (full-val 4.138937 unused)",1.3893,1.3893
+flame38m_temporal_minlogit,temporal,1,64,6,1234,3.9045,3.9050,log.md (temporal-moe-impl@66f786b7),"a6000 original run. train.log-verified: val_ce=during-training val 3.904450, test_ce=end-of-run test 3.904986; the docs 3.906 was the end-of-run FULL-VAL eval 3.906246 (not a rounding)",1.3111,1.3113
 flame38m_g1_moe,moe,1,64,6,1234,3.914069,3.918414,t18_1e18_curves.csv (h100@60b0e351),"h100 re-run, local self-consistent split; measured per-seed finals here are canonical - the plot_1e18.py coarse bars and G3_RESULTS 3.9209 were pre-run approximations used for error bars, superseded by these values (per Noah)",1.3143,1.3158
 flame38m_g1_moe_s2,moe,1,64,6,2,3.932836,3.93021,t18_1e18_curves.csv (h100@e53596d6),seed replicate,1.3206,1.3197
 flame38m_g1_temporal,temporal,1,64,6,1234,,3.91209,t18_1e18_curves.csv (h100@60b0e351),h100 re-run; source row lacked val_ce column,,1.3137

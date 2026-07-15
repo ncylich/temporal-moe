@@ -14,8 +14,8 @@ in `phase0_isoflop_points.csv`. One value (temporal s2@1e17, 1.2821) has no surv
 keeps its published figure. Figures: `../phase0/figures/`.
 
 **Metrics.** `BPB = CE_nats / (ln2 · bytes_per_token)` — bits-per-byte, tokenizer-invariant, lower
-is better (needed because Phase-0 sweeps use a custom 16k-BPE; divisor 2.7568 for bpe-16k,
-2.978 for pythia-50k). 1e18 results report raw **validation cross-entropy in nats** (the paper's
+is better (needed because Phase-0 sweeps use a custom 16k-BPE; divisor 2.7568 for the original
+bpe-16k corpus, 2.7600 for the G3-era 16k corpus, 2.9780 for pythia-50k). 1e18 results report raw **validation cross-entropy in nats** (the paper's
 metric; we match their pythia-50k tokenizer there). `recovery = (dense − temporal)/(dense − MoE)`:
 the fraction of MoE's quality gain over dense that temporal keeps (higher is better).
 
@@ -52,7 +52,7 @@ Repro: `scripts/phase0/run.sh` (env-parametrized launcher), `drive.sh` (driver),
 
 ## 2. G=1 FLAME-MoE baseline — IsoFLOP parabolas match the scaling law
 
-At fixed compute, validation loss vs model size is a **parabola**, and its **minimum shifts right
+At fixed compute, eval loss vs model size is a **parabola**, and its **minimum shifts right
 as the FLOP budget grows** — the compute-optimal model size scales with compute, exactly as the
 FLAME scaling law predicts.
 
@@ -188,15 +188,16 @@ Paper's smallest compute-optimal model replicated exactly (hidden 256 / 9 layers
 2121 iters = 4.45B tokens, **pythia-50k**, dclm; metric = validation CE in nats, lower better).
 Two measurement panels — note they use **different val splits**, so compare within a panel:
 
-**(a) A6000 panel** (dense + temporal-G1 trained identically; only the router differs):
-| config | val-CE @1e18 |
+**(a) A6000 panel** (dense + temporal-G1 trained identically; only the router differs;
+test-set CE, train.log-verified — the originally-quoted 3.906 was the full-val eval line):
+| config | test-CE @1e18 |
 |---|---|
-| dense floor (ffn 1422, matched active non-embed params) | **4.137** |
-| **temporal** (rolling residency, 6/64 resident, min_logit) | **3.906** |
+| dense floor (ffn 1422, matched active non-embed params) | **4.1373** |
+| **temporal** (rolling residency, 6/64 resident, min_logit) | **3.9050** |
 
-Temporal beats dense by **0.231 nats** — clean, fully measured. Against the paper's law-predicted
+Temporal beats dense by **0.232 nats** — clean, fully measured. Against the paper's law-predicted
 MoE (≈3.78, *their* val set — extrapolation + val-split confounds) that is ~65% recovery
-(0.231/0.357); the measured panel below is the sharper comparison.
+(0.232/0.357); the measured panel below is the sharper comparison.
 
 **(b) Local self-consistent panel** (freshly-tokenized 50k dclm, one shared val split;
 `flame38m_run.sh`; dense not re-run locally — the A6000 4.137 cross-checks within ~0.01 nats):
