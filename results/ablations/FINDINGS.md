@@ -199,24 +199,26 @@ Temporal beats dense by **0.232 nats** — clean, fully measured. Against the pa
 MoE (≈3.78, *their* val set — extrapolation + val-split confounds) that is ~65% recovery
 (0.232/0.357); the measured panel below is the sharper comparison.
 
-**(b) Local self-consistent panel** (freshly-tokenized 50k dclm, one shared val split;
-`flame38m_run.sh`; dense not re-run locally — the A6000 4.137 cross-checks within ~0.01 nats):
-| config | val-CE @1e18 |
+**(b) Local self-consistent panel** (freshly-tokenized 50k dclm, one shared split;
+`flame38m_run.sh`; dense not re-run locally — the A6000 4.1373 cross-checks within ~0.01 nats;
+test-set CE, h100 train.log-verified — the originally-quoted 3.9209 was MoE-G1's during-training
+val line, and the G3 figures were already the test lines):
+| config | test-CE @1e18 |
 |---|---|
-| MoE (G1, 6/64, full) | **3.9209** — best MoE |
+| MoE (G1, 6/64, full) | **3.9184** — best MoE (seed-2: 3.9302) |
 | temporal (G3, 18/192) | **3.9768** |
 | MoE (G3, 18/192, full) | **4.0087** |
 
 Two clean findings:
 
-1. **Fine-graining HURTS the full MoE at 1e18** — coarse MoE-G1 (3.921) beats fine MoE-G3 (4.009)
-   by 0.088 nats: 192 experts is over-fine for 4.45B tokens (experts undertrained). Opposite of
+1. **Fine-graining HURTS the full MoE at 1e18** — coarse MoE-G1 (3.918) beats fine MoE-G3 (4.009)
+   by 0.090 nats: 192 experts is over-fine for 4.45B tokens (experts undertrained). Opposite of
    1e16/1e17, where the coarse MoE is *also* token-starved, hiding the effect.
 2. **Temporal is robust to over-fine-graining** — temporal-G3 (3.977) beats its own-granularity
    full MoE (4.009) by 0.032 (train loss agrees: 3.975 vs 4.011): rolling residency concentrates each span on a
    small resident set, so those experts see more tokens and train better than the full MoE's
-   thinly-spread 192. Against the true MoE quality (G1 3.921) and the dense floor (4.137),
-   temporal-G3 recovers **~74%** — consistent with the ~66–77% at 1e16/1e17.
+   thinly-spread 192. Against the true MoE quality (G1 3.918) and the dense floor (4.137),
+   temporal-G3 recovers **~73%** — consistent with the ~66–77% at 1e16/1e17.
 
 Perf: ~7–13s/iter locally (G1 ~7s, G3 ~13s) — the un-fused 50k-vocab LM head is the fixed cost at
 this 12M-hidden-dim scale. Plot: `../phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png`.

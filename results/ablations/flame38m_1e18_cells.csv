@@ -3,9 +3,9 @@
 run,method,grain,experts,topk,seed,val_ce,test_ce,source,note,val_ce_bpb,test_ce_bpb
 flame38m_dense,dense,1,,,1234,4.1373,4.1373,log.md (temporal-moe-impl@66f786b7),"a6000; ffn 1422 param-matched dense floor. train.log-verified: val_ce=during-training val 4.137277, test_ce=end-of-run test 4.137313 (full-val 4.138937 unused)",1.3893,1.3893
 flame38m_temporal_minlogit,temporal,1,64,6,1234,3.9045,3.9050,log.md (temporal-moe-impl@66f786b7),"a6000 original run. train.log-verified: val_ce=during-training val 3.904450, test_ce=end-of-run test 3.904986; the docs 3.906 was the end-of-run FULL-VAL eval 3.906246 (not a rounding)",1.3111,1.3113
-flame38m_g1_moe,moe,1,64,6,1234,3.914069,3.918414,t18_1e18_curves.csv (h100@60b0e351),"h100 re-run, local self-consistent split; measured per-seed finals here are canonical - the plot_1e18.py coarse bars and G3_RESULTS 3.9209 were pre-run approximations used for error bars, superseded by these values (per Noah)",1.3143,1.3158
-flame38m_g1_moe_s2,moe,1,64,6,2,3.932836,3.93021,t18_1e18_curves.csv (h100@e53596d6),seed replicate,1.3206,1.3197
-flame38m_g1_temporal,temporal,1,64,6,1234,,3.91209,t18_1e18_curves.csv (h100@60b0e351),h100 re-run; source row lacked val_ce column,,1.3137
-flame38m_g1_temporal_s2,temporal,1,64,6,2,3.906799,,t18_1e18_curves.csv (h100@e53596d6),seed replicate,1.3119,
-flame38m_g3_moe,moe,3,192,18,1234,4.0087,,G3_RESULTS/plot_1e18.py,h100 local; fine-graining hurts full MoE at 1e18,1.3461,
-flame38m_g3_temporal,temporal,3,192,18,1234,3.9768,,G3_RESULTS/plot_1e18.py,h100 local; temporal robust to over-fine-graining,1.3354,
+flame38m_g1_moe,moe,1,64,6,1234,3.914069,3.918414,t18_1e18_curves.csv (h100@60b0e351),"h100; train.log-verified: val_ce=full-val, test_ce=test. The G3_RESULTS 3.9209 = this run's during-training val line (3.920937); plot_1e18.py coarse bars = 2-seed means of the during-training val lines (moe (3.920937+3.933625)/2=3.9273, temporal (3.912090+3.907420)/2=3.9098) - all three eval lines now reconciled",1.3143,1.3158
+flame38m_g1_moe_s2,moe,1,64,6,2,3.932836,3.930210,t18_1e18_curves.csv (h100@e53596d6),"seed replicate; val_ce=full-val, test_ce=test (h100-verified)",1.3206,1.3197
+flame38m_g1_temporal,temporal,1,64,6,1234,3.905200,3.909421,t18_1e18_curves.csv (h100@60b0e351),"h100; train.log-verified: the t18 source file's 3.912090 was the during-training val line; val_ce=full-val, test_ce=test",1.3113,1.3128
+flame38m_g1_temporal_s2,temporal,1,64,6,2,3.906799,3.904324,t18_1e18_curves.csv (h100@e53596d6),"seed replicate; val_ce=full-val, test_ce=test (h100-verified)",1.3119,1.3111
+flame38m_g3_moe,moe,3,192,18,1234,4.004456,4.008667,G3_RESULTS/plot_1e18.py,"h100; train.log-verified: G3_RESULTS' 4.0087 was in fact the TEST line; val_ce=full-val, test_ce=test. Fine-graining hurts full MoE at 1e18",1.3447,1.3461
+flame38m_g3_temporal,temporal,3,192,18,1234,3.972339,3.976762,G3_RESULTS/plot_1e18.py,"h100; train.log-verified: G3_RESULTS' 3.9768 was in fact the TEST line; val_ce=full-val, test_ce=test. Temporal robust to over-fine-graining",1.3339,1.3354

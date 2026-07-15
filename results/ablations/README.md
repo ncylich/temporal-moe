@@ -63,7 +63,7 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `t19_lmeval.csv` | t19 downstream lm-eval accuracies (dense / moe_coarse / temporal_coarse). | h100@a42340f1 |
 | `t19_lmeval_finegrain.csv` | t19 fine-grained temporal downstream lm-eval accuracies. | h100@3b8d9da8 |
 | `t19_moe_coarse_probe.csv` | t19 coarse full-MoE routing probe — load balance, gate PR, self-consistency. | h100@5df8095d |
-| `t19_temporal_probe.csv` | t19 temporal residency probe (coarse 6/64 val-CE + fine 18/192 test-CE) — A3 mass/set coverage, union, eff-experts. Combines t19_probe_triple + t19_fine_probe_triple. | h100@6a69b7f7 (coarse), h100@d2b7cd7e (fine) |
+| `t19_temporal_probe.csv` | t19 temporal residency probe (coarse 6/64 + fine 18/192; test-CE, h100 train.log-verified) — A3 mass/set coverage, union, eff-experts. Combines t19_probe_triple + t19_fine_probe_triple. | h100@6a69b7f7 (coarse), h100@d2b7cd7e (fine) |
 | `temporal_router_momentum_sweep.csv` | Temporal-router momentum (γ_m×β_m) sweep — swap rate & set/mass coverage (audit-scored). | a6000@6f9e02bc |
 | `temporal_router_momentum_sweep_selfscored.csv` | Same momentum sweep, self-scored coverage. | a6000@6f9e02bc |
 | `temporal_router_tau_ema_sweep.csv` | Temporal-router τ (min-logit eviction threshold) × EMA-β sweep — swap rate & coverage (audit-scored). | a6000@6f9e02bc |

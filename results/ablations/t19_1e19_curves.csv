@@ -1,4 +1,4 @@
-run,iteration,train_lm_loss,final_val_ce,seed,train_lm_loss_bpb,final_val_ce_bpb
+run,iteration,train_lm_loss,final_test_ce,seed,train_lm_loss_bpb,final_test_ce_bpb
 dense_1e19,10,1.011392E+01,,1234,3.3962,
 dense_1e19,20,8.825540E+00,,1234,2.9636,
 dense_1e19,30,7.702665E+00,,1234,2.5865,
