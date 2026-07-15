@@ -12,7 +12,7 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `b1_eval_bpb.csv` | B1 eval: test-BPB vs baseline (Δ) across τ_ρ / EMA-β router configs. | a6000@85c6f4e7 |
 | `block_replay.csv` | Block-wise (chunked) routing replay — retained mass, coverage, union, turnover per block boundary. | a6000@97de0d04 |
 | `downstream_evals.csv` | Downstream lm-eval task accuracies per budget/checkpoint/model/task. | a6000@10a8bf6a |
-| `e1_swap_rate_by_layer.csv` | Mean & p95 rolling-residency swap rate per layer. | a6000@cd588fd6, h100@cd588fd6 |
+| `e1_swap_rate_by_layer.csv` | Mean rolling-residency swap rate + p95 swap-burst length per layer. | a6000@cd588fd6, h100@cd588fd6 |
 | `e1_victim_cache_hitrate.csv` | Expert-reload hit-rate vs victim-cache size. | a6000@cd588fd6, h100@cd588fd6 |
 | `e2_streamed_diversity.csv` | Streamed expert diversity — union / effective-experts per model. | a6000@cd588fd6, h100@cd588fd6 |
 | `e3_mass_vs_set_consistency.csv` | Mass- vs set-consistency of routing across positions. | a6000@cd588fd6, h100@cd588fd6 |
