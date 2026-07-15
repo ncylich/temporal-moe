@@ -1,0 +1,493 @@
+#!/usr/bin/env python3
+"""Temporal MoE — rolling-residency routing (proof of concept).
+
+A trained-from-scratch MoE variant that keeps only K = k routed experts resident per layer and
+streams one expert at a time (evicting the LRU or least-wanted resident — see `evict` below),
+so the resident footprint is a small fraction of all E experts.
+See docs/research/temporal-moe.md (§2 "rolling residency").
+
+The whole architecture is:
+  1. `compute_resident_mask` — the pure, unit-tested rolling-residency selection (this is the only
+     novel logic; tests in temporal/tests/test_temporal_router.py).
+  2. `temporal_forward` — a ~6-line replacement for Megatron's `TopKRouter.forward` that restricts
+     each token's selection to its resident set by masking non-resident logits to -inf, then calls
+     the UNMODIFIED `routing()` so z-loss, aux-loss and top-k are reused verbatim.
+  3. `install` — monkeypatches `TopKRouter.forward` (same approach as expert_load.py).
+
+The Megatron import lives inside `install()` so this module (and its tests) import with plain torch
+and no Megatron present.
+
+Experimental (default-off, negative-result) scoring/loss knobs — aux-free trigger, momentum,
+logratio momentum, coherence/anticipatory/bursty losses, nomination head — live in the sibling
+module `ablation_mechanisms`; the core reaches them only at the flag-gated branch points in
+`temporal_forward`. With every knob off (the default) that module never runs.
+"""
+import os
+import torch
+import torch.nn.functional as F
+
+from . import ablation_mechanisms as ab
+
+try:
+    import triton
+    import triton.language as tl
+    _HAS_TRITON = True
+except Exception:                                           # triton missing -> eager/graph fallback
+    _HAS_TRITON = False
+
+
+def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
+                          tau: float = 0.0, ema_beta: float = 1.0) -> torch.Tensor:
+    """Rolling-residency expert selection.
+
+    Args:
+        logits: [seq, batch, num_experts] router logits (seq-first, as Megatron's router sees them).
+        k: resident-set size (= top-k; K = k for this PoC).
+        evict: which resident to remove when a swap happens (experiment knob, same swap *trigger*):
+            "lru"       — oldest last-refresh time (cache-style; protects just-loaded experts from
+                          immediate re-eviction → less thrash; score-neutral w.r.t. the aux loss).
+            "min_logit" — lowest current logit, i.e. the same "worst resident" the swap trigger
+                          compares against (most consistent; quality-greedy; simpler).
+        tau: hysteresis margin (logit units): swap fires only if the best non-resident beats the
+            worst resident by MORE than tau. tau=0 == shipped behavior.
+        ema_beta: causal EMA smoothing of the TRIGGER stream (weight on the current token;
+            trig[t] = (1-ema_beta)*trig[t-1] + ema_beta*logits[t]; ema_beta=1 == shipped, no
+            smoothing). Shapes only WHICH experts are resident — the caller applies the returned
+            mask to the RAW logits, so gates/routing always see raw scores (matches the canonical
+            raw-demand-scored A1 replay semantics in probe_replay.py).
+
+    Returns:
+        Boolean mask [seq, batch, num_experts] with exactly `k` True per (seq, batch) token: the
+        experts resident — and therefore usable — for that token.
+
+    Policy (swap-then-use): a token pulls in one expert and uses it the SAME step (no prefetch lag),
+    so the token always gets its top-k experts that are within +1 swap of the current set.
+        R_0 = top-k(logits[0])                      # cold fill: first token picks all k experts
+        for t >= 1:  R_t = swap(R_{t-1}, logits[t]):
+            nominee = argmax over NON-resident logits[t]
+            swap in nominee iff it beats the worst resident (i.e. R_{t-1} != global top-k),
+            evicting the resident chosen by `evict`.
+        mask[t] = R_t                               # the post-swap set the token actually uses
+    Refresh times (for "lru"): cold-fill experts rank by ascending logit (lowest = oldest); each
+    nomination is the newest. All resident refresh times stay distinct, so eviction is deterministic.
+    """
+    assert evict in ("lru", "min_logit"), f"unknown evict policy {evict!r}"
+    use_lru = evict == "lru"
+    S, B, E = logits.shape
+    dev = logits.device
+    NEG, POS = float("-inf"), float("inf")
+
+    trig = logits                                           # trigger stream (== raw when ema_beta=1)
+    if ema_beta < 1.0:
+        trig = torch.empty_like(logits)
+        trig[0] = logits[0]
+        for _t in range(1, S):
+            trig[_t] = (1.0 - ema_beta) * trig[_t - 1] + ema_beta * logits[_t]
+
+    refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert ("lru" only)
+    out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
+
+    # --- t=0 cold fill: R_0 = top-k(trig[0]) (== top-k(logits[0]): EMA is identity at t=0) ---
+    resident = torch.zeros(B, E, dtype=torch.bool, device=dev)
+    _, top_i = trig[0].topk(k, dim=-1)                      # [B,k], descending by logit
+    resident.scatter_(1, top_i, True)
+    # highest logit -> newest (largest refresh); lowest of the k -> oldest (0).
+    rank_refresh = torch.arange(k - 1, -1, -1, device=dev).float().expand(B, k)
+    refresh.scatter_(1, top_i, rank_refresh)
+    out[0] = resident
+
+    for t in range(1, S):
+        lt = trig[t]                                        # token t pulls in one expert and uses it
+        nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)      # best non-resident [B]
+        worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)       # worst resident   [B]
+        do_swap = (nom_val > worst_val + tau).unsqueeze(-1)             # [B,1]; tau=0 == shipped
+        evict_key = refresh if use_lru else lt
+        evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
+        evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
+        nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
+        resident = (resident & ~evicted) | nominee
+        refresh = refresh.masked_fill(nominee, float(k + t))           # newest (read only when "lru")
+        out[t] = resident
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# GPU acceleration (additive — `compute_resident_mask` above is unchanged and
+# remains the canonical, unit-tested reference + the fallback).
+#
+# The sequence scan launches ~6 tiny CUDA kernels per step × 2048 steps × every
+# MoE layer × every micro-batch, which is purely kernel-launch-bound (~10× slower
+# than the baseline router). `_step` is the per-step body factored out so it can be
+# captured once into a CUDA graph and replayed, collapsing the launch storm (~7×
+# faster, measured). The captured body is numerically identical to the reference
+# loop; `compute_resident_mask_accel` enforces that at runtime (one-time equality
+# check vs `compute_resident_mask`) and RAISES HARD on any mismatch (no fallback).
+# ---------------------------------------------------------------------------
+def _step(lt, resident, refresh, tval, use_lru):
+    """One rolling-residency update step (the body of compute_resident_mask's loop)."""
+    E = lt.shape[-1]
+    NEG, POS = float("-inf"), float("inf")
+    nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
+    worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
+    do_swap = (nom_val > worst_val).unsqueeze(-1)
+    evict_key = refresh if use_lru else lt
+    evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)
+    evicted = F.one_hot(evict_i, E).bool() & do_swap
+    nominee = F.one_hot(nom_i, E).bool() & do_swap
+    resident = (resident & ~evicted) | nominee
+    refresh = torch.where(nominee, tval, refresh)
+    return resident, refresh
+
+
+_graph_cache = {}
+_scan_path = None   # "cuda-graph" | "eager" — logged once
+
+
+def _graph_scan(logits, k, use_lru):
+    """CUDA-graph fast path: capture `_step` once per (B,E,policy) and replay over the sequence."""
+    S, B, E = logits.shape
+    dev, dt = logits.device, logits.dtype
+    key = (B, E, use_lru, dt)
+    if key not in _graph_cache:
+        lt_s = torch.zeros(B, E, device=dev, dtype=dt)
+        res_s = torch.zeros(B, E, dtype=torch.bool, device=dev)
+        ref_s = torch.zeros(B, E, device=dev, dtype=dt)
+        tval_s = torch.zeros((), device=dev, dtype=dt)
+        torch.cuda.synchronize()
+        warm = torch.cuda.Stream()
+        warm.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(warm):
+            for _ in range(3):
+                r, rf = _step(lt_s, res_s, ref_s, tval_s, use_lru)
+                res_s.copy_(r); ref_s.copy_(rf)
+        torch.cuda.current_stream().wait_stream(warm)
+        g = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(g):
+            r, rf = _step(lt_s, res_s, ref_s, tval_s, use_lru)
+            res_s.copy_(r); ref_s.copy_(rf)
+        _graph_cache[key] = (lt_s, res_s, ref_s, tval_s, g)
+    lt_s, res_s, ref_s, tval_s, g = _graph_cache[key]
+
+    out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
+    res_s.zero_(); ref_s.fill_(float("-inf"))
+    _, top_i = logits[0].topk(k, dim=-1)
+    res_s.scatter_(1, top_i, True)
+    rank = torch.arange(k - 1, -1, -1, device=dev, dtype=dt).expand(B, k)
+    ref_s.scatter_(1, top_i, rank)
+    out[0].copy_(res_s)
+    for t in range(1, S):
+        lt_s.copy_(logits[t]); tval_s.fill_(float(k + t))
+        g.replay()
+        out[t].copy_(res_s)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Triton fast path (default) — the whole sequential scan in ONE kernel launch.
+#
+# The CUDA-graph path above still launches ~4 kernels/step × 2048 steps (the
+# replay is GPU-side but every captured op is its own dispatch), ~91 ms/call.
+# This fuses the entire t=1..S-1 residency update into a single kernel: grid of
+# B programs (one per batch element), each holding the E-wide resident/refresh
+# state in registers and looping the steps in-kernel. One launch total -> ~1 ms
+# at the production shape ([2048,32,64], k=6), a further ~90× over the graph.
+#
+# The t=0 cold fill (torch.topk) is done in torch so its tie-breaking matches the
+# reference exactly; the kernel reproduces torch's first-index argmax/argmin tie
+# semantics via "max value, then min index achieving it". All comparisons are in
+# fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
+# bit-identical to the reference for any input dtype. Verified == reference once at
+# runtime by compute_resident_mask_accel, which raises hard on any mismatch.
+# ---------------------------------------------------------------------------
+if _HAS_TRITON:
+    @triton.jit
+    def _scan_kernel(logits_ptr, res0_ptr, ref0_ptr, out_ptr,
+                     S, B, k, E, use_lru: tl.constexpr, BLOCK: tl.constexpr):
+        b = tl.program_id(0)
+        e = tl.arange(0, BLOCK)
+        valid = e < E                                        # BLOCK = next pow2 >= E; mask pad lanes
+        NEG, POS = float("-inf"), float("inf")
+        resident = tl.load(res0_ptr + b * E + e, mask=valid, other=0) != 0
+        refresh = tl.load(ref0_ptr + b * E + e, mask=valid, other=0.0)
+        tl.store(out_ptr + b * E + e, resident.to(tl.int8), mask=valid)   # out[0] = cold fill
+        for t in range(1, S):
+            base = t * B * E + b * E + e
+            lt = tl.load(logits_ptr + base, mask=valid, other=0.0).to(tl.float32)
+            # nominee = argmax over NON-resident logits (first index on ties)
+            masked_nom = tl.where(valid & (resident == 0), lt, NEG)
+            nom_val = tl.max(masked_nom, 0)
+            nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
+            # worst resident logit (the swap trigger)
+            worst_val = tl.min(tl.where(resident, lt, POS), 0)
+            do_swap = nom_val > worst_val
+            # evict: lru -> oldest refresh; min_logit -> lowest current logit (first index on ties)
+            if use_lru:
+                evict_key = refresh
+            else:
+                evict_key = lt
+            masked_ev = tl.where(resident, evict_key, POS)
+            ev_val = tl.min(masked_ev, 0)
+            evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
+            is_evict = (e == evict_i) & do_swap
+            is_nom = (e == nom_i) & do_swap
+            resident = (resident & (is_evict == 0)) | is_nom
+            refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)   # newest (read only when lru)
+            tl.store(out_ptr + base, resident.to(tl.int8), mask=valid)
+
+
+def _triton_scan(logits, k, use_lru):
+    """Single-launch Triton fast path: cold fill in torch, full t>=1 scan in one kernel."""
+    if not _HAS_TRITON:
+        raise RuntimeError("triton unavailable")
+    S, B, E = logits.shape
+    dev = logits.device
+    logits = logits.contiguous()
+    resident0 = torch.zeros(B, E, dtype=torch.bool, device=dev)
+    refresh0 = torch.full((B, E), float("-inf"), device=dev, dtype=torch.float32)
+    _, top_i = logits[0].topk(k, dim=-1)
+    resident0.scatter_(1, top_i, True)
+    rank = torch.arange(k - 1, -1, -1, device=dev, dtype=torch.float32).expand(B, k)
+    refresh0.scatter_(1, top_i, rank)
+    out = torch.empty(S, B, E, dtype=torch.int8, device=dev)
+    BLOCK = 1 << (E - 1).bit_length()
+    _scan_kernel[(B,)](logits, resident0.to(torch.int8), refresh0, out,
+                       S, B, k, E, use_lru, BLOCK, num_warps=1)
+    return out.to(torch.bool)
+
+
+def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
+    """Resident mask via a GPU fast path; identical result to compute_resident_mask.
+
+    On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects the
+    CUDA-graph path, "eager" forces the reference). The fast path is verified bit-exact against the
+    reference once at startup; a mismatch (or any kernel/capture error) RAISES HARD — we deliberately
+    do NOT silently fall back to eager, so a correctness bug crashes the run loudly instead of
+    degrading to the ~10x-slower path unnoticed across a multi-hour sweep.
+    """
+    global _scan_path
+    mode = os.environ.get("TEMPORAL_SCAN", "triton")
+    if tau != 0.0 or ema_beta < 1.0:                        # shaped trigger: reference only
+        # The Triton/CUDA-graph kernels implement the shipped (tau=0, ema_beta=1) semantics;
+        # running them here would silently ignore the knobs. Eval-only workloads tolerate eager.
+        if _scan_path != "eager-shaped":
+            _scan_path = "eager-shaped"
+            print(f"[temporal] scan path: eager (shaped trigger: tau={tau}, ema_beta={ema_beta})")
+        with torch.no_grad():
+            return compute_resident_mask(logits, k, evict, tau=tau, ema_beta=ema_beta)
+    if not logits.is_cuda or mode == "eager":               # CPU (tests) or explicit opt-out
+        if _scan_path is None:
+            _scan_path = "eager"
+            print("[temporal] scan path: eager")
+        with torch.no_grad():
+            return compute_resident_mask(logits, k, evict)
+    # GPU fast path — correct or crash; no fallback.
+    with torch.no_grad():
+        out, pathname = ((_graph_scan(logits, k, evict == "lru"), "cuda-graph") if mode == "graph"
+                         else (_triton_scan(logits, k, evict == "lru"), "triton"))
+        if _scan_path is None:                              # one-time bit-exactness gate (hard)
+            ref = compute_resident_mask(logits, k, evict)
+            if not torch.equal(out, ref):
+                bad = (out != ref).any(dim=-1).sum().item()
+                raise RuntimeError(
+                    f"[temporal] FAST PATH '{pathname}' DISAGREES WITH REFERENCE on {bad} tokens — "
+                    f"aborting (kernel bug; do not trust results). Set TEMPORAL_SCAN=eager to bypass.")
+            _scan_path = pathname
+            print(f"[temporal] scan path: {pathname} (verified == reference)")
+    return out
+
+
+def temporal_forward(self, input: torch.Tensor):
+    """Drop-in replacement for TopKRouter.forward: restrict selection to the resident set.
+
+    Masking non-resident experts to -inf and calling the unmodified self.routing() keeps z-loss,
+    aux-loss and the top-k/dispatch path byte-for-byte identical (they just see masked logits).
+
+    If TEMPORAL_COHERENCE_LAMBDA>0, add the BCE coherence loss (train only): its
+    gradient is injected onto the raw logits via MoEAuxLossAutoScaler (same mechanism as z-loss),
+    pulling the router toward its own resident set so future tokens swap less.
+    """
+    input = self.apply_input_jitter(input)
+    logits = self.gating(input)                             # [seq, batch, num_experts]
+    k = self.config.moe_router_topk
+    mom_beta = float(os.environ.get("TEMPORAL_MOM_BETA", "0"))
+    mom_apply = os.environ.get("TEMPORAL_MOM_APPLY", "trigger")
+    if mom_beta > 0 and mom_apply == "gates":
+        # K2: shape the scores the router ROUTES on (demand dynamics), not just the trigger.
+        # Bonus is detached inside; downstream (trigger, losses, mask, routing) sees the shaped
+        # stream as "the" logits — the demand process itself is now bursty-rotating.
+        logits = ab.gate_momentum_scores(
+            logits, mom_beta,
+            gamma_m=float(os.environ.get("TEMPORAL_MOM_GAMMA", "0.125")),
+            gamma_q=float(os.environ.get("TEMPORAL_MOM_GAMMA_Q", "0.015625")))
+    auxfree = bool(getattr(self, "enable_expert_bias", False)) and getattr(self, "expert_bias", None) is not None
+    trig = ab.auxfree_trigger_scores(logits, self.expert_bias).to(logits.dtype) if auxfree else logits
+    if mom_beta > 0 and mom_apply == "trigger":
+        probs = torch.softmax(logits.float(), dim=-1)
+        trig = ab.momentum_shaped_scores(trig, probs, mom_beta,
+                                         float(os.environ.get("TEMPORAL_MOM_GAMMA", "0.125")),
+                                         alpha_m=float(os.environ.get("TEMPORAL_MOM_ALPHA", "0")),
+                                         gamma_q=float(os.environ.get("TEMPORAL_MOM_GAMMA_Q", "0.015625")),
+                                         mode=os.environ.get("TEMPORAL_MOM_MODE", "add"))
+    head_lam = float(os.environ.get("HEAD_LAMBDA", "0"))
+    head_beta = float(os.environ.get("HEAD_BETA", "0"))
+    head_logits = None
+    if (head_lam > 0 or head_beta > 0) and getattr(self, "nom_head_weight", None) is not None:
+        head_logits = ab.nomination_head_logits(input, self.nom_head_weight)
+        if head_beta > 0:
+            # HEAD_FORCE_ACTIVE=1: eval-only screens on a trained checkpoint (fresh process has
+            # no curr_iteration, which would silently disable the bonus). Never set in training.
+            if os.environ.get("HEAD_FORCE_ACTIVE", "0") == "1":
+                active = True
+            else:
+                from megatron.training import get_args
+                targs = get_args()
+                active = ab.head_selection_active(int(getattr(targs, "curr_iteration", 0) or 0),
+                                                  int(getattr(targs, "train_iters", 0) or 0),
+                                                  float(os.environ.get("HEAD_WARMUP_FRAC", "0.25")))
+            if active:
+                if os.environ.get("HEAD_CENTER", "0") == "1":
+                    bonus = ab.head_centered_bonus(head_logits, head_beta,
+                                                   float(os.environ.get("HEAD_GAMMA_C", "0.015625")))
+                else:
+                    bonus = ab.head_trigger_bonus(head_logits, head_beta)
+                trig = (trig.float() + bonus).to(trig.dtype)
+    # R-knob (de-lexicalization dose): residency-set size R >= k, decoupled from top-k. The cache
+    # holds R experts (cold fill = top-R, same <=1 swap/token trigger/evict on the R-set) and the
+    # router selects top-k AMONG residents. R=k (default) == shipped maximal constraint; R=E ==
+    # unconstrained full MoE (mask all-True, masked_fill a no-op). Zero FLOP change at any R.
+    resid_R = int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) or k
+    mask = compute_resident_mask_accel(
+        trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
+        tau=float(os.environ.get("TEMPORAL_RHO", "0")),
+        ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
+    lam = float(os.environ.get("TEMPORAL_COHERENCE_LAMBDA", "0"))
+    if lam > 0 and self.training:
+        from megatron.core.transformer.moe.moe_utils import (
+            MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
+        coh = ab.coherence_bce_loss(logits, mask)
+        logits = MoEAuxLossAutoScaler.apply(logits, lam * coh)   # inject grad onto raw logits
+        save_to_aux_losses_tracker("coherence_loss", coh.detach(),
+                                   self.layer_number, self.config.num_layers)
+    bw_lam = float(os.environ.get("BURSTY_LAMBDA", "0"))
+    if bw_lam > 0 and self.training:
+        from megatron.core.transformer.moe.moe_utils import (
+            MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
+        bw = ab.bursty_window_loss(logits, int(os.environ.get("BURSTY_WINDOW", "32")))
+        logits = MoEAuxLossAutoScaler.apply(logits, bw_lam * bw)
+        save_to_aux_losses_tracker("bursty_loss", bw.detach(),
+                                   self.layer_number, self.config.num_layers)
+    ant_lam = float(os.environ.get("ANTICIPATORY_LAMBDA", "0"))
+    if ant_lam > 0 and self.training:
+        from megatron.core.transformer.moe.moe_utils import (
+            MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
+        gamma = float(os.environ.get("ANTICIPATORY_GAMMA", "0.5"))
+        tgt, valid = ab.anticipatory_target(logits, k, gamma)
+        ant = ab.anticipatory_bce_loss(logits, tgt, valid)
+        logits = MoEAuxLossAutoScaler.apply(logits, ant_lam * ant)
+        save_to_aux_losses_tracker("anticipatory_loss", ant.detach(),
+                                   self.layer_number, self.config.num_layers)
+    head_bce = None
+    if head_lam > 0 and self.training and head_logits is not None:
+        # BCE(head(h.detach()), discounted-future-demand) — target from the RAW (pre-mask) logits,
+        # detached inside anticipatory_target. The loss graph touches ONLY nom_head_weight.
+        tgt, valid = ab.anticipatory_target(logits, k, float(os.environ.get("HEAD_GAMMA", "0.5")))
+        if os.environ.get("HEAD_TARGET_CENTER", "0") == "1":
+            # H3: labels centered on each expert's own baseline — popularity unlearnable.
+            tgt = ab.centered_demand_labels(tgt, float(os.environ.get("HEAD_GAMMA_C", "0.015625")))
+        head_bce = ab.anticipatory_bce_loss(head_logits, tgt, valid)
+    logits = logits.masked_fill(~mask, float("-inf"))       # only resident experts are selectable
+    if auxfree:
+        # Selection over the k unmasked residents is a no-op top-k, but sigmoid(-inf)=0 plus a
+        # positive bias could in principle outrank a low-scoring resident inside Megatron's
+        # biased selection — zero the bias for this call to make the residency invariant
+        # unconditional. The bias still governed the trigger above (where the paradigm acts),
+        # and the per-step bias UPDATE uses the routing_map (residents) — the correct load signal.
+        saved_bias = self.expert_bias
+        self.expert_bias = torch.zeros_like(saved_bias)
+        try:
+            probs, routing_map = self.routing(logits)
+        finally:
+            self.expert_bias = saved_bias
+    else:
+        probs, routing_map = self.routing(logits)
+    if head_bce is not None:
+        # Attach the head loss to the model loss via the aux-loss autoscaler hooked on the
+        # routing OUTPUT (gate probs) — deliberately NOT on the router logits (the Track-B
+        # Goodhart path). The scaler's backward passes the probs gradient through UNCHANGED and
+        # kicks off backward on `head_bce`, whose graph is detached from the trunk — so the only
+        # parameters that can move are the head weights. Tracked as "head_bce_loss" for logging.
+        from megatron.core.transformer.moe.moe_utils import (
+            MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
+        probs = MoEAuxLossAutoScaler.apply(probs, head_lam * head_bce)
+        save_to_aux_losses_tracker("head_bce_loss", head_bce.detach(),
+                                   self.layer_number, self.config.num_layers)
+    return probs, routing_map
+
+
+def banner_knobs() -> str:
+    """The env-knob suffix of the install banner (pure — reads only os.environ; unit-tested)."""
+    tau = os.environ.get("TEMPORAL_RHO", "0"); beta = os.environ.get("TEMPORAL_EMA_BETA", "1.0")
+    knobs = f", tau={tau}, ema_beta={beta}" if (float(tau) != 0.0 or float(beta) < 1.0) else ""
+    if int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) > 0:
+        knobs += f", residency_R={os.environ.get('TEMPORAL_RESIDENCY_R')}"
+    if os.environ.get("AUXFREE", "0") == "1":
+        knobs += ", auxfree-trigger=sigmoid+bias"
+    if float(os.environ.get("TEMPORAL_MOM_BETA", "0")) > 0:
+        dm = ""
+        if os.environ.get("TEMPORAL_MOM_APPLY", "trigger") == "gates":
+            dm = f", apply=gates, gamma_q={os.environ.get('TEMPORAL_MOM_GAMMA_Q', '0.015625')}"
+        elif os.environ.get("TEMPORAL_MOM_MODE", "add") == "logratio":
+            dm = f", mode=logratio, gamma_q={os.environ.get('TEMPORAL_MOM_GAMMA_Q', '0.015625')}"
+        elif float(os.environ.get("TEMPORAL_MOM_ALPHA", "0")) > 0:
+            dm = (f", alpha={os.environ.get('TEMPORAL_MOM_ALPHA')}, "
+                  f"gamma_q={os.environ.get('TEMPORAL_MOM_GAMMA_Q', '0.015625')}")
+        knobs += (f", momentum(beta={os.environ.get('TEMPORAL_MOM_BETA')}, "
+                  f"gamma={os.environ.get('TEMPORAL_MOM_GAMMA', '0.125')}{dm})")
+    if float(os.environ.get("BURSTY_LAMBDA", "0")) > 0:
+        knobs += (f", bursty(lambda={os.environ.get('BURSTY_LAMBDA')}, "
+                  f"window={os.environ.get('BURSTY_WINDOW', '32')})")
+    if float(os.environ.get("ANTICIPATORY_LAMBDA", "0")) > 0:
+        knobs += (f", anticipatory(lambda={os.environ.get('ANTICIPATORY_LAMBDA')}, "
+                  f"gamma={os.environ.get('ANTICIPATORY_GAMMA', '0.5')})")
+    if float(os.environ.get("HEAD_LAMBDA", "0")) > 0 or float(os.environ.get("HEAD_BETA", "0")) > 0:
+        hc = ""
+        if os.environ.get("HEAD_TARGET_CENTER", "0") == "1":
+            hc += f", target_center=1, gamma_c={os.environ.get('HEAD_GAMMA_C', '0.015625')}"
+        if os.environ.get("HEAD_CENTER", "0") == "1":
+            hc += f", center=1, gamma_c={os.environ.get('HEAD_GAMMA_C', '0.015625')}"
+        if os.environ.get("HEAD_FORCE_ACTIVE", "0") == "1":
+            hc += ", force_active=1"
+        knobs += (f", head(lambda={os.environ.get('HEAD_LAMBDA', '0')}, "
+                  f"beta={os.environ.get('HEAD_BETA', '0')}, "
+                  f"gamma={os.environ.get('HEAD_GAMMA', '0.5')}, "
+                  f"warmup={os.environ.get('HEAD_WARMUP_FRAC', '0.25')}{hc})")
+    return knobs
+
+
+def _head_patched_init(orig_init):
+    """Wrap TopKRouter.__init__ to register the nomination head W_f in R^{E x d}.
+
+    Registered as a Parameter at construction time (before DDP wrap / optimizer build), same
+    init + dtype + sequence_parallel treatment as the router's own gate weight. Changes the
+    checkpoint shape — head cells are trained from scratch only.
+    """
+    def _init(self, config, *a, **kw):
+        orig_init(self, config, *a, **kw)
+        self.nom_head_weight = torch.nn.Parameter(
+            torch.empty((config.num_moe_experts, config.hidden_size), dtype=torch.float32))
+        if config.perform_initialization:
+            config.init_method(self.nom_head_weight)
+        self.nom_head_weight.data = self.nom_head_weight.data.to(dtype=config.params_dtype)
+        setattr(self.nom_head_weight, 'sequence_parallel', config.sequence_parallel)
+    return _init
+
+
+def install():
+    """Monkeypatch TopKRouter.forward (call once at startup, before model build)."""
+    from megatron.core.transformer.moe.router import TopKRouter
+    TopKRouter.forward = temporal_forward
+    if float(os.environ.get("HEAD_LAMBDA", "0")) > 0 or float(os.environ.get("HEAD_BETA", "0")) > 0:
+        TopKRouter.__init__ = _head_patched_init(TopKRouter.__init__)
+    print(f"[temporal] rolling-residency router installed "
+          f"(evict={os.environ.get('TEMPORAL_EVICT', 'lru')}{banner_knobs()})")
