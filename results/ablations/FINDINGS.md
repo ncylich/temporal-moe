@@ -6,9 +6,13 @@ numbers; duplication removed; stale status lines fixed — those originals live 
 history). Per-point data: `phase0_isoflop_points.csv` (finals for every §2–§6 run, extracted from the raw
 run log `results/phase0/log.md` on `temporal-moe-impl@66f786b7`) + `phase0_lr_tuning.csv` (§1) +
 `flame38m_1e18_cells.csv` (§7); later 1e18/1e19 programs have their own CSVs — see
-[README.md](README.md). **Split caveat:** for 7 of the points the published BPB below is ~+0.004 CE
-above the run-log val final — comms label such values test-split evals; both values are recorded in
-`phase0_isoflop_points.csv`. Figures: `../phase0/figures/`.
+[README.md](README.md). **Eval-split caveat (resolved via raw train.log forensics):** the tables
+below mix two eval lines — some cells are the during-training **val** eval (20-batch subsample,
+occasionally pre-final iteration), others the end-of-training **test-set** eval, which is what
+`parse_run.py`'s mislabeled `final_val` field actually captures. Differences are ~0.004 CE, smaller
+than seed noise; no conclusion changes. `phase0_isoflop_points.csv` records both per point, with the
+protocol-consistent `ce_test_final` column (end-of-training test eval, final weights, same protocol
+for all runs) as the preferred series. Figures: `../phase0/figures/`.
 
 **Metrics.** `BPB = CE_nats / (ln2 · bytes_per_token)` — bits-per-byte, tokenizer-invariant, lower
 is better (needed because Phase-0 sweeps use a custom 16k-BPE; divisor 2.7568 for bpe-16k,
