@@ -1,9 +1,9 @@
 # Mechanistic probe results — the cheap graphs (A, B, C)
 
 *Why* rolling-residency temporal MoE works, measured post-hoc on trained checkpoints (no training).
-Probe: `scripts/phase0/router_probe.py` (via `run.sh PROBE=1`) logs, per MoE-layer per-token on **one
+Probe: `analysis/probes/router_probe.py` (via `run.sh PROBE=1`) logs, per MoE-layer per-token on **one
 fixed 16×2048 batch** (seed 1234 → identical tokens across models), the raw gating logits (pre-mask) and,
-for temporal models, the resident set used. Analysis + figures: `scripts/phase0/plot_probe.py`.
+for temporal models, the resident set used. Analysis + figures: `analysis/plots/plot_probe.py`.
 
 Checkpoints probed (matched temporal+MoE pairs, 16k vocab, plus G3): `tmoe_minlogit_sh1_s2_1e17` +
 `v16k_sweep_s2_1e17` (s2@1e17, 64 experts, k=6); `tmoe_minlogit_sh1_s0_1e16` + `v16k_d_s0_1e16`;

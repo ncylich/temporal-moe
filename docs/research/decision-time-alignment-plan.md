@@ -92,7 +92,7 @@ only `K = k` of its `E` routed experts *resident* in fast memory (k = top-k widt
 on SSD), and **at most one** expert is swapped in per token. The swap rule: swap iff the best
 *non-resident* expert's router logit beats the *worst resident's*; evict the lowest-logit resident
 (`min_logit`); the token is served by the post-swap resident set — the fetch overlaps the other
-resident experts' compute within the same layer (`scripts/phase0/temporal_router.py`; these
+resident experts' compute within the same layer (`temporal/temporal_router.py`; these
 semantics are settled — do not revisit). It works — ~72–82% of the full-MoE-over-dense quality
 gain with 6/64 (or 18/192) experts resident — but two measured problems remain: **(P1)** the swap
 rate sits at ~1.0/token (every swap is bandwidth someone must pay), and **(P2) alignment**: the
@@ -125,7 +125,7 @@ genuinely *new* (future) information; never a backward-looking gradient on the s
 | G3 s2@1e17 | 1.341 | 1.2708 | 1.2873 | 0.017 |
 | G1 s2@1e17 | 1.341 | 1.269 | 1.2821 | 0.013 |
 
-- **Probe checkpoints** (router logs saved; replay harness `scripts/phase0/probe_replay.py`):
+- **Probe checkpoints** (router logs saved; replay harness `analysis/probes/probe_replay.py`):
   `tmoe_minlogit_sh1_s2_1e17` (G1 8.1M active), `g3_tmoe_s1_1e17` (G3 3.9M),
   `flame38m_temporal_minlogit` (38M @1e18).
 - **Measured headroom map (E5)** at K=k / cap-1: better *eviction* is capped at **+6–10 pt**

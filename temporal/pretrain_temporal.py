@@ -3,14 +3,14 @@
 
 Installs the rolling-residency router patch (temporal_router.install) and then runs Megatron's
 normal GPT pretrain loop — identical to pretrain_gpt.py, only the router selection differs.
-Mirrors scripts/phase0/expert_load.py: invoked by run.sh (TEMPORAL=1) from inside Megatron-LM/.
+Mirrors analysis/probes/expert_load.py: invoked by run.sh (TEMPORAL=1) from inside Megatron-LM/.
 """
 import os, sys
 
 sys.path.insert(0, os.getcwd())                              # run.sh cd's to Megatron-LM/ -> import megatron
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # this dir -> import temporal_router
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root -> import temporal pkg
 
-import temporal_router
+from temporal import temporal_router
 temporal_router.install()                                   # patch TopKRouter.forward before model build
 
 if __name__ == "__main__":

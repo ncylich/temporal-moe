@@ -5,16 +5,16 @@ Pure-function tests for the default-off, negative-result scoring/loss knobs livi
 temporal/ablation_mechanisms.py: aux-free (sigmoid+bias) trigger, demand momentum (Karen A3 /
 double-momentum A3q / logratio LG1), K2 gate momentum, the decoupled stop-grad nomination head
 (H1/H2/H3), the anticipatory (Track B) loss, the bursty-window (LG2) loss, and the temporal-
-coherence BCE loss (the latter absorbed from the former scripts/phase0/test_coherence_loss.py).
+coherence BCE loss (the latter absorbed from the former test_coherence_loss.py).
 
 No Megatron, no GPU — CPU torch only.
-Run: .venv/bin/python -m pytest scripts/phase0/temporal/tests/test_ablation_mechanisms.py
+Run: .venv/bin/python -m pytest temporal/tests/test_ablation_mechanisms.py
 """
 import os, sys
 import torch
 import pytest
 
-# scripts/phase0 on path -> import the `temporal` package and (for cross-checks) probe_replay.
+# repo root on path -> import the `temporal` package and (for cross-checks) probe_replay.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from temporal.ablation_mechanisms import (auxfree_trigger_scores,
                                           anticipatory_target, anticipatory_bce_loss,

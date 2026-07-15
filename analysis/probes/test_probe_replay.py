@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Unit tests for the probe-replay policies (scripts/phase0/probe_replay.py).
+"""Unit tests for the probe-replay policies (analysis/probes/probe_replay.py).
 
 Pure-numpy, no logs, no GPU. Run:
-  .venv/bin/python -m pytest scripts/phase0/test_probe_replay.py
+  .venv/bin/python -m pytest analysis/probes/test_probe_replay.py
 
 Covers the replay semantics that back experiments E4/E5/E7:
   - Belady (offline-optimal eviction) on a hand-computable 5-token example, and its coverage-bound

@@ -3,7 +3,7 @@
 
 Pure-function tests for `compute_resident_mask` (+ the GPU accel scan, the tau/ema_beta trigger
 knobs, and the residency-set-size R knob) — no Megatron, GPU only where marked, CPU torch otherwise.
-Run: .venv/bin/python -m pytest scripts/phase0/temporal/tests/test_temporal_router.py
+Run: .venv/bin/python -m pytest temporal/tests/test_temporal_router.py
 
 Experimental (default-off, negative-result) scoring/loss knobs are tested separately in
 test_ablation_mechanisms.py.
@@ -18,7 +18,7 @@ import os, sys
 import torch
 import pytest
 
-# scripts/phase0 on path -> import the `temporal` package and (for cross-checks) probe_replay.
+# repo root on path -> import the `temporal` package and (for cross-checks) probe_replay.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from temporal import temporal_router as tr
 from temporal.temporal_router import compute_resident_mask, banner_knobs

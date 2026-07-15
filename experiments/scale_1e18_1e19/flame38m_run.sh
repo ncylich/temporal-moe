@@ -93,7 +93,7 @@ LOG_ARGS=(
 
 # temporal -> pretrain_temporal.py (installs router patch); dense/moe -> plain pretrain_gpt.py
 ENTRY=pretrain_gpt.py
-[ "$MODE" = "temporal" ] && ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py
+[ "$MODE" = "temporal" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
 cd Megatron-LM
 $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
   "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \

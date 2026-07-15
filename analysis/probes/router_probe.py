@@ -14,7 +14,7 @@ Invoked by run.sh (PROBE=1) from inside Megatron-LM/. Mirrors expert_load.py.
 """
 import os, sys, torch
 sys.path.insert(0, os.getcwd())                                  # -> import megatron
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # -> import temporal_router
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # repo root -> temporal pkg
 from megatron.core.transformer.moe.router import TopKRouter
 
 _TEMPORAL = os.environ.get("TEMPORAL", "0") == "1"
@@ -30,7 +30,7 @@ def _probe_forward(self, input):
     ln = int(getattr(self, "layer_number", -1))
     mask = None
     if _TEMPORAL:
-        from temporal_router import compute_resident_mask_accel   # same mask as training
+        from temporal.temporal_router import compute_resident_mask_accel   # same mask as training
         with torch.no_grad():
             mask = compute_resident_mask_accel(logits, k, evict=_EVICT)
         used = logits.masked_fill(~mask, float("-inf"))

@@ -10,7 +10,7 @@ export PATH=$ROOT/.venv/bin:$PATH CUDNN_PATH=$NV/cudnn \
 export PARTS_GLOB="$ROOT/data/dclm_parts/part*.jsonl" OUT_DIR="$ROOT/data/tok16k_full" \
   TOKENIZER_MODEL="$ROOT/data/tok16k" EOD=0 TOKENIZERS_PARALLELISM=false
 echo "=== tokenizing (idempotent) $(date) ==="
-python scripts/phase0/fast_tokenize.py 12
+python experiments/data/fast_tokenize.py 12
 echo "=== TOTAL CORPUS $(date) ==="
 python - <<'PY'
 import glob, os

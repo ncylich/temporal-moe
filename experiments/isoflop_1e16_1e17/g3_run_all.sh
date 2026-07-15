@@ -2,7 +2,7 @@
 # Master serial runner for the G=3 fine-grained sweeps: 4 cells x 3 shapes = 12 runs, one GPU.
 # MoE then temporal, 1e16 then 1e17. All EVAL_AT_END (single-budget parabolas; dedicated 1e16 runs).
 # drive.sh is idempotent (skips runs whose final ckpt exists), so this is safe to re-launch.
-# Launch detached:  nohup bash scripts/phase0/g3_run_all.sh > results/phase0/g3_run_all.log 2>&1 &
+# Launch detached:  nohup bash experiments/isoflop_1e16_1e17/g3_run_all.sh > results/phase0/g3_run_all.log 2>&1 &
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 ROOT=$(pwd)
@@ -24,15 +24,15 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 echo "=== G3 RUN ALL START $(date) ==="
 
 echo "--- [1/4] MoE @1e16 ---"
-bash scripts/phase0/drive.sh scripts/phase0/g3_moe_1e16.txt
+bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/g3_moe_1e16.txt
 
 echo "--- [2/4] MoE @1e17 ---"
-bash scripts/phase0/drive.sh scripts/phase0/g3_moe_1e17.txt
+bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/g3_moe_1e17.txt
 
 echo "--- [3/4] Temporal @1e16 ---"
-TEMPORAL=1 TEMPORAL_EVICT=min_logit bash scripts/phase0/drive.sh scripts/phase0/g3_tmoe_1e16.txt
+TEMPORAL=1 TEMPORAL_EVICT=min_logit bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/g3_tmoe_1e16.txt
 
 echo "--- [4/4] Temporal @1e17 ---"
-TEMPORAL=1 TEMPORAL_EVICT=min_logit bash scripts/phase0/drive.sh scripts/phase0/g3_tmoe_1e17.txt
+TEMPORAL=1 TEMPORAL_EVICT=min_logit bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/g3_tmoe_1e17.txt
 
 echo "=== G3 RUN ALL DONE $(date) ==="

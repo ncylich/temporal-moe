@@ -24,4 +24,4 @@ by someone who has never seen this project or any discussion of it.
 - **Preferred IsoFLOP format:** one combined single axes with both budgets (dashed = 1e16, solid =
   1e17; color = method), not separate side-by-side panels.
 
-Generators live in `scripts/phase0/plot_*.py`.
+Generators live in `analysis/plots/plot_*.py`.

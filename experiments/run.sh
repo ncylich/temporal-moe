@@ -3,7 +3,7 @@
 # Adapted from scripts/training/flame-moe.sh: no SLURM, no GCS, local transformer impl.
 # All knobs via env vars (see defaults). Computes train_iters so C = 6*N*D hits TARGET_FLOPS.
 set -euo pipefail
-cd "$(dirname "$0")/../.."        # repo root
+cd "$(dirname "$0")/.."        # repo root
 ROOT=$(pwd)
 
 # ---- run config (env overridable) ----
@@ -64,7 +64,7 @@ if [ "${DENSE:-0}" = "1" ]; then
 fi
 
 # ---- compute iters so C = 6*N*D ----
-read N TRAIN_ITERS < <(.venv/bin/python scripts/phase0/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
+read N TRAIN_ITERS < <(.venv/bin/python analysis/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
 WARMUP_ITERS=$(.venv/bin/python -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
 MIN_LR=$(.venv/bin/python -c "print($PEAK_LR*0.1)")
 # LR_DECAY_STYLE=WSD: flame-family schedule (stable then decay over the last ~10% of iters),
@@ -176,7 +176,7 @@ if [ "${PROBE:-0}" = "1" ]; then
   # (raw logits + resident mask). --finetune loads weights only; the hook records the first forward.
   export ROUTER_LOG_OUT=$OUT/router_log.pt
   $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
-    $ROOT/scripts/phase0/router_probe.py \
+    $ROOT/analysis/probes/router_probe.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
     2>&1 | tee "$OUT/probe.log"
@@ -195,9 +195,9 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   # LR (not min-LR as an earlier comment claimed) — 10 such iters measurably corrupt a checkpoint
   # before eval (smoke: BPB 1.93 vs 1.4753 baseline). The temporal eval path therefore freezes
   # weights outright (--lr 0 --min-lr 0): routers/banners still fire, eval is of the true ckpt.
-  EVAL_ENTRY=$ROOT/scripts/phase0/expert_load.py; EVAL_LOG=expert_load.log; EVAL_FREEZE=""
+  EVAL_ENTRY=$ROOT/analysis/probes/expert_load.py; EVAL_LOG=expert_load.log; EVAL_FREEZE=""
   if [ "${TEMPORAL:-0}" = "1" ]; then
-    EVAL_ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
+    EVAL_ENTRY=$ROOT/temporal/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
     EVAL_FREEZE="--lr 0 --min-lr 0"
   fi
   $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
@@ -209,7 +209,7 @@ else
   # TEMPORAL=1: rolling-residency MoE -> run via pretrain_temporal.py (installs the router patch,
   # then the identical pretrain loop). Same model args; only the expert selection differs.
   ENTRY=pretrain_gpt.py
-  [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/scripts/phase0/pretrain_temporal.py
+  [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
   $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
     2>&1 | tee "$OUT/train.log"

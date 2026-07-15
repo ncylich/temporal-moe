@@ -15,9 +15,9 @@ Experiments (see tmp/additional-experiments.md and docs/research/probe-replay-re
   E7 EMA-logit smoothing replay (slow-feature routing preview; beta=1 == baseline identity)
   E8 document-boundary attribution (EOD cold-fill contamination)
 
-Run: .venv/bin/python scripts/phase0/probe_replay.py   (regenerates every number + figure)
+Run: .venv/bin/python analysis/probes/probe_replay.py   (regenerates every number + figure)
 
-Convention (matches scripts/phase0/plot_probe.py rolling()/overlap()):
+Convention (matches analysis/plots/plot_probe.py rolling()/overlap()):
   "hit-rate" / "coverage" = fraction of a token's unconstrained top-k demand that is ALREADY
   resident on entry to the token (i.e. before that token's own <=1 swap). This is the cacheability
   metric behind the shipped B/A3 figures (temporal s2 == 36.2%, full MoE == 17.7% at K=k).
@@ -28,7 +28,7 @@ import os, sys, json
 import numpy as np
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plots"))  # analysis/plots
 from plot_probe import load, topk_ids, OUT, rolling, overlap, sweep, PAIRS, G3  # reuse helpers/paths
 
 CACHE = "/workspace/FLAME-MoE/results/phase0/probe_batch_cache"

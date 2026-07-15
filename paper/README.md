@@ -70,4 +70,4 @@ with the reason it exists.
 
 ## Build
 `cd paper && pdflatex main.tex` twice (uses `neurips_2024.sty` if present, else a plain-article
-fallback). Figures are the `*_nocaption.png` variants from `scripts/phase0/plot_*.py --no-caption`.
+fallback). Figures are the `*_nocaption.png` variants from `analysis/plots/plot_*.py --no-caption`.

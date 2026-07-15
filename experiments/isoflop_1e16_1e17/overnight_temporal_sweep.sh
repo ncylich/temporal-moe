@@ -8,5 +8,5 @@ export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k DATA_DIR=/workspace/FLAM
 export CE_FUSION=1 BPB_DIVISOR=2.7568
 export TEMPORAL=1 TEMPORAL_EVICT=min_logit SHARED_MULT=2 TOPK=6 EVAL_AT_END=1
 echo "=== sweep start $(date) ==="
-bash scripts/phase0/drive.sh scripts/phase0/temporal_minlogit_sh1_sweep.txt
+bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/temporal_minlogit_sh1_sweep.txt
 echo "=== TEMPORAL MINLOGIT SH1 SWEEP DONE $(date) ==="

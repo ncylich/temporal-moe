@@ -3,8 +3,8 @@
 Follow-up to `docs/research/mechanistic-probe-results.md`. **Everything here is offline CPU replay of
 the already-saved router-probe logs — zero training, no GPU.** Each experiment replays a *selection
 policy* over the logged per-token gating logits; the trained weights are never touched. Code:
-`scripts/phase0/probe_replay.py` (regenerates every number and figure); tests:
-`scripts/phase0/test_probe_replay.py`.
+`analysis/probes/probe_replay.py` (regenerates every number and figure); tests:
+`analysis/probes/test_probe_replay.py`.
 
 ### Setup and definitions (read once — every metric below uses these)
 

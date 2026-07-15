@@ -46,7 +46,7 @@ point (1e18 → FLAME-MoE-38M-100M), so absolute BPB are undertrained — the **
 dense vs MoE, coarse vs fine) and the clean parabolas/min-shift are the signal. Paper scaling law:
 N\*∝C^0.69, D\*∝C^0.31.
 
-Repro: `scripts/phase0/run.sh` (env-parametrized launcher), `drive.sh` (driver), `shapes.py`,
+Repro: `experiments/run.sh` (env-parametrized launcher), `drive.sh` (driver), `shapes.py`,
 `parse_run.py`, `summarize.py`; data = dclm-baseline tokenized with the 16k BPE
 (`train_tok16k.py` + `fast_tokenize.py`), 5.55B-token corpus.
 

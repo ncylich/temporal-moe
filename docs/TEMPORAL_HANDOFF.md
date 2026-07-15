@@ -19,13 +19,13 @@ math: `docs/research/temporal-moe.md` (§2 "rolling residency") and `docs/EVALUA
 ## Design (why the diff is tiny and safe to review)
 
 - **All logic is one pure function** `compute_resident_mask(logits, k, evict)` in
-  `scripts/phase0/temporal_router.py` — `[seq,batch,E]` logits → boolean `[seq,batch,E]` mask, exactly `k`
+  `temporal/temporal_router.py` — `[seq,batch,E]` logits → boolean `[seq,batch,E]` mask, exactly `k`
   True per token. No Megatron, no GPU. This is the only novel code; it is fully unit-tested.
 - **The router patch is ~6 lines** (`temporal_forward`): mask non-resident experts to `-inf`, then call
   Megatron's **unmodified** `routing()`. So z-loss, aux-loss, top-k and the alltoall dispatcher are reused
   byte-for-byte (they just see masked logits — the deliberately chosen, most-surgical option).
 - **Zero edits to the Megatron-LM submodule.** The patch is installed by monkeypatch from
-  `pretrain_temporal.py`, exactly mirroring the existing `scripts/phase0/expert_load.py`.
+  `pretrain_temporal.py`, exactly mirroring the existing `analysis/probes/expert_load.py`.
 - **No new Megatron CLI flags.** Resident size `K` = the existing `--moe-router-topk` (read off the router).
   Activation is a single `TEMPORAL=1` env in `run.sh`, following the `DENSE=1`/`EVAL_ONLY=1` precedent.
 
@@ -47,18 +47,18 @@ burden (the token gets what it wants *now*) — the right semantics for a *quali
 
 | file | new? | role |
 |---|---|---|
-| `scripts/phase0/temporal_router.py` | new | `compute_resident_mask` (pure) + `temporal_forward` + `install()` |
-| `scripts/phase0/test_temporal_router.py` | new | 9 pure-function specs (TDD) — run these first |
-| `scripts/phase0/pretrain_temporal.py` | new | entrypoint: `install()` then Megatron `pretrain(...)` (mirrors expert_load.py) |
-| `scripts/phase0/run.sh` | edit (~6 lines) | `TEMPORAL=1` swaps entrypoint to `pretrain_temporal.py`; logs `temporal=` |
-| `scripts/phase0/temporal_{lru,minlogit}_sh{1,2}_{1e16,1e17}.txt` | new | the 8 matrix cells (one run each); `temporal_lru_sh1_1e16.txt` is also the integration smoke |
-| `scripts/phase0/temporal_matrix.sh` | new | runs the full 8-cell matrix serially, all 1e16 before all 1e17 (sets per-cell env; idempotent) |
+| `temporal/temporal_router.py` | new | `compute_resident_mask` (pure) + `temporal_forward` + `install()` |
+| `temporal/tests/test_temporal_router.py` | new | 9 pure-function specs (TDD) — run these first |
+| `temporal/pretrain_temporal.py` | new | entrypoint: `install()` then Megatron `pretrain(...)` (mirrors expert_load.py) |
+| `experiments/run.sh` | edit (~6 lines) | `TEMPORAL=1` swaps entrypoint to `pretrain_temporal.py`; logs `temporal=` |
+| `experiments/isoflop_1e16_1e17/temporal_{lru,minlogit}_sh{1,2}_{1e16,1e17}.txt` | new | the 8 matrix cells (one run each); `temporal_lru_sh1_1e16.txt` is also the integration smoke |
+| `experiments/isoflop_1e16_1e17/temporal_matrix.sh` | new | runs the full 8-cell matrix serially, all 1e16 before all 1e17 (sets per-cell env; idempotent) |
 
 ## Step 0 — verify locally (no GPU; ~1s)
 
 ```bash
 git switch temporal-moe-impl
-python3 -m pytest scripts/phase0/test_temporal_router.py -q   # expect 9 passed
+python3 -m pytest temporal/tests/test_temporal_router.py -q   # expect 9 passed
 ```
 (Local tree's Megatron-LM submodule is uninitialized — that's fine; only the pure function is tested here.)
 
@@ -72,7 +72,7 @@ export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k
 export DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568
 export TEMPORAL=1 TEMPORAL_EVICT=lru SHARED_MULT=2 TOPK=6
-EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/temporal_lru_sh1_1e16.txt \
+EVAL_AT_END=1 nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/temporal_lru_sh1_1e16.txt \
   > results/phase0/temporal_smoke.drive.log 2>&1 &
 ```
 Watch with the EVALUATION_METHODOLOGY §11 reactive loop. **Pass = it launches, `[temporal] rolling-residency
@@ -95,14 +95,14 @@ already-done smoke cell. The 8 cells (one config file each, `temporal_<evict>_sh
 
 ```bash
 # common env as above (TEMPORAL is set by the wrapper). Then, after the smoke passes:
-nohup bash scripts/phase0/temporal_matrix.sh > results/phase0/temporal_matrix.log 2>&1 &
+nohup bash experiments/isoflop_1e16_1e17/temporal_matrix.sh > results/phase0/temporal_matrix.log 2>&1 &
 ```
 Each cell's BPB (success = inside the band, dense .. MoE: @1e16/s0 1.519..1.447, @1e17/s2 1.341..1.269):
 ```bash
-BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py results/phase0/runs/tmoe_lru_sh1_s2_1e17
+BPB_DIVISOR=2.7568 .venv/bin/python analysis/parse_run.py results/phase0/runs/tmoe_lru_sh1_s2_1e17
 # ... repeat per cell: tmoe_{lru,minlogit}_sh{1,2}_{s0_1e16,s2_1e17}
 ```
-Then extend `scripts/phase0/plot_g3_curves.py` with the temporal curve(s) — the matrix already covers both
+Then extend `analysis/plots/plot_g3_curves.py` with the temporal curve(s) — the matrix already covers both
 budgets, so no extra back-fill is needed for the two-budget frontier figure.
 
 ## Risks / knobs the next agent should expect

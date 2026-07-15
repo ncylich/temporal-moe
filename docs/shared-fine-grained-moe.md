@@ -60,7 +60,7 @@ Balanced makespan ≈ 5.5 h (A6000 assumed 1.5× H100 per-iter).
 
 ## How to run
 
-**H100** (this machine): driven by `scripts/phase0/g3_run_all.sh` (idempotent — skips completed
+**H100** (this machine): driven by `experiments/isoflop_1e16_1e17/g3_run_all.sh` (idempotent — skips completed
 runs). It has been reconfigured to run exactly the H100 list above.
 
 **A6000** — same shared `/workspace` volume, so code + data + `.venv` are already present. Verify
@@ -73,8 +73,8 @@ export CUDNN_PATH=$NV/cudnn LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/lo
 
 source <common env above>
 export TEMPORAL=1 TEMPORAL_EVICT=min_logit
-nohup bash scripts/phase0/drive.sh scripts/phase0/g3_a6000_1e16.txt > results/phase0/a6000_1e16.log 2>&1 &   # s0, s1 @1e16
-nohup bash scripts/phase0/drive.sh scripts/phase0/g3_a6000_1e17.txt > results/phase0/a6000_1e17.log 2>&1 &   # s1 @1e17  (run AFTER 1e16 — one GPU, serial)
+nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/g3_a6000_1e16.txt > results/phase0/a6000_1e16.log 2>&1 &   # s0, s1 @1e16
+nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/g3_a6000_1e17.txt > results/phase0/a6000_1e17.log 2>&1 &   # s1 @1e17  (run AFTER 1e16 — one GPU, serial)
 ```
 (Run the two serially on the A6000 — one GPU. `drive.sh` skips any run whose final checkpoint
 already exists, so the shared volume auto-coordinates: neither machine will redo the other's runs.)
@@ -83,7 +83,7 @@ already exists, so the shared volume auto-coordinates: neither machine will redo
 
 Both machines write to the shared `results/phase0/runs/`, so no copy needed. Once all 12 exist:
 ```bash
-.venv/bin/python scripts/phase0/plot_g3_curves.py   # -> results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png
+.venv/bin/python analysis/plots/plot_g3_curves.py   # -> results/phase0/figures/fine_grained_vs_coarse_experts_isoflop.png
 ```
 
 ## Current results (measured, mb=64, TE 1.11; lower BPB better)

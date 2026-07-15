@@ -17,7 +17,7 @@ for spec in "$@"; do
   PORT=$((PORT+1))
   MOE_PERMUTE_FUSION=$([ "$pf" = "1" ] && echo 1 || echo "") \
   MICRO_BATCH=$mb SHAPE=$shape TARGET_FLOPS=$flops RUN_NAME=g3_time RDZV_PORT=$PORT \
-    bash scripts/phase0/run.sh > results/phase0/g3_time_${shape}_${mb}_pf${pf}.out 2>&1 || true
+    bash experiments/run.sh > results/phase0/g3_time_${shape}_${mb}_pf${pf}.out 2>&1 || true
   if grep -qiE "out of memory|OutOfMemory" "$d/train.log" 2>/dev/null; then
     echo "TIME $shape@$flops mb=$mb pf=$pf : OOM"
   else

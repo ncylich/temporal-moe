@@ -14,7 +14,7 @@ run_one() {  # $1=name $2=extra_env_desc ; remaining env vars set by caller
   local name=$1
   rm -rf results/phase0/runs/$name
   RUN_NAME=$name SHAPE=s0 TARGET_FLOPS=1e16 RDZV_PORT=$((29600 + RANDOM % 100)) \
-    bash scripts/phase0/run.sh > results/phase0/${name}.out 2>&1 || true
+    bash experiments/run.sh > results/phase0/${name}.out 2>&1 || true
   local d=results/phase0/runs/$name
   local loss=$(grep "lm loss:" $d/train.log 2>/dev/null | tail -1 | grep -oE "lm loss: [0-9.E+]+" | grep -oE "[0-9.E+]+$")
   local nan=$(grep -oE "nan iterations:   [0-9]+" $d/train.log 2>/dev/null | tail -1)

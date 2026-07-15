@@ -8,7 +8,7 @@ cd "$(dirname "$0")/../.."
 C="HIDDEN_SIZE=512 N_LAYERS=9 N_HEADS=32 FFN_MOE=2736 FFN_DENSE=2826 MOE_FFN_BASE=352 SHARED_INT=704 TRAIN_ITERS=802 MICRO_BATCH=32"
 run(){ local name=$1; shift
   if [ -f "results/phase0/runs/$name/ckpt/latest_checkpointed_iteration.txt" ]; then echo "SKIP $name (done)"; return; fi
-  echo "--- RUN $name $(date) ---"; env $C "$@" RUN_NAME=$name bash scripts/phase0/flame_scale_run.sh; }
+  echo "--- RUN $name $(date) ---"; env $C "$@" RUN_NAME=$name bash experiments/scale_1e18_1e19/flame_scale_run.sh; }
 echo "=== flame512 1e18 right-flank SEQ START $(date) ==="
 run flame512_dense        DENSE=1                                RDZV_PORT=29580
 run flame512_g1_moe       MOE_FULL=1 GRAIN=1                     RDZV_PORT=29581

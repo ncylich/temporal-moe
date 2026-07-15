@@ -19,7 +19,7 @@ for spec in "$@"; do
   PORT=$((PORT+1))
   echo ">>> PROBE shape=$shape flops=$flops mb=$mb $(date)"
   MICRO_BATCH=$mb SHAPE=$shape TARGET_FLOPS=$flops RUN_NAME=g3_probe RDZV_PORT=$PORT \
-    bash scripts/phase0/run.sh > results/phase0/g3_probe_${shape}_${flops}_mb${mb}.out 2>&1 || true
+    bash experiments/run.sh > results/phase0/g3_probe_${shape}_${flops}_mb${mb}.out 2>&1 || true
   if grep -q "after training is done" "$d/train.log" 2>/dev/null; then
     echo "RESULT: FIT  $shape@$flops mb=$mb"
   elif grep -qiE "out of memory|OutOfMemory" "$d/train.log" 2>/dev/null; then

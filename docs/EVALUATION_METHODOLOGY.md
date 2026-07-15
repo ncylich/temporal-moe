@@ -58,7 +58,7 @@ moving HP would make the parabola meaningless.
   vs N+1"). All shape ffn values are rounded to even.
 - micro-batch is capped at 32 by vocab-logit memory.
 
-All of this lives in one env-parametrized launcher, `scripts/phase0/run.sh` — you set
+All of this lives in one env-parametrized launcher, `experiments/run.sh` — you set
 `SHAPE`/`TARGET_FLOPS` and it computes everything else.
 
 ---
@@ -68,7 +68,7 @@ All of this lives in one env-parametrized launcher, `scripts/phase0/run.sh` — 
 A fixed ladder of geometries (hidden/layers), each with matched ffn so the proportions hold.
 `N_active` =
 active **non-embedding** params (the quantity that enters the FLOP law; computed by
-`scripts/phase0/shapes.py`, which excludes embeddings because they don't scale compute the same way).
+`analysis/shapes.py`, which excludes embeddings because they don't scale compute the same way).
 
 | shape | hidden | layers | ffn | moe_ffn | N_active |
 |---|---|---|---|---|---|
@@ -176,7 +176,7 @@ within ~15 s, without busy-polling, and without ever sleeping blindly through a 
 
 ### 8a. One GPU ⇒ strictly serial
 Runs must not overlap (GPU contention corrupts throughput and can OOM). Queue them in a **driver**:
-`scripts/phase0/drive.sh <configs.txt>` reads `NAME SHAPE FLOPS LR WARMUP GB SEED [AUX]` lines, skips
+`experiments/isoflop_1e16_1e17/drive.sh <configs.txt>` reads `NAME SHAPE FLOPS LR WARMUP GB SEED [AUX]` lines, skips
 any run whose final-iter checkpoint already exists (idempotent restart), runs each via `run.sh`,
 parses the result, and appends to `results/phase0/log.md`. Chain different env regimes (e.g.
 `EVAL_AT_END` differing between budgets) with a small wrapper script and launch it **detached**
@@ -289,24 +289,24 @@ export BPB_DIVISOR=2.7568                                      # 16k bytes/token
 ```bash
 # s2 @1e17, locked HPs, eval@iters/10 (so the 1e16 point is also readable from this run)
 SHAPE=s2 TARGET_FLOPS=1e17 RUN_NAME=v16k_sweep_s2_1e17 \
-  bash scripts/phase0/run.sh
+  bash experiments/run.sh
 # -> results/phase0/runs/v16k_sweep_s2_1e17/{train.log,ckpt,run.meta}
 
 # a 1e16-only parabola point: one eval at the end (saves ~9 intermediate evals)
 SHAPE=s0 TARGET_FLOPS=1e16 EVAL_AT_END=1 RUN_NAME=v16k_d_s0_1e16 \
-  bash scripts/phase0/run.sh
+  bash experiments/run.sh
 ```
 
 ### 10c. Drive the baseline MoE IsoFLOP sweeps (serial, detached)
 The bracket triple is ordered first in the config file (`s2,s1,s3`), rising branch after, so the
 parabola is decidable as early as possible.
 ```bash
-# @1e17 IsoFLOP sweep (config: scripts/phase0/sweep_1e17.txt)
-nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_1e17.txt \
+# @1e17 IsoFLOP sweep (config: experiments/isoflop_1e16_1e17/sweep_1e17.txt)
+nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/sweep_1e17.txt \
   > results/phase0/sweep_1e17.drive.log 2>&1 &
 
 # @1e16 dedicated parabola (EVAL_AT_END for every run in this file)
-EVAL_AT_END=1 nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_1e16_dedicated.txt \
+EVAL_AT_END=1 nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/sweep_1e16_dedicated.txt \
   > results/phase0/sweep_1e16.drive.log 2>&1 &
 ```
 A config line is `NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED [AUX]`, e.g.
@@ -315,35 +315,35 @@ A config line is `NAME SHAPE FLOPS PEAK_LR WARMUP GB SEED [AUX]`, e.g.
 ### 10d. Variant sweeps (change one knob, re-run §5)
 ```bash
 # s=2 (two constant experts, FLOP-matched: shared 3x moe_ffn + top-5). N/iters unchanged.
-SHARED_MULT=3 TOPK=5 nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_s2shared_trio.txt \
+SHARED_MULT=3 TOPK=5 nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/sweep_s2shared_trio.txt \
   > results/phase0/s2shared.drive.log 2>&1 &
 
 # dense IsoFLOP floor (DENSE=1 drops all MoE args, sets the matched even ffn per shape)
-DENSE=1 nohup bash scripts/phase0/drive.sh scripts/phase0/dense_1e17.txt \
+DENSE=1 nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/dense_1e17.txt \
   > results/phase0/dense_1e17.drive.log 2>&1 &
 ```
 
 ### 10e. The two acceptance probes at the chosen optimum
 ```bash
 # reproducibility: re-run the winner at a 2nd seed (config has seed 2024)
-nohup bash scripts/phase0/drive.sh scripts/phase0/sweep_seed2.txt \
+nohup bash experiments/isoflop_1e16_1e17/drive.sh experiments/isoflop_1e16_1e17/sweep_seed2.txt \
   > results/phase0/seed2.drive.log 2>&1 &
 # accept if |Δ CE| <= 0.03 nats vs seed 1234
 
 # expert load (criterion 4): reload the trained ckpt, fire the router hook
 SHAPE=s2 TARGET_FLOPS=1e17 RUN_NAME=v16k_sweep_s2_1e17 EVAL_ONLY=1 \
-  bash scripts/phase0/run.sh
+  bash experiments/run.sh
 # -> .../expert_load.json ; accept if worst max/mean <= 8x
 ```
 
 ### 10f. Reading results
 ```bash
 # one run -> final/at-1e16 BPB JSON
-BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py \
+BPB_DIVISOR=2.7568 .venv/bin/python analysis/parse_run.py \
   results/phase0/runs/v16k_sweep_s2_1e17
 
 grep "SUMMARY" results/phase0/log.md          # the measured ledger, one line per run
-.venv/bin/python scripts/phase0/plot_g3_curves.py   # regenerate the comparison plot
+.venv/bin/python analysis/plots/plot_g3_curves.py   # regenerate the comparison plot
 ```
 
 ## 11. Monitoring commands (what we actually ran)
@@ -373,7 +373,7 @@ grep "consumed samples" $d/train.log | tail -1 \
 ### 11b. Grab a finished run's BPB and confirm the next started
 ```bash
 d=results/phase0/runs/<this>
-BPB_DIVISOR=2.7568 .venv/bin/python scripts/phase0/parse_run.py $d 2>/dev/null \
+BPB_DIVISOR=2.7568 .venv/bin/python analysis/parse_run.py $d 2>/dev/null \
   | grep '^{' | python3 -c "import json,sys; o=json.load(sys.stdin); print('BPB', o['final_val_bpb'])"
 echo "next started: $([ -d results/phase0/runs/<next> ] && echo yes || echo no)"
 ```
@@ -407,12 +407,12 @@ rm -rf results/phase0/runs/<this>
 
 | file | role |
 |---|---|
-| `scripts/phase0/run.sh` | env-parametrized single-run launcher (all of §2; `DENSE=1`, `EVAL_AT_END`, `EVAL_ONLY` modes) |
-| `scripts/phase0/shapes.py` | `N_active` and iters-for-budget (§3–4) |
-| `scripts/phase0/drive.sh` | serial driver over a configs file; idempotent skip; parse+log (§8a) |
-| `scripts/phase0/parse_run.py` | train.log → final/at-1e16 BPB (`BPB_DIVISOR`) |
-| `scripts/phase0/expert_load.py` | per-expert load, criterion 4 (§5 Step 5) |
-| `scripts/phase0/plot_g3_curves.py` | dense-vs-MoE parabola plot (§6) |
+| `experiments/run.sh` | env-parametrized single-run launcher (all of §2; `DENSE=1`, `EVAL_AT_END`, `EVAL_ONLY` modes) |
+| `analysis/shapes.py` | `N_active` and iters-for-budget (§3–4) |
+| `experiments/isoflop_1e16_1e17/drive.sh` | serial driver over a configs file; idempotent skip; parse+log (§8a) |
+| `analysis/parse_run.py` | train.log → final/at-1e16 BPB (`BPB_DIVISOR`) |
+| `analysis/probes/expert_load.py` | per-expert load, criterion 4 (§5 Step 5) |
+| `analysis/plots/plot_g3_curves.py` | dense-vs-MoE parabola plot (§6) |
 | `results/phase0/log.md` | append-only measured-results ledger |
 | `results/phase0/{RESULTS,PASS,DENSE_BASELINES}.md` | writeups |
 | `*.txt` (sweep_*, dense_*, dense_ext_*) | driver config lists |

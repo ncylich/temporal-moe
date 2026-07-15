@@ -28,14 +28,14 @@ hit-rate).
 
 ## Code
 
-- `scripts/phase0/temporal_router.py`
+- `temporal/temporal_router.py`
   - `coherence_bce_loss(logits, resident_mask)` — pure, tested (one-line BCE).
   - `temporal_forward` — if `TEMPORAL_COHERENCE_LAMBDA>0` **and training**, injects the loss'
     gradient onto the raw logits via `MoEAuxLossAutoScaler` (identical mechanism to the existing
     z-loss / load-balancing aux loss) and logs `coherence_loss` to the aux-loss tracker.
-- `scripts/phase0/test_coherence_loss.py` — 6 CPU unit tests (alignment→0, anti-alignment large,
+- `temporal/tests/test_ablation_mechanisms.py` — 6 CPU unit tests (alignment→0, anti-alignment large,
   gradient sign = retention direction, target-detachment vs analytic gradient, retention lowers
-  loss). Run: `.venv/bin/python -m pytest scripts/phase0/test_coherence_loss.py`.
+  loss). Run: `.venv/bin/python -m pytest temporal/tests/test_ablation_mechanisms.py`.
 
 **Env knob** (no `run.sh` change needed — read from the environment):
 - `TEMPORAL_COHERENCE_LAMBDA` (default `0` = off) — loss weight.
@@ -105,12 +105,12 @@ export TEMPORAL=1 TEMPORAL_EVICT=min_logit PYTORCH_CUDA_ALLOC_CONF=expandable_se
 Smoke (one per λ):
 ```bash
 SHAPE=s0 TARGET_FLOPS=1e16 PEAK_LR=3e-3 WARMUP_FRAC=0.05 GLOBAL_BATCH=256 SEED=1234 AUX_COEFF=0.01 \
-  TEMPORAL_COHERENCE_LAMBDA=0.1 RUN_NAME=g3_tmoe_s0_1e16_coh0p1 bash scripts/phase0/run.sh
+  TEMPORAL_COHERENCE_LAMBDA=0.1 RUN_NAME=g3_tmoe_s0_1e16_coh0p1 bash experiments/run.sh
 ```
 Signal (best λ):
 ```bash
 SHAPE=s2 TARGET_FLOPS=1e17 PEAK_LR=3e-3 WARMUP_FRAC=0.05 GLOBAL_BATCH=256 SEED=1234 AUX_COEFF=0.01 \
-  TEMPORAL_COHERENCE_LAMBDA=<best> RUN_NAME=g3_tmoe_s2_1e17_coh bash scripts/phase0/run.sh
+  TEMPORAL_COHERENCE_LAMBDA=<best> RUN_NAME=g3_tmoe_s2_1e17_coh bash experiments/run.sh
 ```
 
 ## Results (measured — smoke λ scan, fine-grained s0 @ 1e16)

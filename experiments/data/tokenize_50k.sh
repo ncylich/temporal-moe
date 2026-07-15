@@ -7,7 +7,7 @@ export PATH=$ROOT/.venv/bin:$PATH CUDNN_PATH=$NV/cudnn \
 export PARTS_GLOB="$ROOT/data/dclm_parts/part*.jsonl" OUT_DIR="$ROOT/data/dclm_tokenized" \
   TOKENIZER_MODEL="EleutherAI/pythia-12b" EOD=0 TOKENIZERS_PARALLELISM=false HF_TOKEN=${HF_TOKEN:-}
 echo "=== 50k tokenize start $(date) ==="
-python scripts/phase0/fast_tokenize.py 12
+python experiments/data/fast_tokenize.py 12
 python - <<'PY'
 import glob, os
 b=sorted(glob.glob("data/dclm_tokenized/part*_text_document.bin")); t=sum(os.path.getsize(x)//2 for x in b)
