@@ -1,5 +1,13 @@
 # Findings: VRAM/RAM↔SSD cache-conditional offload is disqualified at batch-1
 
+> **2026-07 update (currency note).** This June analysis stands for its regime — coarse experts
+> (~MB-scale per miss) over SSD-class tiers — and the measured `llamacpp-bench/` coarse row
+> (2.5 MiB swaps → 0.51× ceiling) confirms it. But the fine-grained temporal case it did not
+> analyze was since built and measured: 18-of-192 rolling residency (840 KiB swaps, RAM→VRAM,
+> ≤1 swap/layer/token) runs at **0.83× the all-resident ceiling with a 5.1× VRAM cut**
+> (`llamacpp-bench/README.md`). The disqualification is regime-specific, not universal.
+
+
 **Decision: do not implement [`PLAN.md`](./PLAN.md).** A bandwidth analysis (below) shows that
 on this hardware — and on Apple Silicon — a single offloaded (SSD-resident) expert per layer
 cannot be hidden behind the compute of the resident experts at batch size 1. Cache-conditional

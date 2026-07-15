@@ -114,7 +114,7 @@ miss costs ~110; on an M4 Pro (unified RAM 273 GB/s ↔ SSD ~5 GB/s) ~55 — but
 (e.g. 8) run per layer to hide behind. So at batch-1 the method is **disqualified for
 single-machine GPU/Apple-Silicon offload**: it lowers miss *rate* but cannot make any single
 miss cheap. Full derivation and per-platform numbers in
-[`../../cce/FINDINGS.md`](../../cce/FINDINGS.md).
+[`./cce/FINDINGS.md`](./cce/FINDINGS.md).
 
 ## Relation to Temporal MoE
 

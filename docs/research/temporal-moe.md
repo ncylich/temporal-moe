@@ -214,7 +214,7 @@ at that stingy `B=1` crossover. A shared window multiplies the compute side by `
 crossover to `miss_rate* ≈ B · BW_ssd/BW_ram`; at `B≈16` storage is hidden almost regardless of
 working-set turnover, provided it fits in `K`. Temporal MoE *is* this crossover shift.
 
-A concrete bandwidth study ([`../../cce/FINDINGS.md`](../../cce/FINDINGS.md)) confirms the
+A concrete bandwidth study ([`./cce/FINDINGS.md`](./cce/FINDINGS.md)) confirms the
 corollary: at `B=1` on high-bandwidth compute (GPU VRAM 768 GB/s, Apple-Silicon unified RAM
 273 GB/s) a single offloaded expert costs ~20–110 resident-experts of compute to hide but only
 `k≈8` run per layer, so per-token cache-conditional offload is *disqualified* there. Batching

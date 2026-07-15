@@ -154,8 +154,10 @@ better by 0.008; both within seed noise; matches §4's s-knob finding). Repro: `
 ## 6. Fine-graining (G=3: 192 experts, top-18) @1e16/1e17 — quality-neutral for MoE, small temporal penalty
 
 `GRAIN=3`: routed experts 64→192, top-k 6→18, shared expert unchanged (BPB divisor 2.7600, mb=64;
-mb≥128 OOMs; `--moe-permute-fusion` tested and rejected — 2–2.5× slower at these sizes). All 12
-runs complete (6 MoE + 6 temporal, split H100/A6000).
+mb≥128 OOMs; `--moe-permute-fusion` tested and rejected — 2–2.5× slower at these sizes; TE pinned
+at 1.11; mb=64 vs mb=32 quality delta ≤0.003 BPB, i.e. within seed noise). All 12 runs complete
+(6 MoE + 6 temporal, split H100/A6000 — the A6000's 48 GB holds only sm1/s0/s1 at mb=64, ~27–37 GB;
+s2/s3 ran H100-only).
 
 **Both G3 MoE parabolas — min unchanged vs G=1:**
 | budget | left | **min** | right | vs G=1 baseline min |
