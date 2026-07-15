@@ -1,2 +1,0 @@
-cell,run,val_ce,a3_mass_pct,set_cov_pct,union,union_frac_pct,eff_experts,max_residency_pct,pinned_per_layer,num_experts,topk
-temporal_coarse@1e19,g1_tmoe_coarse_1e19,3.180622,31.92,28.33,63.91,99.86,62.48,19.95,0.00,64,6

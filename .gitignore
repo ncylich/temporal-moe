@@ -16,3 +16,4 @@ __pycache__/
 results/phase0/*.out
 results/phase0/*.log
 results/phase0/log.md
+results/phase0/probe_batch_cache/

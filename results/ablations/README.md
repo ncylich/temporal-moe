@@ -1,5 +1,7 @@
 # Ablation Results — CSV index
 
+Prose narrative of the Phase-0 findings (baselines, dense floor, acceptance, temporal, fine-graining, 1e18): [FINDINGS.md](FINDINGS.md).
+
 Consolidated result tables from the temporal-MoE ablation program, gathered from the `a6000` / `h100` orchestration branches (comms + code excluded). One row per file: a one-line description and the branch commit(s) whose result-distillation produced it.
 
 **Provenance** — `a6000@<sha>` / `h100@<sha>` is the commit on that branch that wrote the source data (read that commit's message for the exact run); files split across both boxes cite both. Pre-consolidation and pre-combine versions of every file live in this branch's earlier commits (`7e89690` consolidate → `2934c9d` combine → `abc63c3` fold/rename → `56758d4` seed-merge).
@@ -53,11 +55,10 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `specialization_summary.csv` | Per-cell specialization summary (PR percentiles, generalist frac, eff-rank, gate stats). | a6000@0ec187a2 |
 | `t18_1e18_curves.csv` | 1e18 (38M) isoFLOP training curves — coarse full-MoE + coarse temporal cells. | h100@60b0e351/e53596d6 |
 | `t19_1e19_curves.csv` | 1e19 isoFLOP training curves for the 4 t19 cells (dense / moe_coarse / coarse_temporal / fine_temporal). | h100@03a8e488/6a69b7f7/d2b7cd7e/de80543f |
-| `t19_fine_probe_triple.csv` | t19 fine-grained (18/192) temporal residency probe — A3 mass/set coverage, union, eff-experts. | h100@d2b7cd7e |
 | `t19_lmeval.csv` | t19 downstream lm-eval accuracies (dense / moe_coarse / temporal_coarse). | h100@a42340f1 |
 | `t19_lmeval_finegrain.csv` | t19 fine-grained temporal downstream lm-eval accuracies. | h100@3b8d9da8 |
 | `t19_moe_coarse_probe.csv` | t19 coarse full-MoE routing probe — load balance, gate PR, self-consistency. | h100@5df8095d |
-| `t19_probe_triple.csv` | t19 coarse temporal residency probe — A3 mass/set coverage, union, eff-experts. | h100@6a69b7f7 |
+| `t19_temporal_probe.csv` | t19 temporal residency probe (coarse 6/64 val-CE + fine 18/192 test-CE) — A3 mass/set coverage, union, eff-experts. Combines t19_probe_triple + t19_fine_probe_triple. | h100@6a69b7f7 (coarse), h100@d2b7cd7e (fine) |
 | `temporal_router_momentum_sweep.csv` | Temporal-router momentum (γ_m×β_m) sweep — swap rate & set/mass coverage (audit-scored). | a6000@6f9e02bc |
 | `temporal_router_momentum_sweep_selfscored.csv` | Same momentum sweep, self-scored coverage. | a6000@6f9e02bc |
 | `temporal_router_tau_ema_sweep.csv` | Temporal-router τ (min-logit eviction threshold) × EMA-β sweep — swap rate & coverage (audit-scored). | a6000@6f9e02bc |
