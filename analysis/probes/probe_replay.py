@@ -5,7 +5,7 @@ All numbers/figures come from the already-saved per-token gating logs
 (`results/phase0/runs/<run>/router_log.pt`, loaded via plot_probe.load). Everything here is a CPU
 replay of a *selection policy* over the logged demand; the trained weights are never touched.
 
-Experiments (see docs/research/probe-replay-results.md):
+Experiments (see docs/research/mechanism/probe-replay-e1-e8.md):
   E1 swap-rate telemetry + re-reference / victim-cache
   E2 streamed-diversity attribution (union size, residency, effective-experts, token-service)
   E3 mass-weighted consistency (A3) and hit-rate vs set-based

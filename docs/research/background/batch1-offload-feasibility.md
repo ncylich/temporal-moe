@@ -8,7 +8,7 @@
 > (`llamacpp-bench/README.md`). The disqualification is regime-specific, not universal.
 
 
-**Decision: do not implement [`PLAN.md`](./PLAN.md).** A bandwidth analysis (below) shows that
+**Decision: do not implement the cache-conditional offload design.** (The shelved plan — a cache-conditional expert-offload layer for batch-1 decode, VRAM/RAM↔SSD tiers with router-guided prefetch — lives in git history at `cce/PLAN.md`, deleted 2026-07-15.) A bandwidth analysis (below) shows that
 on this hardware — and on Apple Silicon — a single offloaded (SSD-resident) expert per layer
 cannot be hidden behind the compute of the resident experts at batch size 1. Cache-conditional
 routing only lowers the miss *rate*; it cannot reduce the per-miss stall, which here is several×
@@ -70,7 +70,7 @@ storage *relatively* further behind. That is why the paper's modest Snapdragon (
 ~12× its Flash) could show a 2× speedup while a 768 GB/s GPU (≥110× its SSD) cannot. **The
 paper's 2× was relative to an LRU baseline, never relative to a resident model** — consistent
 with the unmeasured fully-resident gap noted in
-[`../docs/research/cache-conditional-experts.md`](../docs/research/cache-conditional-experts.md).
+[`../docs/research/cache-conditional-experts.md`](./cache-conditional-experts.md).
 Our goal (useful speed toward resident) is exactly the comparison the method can't win here.
 
 ## The only escape: batch the tokens (Temporal MoE)
@@ -85,12 +85,12 @@ experts needed to hide 1 miss  →  (1/B) · BW_fast / BW_offload
 
 At `B≈16` the Mac crossover rises from ~1.8% to ~29%, and the A6000+RAM case from ~4% to ~67% —
 i.e., the miss cost finally drops below the available compute. **This is precisely the
-[Temporal MoE](../docs/research/temporal-moe.md) thesis**, and this analysis is independent
+[Temporal MoE](../temporal-moe.md) thesis**, and this analysis is independent
 confirmation that *windowed, batched* expert reuse — not per-token cache-conditional routing —
 is the only thing that makes single-machine expert offload viable on high-bandwidth compute.
 
 ## Status
 
-`PLAN.md` is shelved (not executed). No dependencies installed, no weights downloaded. The
+The offload design is shelved (never executed; git history: `cce/PLAN.md`). No dependencies installed, no weights downloaded. The
 takeaway for the research program: drop batch-1 cache-conditional offload; pursue the batched
 Temporal-MoE direction, where the crossover scales with `B`.

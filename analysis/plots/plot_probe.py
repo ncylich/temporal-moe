@@ -4,7 +4,7 @@
   A3  learned-locality overlap vs model scale (does the router learn to want its resident set?)
   B   rolling-policy hit-rate (coverage) vs resident budget K
   C   expert lifetime vs K
-Reads results/phase0/runs/<run>/router_log.pt. See docs/research/mechanistic-probe-results.md.
+Reads results/phase0/runs/<run>/router_log.pt. See docs/research/mechanism/probe-results.md.
 """
 import os, sys
 import numpy as np

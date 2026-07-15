@@ -142,7 +142,7 @@ so an explicit coherence loss has little to add and mostly distorts routing. The
 settles the question. Kept as a documented negative result (the loss code stays, env-gated off at
 λ=0, for reproducibility).
 **Successor plan** (decision-time mechanisms replacing gradient-space pressure):
-[`decision-time-alignment-plan.md`](./decision-time-alignment-plan.md).
+[`decision-time-alignment-plan.md`](./decision-time-alignment.md).
 
 ## Risks
 

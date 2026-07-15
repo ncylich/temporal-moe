@@ -2,7 +2,7 @@
 
 Skliar et al., *Mixture of Cache-Conditional Experts for Efficient Mobile Device Inference*,
 arXiv:2412.00099 (Dec 2024; Contextual AI · Qualcomm AI Research · Tivaro; preprint, under
-review). Companion to [temporal-moe.md](./temporal-moe.md) — this is the nearest *routing-side*
+review). Companion to [temporal-moe.md](../temporal-moe.md) — this is the nearest *routing-side*
 baseline to Temporal MoE: same locality target, but a **soft, reactive, per-token** nudge
 instead of a hard window commitment.
 
@@ -114,7 +114,7 @@ miss costs ~110; on an M4 Pro (unified RAM 273 GB/s ↔ SSD ~5 GB/s) ~55 — but
 (e.g. 8) run per layer to hide behind. So at batch-1 the method is **disqualified for
 single-machine GPU/Apple-Silicon offload**: it lowers miss *rate* but cannot make any single
 miss cheap. Full derivation and per-platform numbers in
-[`./cce/FINDINGS.md`](./cce/FINDINGS.md).
+[`./batch1-offload-feasibility.md`](./batch1-offload-feasibility.md).
 
 ## Relation to Temporal MoE
 

@@ -25,8 +25,8 @@ The current plan of record is §0 below. Historical sections are retained for pr
 # Decision-time alignment & demand reduction — run plan (v3)
 
 **Self-contained** — everything needed to execute is defined here. Deeper context:
-[`temporal-moe.md`](./temporal-moe.md) (design, "rolling residency" section),
-[`coherence-loss-plan.md`](./coherence-loss-plan.md) (the measured negative result this plan
+[`temporal-moe.md`](../temporal-moe.md) (design, "rolling residency" section),
+[`coherence-loss-plan.md`](./coherence-loss.md) (the measured negative result this plan
 succeeds), and `docs/research/probe-replay-results.md` (**on `main`**; the E1–E8 offline
 measurements that set these priorities). Scope note: we are **optimizing the technique in
 isolation** — quality first, one step at a time; systems-level bandwidth accounting is
