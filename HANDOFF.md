@@ -69,7 +69,7 @@ The one new mechanism authorized this window. Design (agreed with Noah):
 - Per-MoE-layer linear head `W_f ∈ R^{d×E}` reading the SAME hidden state the router reads,
   **detached** (`h.detach()`) — no gradient to the trunk, ever.
 - Target: discounted future demand `y_t` from the existing `anticipatory_target(logits, k,
-  gamma=0.5)` in `scripts/phase0/temporal_router.py` (reverse scan, tail-masked, detached).
+  gamma=0.5)` in `temporal/temporal_router.py` (ablation knobs now in `temporal/ablation_mechanisms.py`) (reverse scan, tail-masked, detached).
 - Loss: BCE(head(h.detach()), y) added to the model loss via the aux-losses tracker with its own
   coefficient `HEAD_LAMBDA=1.0` — gradients reach ONLY head weights (input detached). Do NOT use
   MoEAuxLossAutoScaler on the router logits — that injects into the router (that's the Goodhart

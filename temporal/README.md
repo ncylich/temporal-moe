@@ -18,11 +18,11 @@ swaps/token) so the resident weights can be streamed from SSD/RAM rather than he
 ## Running the tests
 
 ```
-PYTHONPATH=Megatron-LM:. .venv/bin/python -m pytest temporal/tests/ -q
+PYTHONPATH=Megatron-LM:. .venv/bin/python -m pytest temporal/tests analysis/probes -q
 ```
 
-The router-vs-replay cross-checks additionally import `analysis/probes/probe_replay.py`; run from the
-repo root so both are importable.
+The router-vs-replay cross-checks import `analysis/probes/probe_replay.py`; co-collecting
+`analysis/probes` puts it on the test path (running `temporal/tests` alone skips those 3 checks).
 
 ## Results
 
