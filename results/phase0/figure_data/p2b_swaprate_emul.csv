@@ -1,0 +1,23 @@
+# Phase 2b — real-swap-rate emulation of temporal-MoE decode (A6000, graphs-on, overlap on, bit-identical).
+# DEFAULT benchmark shape: 1024-token prefill (KV depth) then 128 decode tokens timed (tg128 @ d1024),
+#   batch 1 (-ub 1 -b 1); prefill speed is NOT included (decode-only, measured at a realistic 1024 context).
+# Emulates the REAL routing swap rate measured on our trained models onto the big random-weight benchmark
+# (fine-grained 18-of-192, exactly this benchmark's config) to get the honest DEPLOY number vs worst-case.
+# emulated_swap_rate_p = fraction of layers/token that fire a <=1-expert (840 KiB) swap over PCIe, in [0,1].
+#   The real mechanism (compute_resident_mask) swaps <=1 expert/layer (single do_swap boolean); remaining
+#   non-resident picks are remapped to resident experts (the cacheability approx the model was trained on).
+#   Measured real rate on the SHIPPED policy (tau=0): p ~= 1.0 on every layer -> deploy point is p=1.0.
+# tok_s = decode tokens/sec (higher better). stderr = std error (n=128, r=6-8). Knob: TEMPORAL_SWAP_PROB=p.
+# Reference: all-resident ceiling (no swap, full expert VRAM) = 199.64 +/- 0.94 tok/s @ d1024.
+# VRAM at the temporal deploy point: 1502 MiB vs 7672 all-resident = 5.1x total cut (10.6x expert tier).
+# Current headline + full results: see bench/llamacpp-temporal/README.md (single doc).
+# Rows below are the swap-rate->tok/s emulation curve (absolute tok/s predate the later
+# parallel-residency optimization, which raised all configs ~+10; relative shape unchanged).
+emulated_swap_rate_p,tok_s,stderr,note
+0.00,164.35,0.84,hypothetical perfect cache (no weight movement)
+0.29,159.75,0.95,fine-grained tau=4 (retained_mass -26%, not worth it)
+0.40,158.76,0.89,coarse-8M tau=2
+0.62,156.75,1.04,coarse-38M tau=2
+0.844,155.12,0.94,fine-grained tau=2 (minor quality cost; within noise of p=1.0 -- curve flat at top)
+1.00,156.24,0.73,SHIPPED policy tau=0 (real measured p~1.0) = DEPLOY NUMBER
+1.00,156.05,0.92,native force1 cross-check (independent code path; matches p=1.0 emulation)

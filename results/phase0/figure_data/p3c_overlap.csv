@@ -1,0 +1,8 @@
+config,decode_tps,ms_per_tok,vram_mib,vram_reduction_x,graphs,swap_policy,correctness,note
+stock,202.4,4.941,7672,1.0,on,none,ref,all experts VRAM-resident (Phase-3c re-measure)
+unified_real_noovl,107.2,9.328,1502,5.1,on,all-nonresident,bit-identical,P3c vectorized uint4 swap-copy; real content-varying swap; worst-case random routing
+unified_real_pipeline,115.1,8.688,1502,5.1,on,all-nonresident,bit-identical,P3c vectorized copy + copy-pipelining overlap (up/down copies hidden behind gate/up GEMM); graphs-ON captures
+unified_force1_noovl,136.9,7.304,1502,5.1,on,1/layer,latency-var,P3c vectorized copy 1-swap/layer timing ceiling (force1 caps swaps -> timing only not bit-identical)
+unified_force1_pipeline,149.3,6.698,1502,5.1,on,1/layer,latency-var,P3c vectorized copy + pipelining 1-swap/layer timing ceiling
+unified_real_pipeline_off,94.9,10.54,1502,5.1,off,all-nonresident,bit-identical,P3c real pipeline graphs-OFF (graphs-on 115 > off 95 confirms capture succeeds+helps)
+decomp_nocopy,184.3,5.426,1502,5.1,on,none-copy-disabled,timing,decomposition: residency+remap kernels only (swap-copy disabled) -> scaffolding ~0.5ms/tok; copy was the dominant 34%

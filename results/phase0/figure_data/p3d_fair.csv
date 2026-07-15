@@ -1,0 +1,10 @@
+config,decode_tps,ms_per_tok,vram_mib,vram_reduction_x,graphs,swap_policy,correctness,note
+stock_fused,202.0,4.950,7672,1.0,on,none,ref,all-resident; single-capture-then-replay CUDA graph (1590 nodes)
+stock_nofuse,203.3,4.919,7672,1.0,on,none,ref,fusion disabled -> ~0 change at B=1 (proves fusion is not the handicap); 1734 nodes
+unified_nocopy,188.7,5.300,1502,5.1,on,none-copy-disabled,timing,scaffolding-only (residency+remap+R-slot indirection); parallel residency + remap-once
+unified_real_noovl,109.7,9.115,1502,5.1,on,all-nonresident,bit-identical,fair unified: parallel residency + merged remap + uint4 copy; no overlap
+unified_real_overlap,117.2,8.532,1502,5.1,on,all-nonresident,bit-identical,FAIR FULL-CAPABILITY: + copy-pipelining overlap; graphs-on single-capture-replay; VRAM 5.1x
+unified_force1_overlap,152.4,6.562,1502,5.1,on,1/layer,latency-var,<=1-swap/layer high-locality timing ceiling (trained model expected near here)
+gap_split_lost_fusion,-0.05,,,,on,,,decomposition: lost fusion = -1% of the stock->unified gap (noise; NOFUSE faster)
+gap_split_scaffolding,0.40,,,,on,,,decomposition: residency+remap+R-slot indirection = 11% of gap (mostly inherent to temporal indirection)
+gap_split_genuine_swap,3.23,,,,on,,,decomposition: genuine PCIe swap physics = 90% of gap (unhidable gate copy + bandwidth)

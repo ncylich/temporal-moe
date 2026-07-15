@@ -1,0 +1,8 @@
+cell,checkpoint,config,tau_rho,ema_beta,test_bpb,baseline_bpb,delta_bpb,bar_-0.003,note
+control,g3_tmoe_s0_1e16,shipped-frozen,0,1.0,1.4758,1.4753,+0.0005,PASS,protocol validation
+G3,g3_tmoe_s0_1e16,tau-only,1,1.0,1.4753,1.4753,+0.0000,PASS,
+G3,g3_tmoe_s0_1e16,EMA-only,0,0.1,1.5577,1.4753,+0.0824,FAIL,
+G3,g3_tmoe_s0_1e16,combo,1,0.1,1.5877,1.4753,+0.1124,FAIL,
+G1,tmoe_minlogit_sh1_s2_1e17,tau-only,1,1.0,1.2822,1.2821,+0.0001,PASS,
+G1,tmoe_minlogit_sh1_s2_1e17,EMA-only,0,0.25,1.3193,1.2821,+0.0372,FAIL,
+G1,tmoe_minlogit_sh1_s2_1e17,combo,1,0.25,1.3977,1.2821,+0.1156,FAIL,

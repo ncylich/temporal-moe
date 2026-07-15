@@ -1,0 +1,9 @@
+config,decode_tps,ms_per_tok,vram_mib,vram_reduction_x,graphs,swap_policy,correctness,note
+stock,202.7,4.933,7672,1.0,on,none,ref,all experts VRAM-resident
+stock,163.2,6.129,7672,1.0,off,none,ref,graphs-off baseline
+probe_1swap,196.2,5.096,7676,1.0,on,1/layer,bit-identical,Phase-3 in-situ overlap PROBE (experts resident+DMA overlap; NOT VRAM-reduced)
+unified_real,89.1,11.22,1500,5.1,on,all-nonresident,bit-identical,FULLY-UNIFIED graphs-ON: CPU pool+R=18 slots+GPU compute+real content-varying swap; worst-case random routing
+unified_force1,106.0,9.434,1500,5.1,on,1/layer,latency-var,FULLY-UNIFIED graphs-ON 1 swap/layer (fair vs probe); host-mapped kernel-copy, no compute overlap
+unified_real_off,80.2,12.47,1468,5.2,off,all-nonresident,bit-identical,unified graphs-off (on-device residency)
+unified_force1_ovl_off,93.4,10.71,1500,5.1,off,1/layer,bit-identical,partial overlap (up/down copies hide behind gate/up GEMM); graphs-off
+unified_force1_noovl_off,88.6,11.29,1500,5.1,off,1/layer,bit-identical,graphs-off no overlap

@@ -1,0 +1,8 @@
+cell,run,dist2centroid_mean,dist2centroid_min,pairwise_cos_median,pairwise_cos_p99,corr_residency_vs_dist
+L0_s1,g3_tmoe_s0_1e16,0.8782,0.8045,0.0097,0.0366,-0.004
+L0_s3,g3_tmoe_s0_1e16_seed3,0.8734,0.8102,0.0109,0.0379,0.0738
+A2_auxfree,g3_tmoe_s0_1e16_auxfree,0.8742,0.7965,0.0107,0.0375,-0.0079
+karen,g3_tmoe_s0_1e16_karen,0.8751,0.7999,0.0104,0.0374,-0.0472
+karen_soft_s1,g3_tmoe_s0_1e16_karen_soft,0.8746,0.8088,0.0106,0.0375,-0.1239
+karen_soft_s2,g3_tmoe_s0_1e16_karen_soft_seed2,0.8716,0.7833,0.0113,0.0383,-0.03
+LG1_momr_s2,g3_tmoe_s0_1e16_momr_seed2,0.8757,0.8132,0.0103,0.0369,0.0533

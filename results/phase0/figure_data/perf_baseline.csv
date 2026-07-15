@@ -1,0 +1,9 @@
+config,shape,mode,micro_batch,s_per_iter,tflops_per_gpu,peak_gb,loss_last
+s2_dense,s2,dense,32,1.6646,29.0,11.1,7.1726
+s2_temporal,s2,temporal_coarse,32,2.5153,19.1,14.7,6.8620
+s19_dense_mb32,s19opt,dense,32,11.4787,60.2,43.4,6.9372
+s19_temporal_mb8,s19opt,temporal_coarse,8,18.7631,36.7,27.2,6.9468
+s2_temporal_mb8,s2,temporal_coarse,8,4.1069,11.7,4.4,6.9691
+s2_temporal_mb16,s2,temporal_coarse,16,2.7760,17.3,7.8,6.9722
+s19_temporal_mb8_cg,s19opt,temporal_coarse,8,NA,NA,NA,BLOCKED_te_rng_tracker
+s19_temporal_mb16,s19opt,temporal_coarse,16,OOM,NA,42.6,OOM_at_unpermute

@@ -1,0 +1,8 @@
+cell,run,E,k,PR_median,PR_p10,PR_p90,generalist_frac_gt0.5,gate_when_sel_median,eff_rank_mean,strong_corr_pairs_mean
+L0_s1,g3_tmoe_s0_1e16,192,18,0.6572,0.2378,0.9232,0.6458,0.0095,11.47,68
+L0_s3,g3_tmoe_s0_1e16_seed3,192,18,0.6502,0.2735,0.9226,0.6667,0.00948,12.14,36
+A2_auxfree,g3_tmoe_s0_1e16_auxfree,192,18,0.6004,0.1343,0.9344,0.5816,0.01095,11.6,116
+karen,g3_tmoe_s0_1e16_karen,192,18,0.6143,0.1658,0.9117,0.6337,0.01122,13.66,10
+karen_soft_s1,g3_tmoe_s0_1e16_karen_soft,192,18,0.579,0.1499,0.9203,0.5781,0.01167,13.62,61
+karen_soft_s2,g3_tmoe_s0_1e16_karen_soft_seed2,192,18,0.5925,0.1362,0.9027,0.5903,0.0118,12.68,62
+LG1_momr_s2,g3_tmoe_s0_1e16_momr_seed2,192,18,0.6851,0.2268,0.9186,0.6979,0.00941,11.13,54

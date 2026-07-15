@@ -1,0 +1,9 @@
+seed,run,variant,k,A3_pct,eff_experts,maxres_pct,union,swap_rate
+seed1,g3_tmoe_s0_1e16_karen_soft,LOGGED-mask(raw-resid),18,,126.45,69.06,152.83,
+seed1,g3_tmoe_s0_1e16_karen_soft,REF,18,36.2,128.13,72.23,153.52,1.0
+seed1,g3_tmoe_s0_1e16_karen_soft,CAND-A,18,35.59,130.73,67.97,153.57,1.0
+seed1,g3_tmoe_s0_1e16_karen_soft,CAND-B,18,35.49,132.16,66.03,156.48,1.0
+seed2,g3_tmoe_s0_1e16_karen_soft_seed2,LOGGED-mask(raw-resid),18,,128.78,74.44,154.1,
+seed2,g3_tmoe_s0_1e16_karen_soft_seed2,REF,18,35.35,131.83,71.28,154.7,1.0
+seed2,g3_tmoe_s0_1e16_karen_soft_seed2,CAND-A,18,34.75,133.8,73.0,155.16,1.0
+seed2,g3_tmoe_s0_1e16_karen_soft_seed2,CAND-B,18,34.68,135.15,69.7,157.76,1.0

@@ -1,0 +1,6 @@
+run,variant,hidden,final_val_ce,final_test_ce,iters,seed
+flame512_dense,dense,512,4.246400,4.245448,802,1234
+flame512_g1_moe,g1_moe,512,4.099714,4.099431,802,1234
+flame512_g1_temporal,g1_temporal,512,4.097912,4.098233,802,1234
+flame512_g3_moe,g3_moe,512,4.222294,4.221056,802,1234
+flame512_g3_temporal,g3_temporal,512,4.183468,4.183103,802,1234
