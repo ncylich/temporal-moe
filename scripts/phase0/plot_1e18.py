@@ -28,11 +28,12 @@ if PAPER:
 # Only dense is A6000 cross-data (different split, within ~0.01 nats) — noted in the caption;
 # the other four are local, one shared split. All values = end-of-training TEST evals. Coarse arms:
 # two seeds each, bar = seed mean (moe (3.918414+3.930210)/2, temporal (3.909421+3.904324)/2).
-# Error bars: MEASURED two-seed half-ranges on the coarse bars (MoE 0.0059, temporal 0.0025); the
-# single-seed fine bars carry the METHOD-MATCHED coarse half-range as an estimate; dense carries
-# its documented +/-0.01 cross-data uncertainty.
+# Error bars ONLY where measured: two-seed half-ranges on the coarse bars (MoE 0.0059,
+# temporal 0.0025). Dense and the fine bars are single measurements — NO error bar drawn
+# (dense's ~0.01-nat cross-data comparability bound is stated in the caption instead).
+NAN = float("nan")
 ce     = [4.1373, 4.0087, 3.9768, 3.9243, 3.9069]     # coarse bars = two-seed means (test)
-yerr   = [0.010, 0.0059, 0.0025, 0.0059, 0.0025]      # dense xdata | fine est. | coarse measured
+yerr   = [NAN, NAN, NAN, 0.0059, 0.0025]              # measured coarse half-ranges only
 colors = ["#7f7f7f", "#0d3b66", "#145a14", "#5aa0dd", "#5cc85c"]
 labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "temporal\ncoarse"] if PAPER else
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
@@ -42,7 +43,8 @@ fig, ax = plt.subplots(figsize=(4.6, 3.6) if PAPER else (8.6, 5.8))
 bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6,
               yerr=yerr, capsize=(4 if PAPER else 5), error_kw=dict(lw=1.3, ecolor="k", zorder=5))
 for b, v, e in zip(bars, ce, yerr):
-    ax.text(b.get_x()+b.get_width()/2, v + e + 0.005, f"{v:.3f}", ha="center",
+    off = (e if e == e else 0)  # nan -> no bar drawn
+    ax.text(b.get_x()+b.get_width()/2, v + off + 0.005, f"{v:.3f}", ha="center",
             fontsize=(11 if PAPER else 10.5), fontweight="bold")
 # individual seed finals (test) on the two-seed coarse bars
 SEEDS = {3: [3.918414, 3.930210], 4: [3.909421, 3.904324]}   # moe coarse, temporal coarse
@@ -77,7 +79,8 @@ else:
              "Test-set cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
              "dclm). Hue = method (dense gray, MoE blue, temporal green); shade = granularity (coarse normal, "
              "fine-grained dark). 'temporal' = rolling residency (keep top-k resident, swap 1/token). Coarse "
-             "bars = two-seed means with individual seeds as dots; dense is A6000 cross-data (different val "
+             "bars = two-seed means with individual seeds as dots and measured half-range error bars; fine bars "
+             "and dense are single runs (no error bar); dense is A6000 cross-data (different val "
              "split, within ~0.01 nats); the other four share one local split.", ha="center", fontsize=7.8, wrap=True)
     fig.tight_layout(rect=[0, 0.09, 1, 1])
     out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png"
