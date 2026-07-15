@@ -15,3 +15,7 @@ s2_FULL,token,circular,0.4993,320
 s2_FULL,token,iid,0.4976,320
 s2_FULL,context,circular,0.5024,320
 s2_FULL,context,iid,0.5002,320
+s0_SOFTMAX_BASELINE,token,circular,0.5007,576
+s0_SOFTMAX_BASELINE,token,iid,0.4994,576
+s0_SOFTMAX_BASELINE,context,circular,0.4995,576
+s0_SOFTMAX_BASELINE,context,iid,0.4987,576

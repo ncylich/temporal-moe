@@ -1,5 +1,0 @@
-model,feature,null_type,median_AUC_floor,n_experts
-s0_SOFTMAX_BASELINE,token,circular,0.5007,576
-s0_SOFTMAX_BASELINE,token,iid,0.4994,576
-s0_SOFTMAX_BASELINE,context,circular,0.4995,576
-s0_SOFTMAX_BASELINE,context,iid,0.4987,576
