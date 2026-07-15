@@ -29,12 +29,13 @@ N_G3 = {"sm1": 0.81, "s0": 1.42, "s1": 3.91, "s2": 8.23, "s3": 15.09}
 
 DENSE_G1 = {"1e16": {"sm1": 1.534, "s0": 1.519, "s1": 1.591},
             "1e17": {"s1": 1.361, "s2": 1.341, "s3": 1.408}}
-MOE_G1   = {"1e16": {"sm1": 1.478, "s0": 1.447, "s1": 1.540},
-            "1e17": {"s1": 1.284, "s2": 1.269, "s3": 1.289}}
+# Values = end-of-training TEST-set BPB (canonical series; see results/ablations/FINDINGS.md).
+MOE_G1   = {"1e16": {"sm1": 1.4766, "s0": 1.447, "s1": 1.540},
+            "1e17": {"s1": 1.2803, "s2": 1.269, "s3": 1.289}}
 MOE_G3   = {"1e16": {"sm1": 1.4786, "s0": 1.4585, "s1": 1.5352},
             "1e17": {"s1": 1.2846, "s2": 1.2708, "s3": 1.2815}}
-TMP_G1   = {"1e16": {"sm1": 1.4891, "s0": 1.4599, "s1": 1.5488},
-            "1e17": {"s1": 1.3039, "s2": 1.2821, "s3": 1.3073}}
+TMP_G1   = {"1e16": {"sm1": 1.4872, "s0": 1.4599, "s1": 1.5473},
+            "1e17": {"s1": 1.3027, "s2": 1.2821, "s3": 1.3061}}
 TMP_G3   = {"1e16": {"sm1": 1.4976, "s0": 1.4753, "s1": 1.5861},
             "1e17": {"s1": 1.3065, "s2": 1.2873, "s3": 1.3129}}
 
@@ -72,18 +73,18 @@ labels  += ["$10^{16}$ FLOPs", "$10^{17}$ FLOPs"]
 
 if PAPER:
     ax.set_xlabel("active params (M)")
-    ax.set_ylabel("validation BPB")
+    ax.set_ylabel("test BPB")
     ax.set_title("Quality at fixed compute")
     ax.legend(handles, labels, ncol=1, loc="lower left")
     fig.tight_layout()
     out = f"{REPO}/results/phase0/figures/fine_grained_vs_coarse_experts_isoflop_nocaption.png"
 else:
     ax.set_xlabel("active non-embedding params  N  (millions)")
-    ax.set_ylabel("validation BPB  (bits/byte, lower better)")
+    ax.set_ylabel("test BPB  (bits/byte, lower better)")
     ax.set_title("IsoFLOP: coarse (6 of 64) vs fine-grained (18 of 192) experts, all methods")
     ax.legend(handles, labels, ncol=2, loc="lower left")
     fig.text(0.5, 0.01,
-             "IsoFLOP curves (validation BPB, lower is better, vs active non-embedding params). "
+             "IsoFLOP curves (test-set BPB, lower is better, vs active non-embedding params). "
              "Color = method (dense gray, MoE blue, temporal green); shade = granularity (coarse = "
              "normal, fine-grained = dark); marker = compute budget (circle 10^16, triangle 10^17). "
              "'temporal' = rolling residency (keep top-k experts resident, swap 1 per token).",

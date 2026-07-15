@@ -1,5 +1,7 @@
 # Shared run plan: G=3 fine-grained MoE + temporal (H100 + A6000)
 
+> Historical coordination doc (numbers as published at the time, during-training-val basis for some G1 cells). Canonical final numbers: `results/ablations/FINDINGS.md` + `phase0_isoflop_points.csv`.
+
 Two-machine execution plan for the **G=3 fine-grained** FLAME-MoE Phase-0 sweep — the same
 IsoFLOP MoE-vs-temporal-vs-dense comparison as `docs/EVALUATION_METHODOLOGY.md`, but with the
 routed experts subdivided 3× (DeepSeek-style segmentation). Branch: `temporal-moe-impl`.

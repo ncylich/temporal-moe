@@ -5,7 +5,7 @@
 Rolling residency restricts each token to the currently resident expert set, removing routing
 freedom, yet at 1e18 FLOPs the temporally constrained model achieves *lower* validation loss
 than the unconstrained MoE baseline of identical architecture, data, and compute, at both
-granularities (coarse: CE 3.9121 vs 3.9209, fine: 3.9768 vs 4.0087, both far below the dense
+granularities (test CE — coarse: 3.9094 vs 3.9184, fine: 3.9768 vs 4.0087, both far below the dense
 floor of 4.137, with a 1e19 replication in progress). A constraint that improves generalization
 must be suppressing a harmful behavior, and this section identifies it.
 

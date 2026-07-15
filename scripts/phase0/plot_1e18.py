@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """1e18 (FLAME-MoE-38M-100M scale): dense floor vs full MoE (coarse & fine-grained) vs temporal.
-Validation cross-entropy (nats, lower better), pythia-50k tokenizer, our dclm val split. Single axes.
-Measured locally on one val split: MoE coarse (6/64, 2 seeds), temporal coarse (6/64, 2 seeds),
-MoE fine (18/192), temporal fine (18/192). Coarse bars show the two-seed mean with individual seed
-dots. Dense floor reused from the A6000 baseline (4.137; same corpus/tokenizer, cross-data <~0.01
-nats). Seed curves: results/phase0/figure_data/t18_coarse_{temporal,moe}.csv (val@2121 lines).
+Test-set cross-entropy (nats, lower better), pythia-50k tokenizer, dclm. Single axes.
+Measured locally on one split: MoE coarse (6/64, 2 seeds), temporal coarse (6/64, 2 seeds),
+MoE fine (18/192), temporal fine (18/192). Coarse bars show the two-seed mean of the END-OF-TRAINING
+TEST evals (canonical series, train.log-verified; see results/ablations/FINDINGS.md section 7) with
+individual seed dots. Dense floor reused from the A6000 baseline (test 4.1373; same corpus/tokenizer,
+cross-data <~0.01 nats). Seed finals: results/ablations/t18_1e18_curves.csv (final_test_ce @2121)
+and flame38m_1e18_cells.csv.
 Output: results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy.png
 """
 import os, sys
@@ -23,13 +25,14 @@ if PAPER:
 
 # worst -> best CE (left -> right). Colors match the left isoFLOP figure: hue = method
 # (gray dense, blue MoE, green temporal), shade = granularity (coarse normal / fine dark).
-# Only dense is A6000 cross-data (different val split, within ~0.01 nats) — noted in the caption;
-# the other four are local, one shared split. Coarse arms: two seeds each (val@2121 basis),
-# bar = seed mean. Error bars: MEASURED two-seed half-ranges on the coarse bars (MoE 0.0064,
-# temporal 0.0024); the single-seed fine bars carry the METHOD-MATCHED coarse half-range as an
-# estimate; dense carries its documented +/-0.01 cross-data uncertainty.
-ce     = [4.137, 4.0087, 3.9768, 3.9273, 3.9098]      # coarse bars = two-seed means
-yerr   = [0.010, 0.0064, 0.0024, 0.0064, 0.0024]      # dense xdata | fine est. | coarse measured
+# Only dense is A6000 cross-data (different split, within ~0.01 nats) — noted in the caption;
+# the other four are local, one shared split. All values = end-of-training TEST evals. Coarse arms:
+# two seeds each, bar = seed mean (moe (3.918414+3.930210)/2, temporal (3.909421+3.904324)/2).
+# Error bars: MEASURED two-seed half-ranges on the coarse bars (MoE 0.0059, temporal 0.0025); the
+# single-seed fine bars carry the METHOD-MATCHED coarse half-range as an estimate; dense carries
+# its documented +/-0.01 cross-data uncertainty.
+ce     = [4.1373, 4.0087, 3.9768, 3.9243, 3.9069]     # coarse bars = two-seed means (test)
+yerr   = [0.010, 0.0059, 0.0025, 0.0059, 0.0025]      # dense xdata | fine est. | coarse measured
 colors = ["#7f7f7f", "#0d3b66", "#145a14", "#5aa0dd", "#5cc85c"]
 labels = (["dense", "full MoE\nfine", "temporal\nfine", "full MoE\ncoarse", "temporal\ncoarse"] if PAPER else
           ["dense\nbaseline", "full MoE\nfine (18 of 192)", "temporal\nfine (18 of 192)",
@@ -41,32 +44,37 @@ bars = ax.bar(labels, ce, color=colors, width=0.66, edgecolor="k", linewidth=0.6
 for b, v, e in zip(bars, ce, yerr):
     ax.text(b.get_x()+b.get_width()/2, v + e + 0.005, f"{v:.3f}", ha="center",
             fontsize=(11 if PAPER else 10.5), fontweight="bold")
+# individual seed finals (test) on the two-seed coarse bars
+SEEDS = {3: [3.918414, 3.930210], 4: [3.909421, 3.904324]}   # moe coarse, temporal coarse
+for i, vals in SEEDS.items():
+    x = bars[i].get_x() + bars[i].get_width()/2
+    ax.scatter([x]*len(vals), vals, s=16, color="k", zorder=6)
 ax.grid(True, axis="y", ls=":", alpha=0.4)
 
 if PAPER:
     ax.set_ylim(3.6, 4.20)
-    ax.set_ylabel("validation CE (nats)")
+    ax.set_ylabel("test CE (nats)")
     ax.set_title("Quality at $10^{18}$ FLOPs")
     fig.tight_layout()
     out = f"{REPO}/results/phase0/figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png"
 else:
-    # finding 1: fine-graining hurts the full MoE (fine 4.009 -> coarse 3.927 mean)
-    ax.annotate("", xy=(3, 3.9273), xytext=(1, 4.0087),
+    # finding 1: fine-graining hurts the full MoE (fine 4.009 -> coarse 3.924 mean)
+    ax.annotate("", xy=(3, 3.9243), xytext=(1, 4.0087),
                 arrowprops=dict(arrowstyle="->", color="darkred", lw=1.4))
-    ax.text(2.0, 4.15, "fine-graining hurts the full MoE  (−0.088 nats)", ha="center", fontsize=8.5, color="darkred")
+    ax.text(2.0, 4.15, "fine-graining hurts the full MoE  (−0.084 nats)", ha="center", fontsize=8.5, color="darkred")
     # finding 2: temporal (fine) beats its own-granularity full MoE
     ax.annotate("", xy=(2, 3.9768), xytext=(1, 4.0087),
                 arrowprops=dict(arrowstyle="->", color="green", lw=1.2))
     ax.text(2.55, 4.05, "temporal beats its own-granularity full MoE", ha="left", fontsize=8, color="green")
-    rec = (4.137 - 3.9768) / (4.137 - 3.9273) * 100
+    rec = (4.1373 - 3.9768) / (4.1373 - 3.9243) * 100
     ax.text(0.985, 0.06, f"temporal (fine) recovers ~{rec:.0f}% of the\ndense→(coarse full-MoE) gap; coarse temporal\nbeats coarse MoE on BOTH seeds (dots)",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8.3, color="dimgray")
     ax.set_ylim(3.6, 4.25)
-    ax.set_ylabel("validation cross-entropy (nats, lower better)")
+    ax.set_ylabel("test cross-entropy (nats, lower better)")
     ax.set_title("At 10^18 FLOPs (FLAME-MoE-38M scale): fine-graining hurts the full MoE,\n"
                  "but temporal routing is robust — and stays inside the dense↔MoE band")
     fig.text(0.5, 0.005,
-             "Validation cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
+             "Test-set cross-entropy (CE, nats, lower better) at 10^18 FLOPs (~38M-active model, pythia-50k, "
              "dclm). Hue = method (dense gray, MoE blue, temporal green); shade = granularity (coarse normal, "
              "fine-grained dark). 'temporal' = rolling residency (keep top-k resident, swap 1/token). Coarse "
              "bars = two-seed means with individual seeds as dots; dense is A6000 cross-data (different val "
