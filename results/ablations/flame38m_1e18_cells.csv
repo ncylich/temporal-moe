@@ -3,7 +3,7 @@
 run,method,grain,experts,topk,seed,val_ce,test_ce,source,note
 flame38m_dense,dense,1,,,1234,4.1373,,log.md (temporal-moe-impl@66f786b7),a6000; ffn 1422 param-matched dense floor
 flame38m_temporal_minlogit,temporal,1,64,6,1234,3.9045,,log.md (temporal-moe-impl@66f786b7),a6000 original run (docs round-quote 3.906)
-flame38m_g1_moe,moe,1,64,6,1234,3.914069,3.918414,t18_1e18_curves.csv (h100@60b0e351),"h100 re-run, local self-consistent split; G3_RESULTS quotes 3.9209 (matches neither seed exactly); plot_1e18.py 2-seed mean 3.9273 vs computed 3.9234 - unreconciled"
+flame38m_g1_moe,moe,1,64,6,1234,3.914069,3.918414,t18_1e18_curves.csv (h100@60b0e351),"h100 re-run, local self-consistent split; measured per-seed finals here are canonical - the plot_1e18.py coarse bars and G3_RESULTS 3.9209 were pre-run approximations used for error bars, superseded by these values (per Noah)"
 flame38m_g1_moe_s2,moe,1,64,6,2,3.932836,3.93021,t18_1e18_curves.csv (h100@e53596d6),seed replicate
 flame38m_g1_temporal,temporal,1,64,6,1234,,3.91209,t18_1e18_curves.csv (h100@60b0e351),h100 re-run; source row lacked val_ce column
 flame38m_g1_temporal_s2,temporal,1,64,6,2,3.906799,,t18_1e18_curves.csv (h100@e53596d6),seed replicate
