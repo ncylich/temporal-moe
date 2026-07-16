@@ -38,7 +38,9 @@ locality as a training-time constraint. A rolling-residency router keeps only th
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
 spanning $10^{16}$ to $10^{19}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
 quality uplift at compute-optimal sizes with 18 of 192 experts resident, a 5.7$\times$ reduction in
-resident memory, and zero-shot downstream accuracy at $10^{19}$ tracks this recovery. The trained router internalizes the constraint, shifting expert specialization
+resident memory, and zero-shot downstream accuracy at $10^{19}$ tracks this recovery. A llama.cpp
+implementation realizes the promise at $\sim$11B scale, decoding at 0.83$\times$ the all-resident
+speed in 5.1$\times$ less VRAM with bit-identical outputs. The trained router internalizes the constraint, shifting expert specialization
 from token identity to surrounding context and nearly doubling its temporal self-consistency
 over vanilla routing, with recovery stable across the whole range. Trained
 temporal routing is a practical path toward MoE-quality models under
@@ -65,9 +67,10 @@ that it recovers most of the MoE quality gain at a fraction of the resident memo
 task accuracy at $10^{19}$ tracking the pretraining recovery, and (iii) a
 mechanistic account of how the router internalizes the constraint, de-lexicalizing routing
 from token identity to context (Section~\ref{sec:mechanism}), with measured negative
-results redirecting future work from cache policy toward anticipation.
+results redirecting future work from cache policy toward anticipation, and (iv) a real-engine
+llama.cpp serving measurement validating the memory-latency claim.
 
-\section{Method}
+\section{Method}\label{sec:method}
 
 Each MoE layer with $E$ routed experts keeps only its $k$ active experts resident, the set $S_t$.
 Given router logits $R_t\in\mathbb{R}^E$ for token $t$, the layer nominates the best
@@ -95,9 +98,9 @@ is, once $k-1$ approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM o
 expert size $b$ cancels, so the condition depends only on the routing width, which DeepSeek-style
 fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 18
 of 192 experts resident (the same fraction as 6 of 64 in the coarse model) the routed-expert
-footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$. These calculations are theoretical. We need to also explore them in real
-kernels. A direction is computing the router earlier in the network than its experts,
-lengthening the masking window.
+footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$. Section~\ref{sec:results}
+measures these calculations in a real engine, including a variant that computes the router earlier
+in the network than its experts to lengthen the masking window.
 
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
 a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 192, DeepSeek-style
@@ -105,7 +108,12 @@ splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep 
 0.77M--15.1M active non-embedding parameters with a 16k vocabulary. At $10^{18}$ we sweep three
 sizes around an exact FLAME-MoE-38M-100M replication (4.45B tokens, 50k pythia vocabulary), and at
 $10^{19}$ train its compute-optimal shape and evaluate it zero-shot on six standard tasks with
-lm-evaluation-harness. All runs use locked hyperparameters and report test-set
+lm-evaluation-harness. For serving, we implement rolling residency in a llama.cpp CUDA fork and
+benchmark batch-1 decode on Qwen3-MoE-shaped random-weight models ($\sim$11.3B total, Q4\_K\_M,
+both granularities scaled $\sim$10$\times$), holding $R=k$ expert slots in VRAM against a full
+CPU pool with at most one swap per layer per token. Decode is verified bit-identical to the
+all-resident engine, and weights are irrelevant to a latency and memory measurement. All runs use
+locked hyperparameters and report test-set
 bits-per-byte (BPB, tokenizer-invariant, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
 $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$.
@@ -166,6 +174,36 @@ pretraining picture. The full MoE lifts the dense average from 0.392 to 0.424 (0
 above chance), and temporal keeps 86\% (coarse) and 76\% (fine) of that above-chance uplift,
 beating the full MoE outright on WinoGrande and matching it on PIQA. Recovery transfers from
 perplexity to task accuracy.
+
+\begin{table}[t]
+  \centering\small
+  \caption{Real-engine decode throughput (tok/s at 1024-token context, llama.cpp CUDA, RTX
+  A6000) for the $\sim$11.3B-total models of Section~\ref{sec:method}. Deploy holds only the
+  $R=k$ active experts in VRAM (1502 vs 7672 MiB, a 5.1$\times$ total and 10.6$\times$
+  expert-tier reduction) and streams the rest from a CPU pool.}
+  \label{tab:serving}
+  \vspace{4pt}
+  \begin{tabular}{@{}lrrrr@{}}
+    \toprule
+    setup & fine 18-of-192 & vs ceiling & coarse 6-of-64 & vs ceiling \\
+    \midrule
+    all experts in VRAM (ceiling) & 200 & 1.00$\times$ & 252 & 1.00$\times$ \\
+    our kernel, no swaps ($p=0$)  & 176 & 0.88$\times$ & 217 & 0.86$\times$ \\
+    deploy: active-only in VRAM   & \textbf{165} & \textbf{0.83$\times$} & 128 & 0.51$\times$ \\
+    router-early variant          & 173 & 0.87$\times$ & 143 & 0.57$\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Serving.} Table~\ref{tab:serving} closes the loop in a real engine. The deploy row
+serves the fine-grained model at 0.83$\times$ the all-resident decode speed in 5.1$\times$ less
+VRAM. The rows isolate the costs, a granularity-independent kernel overhead (0.86--0.88$\times$)
+and a streaming cost granularity controls, roughly free for fine experts (840\,KiB per swap,
+hidden behind compute) but dominant for coarse ones (2.5\,MiB, 0.51$\times$). The asymmetry is
+the measured converse of the $10^{19}$ crossover, scale pushes temporal quality toward fine
+granularity and fine granularity is what streams cheaply, so quality and serving select the same
+design point. Router-early lengthens the masking window and recovers most of the fine model's
+remaining gap, as the bandwidth analysis anticipates.
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -270,7 +308,9 @@ anticipation directions below target.
 Across four compute decades, two tokenizer families, and two expert granularities, training under
 rolling residency keeps 72--82\% of the MoE-over-dense quality gain with only the active experts
 resident, preserves the baselines' scaling geometry, and transfers to downstream tasks at
-$10^{19}$. The mechanism is not tolerance but reorganization: the router de-lexicalizes, binding
+$10^{19}$. A real-engine implementation serves the fine-grained model at 0.83$\times$ the
+all-resident decode speed in 5.1$\times$ less VRAM. The mechanism is not tolerance but
+reorganization: the router de-lexicalizes, binding
 experts to context that persists across a residency lifetime (Section~\ref{sec:mechanism}).
 
 Our negative results narrow the path to the remaining deficit (Appendix~\ref{app:negatives}). A
