@@ -64,7 +64,7 @@ with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, $1
 that it recovers most of the MoE quality gain at a fraction of the resident memory, with zero-shot
 task accuracy at $10^{19}$ tracking the pretraining recovery, and (iii) a
 mechanistic account of how the router internalizes the constraint, de-lexicalizing routing
-from token identity to context (Section~\ref{sec:mechanism}), with two measured negative
+from token identity to context (Section~\ref{sec:mechanism}), with measured negative
 results redirecting future work from cache policy toward anticipation.
 
 \section{Method}
@@ -286,13 +286,9 @@ active parameters. Second, establishing the architecture's stability profile, we
 activation norms against the baselines, loss stability, and reinforcement-learning stability
 where MoEs are notoriously fragile, so the recipe is viable end to end with no caveats.
 
-\section{Vision}
-
-Overall, even though this technique is not yet perfected, its promising performance could lay the
-groundwork for future local large language models. The ultimate goal of this work is to push for a
-future where users can run extremely sparse models, imagine a Kimi-K2.X-scale model \cite{kimik2}
-running at similar performance, completely locally on quantized consumer GPU hardware.
-Near-state-of-the-art models will be accessible, privately and safely, to the average person.
+The end goal is local inference. If temporal routing holds at scale, a Kimi-K2-scale sparse model
+\cite{kimik2} could run in the memory of its active parameters on quantized consumer hardware,
+putting near-state-of-the-art models within private, local reach of the average person.
 
 
 \begin{thebibliography}{10}
