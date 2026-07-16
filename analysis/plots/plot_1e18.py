@@ -57,12 +57,12 @@ else:
     ax.annotate("", xy=(3, 3.9243), xytext=(1, 4.0087),
                 arrowprops=dict(arrowstyle="->", color="darkred", lw=1.4))
     ax.text(2.0, 4.15, "fine-graining hurts the full MoE  (−0.084 nats)", ha="center", fontsize=8.5, color="darkred")
-    # finding 2: temporal (fine) beats its own-granularity full MoE
+    # finding 2: temporal (fine) tracks its own-granularity full MoE (single-budget delta)
     ax.annotate("", xy=(2, 3.9768), xytext=(1, 4.0087),
                 arrowprops=dict(arrowstyle="->", color="green", lw=1.2))
-    ax.text(2.55, 4.05, "temporal beats its own-granularity full MoE", ha="left", fontsize=8, color="green")
+    ax.text(2.55, 4.05, "temporal tracks its own-granularity full MoE (\u22120.032)", ha="left", fontsize=8, color="green")
     rec = (4.1373 - 3.9768) / (4.1373 - 3.9243) * 100
-    ax.text(0.985, 0.06, f"temporal (fine) recovers ~{rec:.0f}% of the\ndense→(coarse full-MoE) gap; coarse temporal\nbeats coarse MoE on both seeds",
+    ax.text(0.985, 0.06, f"temporal (fine) recovers ~{rec:.0f}% of the\ndense→(coarse full-MoE) gap; coarse temporal\nholds parity with coarse MoE on both seeds",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8.3, color="dimgray")
     ax.set_ylim(3.6, 4.25)
     ax.set_ylabel("test cross-entropy (nats, lower better)")

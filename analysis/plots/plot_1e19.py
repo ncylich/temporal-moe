@@ -46,7 +46,7 @@ else:
     rec_coarse = (3.3532 - 3.1806) / (3.3532 - 3.1310) * 100
     rec_fine   = (3.3532 - 3.1732) / (3.3532 - 3.1310) * 100
     ax.text(0.985, 0.06, f"temporal recovers ~{rec_coarse:.0f}% (coarse) / ~{rec_fine:.0f}% (fine) of the\n"
-            "dense→MoE gap; fine-grained temporal now BEATS coarse\n"
+            "dense→MoE gap; fine-grained temporal now edges out coarse\n"
             "temporal (crossover — reversed from 10^18)",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8.3, color="dimgray")
     ax.set_ylim(3.0, 3.45)

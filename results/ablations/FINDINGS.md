@@ -216,8 +216,9 @@ Two clean findings:
 1. **Fine-graining HURTS the full MoE at 1e18** — coarse MoE-G1 (3.918) beats fine MoE-G3 (4.009)
    by 0.090 nats: 192 experts is over-fine for 4.45B tokens (experts undertrained). Opposite of
    1e16/1e17, where the coarse MoE is *also* token-starved, hiding the effect.
-2. **Temporal is robust to over-fine-graining** — temporal-G3 (3.977) beats its own-granularity
-   full MoE (4.009) by 0.032 (train loss agrees: 3.975 vs 4.011): rolling residency concentrates each span on a
+2. **Temporal is robust to over-fine-graining** — temporal-G3 (3.977) lands 0.032 below its
+   own-granularity full MoE (4.009) in this panel (train loss agrees: 3.975 vs 4.011; a
+   single-budget observation, not a general claim): rolling residency concentrates each span on a
    small resident set, so those experts see more tokens and train better than the full MoE's
    thinly-spread 192. Against the true MoE quality (G1 3.918) and the dense floor (4.137),
    temporal-G3 recovers **~73%** — consistent with the ~66–77% at 1e16/1e17.

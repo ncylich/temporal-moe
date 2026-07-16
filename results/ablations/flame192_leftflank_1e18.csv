@@ -5,6 +5,6 @@
 run,method,granularity,experts,topk,val_CE_nats,test_CE_nats,BPB_pythia50k,PPL,iters,box,note,val_CE_nats_bpb
 flame192_dense,dense,-,-,-,4.1925,4.1907,1.4072,66.07,3068,a6000,dense floor,1.4078
 flame192_g1_moe,full_moe,coarse,64,6,3.9539,3.9523,1.3272,52.05,3068,a6000,coarse full MoE (6 of 64),1.3277
-flame192_g1_temporal,temporal,coarse,64,6,3.9318,3.9303,1.3198,50.92,3068,a6000,"coarse temporal (min_logit, R=k); beats coarse full-MoE by 0.022 nats",1.3203
+flame192_g1_temporal,temporal,coarse,64,6,3.9318,3.9303,1.3198,50.92,3068,a6000,"coarse temporal (min_logit, R=k); 0.022 nats below coarse full-MoE in this cell (single seed)",1.3203
 flame192_g3_moe,full_moe,fine,192,18,4.0404,4.0411,1.3570,56.89,3068,h100,fine full MoE (18 of 192),1.3567
-flame192_g3_temporal,temporal,fine,192,18,3.9832,3.9843,1.3379,53.75,3068,h100,fine temporal (min_logit); beats fine full-MoE by 0.057 nats,1.3375
+flame192_g3_temporal,temporal,fine,192,18,3.9832,3.9843,1.3379,53.75,3068,h100,fine temporal (min_logit); 0.057 nats below fine full-MoE in this cell (single seed),1.3375
