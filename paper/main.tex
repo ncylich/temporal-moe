@@ -38,7 +38,7 @@ locality as a training-time constraint. A rolling-residency router keeps only th
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
 spanning $10^{16}$ to $10^{19}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
 quality uplift at compute-optimal sizes with 18 of 192 experts resident, a 5.7$\times$ reduction in
-resident memory. The trained router internalizes the constraint, shifting expert specialization
+resident memory, and zero-shot downstream accuracy at $10^{19}$ tracks this recovery. The trained router internalizes the constraint, shifting expert specialization
 from token identity to surrounding context and nearly doubling its temporal self-consistency
 over vanilla routing, with recovery stable across the whole range. Trained
 temporal routing is a practical path toward MoE-quality models under
@@ -61,7 +61,8 @@ needs will not be found after training. It must be trained in.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
 with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, $10^{18}$, and $10^{19}$ FLOPs
-that it recovers most of the MoE quality gain at a fraction of the resident memory, and (iii) a
+that it recovers most of the MoE quality gain at a fraction of the resident memory, with zero-shot
+task accuracy at $10^{19}$ tracking the pretraining recovery, and (iii) a
 mechanistic account of how the router internalizes the constraint, de-lexicalizing routing
 from token identity to context (Section~\ref{sec:mechanism}), with two measured negative
 results redirecting future work from cache policy toward anticipation.
@@ -103,7 +104,8 @@ a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 1
 splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over
 0.77M--15.1M active non-embedding parameters with a 16k vocabulary. At $10^{18}$ we sweep three
 sizes around an exact FLAME-MoE-38M-100M replication (4.45B tokens, 50k pythia vocabulary), and at
-$10^{19}$ train its compute-optimal shape. All runs use locked hyperparameters and report test-set
+$10^{19}$ train its compute-optimal shape and evaluate it zero-shot on six standard tasks with
+lm-evaluation-harness. All runs use locked hyperparameters and report test-set
 bits-per-byte (BPB, tokenizer-invariant, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
 $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$.
@@ -139,6 +141,31 @@ routing is robust to it, so the fine cell we carry forward is temporal. At $10^{
 MoE-over-dense gain and the granularity preference flips: the fine-grained temporal model (1.065
 BPB) now edges out the coarse one (1.068). Scale moves the temporal optimum toward exactly the
 granularity that makes streaming cheap.
+
+\begin{table}[t]
+  \centering\small
+  \caption{Zero-shot downstream accuracy at $10^{19}$ FLOPs (lm-evaluation-harness, acc\_norm
+  except WinoGrande which reports acc). Avg$-$chance subtracts each task's chance floor (0.5 for
+  WinoGrande and PIQA, 0.25 elsewhere) before averaging. Bold = best per column.}
+  \label{tab:lmeval}
+  \vspace{4pt}
+  \begin{tabular}{@{}lrrrrrrrr@{}}
+    \toprule
+    model & OBQA & WinoG & PIQA & ARC-e & ARC-c & HSwag & Avg & Avg$-$chance \\
+    \midrule
+    dense                 & .276 & .501 & .621 & .437 & .222 & .296 & .392 & .059 \\
+    full MoE, 6 of 64     & \textbf{.296} & .507 & \textbf{.659} & \textbf{.495} & .247 & \textbf{.341} & \textbf{.424} & \textbf{.091} \\
+    temporal, 6 of 64     & .292 & \textbf{.512} & \textbf{.659} & .473 & .246 & .336 & .420 & .086 \\
+    temporal, 18 of 192   & .288 & .487 & .652 & .481 & \textbf{.254} & .336 & .416 & .083 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Downstream tasks.} Zero-shot accuracy at $10^{19}$ (Table~\ref{tab:lmeval}) tracks the
+pretraining picture. The full MoE lifts the dense average from 0.392 to 0.424 (0.059 to 0.091
+above chance), and temporal keeps 86\% (coarse) and 76\% (fine) of that above-chance uplift,
+beating the full MoE outright on WinoGrande and matching it on PIQA. Recovery transfers from
+perplexity to task accuracy.
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -238,7 +265,7 @@ persists across a residency lifetime. That move explains how quality survives th
 the near-doubled self-consistency of Figure~\ref{fig:locality}, and the forecastable demand the
 anticipation directions below target.
 
-\section{Outlook and next steps}\label{sec:outlook}
+\section{Conclusion and next steps}\label{sec:outlook}
 
 Two early probes shape the roadmap. An explicit coherence loss pulling router logits toward the
 resident set hurts monotonically at every weight scanned. The constraint is already internalized,
@@ -254,11 +281,10 @@ pursue it on two fronts: auxiliary-loss-free, DeepSeek-inspired routing that rep
 balancing losses with gradient-free selection biases \cite{wang2024auxfree}, and an anticipatory
 training loss targeting discounted future expert demand, injecting new information rather than
 imitating the past.
-Beyond closing the gap, the highest-leverage directions are converting released MoE checkpoints
+Beyond closing the gap, the highest-leverage direction is converting released MoE checkpoints
 by router-only adaptation under residency (zero-shot imposition is the costliest direction in
-Table~\ref{tab:swap}), and downstream evaluation of the checkpoint pairs. If either matches
-pretraining, temporal routing becomes a recipe for serving MoE-class models in the memory of
-their active parameters.
+Table~\ref{tab:swap}). If it matches pretraining, temporal routing becomes a recipe for serving
+MoE-class models in the memory of their active parameters.
 
 \section{Vision}
 
