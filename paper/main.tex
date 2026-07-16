@@ -36,7 +36,7 @@ of parameters per token, but serving them still requires the full expert pool in
 scale with active rather than total parameters. Unlike post-hoc caching or offloading, we impose
 locality as a training-time constraint. A rolling-residency router keeps only the $k$ active experts
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
-spanning $10^{16}$ to $10^{18}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
+spanning $10^{16}$ to $10^{19}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
 quality uplift at compute-optimal sizes with 18 of 192 experts resident, a 5.7$\times$ reduction in
 resident memory. The trained router internalizes the constraint, shifting expert specialization
 from token identity to surrounding context and nearly doubling its temporal self-consistency
@@ -60,7 +60,7 @@ expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,zhu2025}. The localit
 needs will not be found after training. It must be trained in.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
-with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, and $10^{18}$ FLOPs
+with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, $10^{18}$, and $10^{19}$ FLOPs
 that it recovers most of the MoE quality gain at a fraction of the resident memory, and (iii) a
 mechanistic account of how the router internalizes the constraint, de-lexicalizing routing
 from token identity to context (Section~\ref{sec:mechanism}), with two measured negative
@@ -100,49 +100,43 @@ lengthening the masking window.
 
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
 a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 192, DeepSeek-style
-splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over model
-sizes (0.77M--15.1M active non-embedding parameters) with locked hyperparameters, reporting
-tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
+splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over
+0.77M--15.1M active non-embedding parameters with a 16k vocabulary. At $10^{18}$ we sweep three
+sizes around an exact FLAME-MoE-38M-100M replication (4.45B tokens, 50k pythia vocabulary), and at
+$10^{19}$ train its compute-optimal shape. All runs use locked hyperparameters and report test-set
+bits-per-byte (BPB, tokenizer-invariant, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
-$(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$. At $10^{18}$ FLOPs we replicate
-FLAME-MoE-38M-100M exactly (4.45B tokens) and report test-set cross-entropy.
+$(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$.
 
 \begin{figure}[t]
   \centering
-  \begin{minipage}[t]{0.53\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{figures/fine_grained_vs_coarse_experts_isoflop_nocaption.png}
-  \end{minipage}\hfill
-  \begin{minipage}[t]{0.44\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png}
-  \end{minipage}
-  \caption{\textbf{Left,} isoFLOP curves (test-set BPB, lower is better; color =
-  method, shade = granularity (coarse normal / fine-grained dark), marker = compute budget (circle
-  $10^{16}$, triangle $10^{17}$)). Temporal MoE (green) lands inside the dense-to-MoE band at every
-  size and preserves both baselines' compute-optimal shapes; recovery at the optima is 72--77\%
-  fine-grained and 82\% coarse. \textbf{Right,}
-  $10^{18}$-FLOP points (test-set CE; colors as left; dense is cross-data, within $\sim$0.01,
-  the others share one local split). Dense 4.137, fine-grained MoE 4.009, fine-grained
-  temporal 3.977, coarse MoE 3.924, coarse temporal 3.907; temporal matches or exceeds its
-  full-MoE counterpart at both granularities.}
+  \includegraphics[width=0.82\linewidth]{figures/isoflop_panels_2x2_nocaption.png}
+  \caption{Quality at fixed compute, one panel per budget (test-set BPB, lower is better; shade =
+  granularity: coarse 6-of-64 normal, fine 18-of-192 dark). Different vocabularies (panel titles)
+  mean BPB is comparable within a panel, not across. Temporal MoE lands inside the dense-to-MoE
+  band at every size and budget, keeping 72--82\% of the MoE-over-dense gain, and at $10^{18}$
+  it matches or beats the coarse full MoE outright.}
   \label{fig:isoflop}
 \end{figure}
 
 \section{Results}\label{sec:results}
 
-\textbf{IsoFLOP bands.} Across every model size and both sweep budgets
-(Figure~\ref{fig:isoflop}, left), temporal MoE sits well inside the dense-to-MoE band, recovering
+\textbf{IsoFLOP bands.} Across every model size and all three swept budgets
+(Figure~\ref{fig:isoflop}), temporal MoE sits well inside the dense-to-MoE band, recovering
 72--82\% of the MoE uplift at compute-optimal sizes (72\% and 77\% for the fine-grained model,
-82\% coarse at both budgets) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
-MoE baselines, so the constraint does not distort scaling geometry.
+82\% coarse) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
+MoE baselines at every budget, so the constraint does not distort scaling geometry.
 
-\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 75\%
+\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, bottom left) recovery is 73\%
 against the strongest full MoE, consistent with the smaller budgets. In fact, sometimes the
 mechanism appears nearly lossless, here outperforming
 its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, run
 with two seeds per arm, it appears to surpass the strongest full MoE outright: every temporal
-seed lands below every MoE seed (3.904--3.909 vs.\ 3.918--3.930 nats).
+seed lands below every MoE seed (3.904--3.909 vs.\ 3.918--3.930 nats). At $10^{19}$
+(Figure~\ref{fig:isoflop}, bottom right), our largest budget, temporal keeps 78--81\% of the
+MoE-over-dense gain and the granularity preference flips: the fine-grained temporal model (1.065
+BPB) now edges out the coarse one (1.068). Scale moves the temporal optimum toward exactly the
+granularity that makes streaming cheap.
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -251,7 +245,8 @@ greedy rule (LRU is 4--8 points worse), while an oracle selecting swaps by short
 demand gains +18--30 points. The headroom is anticipation, not cache policy, consistent with
 de-lexicalized, forecastable routing (Section~\ref{sec:mechanism}).
 
-The recovery deficit at matched granularity is therefore a stable, attackable 18--28\%, and we
+The recovery deficit is therefore a stable, attackable 18--28\% at the sweep budgets (the coarse
+model already closes it at $10^{18}$), and we
 pursue it on two fronts: auxiliary-loss-free, DeepSeek-inspired routing that replaces
 balancing losses with gradient-free selection biases \cite{wang2024auxfree}, and an anticipatory
 training loss targeting discounted future expert demand, injecting new information rather than
@@ -398,7 +393,7 @@ median 15{,}932, with no word-list experts even in the tail.
   \caption{Constraint swap. Unmasking makes every expert resident for a trained temporal model;
   imposing puts a trained full MoE under rolling residency. Held-out BPB except the $10^{18}$
   row, which is validation CE on the analysis batch (its native value accordingly differs from
-  Figure~\ref{fig:isoflop}'s two-seed test mean 3.907 by 0.003). Imposing costs two to five times more
+  the $10^{18}$ panel's seed-1 test value, 3.909 CE, by 0.006). Imposing costs two to five times more
   than unmasking, the asymmetry expected if full-MoE experts are token-bound: a token denied its
   bespoke expert has nowhere to go, while a contextual expert serves its neighborhood
   regardless. The fine-grained full-MoE row is the sigmoid-router control, whose artifacts were

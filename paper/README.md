@@ -1,5 +1,6 @@
 # Paper — style & decisions (what Noah taught me)
 
+- **No em-dashes and no semicolons anywhere, use commas or split into sentences. Colons rarely/seldom.**
 The Temporal-MoE short paper (`main.tex` → `main.pdf`, author: Noah Cylich, noahcylich@gmail.com —
 personal email on purpose, to avoid misattributing the work to an employer). This file records the
 guidance Noah gave while we built it, so future edits keep the same quality bar. Rules first, each
