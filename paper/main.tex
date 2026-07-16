@@ -105,7 +105,7 @@ sizes (0.77M--15.1M active non-embedding parameters) with locked hyperparameters
 tokenizer-invariant bits-per-byte (BPB, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
 $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$. At $10^{18}$ FLOPs we replicate
-FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
+FLAME-MoE-38M-100M exactly (4.45B tokens) and report test-set cross-entropy.
 
 \begin{figure}[t]
   \centering
@@ -117,15 +117,14 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
     \centering
     \includegraphics[width=\linewidth]{figures/temporal_vs_dense_and_moe_1e18_crossentropy_nocaption.png}
   \end{minipage}
-  \caption{\textbf{Left,} isoFLOP curves (validation BPB, lower is better; color =
+  \caption{\textbf{Left,} isoFLOP curves (test-set BPB, lower is better; color =
   method, shade = granularity (coarse normal / fine-grained dark), marker = compute budget (circle
   $10^{16}$, triangle $10^{17}$)). Temporal MoE (green) lands inside the dense-to-MoE band at every
   size and preserves both baselines' compute-optimal shapes; recovery at the optima is 72--77\%
   fine-grained and 82\% coarse. \textbf{Right,}
-  $10^{18}$-FLOP points (validation CE; colors as left). Error bars: measured two-seed
-  ranges (coarse), method-matched estimates (single-seed fine), $\pm$0.01 cross-data uncertainty
-  (dense; others share a local split). Dense 4.137, fine-grained MoE 4.009, fine-grained
-  temporal 3.977, coarse MoE 3.927, coarse temporal 3.910; temporal matches or exceeds its
+  $10^{18}$-FLOP points (test-set CE; colors as left; dense is cross-data, within $\sim$0.01,
+  the others share one local split). Dense 4.137, fine-grained MoE 4.009, fine-grained
+  temporal 3.977, coarse MoE 3.924, coarse temporal 3.907; temporal matches or exceeds its
   full-MoE counterpart at both granularities.}
   \label{fig:isoflop}
 \end{figure}
@@ -138,12 +137,12 @@ FLAME-MoE-38M-100M exactly (4.45B tokens) and report validation cross-entropy.
 82\% coarse at both budgets) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
 MoE baselines, so the constraint does not distort scaling geometry.
 
-\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 76\%
+\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, right) recovery is 75\%
 against the strongest full MoE, consistent with the smaller budgets. In fact, sometimes the
 mechanism appears nearly lossless, here outperforming
 its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, run
 with two seeds per arm, it appears to surpass the strongest full MoE outright: every temporal
-seed lands below every MoE seed (3.907--3.912 vs.\ 3.921--3.934 nats).
+seed lands below every MoE seed (3.904--3.909 vs.\ 3.918--3.930 nats).
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
@@ -399,7 +398,7 @@ median 15{,}932, with no word-list experts even in the tail.
   \caption{Constraint swap. Unmasking makes every expert resident for a trained temporal model;
   imposing puts a trained full MoE under rolling residency. Held-out BPB except the $10^{18}$
   row, which is validation CE on the analysis batch (its native value accordingly differs from
-  Figure~\ref{fig:isoflop}'s full-split 3.910 by 0.006). Imposing costs two to five times more
+  Figure~\ref{fig:isoflop}'s two-seed test mean 3.907 by 0.003). Imposing costs two to five times more
   than unmasking, the asymmetry expected if full-MoE experts are token-bound: a token denied its
   bespoke expert has nowhere to go, while a contextual expert serves its neighborhood
   regardless. The fine-grained full-MoE row is the sigmoid-router control, whose artifacts were
