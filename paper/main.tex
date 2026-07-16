@@ -111,8 +111,8 @@ $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$.
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.82\linewidth]{figures/isoflop_panels_2x2_nocaption.png}
-  \caption{Quality at fixed compute, one panel per budget (test-set BPB, lower is better; shade =
-  granularity: coarse 6-of-64 normal, fine 18-of-192 dark). Different vocabularies (panel titles)
+  \caption{Quality at fixed compute, one panel per budget (test-set BPB, lower is better). Shade
+  encodes granularity, coarse 6-of-64 normal and fine 18-of-192 dark. Different vocabularies
   mean BPB is comparable within a panel, not across. Temporal MoE lands inside the dense-to-MoE
   band at every size and budget, keeping 72--82\% of the MoE-over-dense gain, and at $10^{18}$
   it matches or beats the coarse full MoE outright.}
@@ -189,7 +189,7 @@ helps. Protocols and full tables are in Appendix~\ref{app:mechanism}.
   \end{minipage}
   \caption{\textbf{Left,} one point per expert, by how well the current token (x) versus the
   surrounding context excluding it (y) predicts its firing (held-out AUC, chance 0.500, window
-  = residency lifetime; colors as in Figure~\ref{fig:isoflop}). Full-MoE experts are token
+  = residency lifetime, colors as in Figure~\ref{fig:isoflop}). Full-MoE experts are token
   lookups, temporal experts context-dominated. \textbf{Right,} held-out BPB vs.\ cache size $R$
   at identical FLOPs (192 experts, $k=18$, $10^{16}$): the constraint is a tunable quality cost
   and, $R$ being the resident-expert memory, the serving memory--quality frontier.}
@@ -200,7 +200,7 @@ helps. Protocols and full tables are in Appendix~\ref{app:mechanism}.
 of evaluation tokens it serves, the normalized inverse Simpson concentration of its routing
 mass, which is 1 under uniform usage and near 0 when usage concentrates on a few recurring
 tokens. The median full-MoE expert serves an effective 30\% of the token stream and almost no
-expert serves a majority of it; the median temporal expert serves 66\%, and two thirds of
+expert serves a majority of it. The median temporal expert serves 66\%, and two thirds of
 temporal experts serve a majority. Expert weights are, in contrast, nearly unaffected, remaining
 equally distinct and near orthogonal in both regimes, with independent seeds and a
 sigmoid-router control reproducing every gap (Appendix~\ref{app:mechanism}). The constraint
@@ -232,16 +232,16 @@ constraint is a pure, tunable quality cost. Because $R$ is the number of experts
 memory, RAM, the curve is the serving memory--quality frontier, the maximal constraint
 costing +0.023 BPB at roughly a tenth of the routed-expert memory.
 
-A free router binds experts to token identities; rolling residency makes that binding
+A free router binds experts to token identities. Rolling residency makes that binding
 unrepresentable while leaving weights untouched. The router reorganizes around context, which
-persists across a residency lifetime; that move explains how quality survives the constraint,
+persists across a residency lifetime. That move explains how quality survives the constraint,
 the near-doubled self-consistency of Figure~\ref{fig:locality}, and the forecastable demand the
 anticipation directions below target.
 
 \section{Outlook and next steps}\label{sec:outlook}
 
 Two early probes shape the roadmap. An explicit coherence loss pulling router logits toward the
-resident set hurts monotonically at every weight scanned; the constraint is already internalized,
+resident set hurts monotonically at every weight scanned. The constraint is already internalized,
 and a backward-looking gradient adds no new information. Replaying logged routing through
 better eviction shows offline-optimal eviction is worth only +6--10 points of hit-rate over our
 greedy rule (LRU is 4--8 points worse), while an oracle selecting swaps by short-horizon \emph{future}
@@ -338,7 +338,7 @@ per model.
 
 \textbf{Selectivity and weight identity.} Renormalizing expert $e$'s gate mass over token
 positions gives $q_e(t)$, and selectivity is the normalized inverse Simpson concentration
-$1/(N\sum_t q_e(t)^2)$, the effective fraction of the stream feeding the expert; generalists are
+$1/(N\sum_t q_e(t)^2)$, the effective fraction of the stream feeding the expert. Generalists are
 experts above 0.5, and router flatness is per-token entropy normalized by $\ln E$. Weight
 identity flattens each expert's FFN weights and reports cosine distance to the expert-weight
 centroid and median pairwise cosine. Table~\ref{tab:structural} gives all cells. Independent
@@ -368,7 +368,7 @@ the regime gaps are ten to forty times larger.
 \textbf{Firing probes.} For each expert, the label marks whether it is in the token's top-$k$.
 Two logistic classifiers predict the label from the model's own input embeddings, the current
 token alone versus the mean embedding of tokens within window $w$ with the current token
-excluded; the exclusion prevents context features from encoding the token itself. Classifiers
+excluded. The exclusion prevents context features from encoding the token itself. Classifiers
 fit on the first 70\% of tokens and report AUC on the last 30\%. Refitting on null labels, both
 iid permutations and circular shifts of at least 1000 tokens (preserving residency-induced
 autocorrelation), gives $0.500 \pm 0.002$ everywhere. At $w = k$, median token AUC / context AUC
@@ -385,16 +385,16 @@ is in the router's selection at the next token. AUC is 0.85--0.87 across tempora
 
 \textbf{Output lens.} Averaging each expert's output vectors over the tokens actually routed to
 it and projecting through the final norm and unembedding gives the vocabulary distribution the
-expert promotes; its exponentiated entropy is an effective vocabulary between 1 and the 16k
+expert promotes. Its exponentiated entropy is an effective vocabulary between 1 and the 16k
 vocabulary size. Projecting without data conditioning reads about 15{,}990 for every expert, the
 method's no-signal reference. Full-MoE experts reach median 14{,}612 with a sharpest decile of
-9{,}683, whose top promoted tokens read as coherent lexical clusters; temporal experts sit at
+9{,}683, whose top promoted tokens read as coherent lexical clusters. Temporal experts sit at
 median 15{,}932, with no word-list experts even in the tail.
 
 \begin{table}[h]
   \centering\small
-  \caption{Constraint swap. Unmasking makes every expert resident for a trained temporal model;
-  imposing puts a trained full MoE under rolling residency. Held-out BPB except the $10^{18}$
+  \caption{Constraint swap. Unmasking makes every expert resident for a trained temporal model.
+  Imposing puts a trained full MoE under rolling residency. Held-out BPB except the $10^{18}$
   row, which is validation CE on the analysis batch (its native value accordingly differs from
   the $10^{18}$ panel's seed-1 test value, 3.909 CE, by 0.006). Imposing costs two to five times more
   than unmasking, the asymmetry expected if full-MoE experts are token-bound: a token denied its
