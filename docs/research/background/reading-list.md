@@ -122,3 +122,19 @@ explain **why** temporal held up (and why fine-graining cost a few points of rec
    stable across training, and how much K>k headroom the co-activation demands.
 4. **Specialization ablation** (DeepSeekMoE-style) — disable top-routed experts, G1 vs G3, to test the
    "finer = more specialized = less residency slack" hypothesis that would explain the G3 recovery dip.
+
+
+## Adjacent: swap avoidance by training loss (read as a counterpoint)
+
+- **CoSMoEs** [2503.00245] (Meta, 2025) — on-device MoE. Three overlaps with this work:
+  (1) fair FLOP-aligned MoE-vs-dense at small scale (MoE wins by >=2% absolute) — independently
+  replicates our dense-floor finding one scale band up; (2) **weight-decomposed (LoRA-style)
+  experts** (M ~ L x R, r = hidden/2, +1.1%) — untried here, would shrink per-swap bytes b and
+  compose with fine-graining for streaming; (3) the **BIES loss** (block-wise expert selection):
+  hard count x soft L1 of consecutive-token router-prob deltas, penalizing expert replacement —
+  the published member of the loss family our negative results reject. Their own Table 3 shows the
+  trade: 6x fewer replacements, +54% tok/s, but a consistent LM-eval regression (up to ~1.9 avg pts
+  at wearable scale). Signature comparison: they avoid swaps by loss incentive and pay quality; we
+  make the single swap affordable by training-time constraint + fine-graining and pay ~nothing at
+  matched granularity (see paper Appendix B + the tau-hysteresis replay, where deploy-time swap
+  dropping is nearly free without touching training).

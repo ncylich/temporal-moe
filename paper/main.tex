@@ -388,6 +388,11 @@ nostalgebraist.
 \newblock Interpreting GPT: the logit lens.
 \newblock \emph{LessWrong}, 2020.
 
+\bibitem{huber2025cosmoes}
+P.~Huber et al.
+\newblock CoSMoEs: compact sparse mixture of experts.
+\newblock \emph{arXiv:2503.00245}, 2025.
+
 \end{thebibliography}
 
 \appendix
@@ -493,16 +498,17 @@ constraint is already internalized, and a backward-looking gradient adds no new 
 
 \textbf{Eviction replay.} Replaying logged routing through alternative eviction shows the
 offline-optimal (Belady) policy is worth only +6--10 points of set hit-rate over the shipped
-least-logit rule, and LRU is 4--8 points worse, while an oracle selecting swaps by short-horizon
-\emph{future} demand gains +18--30 points. Cache policy is nearly saturated, anticipation is not.
+least-logit rule (LRU is 4--8 points worse), while a short-horizon \emph{future}-demand oracle
+gains +18--30 points. Cache policy is nearly saturated, anticipation is not.
 
 \textbf{Predictability objectives.} Two objectives rewarding the router's own predictability both
 Goodhart at sweep budgets. Auxiliary-loss-free, DeepSeek-inspired selection biases
-\cite{wang2024auxfree} with demand momentum raise residency alignment (+7 points of next-token
-overlap at the promotion cell) but induce a de-facto pinned expert, resident 85\% of the time,
-with no quality gain. An anticipatory loss targeting discounted future demand raises alignment
+\cite{wang2024auxfree} with demand momentum raise residency alignment (+7 points at the promotion
+cell) but induce a de-facto pinned expert (resident 85\% of the time) with no quality gain. An anticipatory loss targeting discounted future demand raises alignment
 sharply (+26 points) by teaching the router to concentrate demand so its own future is easy to
 predict, collapsing streamed expert diversity threefold (expert union 158 to 50 of 192) and
-hurting BPB. Full cell-level records live in the repository's ablation documents.
+hurting BPB. A published loss of this family, CoSMoEs' block-wise expert selection
+\cite{huber2025cosmoes}, reports the same trade, fewer expert replacements for a consistent
+quality regression.
 
 \end{document}
