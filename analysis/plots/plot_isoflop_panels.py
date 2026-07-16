@@ -115,7 +115,7 @@ out = f"{OUTD}/isoflop_panel_1e19_nocaption.png"
 fig.savefig(out, dpi=200); print("wrote", out); plt.close(fig)
 
 # PAPER GRID: one tight 2x2 image with a single shared legend (used by paper/main.tex)
-fig, axes = plt.subplots(2, 2, figsize=(7.0, 4.5))
+fig, axes = plt.subplots(2, 2, figsize=(7.0, 4.15))
 curve_panel(axes[0][0], P16, "$10^{16}$ FLOPs · 16k vocab", ticks=TICKS["1e16"], xlabel=False)
 curve_panel(axes[0][1], P17, "$10^{17}$ FLOPs · 16k vocab", ticks=TICKS["1e17"], xlabel=False, ylabel=False)
 curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"])

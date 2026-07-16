@@ -132,7 +132,9 @@ against the strongest full MoE, consistent with the smaller budgets. In fact, so
 mechanism appears nearly lossless, here outperforming
 its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, run
 with two seeds per arm, it appears to surpass the strongest full MoE outright: every temporal
-seed lands below every MoE seed (3.904--3.909 vs.\ 3.918--3.930 nats). At $10^{19}$
+seed lands below every MoE seed (3.904--3.909 vs.\ 3.918--3.930 nats). Fine-graining itself hurts the full
+MoE at this scale (at 48.5M active it lands within 0.024 nats of the dense floor) while temporal
+routing is robust to it, so the fine cell we carry forward is temporal. At $10^{19}$
 (Figure~\ref{fig:isoflop}, bottom right), our largest budget, temporal keeps 78--81\% of the
 MoE-over-dense gain and the granularity preference flips: the fine-grained temporal model (1.065
 BPB) now edges out the coarse one (1.068). Scale moves the temporal optimum toward exactly the
@@ -142,8 +144,9 @@ granularity that makes streaming cheap.
 under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
 next-token self-consistency nearly doubles over vanilla routing at every scale probed. The effect
 is streaming, not collapse. Over a 2048-token sequence a temporal model still touches 83--98\% of
-its expert pool, and no expert is resident more than 40\% of the time, so quality comes from
-time-multiplexed access to the full pool rather than a static subset.
+its expert pool (96--100\% at $10^{19}$), and no expert is resident more than 40\% of the time
+(25\% at $10^{19}$), so quality comes from time-multiplexed access to the full pool rather than a
+static subset.
 
 \begin{figure}[t]
   \centering
@@ -416,8 +419,8 @@ median 15{,}932, with no word-list experts even in the tail.
 \end{table}
 
 \textbf{Dose sweep.} Cells trained from scratch at $10^{16}$ FLOPs on the same softmax-aux
-recipe. Held-out BPB at $R = 18/36/72/128/192$ is 1.4750 / 1.4736 / 1.4681 / 1.4580 / 1.4519,
-the endpoint being the retrained full-MoE baseline; most of the gap closes by $R = 128$, and
-expert diversity is preserved at every dose (182--186 effective experts).
+recipe. Held-out BPB at $R = 18/36/72/128/192$ is 1.4750 / 1.4736 / 1.4681 / 1.4580 / 1.4519
+(endpoint = the retrained full-MoE baseline). Most of the gap closes by $R = 128$, with expert
+diversity preserved at every dose (182--186 effective experts).
 
 \end{document}
