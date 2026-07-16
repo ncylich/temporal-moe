@@ -116,8 +116,8 @@ $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$.
   \caption{Quality at fixed compute, one panel per budget (test-set BPB, lower is better). Shade
   encodes granularity, coarse 6-of-64 normal and fine 18-of-192 dark. Different vocabularies
   mean BPB is comparable within a panel, not across. Temporal MoE lands inside the dense-to-MoE
-  band at every size and budget, keeping 72--82\% of the MoE-over-dense gain, and at $10^{18}$
-  it matches or beats the coarse full MoE outright.}
+  band at every size and budget, keeping 72--82\% of the MoE-over-dense gain, reaching parity
+  with the coarse full MoE at $10^{18}$.}
   \label{fig:isoflop}
 \end{figure}
 
@@ -133,8 +133,8 @@ MoE baselines at every budget, so the constraint does not distort scaling geomet
 against the strongest full MoE, consistent with the smaller budgets. In fact, sometimes the
 mechanism appears nearly lossless, here outperforming
 its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, run
-with two seeds per arm, it appears to surpass the strongest full MoE outright: every temporal
-seed lands below every MoE seed (3.904--3.909 vs.\ 3.918--3.930 nats). Fine-graining itself hurts the full
+with two seeds per arm, it holds parity with the strongest full MoE (seed ranges 3.904--3.909
+vs.\ 3.918--3.930 nats). Fine-graining itself hurts the full
 MoE at this scale (at 48.5M active it lands within 0.024 nats of the dense floor) while temporal
 routing is robust to it, so the fine cell we carry forward is temporal. At $10^{19}$
 (Figure~\ref{fig:isoflop}, bottom right), our largest budget, temporal keeps 78--81\% of the
@@ -267,24 +267,24 @@ anticipation directions below target.
 
 \section{Conclusion and next steps}\label{sec:outlook}
 
-Two early probes shape the roadmap. An explicit coherence loss pulling router logits toward the
-resident set hurts monotonically at every weight scanned. The constraint is already internalized,
-and a backward-looking gradient adds no new information. Replaying logged routing through
-better eviction shows offline-optimal eviction is worth only +6--10 points of hit-rate over our
-greedy rule (LRU is 4--8 points worse), while an oracle selecting swaps by short-horizon \emph{future}
-demand gains +18--30 points. The headroom is anticipation, not cache policy, consistent with
-de-lexicalized, forecastable routing (Section~\ref{sec:mechanism}).
+Across four compute decades, two tokenizer families, and two expert granularities, training under
+rolling residency keeps 72--82\% of the MoE-over-dense quality gain with only the active experts
+resident, preserves the baselines' scaling geometry, and transfers to downstream tasks at
+$10^{19}$. The mechanism is not tolerance but reorganization: the router de-lexicalizes, binding
+experts to context that persists across a residency lifetime (Section~\ref{sec:mechanism}).
 
-The recovery deficit is therefore a stable, attackable 18--28\% at the sweep budgets (the coarse
-model already closes it at $10^{18}$), and we
-pursue it on two fronts: auxiliary-loss-free, DeepSeek-inspired routing that replaces
-balancing losses with gradient-free selection biases \cite{wang2024auxfree}, and an anticipatory
-training loss targeting discounted future expert demand, injecting new information rather than
-imitating the past.
-Beyond closing the gap, the highest-leverage direction is converting released MoE checkpoints
-by router-only adaptation under residency (zero-shot imposition is the costliest direction in
-Table~\ref{tab:swap}). If it matches pretraining, temporal routing becomes a recipe for serving
-MoE-class models in the memory of their active parameters.
+Our negative results narrow the path to the remaining deficit (Appendix~\ref{app:negatives}). A
+coherence loss imitating past routing hurts at every weight, better eviction is worth little while
+a future-demand oracle gains +18--30 points of hit-rate, and two objectives rewarding the router's
+own predictability both Goodhart, pinning experts or collapsing diversity. The headroom is
+anticipation, and it must be decoupled from the router's objective.
+
+Two directions follow. First, adapting a released MoE checkpoint to residency by router-only
+training (zero-shot imposition is the costliest direction in Table~\ref{tab:swap}), which would
+make temporal routing a serving recipe for existing MoE-class models in the memory of their
+active parameters. Second, establishing the architecture's stability profile, weight and
+activation norms against the baselines, loss stability, and reinforcement-learning stability
+where MoEs are notoriously fragile, so the recipe is viable end to end with no caveats.
 
 \section{Vision}
 
@@ -448,5 +448,25 @@ median 15{,}932, with no word-list experts even in the tail.
 recipe. Held-out BPB at $R = 18/36/72/128/192$ is 1.4750 / 1.4736 / 1.4681 / 1.4580 / 1.4519
 (endpoint = the retrained full-MoE baseline). Most of the gap closes by $R = 128$, with expert
 diversity preserved at every dose (182--186 effective experts).
+
+\section{Negative results}\label{app:negatives}
+
+\textbf{Coherence loss.} An explicit loss pulling router logits toward the current resident set
+hurts monotonically at every weight scanned at $10^{16}$, across both granularities. The
+constraint is already internalized, and a backward-looking gradient adds no new information.
+
+\textbf{Eviction replay.} Replaying logged routing through alternative eviction shows the
+offline-optimal (Belady) policy is worth only +6--10 points of set hit-rate over the shipped
+least-logit rule, and LRU is 4--8 points worse, while an oracle selecting swaps by short-horizon
+\emph{future} demand gains +18--30 points. Cache policy is nearly saturated, anticipation is not.
+
+\textbf{Predictability objectives.} Two objectives rewarding the router's own predictability both
+Goodhart at sweep budgets. Auxiliary-loss-free, DeepSeek-inspired selection biases
+\cite{wang2024auxfree} with demand momentum raise residency alignment (+7 points of next-token
+overlap at the promotion cell) but induce a de-facto pinned expert, resident 85\% of the time,
+with no quality gain. An anticipatory loss targeting discounted future demand raises alignment
+sharply (+26 points) by teaching the router to concentrate demand so its own future is easy to
+predict, collapsing streamed expert diversity threefold (expert union 158 to 50 of 192) and
+hurting BPB. Full cell-level records live in the repository's ablation documents.
 
 \end{document}
