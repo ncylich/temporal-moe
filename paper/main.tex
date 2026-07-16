@@ -36,15 +36,15 @@ of parameters per token, but serving them still requires the full expert pool in
 scale with active rather than total parameters. Unlike post-hoc caching or offloading, we impose
 locality as a training-time constraint. A rolling-residency router keeps only the $k$ active experts
 of each layer resident and swaps at most one expert per token. Across FLAME-MoE isoFLOP sweeps
-spanning $10^{16}$ to $10^{19}$ FLOPs, our temporal MoE recovers 72--82\% of the MoE-over-dense
-quality uplift at compute-optimal sizes with 18 of 192 experts resident, a 5.7$\times$ reduction in
-resident memory, and zero-shot downstream accuracy at $10^{19}$ tracks this recovery. A llama.cpp
-implementation realizes the promise at $\sim$11B scale, decoding at 0.83$\times$ the all-resident
-speed in 5.1$\times$ less VRAM with bit-identical outputs. The trained router internalizes the constraint, shifting expert specialization
-from token identity to surrounding context and nearly doubling its temporal self-consistency
-over vanilla routing, with recovery stable across the whole range. Trained
-temporal routing is a practical path toward MoE-quality models under
-memory-constrained serving.
+spanning $10^{16}$ to $10^{19}$ FLOPs, temporal MoE recovers 72--82\% of the MoE-over-dense
+quality gain at compute-optimal sizes, and zero-shot downstream accuracy at $10^{19}$ tracks the
+recovery. The fine-grained configuration holds 18 of 192 experts resident, a 5.7$\times$ cut in
+whole-model memory. A llama.cpp implementation serves an $\sim$11B-scale model at 0.83$\times$
+the all-resident decode speed in 5.1$\times$ less VRAM with bit-identical outputs. The trained
+router internalizes the constraint. Expert specialization shifts from token identity to
+surrounding context, and temporal self-consistency nearly doubles over vanilla routing.
+Trained-in locality makes MoE-quality models practical to serve in the memory of their active
+parameters.
 \end{abstract}
 
 \section{Introduction}
@@ -59,16 +59,16 @@ is bandwidth-infeasible. Hiding one expert miss costs roughly the fast-to-slow b
 work exist per layer to hide it behind. Caching lowers the miss rate, not the miss cost, and
 vanilla routers give it little to work with, as consecutive tokens share only about 20\% of their
 expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,zhu2025}. The locality that serving
-needs will not be found after training. It must be trained in.
+needs must be trained in, not recovered after the fact.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
 with an unmodified loss stack, (ii) isoFLOP evidence at $10^{16}$, $10^{17}$, $10^{18}$, and $10^{19}$ FLOPs
-that it recovers most of the MoE quality gain at a fraction of the resident memory, with zero-shot
-task accuracy at $10^{19}$ tracking the pretraining recovery, and (iii) a
-mechanistic account of how the router internalizes the constraint, de-lexicalizing routing
-from token identity to context (Section~\ref{sec:mechanism}), with measured negative
-results redirecting future work from cache policy toward anticipation, and (iv) a real-engine
-llama.cpp serving measurement validating the memory-latency claim.
+that it recovers most of the MoE quality gain at a fraction of the resident memory, and that
+zero-shot task accuracy at $10^{19}$ tracks the pretraining recovery, (iii) a mechanistic account
+of how the router internalizes the constraint, a shift of expert selection off token identity and
+onto context (Section~\ref{sec:mechanism}), together with measured negative results that redirect
+future work from cache policy toward anticipation, and (iv) a real-engine llama.cpp serving
+measurement that validates the memory-latency claim.
 
 \section{Method}\label{sec:method}
 
@@ -88,7 +88,7 @@ resident logits, and $S_0$ cold-fills from the first token's top-$k$. Training u
 modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
 receives ordinary gate gradients on every resident it scores, so the function the swap rule reads
 is trained normally. The selection scan runs as a single-launch Triton kernel, verified bit-exact
-against a unit-tested reference, adding under 50\% to step time at our scales.
+against a unit-tested reference, and adds under 50\% to step time at our scales.
 
 The single-swap budget is what lets the load hide behind compute. At small batch the expert FFN is
 memory-bandwidth-bound, so serving the $k-1$ already-resident experts reads $(k-1)\,b$ bytes from
@@ -99,7 +99,7 @@ expert size $b$ cancels, so the condition depends only on the routing width, whi
 fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 18
 of 192 experts resident (the same fraction as 6 of 64 in the coarse model) the routed-expert
 footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$. Section~\ref{sec:results}
-measures these calculations in a real engine, including a variant that computes the router earlier
+tests these calculations in a real engine, including a variant that computes the router earlier
 in the network than its experts to lengthen the masking window.
 
 We build on FLAME-MoE \cite{kang2025flame} (64 experts, top-6, one shared expert) in two versions,
@@ -107,11 +107,11 @@ a coarse-expert model (6 active of 64 experts) and a fine-grained model (18 of 1
 splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep isoFLOP curves over
 0.77M--15.1M active non-embedding parameters with a 16k vocabulary. At $10^{18}$ we sweep three
 sizes around an exact FLAME-MoE-38M-100M replication (4.45B tokens, 50k pythia vocabulary), and at
-$10^{19}$ train its compute-optimal shape and evaluate it zero-shot on six standard tasks with
-lm-evaluation-harness. For serving, we implement rolling residency in a llama.cpp CUDA fork and
-benchmark batch-1 decode on Qwen3-MoE-shaped random-weight models ($\sim$11.3B total, Q4\_K\_M,
-both granularities scaled $\sim$10$\times$), holding $R=k$ expert slots in VRAM against a full
-CPU pool with at most one swap per layer per token. Decode is verified bit-identical to the
+$10^{19}$ we train the budget's compute-optimal shape and evaluate it zero-shot on six standard
+tasks with lm-evaluation-harness. For serving, we implement rolling residency in a llama.cpp CUDA
+fork and benchmark batch-1 decode on Qwen3-MoE-shaped random-weight models ($\sim$11.3B total,
+Q4\_K\_M, both granularities scaled $\sim$10$\times$), with $R=k$ expert slots held in VRAM
+against a full CPU pool and at most one swap per layer per token. Decode is verified bit-identical to the
 all-resident engine, and weights are irrelevant to a latency and memory measurement. All runs use
 locked hyperparameters and report test-set
 bits-per-byte (BPB, tokenizer-invariant, seed noise $\approx$0.003). Each shape gets a dense floor
@@ -124,31 +124,30 @@ $(\text{dense}-\text{temporal})/(\text{dense}-\text{MoE})$.
   \caption{Quality at fixed compute, one panel per budget (test-set BPB, lower is better). Shade
   encodes granularity, coarse 6-of-64 normal and fine 18-of-192 dark. Different vocabularies
   mean BPB is comparable within a panel, not across. Temporal MoE lands inside the dense-to-MoE
-  band at every size and budget, keeping 72--82\% of the MoE-over-dense gain, reaching parity
-  with the coarse full MoE at $10^{18}$.}
+  band at every size and budget and keeps 72--82\% of the MoE-over-dense gain. At $10^{18}$ the
+  coarse temporal model reaches parity with the coarse full MoE.}
   \label{fig:isoflop}
 \end{figure}
 
 \section{Results}\label{sec:results}
 
-\textbf{IsoFLOP bands.} Across every model size and all three swept budgets
-(Figure~\ref{fig:isoflop}), temporal MoE sits well inside the dense-to-MoE band, recovering
-72--82\% of the MoE uplift at compute-optimal sizes (72\% and 77\% for the fine-grained model,
-82\% coarse) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
+\textbf{IsoFLOP bands.} At every model size in the three budgets with full size sweeps
+(Figure~\ref{fig:isoflop}), temporal MoE sits well inside the dense-to-MoE band and recovers
+72--82\% of the MoE-over-dense gain at compute-optimal sizes (72\% and 77\% for the fine-grained
+model, 82\% coarse) with only $k$ experts ever resident. The isoFLOP parabola and its minimum match the dense and
 MoE baselines at every budget, so the constraint does not distort scaling geometry.
 
-\textbf{Paper scale.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, bottom left) recovery is 73\%
-against the strongest full MoE, consistent with the smaller budgets. In fact, sometimes the
+\textbf{Larger budgets.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, bottom left) recovery is 73\%
+against the strongest full MoE, consistent with the smaller budgets. Sometimes the
 mechanism appears nearly lossless, here outperforming
-its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, run
-with two seeds per arm, it holds parity with the strongest full MoE (seed ranges 3.904--3.909
+its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, with
+two seeds per arm, temporal holds parity with the strongest full MoE (seed ranges 3.904--3.909
 vs.\ 3.918--3.930 nats). Fine-graining itself hurts the full
 MoE at this scale (at 48.5M active it lands within 0.024 nats of the dense floor) while temporal
-routing is robust to it, so the fine cell we carry forward is temporal. At $10^{19}$
-(Figure~\ref{fig:isoflop}, bottom right), our largest budget, temporal keeps 78--81\% of the
-MoE-over-dense gain and the granularity preference flips: the fine-grained temporal model (1.065
-BPB) now edges out the coarse one (1.068). Scale moves the temporal optimum toward exactly the
-granularity that makes streaming cheap.
+routing is robust to it, so the only fine-grained model we take to $10^{19}$ is the temporal one.
+At $10^{19}$ (Figure~\ref{fig:isoflop}, bottom right), our largest budget, the temporal models
+keep 78--81\% of the MoE-over-dense gain and the granularity preference flips: the fine-grained
+temporal model (1.065 BPB) now edges out the coarse one (1.068).
 
 \begin{table}[t]
   \centering\small
@@ -171,9 +170,9 @@ granularity that makes streaming cheap.
 
 \textbf{Downstream tasks.} Zero-shot accuracy at $10^{19}$ (Table~\ref{tab:lmeval}) tracks the
 pretraining picture. The full MoE lifts the dense average from 0.392 to 0.424 (0.059 to 0.091
-above chance), and temporal keeps 86\% (coarse) and 76\% (fine) of that above-chance uplift,
-beating the full MoE outright on WinoGrande and matching it on PIQA. Recovery transfers from
-perplexity to task accuracy.
+above chance), and the temporal models keep 86\% (coarse) and 76\% (fine) of that above-chance
+gain. On WinoGrande and PIQA the coarse temporal model matches the full MoE. Recovery transfers
+from pretraining loss to task accuracy.
 
 \begin{table}[t]
   \centering\small
@@ -197,16 +196,16 @@ perplexity to task accuracy.
 
 \textbf{Serving.} Table~\ref{tab:serving} closes the loop in a real engine. The deploy row
 serves the fine-grained model at 0.83$\times$ the all-resident decode speed in 5.1$\times$ less
-VRAM. The rows isolate the costs, a granularity-independent kernel overhead (0.86--0.88$\times$)
-and a streaming cost granularity controls, roughly free for fine experts (840\,KiB per swap,
-hidden behind compute) but dominant for coarse ones (2.5\,MiB, 0.51$\times$). The asymmetry is
-the measured converse of the $10^{19}$ crossover, scale pushes temporal quality toward fine
-granularity and fine granularity is what streams cheaply, so quality and serving select the same
-design point. Router-early lengthens the masking window and recovers most of the fine model's
-remaining gap, as the bandwidth analysis anticipates.
+VRAM. The other rows isolate two costs. Kernel overhead is granularity-independent
+(0.86--0.88$\times$). The streaming cost is set by granularity, roughly free for fine experts
+(840\,KiB per swap, hidden behind compute) but dominant for coarse ones (2.5\,MiB, 0.51$\times$).
+The asymmetry is the measured converse of the $10^{19}$ crossover. Scale pushes temporal quality
+toward fine granularity, and fine granularity is what streams cheaply, so quality and serving
+select the same design point. The router-early variant lengthens the masking window and recovers
+most of the fine model's remaining gap, as the bandwidth analysis anticipates.
 
-\textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. Trained
-under residency, the router's \emph{unconstrained} preferences become temporally banded, and its
+\textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. A router
+trained under residency shows temporally banded \emph{unconstrained} preferences, and its
 next-token self-consistency nearly doubles over vanilla routing at every scale probed. The effect
 is streaming, not collapse. Over a 2048-token sequence a temporal model still touches 83--98\% of
 its expert pool (96--100\% at $10^{19}$), and no expert is resident more than 40\% of the time
@@ -236,8 +235,8 @@ static subset.
 \section{De-lexicalization of routing}\label{sec:mechanism}
 
 Section~\ref{sec:results} showed that the router internalizes the constraint. This section asks
-what it learns instead of the free routing it can no longer express, analyzing trained temporal
-and full-MoE pairs at the two budgets where full artifacts are preserved, fine-grained (18 of
+what it learns instead of the free routing it can no longer express. We analyze trained temporal
+and full-MoE pairs at the two budgets whose full artifacts are preserved, fine-grained (18 of
 192) at $10^{16}$ and coarse (6 of 64) at $10^{17}$ FLOPs. At these budgets the full MoE holds a
 small quality edge, so what follows characterizes what the constraint changes, not whether it
 helps. Protocols and full tables are in Appendix~\ref{app:mechanism}.
@@ -256,28 +255,30 @@ helps. Protocols and full tables are in Appendix~\ref{app:mechanism}.
   surrounding context excluding it (y) predicts its firing (held-out AUC, chance 0.500, window
   = residency lifetime, colors as in Figure~\ref{fig:isoflop}). Full-MoE experts are token
   lookups, temporal experts context-dominated. \textbf{Right,} held-out BPB vs.\ cache size $R$
-  at identical FLOPs (192 experts, $k=18$, $10^{16}$): the constraint is a tunable quality cost
-  and, $R$ being the resident-expert memory, the serving memory--quality frontier.}
+  at identical FLOPs (192 experts, $k=18$, $10^{16}$). The constraint is a tunable quality cost,
+  and because $R$ is the resident-expert memory, the curve is the serving memory-quality
+  frontier.}
   \label{fig:delex}
 \end{figure}
 
 \textbf{Usage concentration.} We measure each expert's usage breadth as the effective fraction
 of evaluation tokens it serves, the normalized inverse Simpson concentration of its routing
 mass, which is 1 under uniform usage and near 0 when usage concentrates on a few recurring
-tokens. The median full-MoE expert serves an effective 30\% of the token stream and almost no
-expert serves a majority of it. The median temporal expert serves 66\%, and two thirds of
-temporal experts serve a majority. Expert weights are, in contrast, nearly unaffected, remaining
-equally distinct and near orthogonal in both regimes, with independent seeds and a
-sigmoid-router control reproducing every gap (Appendix~\ref{app:mechanism}). The constraint
+tokens. In the fine-grained pair, the median full-MoE expert serves an effective 30\% of the
+token stream and almost no expert serves a majority of it. The median temporal expert serves
+66\%, two thirds of temporal experts serve a majority, and the coarse pair shifts the same way.
+Expert weights, in contrast, are nearly unaffected, equally distinct and near orthogonal in both
+regimes. Independent seeds and a sigmoid-router control reproduce every gap
+(Appendix~\ref{app:mechanism}). The constraint
 therefore changes how experts are used rather than what they compute, and the rest of this
 section identifies what replaces token ownership.
 
 \textbf{Token to context.} For each expert, two logistic probes predict its firing, one from the
 current token's embedding alone and one from the surrounding window with the token excluded,
 sized to one residency lifetime, the number of active experts. Figure~\ref{fig:delex} (left) plots every expert.
-Full-MoE routing is close to a token lookup, the token alone predicting firing at median
-AUC 0.93 and context dominant for under 1\% of experts. Temporal routing inverts the picture,
-token AUC falling to 0.62 and context dominating for 85--91\% of experts. We call this
+Full-MoE routing is close to a token lookup. The token alone predicts firing at median
+AUC 0.93, and context dominates for under 1\% of experts. Temporal routing inverts the picture.
+Token AUC falls to 0.62, and context dominates for 85--91\% of experts. We call this
 \emph{de-lexicalization}. The shift is visible forward in time: a probe predicting the
 router's next-token expert selection from the preceding tokens' routing record alone reaches
 AUC 0.85 on temporal models against 0.64 for the full MoE at matched granularity, because
@@ -289,46 +290,48 @@ clusters and temporal experts show no detectable vocabulary preference.
 unconstrained preferences, each model performs best under its training regime: unmasking
 a temporal model and imposing residency on a full MoE both degrade quality
 (Table~\ref{tab:swap}), so the routing organization is trained into the weights rather than
-removable at inference. The constraint's strength is, moreover, a continuous dial.
-Decoupling the cache size $R$ from the active $k$ interpolates between the shipped constraint
+removable at inference. The constraint's strength is also a continuous dial.
+Decoupling the cache size $R$ from the active $k$ interpolates between our deployed setting
 ($R = k$) and the full-MoE recipe ($R = E$) at identical FLOPs, and held-out BPB falls
 monotonically as the cache grows (Figure~\ref{fig:delex}, right), so at this budget the
-constraint is a pure, tunable quality cost. Because $R$ is the number of experts held in fast
-memory, RAM, the curve is the serving memory--quality frontier, the maximal constraint
-costing +0.023 BPB at roughly a tenth of the routed-expert memory.
+constraint is a pure, tunable quality cost. $R$ is the number of experts held in fast memory, so
+the curve is the serving memory-quality frontier. The maximal constraint costs +0.023 BPB at
+roughly a tenth of the routed-expert memory.
 
 A free router binds experts to token identities. Rolling residency makes that binding
-unrepresentable while leaving weights untouched. The router reorganizes around context, which
-persists across a residency lifetime. That move explains how quality survives the constraint,
-the near-doubled self-consistency of Figure~\ref{fig:locality}, and the forecastable demand the
-anticipation directions below target.
+unrepresentable while leaving weights untouched, so the router reorganizes around context, which
+persists across a residency lifetime. That reorganization explains how quality survives the
+constraint, the near-doubled self-consistency of Figure~\ref{fig:locality}, and the forecastable
+demand that the anticipation direction of Section~\ref{sec:outlook} targets.
 
 \section{Conclusion and next steps}\label{sec:outlook}
 
 Across four compute decades, two tokenizer families, and two expert granularities, training under
 rolling residency keeps 72--82\% of the MoE-over-dense quality gain with only the active experts
-resident, preserves the baselines' scaling geometry, and transfers to downstream tasks at
-$10^{19}$. A real-engine implementation serves the fine-grained model at 0.83$\times$ the
-all-resident decode speed in 5.1$\times$ less VRAM. The mechanism is not tolerance but
-reorganization: the router de-lexicalizes, binding
-experts to context that persists across a residency lifetime (Section~\ref{sec:mechanism}).
+resident. It preserves the baselines' scaling geometry, and the recovery carries to downstream
+tasks at $10^{19}$. A real-engine implementation serves the fine-grained model at 0.83$\times$
+the all-resident decode speed in 5.1$\times$ less VRAM. Quality survives because the router
+reorganizes. Routing de-lexicalizes, and experts bind to context that persists across a residency
+lifetime (Section~\ref{sec:mechanism}).
 
-Our negative results narrow the path to the remaining deficit (Appendix~\ref{app:negatives}). A
-coherence loss imitating past routing hurts at every weight, better eviction is worth little while
-a future-demand oracle gains +18--30 points of hit-rate, and two objectives rewarding the router's
-own predictability both Goodhart, pinning experts or collapsing diversity. The headroom is
-anticipation, and it must be decoupled from the router's objective.
+Our negative results narrow down where the remaining deficit can be closed
+(Appendix~\ref{app:negatives}). A coherence loss that imitates past routing hurts at every
+weight. Better eviction is worth little, while a future-demand oracle gains 18--30 points of hit
+rate. Two objectives that reward the router's own predictability both Goodhart (one pins an
+expert, the other collapses diversity). The headroom is anticipation, and it must be decoupled
+from the router's objective.
 
-Two directions follow. First, adapting a released MoE checkpoint to residency by router-only
-training (zero-shot imposition is the costliest direction in Table~\ref{tab:swap}), which would
-make temporal routing a serving recipe for existing MoE-class models in the memory of their
-active parameters. Second, establishing the architecture's stability profile, weight and
-activation norms against the baselines, loss stability, and reinforcement-learning stability
-where MoEs are notoriously fragile, so the recipe is viable end to end with no caveats.
+Two directions follow. The first is to adapt a released MoE checkpoint to residency with
+router-only training (zero-shot imposition is the costliest direction in Table~\ref{tab:swap}),
+which would make temporal routing a serving recipe for existing MoE-class models in the memory
+of their active parameters. The second is to establish the architecture's
+stability profile, weight and activation norms against the baselines, loss stability, and
+reinforcement-learning stability where MoEs are notoriously fragile, so the recipe is viable end
+to end with no caveats.
 
 The end goal is local inference. If temporal routing holds at scale, a Kimi-K2-scale sparse model
-\cite{kimik2} could run in the memory of its active parameters on quantized consumer hardware,
-putting near-state-of-the-art models within private, local reach of the average person.
+\cite{kimik2} could run in the memory of its active parameters on quantized consumer hardware.
+That would put near-state-of-the-art models within private, local reach of the average person.
 
 
 \begin{thebibliography}{10}
@@ -480,29 +483,29 @@ median 15{,}932, with no word-list experts even in the tail.
   \end{tabular}
 \end{table}
 
-\textbf{Dose sweep.} Cells trained from scratch at $10^{16}$ FLOPs on the same softmax-aux
-recipe. Held-out BPB at $R = 18/36/72/128/192$ is 1.4750 / 1.4736 / 1.4681 / 1.4580 / 1.4519
-(endpoint = the retrained full-MoE baseline). Most of the gap closes by $R = 128$, with expert
-diversity preserved at every dose (182--186 effective experts).
+\textbf{Dose sweep.} Every dose is trained from scratch at $10^{16}$ FLOPs on the same
+softmax-aux recipe. Held-out BPB at $R = 18/36/72/128/192$ is 1.4750 / 1.4736 / 1.4681 / 1.4580 /
+1.4519 (endpoint = the retrained full-MoE baseline). Most of the gap closes by $R = 128$, and
+expert diversity is preserved at every dose (182--186 effective experts).
 
 \section{Negative results}\label{app:negatives}
 
-\textbf{Coherence loss.} An explicit loss pulling router logits toward the current resident set
-hurts monotonically at every weight scanned at $10^{16}$, across both granularities. The
+\textbf{Coherence loss.} An explicit loss that pulls router logits toward the current resident
+set hurts monotonically at every weight scanned at $10^{16}$, across both granularities. The
 constraint is already internalized, and a backward-looking gradient adds no new information.
 
 \textbf{Eviction replay.} Replaying logged routing through alternative eviction shows the
-offline-optimal (Belady) policy is worth only +6--10 points of set hit-rate over the shipped
-least-logit rule, and LRU is 4--8 points worse, while an oracle selecting swaps by short-horizon
-\emph{future} demand gains +18--30 points. Cache policy is nearly saturated, anticipation is not.
+offline-optimal (Belady) policy is worth only 6--10 points of set hit rate over our least-logit
+rule, and LRU is 4--8 points worse, while an oracle that selects swaps by short-horizon
+\emph{future} demand gains 18--30 points. Cache policy is nearly saturated. Anticipation is not.
 
-\textbf{Predictability objectives.} Two objectives rewarding the router's own predictability both
-Goodhart at sweep budgets. Auxiliary-loss-free, DeepSeek-inspired selection biases
+\textbf{Predictability objectives.} Two objectives that reward the router's own predictability
+both Goodhart at sweep budgets. Auxiliary-loss-free, DeepSeek-inspired selection biases
 \cite{wang2024auxfree} with demand momentum raise residency alignment (+7 points of next-token
-overlap at the promotion cell) but induce a de-facto pinned expert, resident 85\% of the time,
-with no quality gain. An anticipatory loss targeting discounted future demand raises alignment
+overlap at the best swept setting) but induce a de-facto pinned expert, resident 85\% of the
+time, with no quality gain. An anticipatory loss on discounted future demand raises alignment
 sharply (+26 points) by teaching the router to concentrate demand so its own future is easy to
-predict, collapsing streamed expert diversity threefold (expert union 158 to 50 of 192) and
-hurting BPB. Full cell-level records live in the repository's ablation documents.
+predict. Streamed expert diversity collapses threefold (expert union 158 to 50 of 192) and BPB
+worsens. Full per-run records live in the repository's ablation documents.
 
 \end{document}
