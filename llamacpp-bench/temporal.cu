@@ -27,11 +27,14 @@ static std::unordered_map<const void*, std::pair<int,int>> g_tptr;
 static cudaStream_t g_copy = nullptr;                        // shared swap-copy stream
 
 int ggml_cuda_temporal_unified() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED");return s?atoi(s):0;}(); return v; }
+// FORCE1 caps the swap to <=1 expert/layer (emulates a trained model's temporal locality). OPT-IN only:
+// it is faster (~160 tok/s) but only CORRECT when consecutive tokens route to mostly-resident experts; on
+// random-locality weights it is numerically approximate (see bench notes). Default 0 = correct on any model.
 static int tu_force1() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_FORCE1");return s?atoi(s):0;}(); return v; }
-// overlap: stagger gate/up/down swap-copies on a copy stream so up-copy+down-copy hide behind the
-// gate/up expert GEMMs (compute stream), each GEMM gated on its own tensor's copy. env
-// TEMPORAL_UNIFIED_OVERLAP=1. (Full compute-swapped-last split-GEMM is a deeper build_moe_ffn change.)
-static int tu_overlap() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_OVERLAP");return s?atoi(s):0;}(); return v; }
+// overlap: stagger gate/up/down swap-copies on a copy stream so up-copy+down-copy hide behind the gate/up
+// expert GEMMs (compute stream), each GEMM gated on its own tensor's copy. DEFAULT ON (correctness-safe:
+// full swap budget, just overlapped); set TEMPORAL_UNIFIED_NOOVERLAP=1 to disable for debugging.
+static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVERLAP")) return 0; const char*s=getenv("TEMPORAL_UNIFIED_OVERLAP"); return s?atoi(s):1; }(); return v; }
 static int tu_nocopy() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_NOCOPY");return s?atoi(s):0;}(); return v; }  // decomposition: skip swap-copy (wrong output)
 // Swap-rate EMULATION. The real mechanism swaps <=1 expert/layer/token; the trained models' measured
 // mean_swap_rate (probe_replay e1) is p in [0,1] (shipped policy ~1.0). Emulate a global rate p on this
@@ -235,10 +238,6 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
 }
 
 // ===== EXPERT-MAJOR STREAMING PREFILL support =====
-int ggml_cuda_temporal_prefill_expertmajor() {
-    static int v=[](){const char*s=getenv("TEMPORAL_PREFILL"); return (s && strcmp(s,"expertmajor")==0)?1:0;}();
-    return v;
-}
 int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
                                 size_t* bytes_per_expert, int* n_expert, int* R) {
     auto it = g_tptr.find(src0_data); if (it==g_tptr.end()) return 0;
