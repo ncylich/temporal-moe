@@ -47,8 +47,8 @@ panel(axp, A_pp, C_pp, "Prefill")
 panel(axd, A_tg, C_tg, "Decode (100-token gen)")
 # legend: method = color, metric = linestyle (kept separate so the dotted 8 GB line reads as VRAM)
 from matplotlib.lines import Line2D
-handles = [Line2D([0],[0], color=CEIL, lw=2.2),
-           Line2D([0],[0], color=DEPL, lw=2.2),
+handles = [Line2D([0],[0], color=CEIL, marker="o", ls="", ms=8),
+           Line2D([0],[0], color=DEPL, marker="s", ls="", ms=8),
            Line2D([0],[0], color="0.25", lw=2.0, ls="-"),
            Line2D([0],[0], color="0.45", lw=1.6, ls="--")]
 labels  = ["all-resident MoE", "temporal (ours)", "throughput (left axis)", "peak VRAM (right axis)"]
