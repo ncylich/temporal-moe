@@ -1,0 +1,30 @@
+# Serving benchmarks for temporal-MoE (llama.cpp CUDA fork, RTX A6000, Q4_K_M random-weight Qwen3-MoE).
+# Fork commits (LOCAL on a6000, NOT pushed): 2cb4175 v1, 13cc828 v2/16k, fb0e979 configD, 5c2f7b2 skipseed, 1896afb wavemmid(NO-GO), 8fa7937 ub-counter, 6094183 matched-ub.
+# tiers: ceiling=all experts VRAM-resident (stock mul_mat_id); deploy=streamed (-ncmoe 48 TEMPORAL_UNIFIED=1, R=k slots + CPU pool); resident_control=expert-major kernel with all experts resident (no upload, config D).
+# prefill_ms lower better; decode_tok_s higher better; peak_vram_mib = nvidia-smi global max. 4 trials, warmup discarded, mean of last 3. correctness: streamed vs ceiling PPL delta 0.02-0.04% (FP-reorder, not a logic error).
+phase,model,tier,setup,ubatch,context,prefill_ms,decode_tok_s,peak_vram_mib,note
+decode,fine,ceiling,a_all_resident,,1024,,200,7672,bit-identical baseline
+decode,fine,deploy,b_our_kernel_no_swap,,1024,,176,7672,p=0 code overhead only
+decode,fine,deploy,c_active_only_router_after_attn_DEPLOY,,1024,,165,1502,PPL 4dp match; 5.1x total / 10.6x expert-tier VRAM cut
+decode,fine,deploy,d_router_early,,1024,,173,1502,router-before-attn overlap variant
+decode,coarse,ceiling,a_all_resident,,1024,,252,,
+decode,coarse,deploy,b_our_kernel_no_swap,,1024,,217,,
+decode,coarse,deploy,c_active_only_DEPLOY,,1024,,128,,2.5MiB swaps dominate at coarse granularity
+decode,coarse,deploy,d_router_early,,1024,,143,,
+prefill,fine,ceiling,A_mul_mat_id_resident,1024,1024,151,,8174,config-D control; kernel baseline
+prefill,fine,resident_control,D_expert_major_resident,1024,1024,366,,8262,config-D control; no upload
+prefill,fine,deploy,C_expert_major_streamed,1024,1024,358,,2172,C/D~1.00x streaming free; kernel-bound at 1k
+prefill,fine,ceiling,A_mul_mat_id_resident,4096,4096,665,,10170,
+prefill,fine,resident_control,D_expert_major_resident,4096,4096,978,,10500,
+prefill,fine,deploy,C_expert_major_streamed,4096,4096,1029,,4410,C/D 1.05x
+prefill,fine,ceiling,A_mul_mat_id_resident,16384,16384,4715,,18162,single-ubatch
+prefill,fine,resident_control,D_expert_major_resident,16384,16384,4219,,19448,
+prefill,fine,deploy,C_expert_major_streamed,16384,16384,4297,,13358,C/D 1.02x
+prefill,fine,ceiling,A_matched_ub,16384,16384,4723,,18162,matched-ub sweep @16k
+prefill,fine,deploy,C_matched_ub,16384,16384,4247,,13358,matched-ub sweep @16k
+prefill,fine,ceiling,A_matched_ub,4096,16384,2922,,10746,ceiling optimum ub
+prefill,fine,deploy,C_matched_ub,4096,16384,4132,,4986,deploy optimum ub; C/A 1.41x
+prefill,fine,ceiling,A_matched_ub,2048,16384,2942,,9512,CHOSEN operating point (base near-optimal)
+prefill,fine,deploy,C_matched_ub,2048,16384,4499,,3590,CHOSEN operating point; C/A 1.53x A/C-VRAM 2.65x
+prefill,fine,ceiling,A_matched_ub,1024,16384,2975,,8894,ceiling VRAM floor ~KV+all-experts
+prefill,fine,deploy,C_matched_ub,1024,16384,5527,,3159,deploy VRAM floor ~KV+ring

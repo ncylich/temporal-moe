@@ -60,6 +60,7 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `specialization_m3.csv` | Expert-specialization M3 — centroid distances & pairwise cosine per cell. | a6000@0ec187a2 |
 | `specialization_probe.csv` | Per-(layer,expert) specialization probe: residency share, selectivity, gate-when-selected, centroid dist. | a6000@0ec187a2 |
 | `specialization_summary.csv` | Per-cell specialization summary (PR percentiles, generalist frac, eff-rank, gate stats). | a6000@0ec187a2 |
+| `serving_benchmarks.csv` | llama.cpp real-engine serving results: decode a/b/c/d kernel setups + prefill A/D/C decomposition + matched-ubatch 16k sweep (fine model; time/throughput/peak-VRAM). Source code in the a6000 fork (local commits, unpushed). | fork@6094183 (a6000, local) |
 | `t18_1e18_curves.csv` | 1e18 (38M) isoFLOP training curves — coarse full-MoE + coarse temporal cells. | h100@60b0e351/e53596d6 |
 | `t19_1e19_curves.csv` | 1e19 isoFLOP training curves for the 4 t19 cells (dense / moe_coarse / coarse_temporal / fine_temporal). | h100@03a8e488/6a69b7f7/d2b7cd7e/de80543f |
 | `t19_lmeval.csv` | t19 downstream lm-eval accuracies (dense / moe_coarse / temporal_coarse). | h100@a42340f1 |
