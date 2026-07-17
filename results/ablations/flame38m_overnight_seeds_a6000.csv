@@ -1,0 +1,4 @@
+# Overnight seed-3 extension of the 1e18 coarse parity pair (flame38m, GRAIN=1, mb=8, 2121 iters, pythia-50k).
+# val_ce = end-of-run 'on validation set' full-val CE (nats); test_ce = 'on test set' CE. BPB = CE/2.9780. Lower better.
+run,seed,val_ce,test_ce,val_ce_bpb,test_ce_bpb
+flame38m_g1_temporal_s3,3,3.9107,3.9125,1.3132,1.3138

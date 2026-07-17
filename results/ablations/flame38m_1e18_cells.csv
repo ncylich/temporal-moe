@@ -9,3 +9,8 @@ flame38m_g1_temporal,temporal,1,64,6,1234,3.905200,3.909421,t18_1e18_curves.csv 
 flame38m_g1_temporal_s2,temporal,1,64,6,2,3.906799,3.904324,t18_1e18_curves.csv (h100@e53596d6),"seed replicate; val_ce=full-val, test_ce=test (h100-verified)",1.3119,1.3111
 flame38m_g3_moe,moe,3,192,18,1234,4.004456,4.008667,G3_RESULTS/plot_1e18.py,"h100; train.log-verified: G3_RESULTS' 4.0087 was in fact the TEST line; val_ce=full-val, test_ce=test. Fine-graining hurts full MoE at 1e18",1.3447,1.3461
 flame38m_g3_temporal,temporal,3,192,18,1234,3.972339,3.976762,G3_RESULTS/plot_1e18.py,"h100; train.log-verified: G3_RESULTS' 3.9768 was in fact the TEST line; val_ce=full-val, test_ce=test. Temporal robust to over-fine-graining",1.3339,1.3354
+flame38m_g3_temporal_s2,temporal,3,192,18,2,3.974704,3.972355,flame38m_overnight_seeds.csv (h100@5a30342a),seed replicate (h100 local split),1.3347,1.3339
+flame38m_g3_moe_s2,moe,3,192,18,2,4.019518,4.017015,flame38m_overnight_seeds.csv (h100@5a30342a),seed replicate (h100 local split),1.3498,1.3489
+flame38m_g1_moe_s3,moe,1,64,6,3,3.921314,3.921753,flame38m_overnight_seeds.csv (h100@5a30342a),third same-split MoE seed (h100),1.3168,1.3169
+flame38m_dense_local,dense,1,,,1234,4.142699,4.142762,flame38m_overnight_seeds.csv (h100@5a30342a),LOCAL dense floor (h100 split) - replaces the cross-data caveat; a6000 dense 4.1373 agrees within 0.0055,1.3911,1.3911
+flame38m_g1_temporal_s3,temporal,1,64,6,3,3.9107,3.9125,flame38m_overnight_seeds_a6000.csv (a6000@e0a98204),third temporal seed on the A6000 split (not poolable with h100-split rows),1.3132,1.3138

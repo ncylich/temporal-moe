@@ -27,6 +27,8 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `e8_document_boundary.csv` | Routing churn at document (EOD) boundaries. | a6000@cd588fd6, h100@cd588fd6 |
 | `expert_selection_per_token.csv` | Per-token expert selections (full-MoE vs temporal) for the 8/15/38M models (model in active_params_M col). | a6000@53aa24ba, h100@53aa24ba |
 | `flame192_leftflank_1e18.csv` | 1e18 isoFLOP LEFT-flank (hidden-192/~26M) 5-cell final CE panel: dense + {MoE,temporal}×{coarse,fine}. | a6000@ee73c64d, h100@5ed5a240 |
+| `flame38m_overnight_seeds.csv` | Overnight seed extension (h100 split): fine-pair seed-2 (temporal+MoE), local dense floor, coarse-MoE seed-3 — end-of-run full-val + test CE/BPB. | h100@5a30342a |
+| `flame38m_overnight_seeds_a6000.csv` | Overnight coarse-temporal seed-3 on the a6000 split (same schema). | a6000@e0a98204 |
 | `flame38m_1e18_cells.csv` | 1e18 38M-middle 5-cell panel finals (dense/MoE/temporal × coarse/fine); coarse per-seed curves in t18_1e18_curves.csv. | temporal-moe-impl@66f786b7, h100@60b0e351/e53596d6 |
 | `flame512_1e18_rightflank.csv` | 1e18 isoFLOP RIGHT-flank (hidden-512/98M) 5-cell final CE panel. | h100@d4827a1e |
 | `flame512_1e18_rightflank_curves.csv` | Per-iteration training curves for the 1e18 right-flank cells. | h100@d4827a1e |
