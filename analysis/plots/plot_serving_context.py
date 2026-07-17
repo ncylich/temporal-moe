@@ -14,7 +14,7 @@ OUT = f"{REPO}/results/phase0/figures"
 
 ctx = [1024, 2048, 4096, 8192, 16384]
 # ceiling (A), deploy (C): prefill tok/s, decode tok/s, VRAM MiB
-A_pp = [6747, 6630, 6545, 6236, 5607]; C_pp = [2739, 3603, 3795, 3945, 3667]
+A_pp = [6756, 6625, 6568, 6284, 5608]; C_pp = [2906, 3570, 3715, 3618, 3568]  # deploy = temporal residency-masked prefill
 A_tg = [203.4, 203.0, 201.9, 201.1, 202.4]; C_tg = [161.7, 159.6, 159.2, 159.5, 159.3]
 A_vram = [8.174, 8.840, 8.936, 9.128, 9.512]; C_vram = [2.172, 2.918, 3.014, 3.206, 3.590]
 
