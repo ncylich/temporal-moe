@@ -1,5 +1,6 @@
 #include "temporal.cuh"
 #include <cstdlib>
+#include <cstring>
 
 // ================= Phase-3b UNIFIED: ON-DEVICE residency + graph-capturable swap ===============
 // Everything the swap needs is on-device with FIXED buffer pointers: the CPU pool is host-registered
@@ -11,6 +12,7 @@
 #include <vector>
 struct TU {
     const uint8_t* pool_dev[3] = {nullptr,nullptr,nullptr};   // host-mapped device ptr of the CPU pool
+    const uint8_t* pool_host[3]= {nullptr,nullptr,nullptr};   // host ptr of the mapped CPU pool (prefill prefetch)
     uint8_t*       slot[3]     = {nullptr,nullptr,nullptr};    // device R-slot base
     size_t         be[3]       = {0,0,0};
     int            E=0, R=0, ready=0, primed=0;   // primed: router-early prime issued this layer (capture-time)
@@ -59,6 +61,7 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host, 
     void* pdev = nullptr;
     cudaHostGetDevicePointer(&pdev, mapped, 0);
     L.pool_dev[which] = (const uint8_t*)pdev;
+    L.pool_host[which] = (const uint8_t*)mapped;
     L.slot[which] = (uint8_t*)rslot_data; L.be[which] = bytes_per_expert; L.E=n_expert; L.R=R;
     if (!L.ready) {
         std::vector<int> hs(R), hl(n_expert,-1);
@@ -229,4 +232,25 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
     }
     *ids_out_ptr = L.remap_ids;
     return is_prime ? 2 : 1;   // 2 = prime: caller skips the expert GEMM (copy already issued)
+}
+
+// ===== EXPERT-MAJOR STREAMING PREFILL support =====
+int ggml_cuda_temporal_prefill_expertmajor() {
+    static int v=[](){const char*s=getenv("TEMPORAL_PREFILL"); return (s && strcmp(s,"expertmajor")==0)?1:0;}();
+    return v;
+}
+int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
+                                size_t* bytes_per_expert, int* n_expert, int* R) {
+    auto it = g_tptr.find(src0_data); if (it==g_tptr.end()) return 0;
+    TU& L = g_L[it->second.first]; int which = it->second.second;
+    if (slot_base)       *slot_base       = L.slot[which];
+    if (pool_host)       *pool_host       = L.pool_host[which];
+    if (bytes_per_expert)*bytes_per_expert= L.be[which];
+    if (n_expert)        *n_expert        = L.E;
+    if (R)               *R               = L.R;
+    return 1;
+}
+cudaStream_t ggml_cuda_temporal_copy_stream() {
+    if (!g_copy) cudaStreamCreateWithFlags(&g_copy, cudaStreamNonBlocking);
+    return g_copy;
 }

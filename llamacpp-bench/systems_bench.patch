@@ -1,5 +1,5 @@
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 98816f8..169546c 100644
+index 98816f8..5fa5a67 100644
 --- a/ggml/src/ggml-cuda/ggml-cuda.cu
 +++ b/ggml/src/ggml-cuda/ggml-cuda.cu
 @@ -53,6 +53,7 @@
@@ -25,19 +25,313 @@ index 98816f8..169546c 100644
      const bool has_bias = ffn_up_bias != nullptr || ffn_gate_bias != nullptr;
      const bool has_scale = ffn_up_scale != nullptr || ffn_gate_scale != nullptr;
  
-@@ -1770,7 +1779,7 @@ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor
+@@ -1770,7 +1779,272 @@ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor
      ggml_cuda_mul_mat_cublas(ctx, src0, src1, dst);
  }
  
 -static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
++// ===== WAVE-BATCHED mul_mat_id PROTOTYPE (env TEMPORAL_PREFILL=wavemmid, RESIDENT control) =====
++// Instead of 192 tiny per-expert GEMMs, tile the E resident experts into ceil(E/W) waves and call the stock
++// fused mmq mul_mat_id ONCE per wave over a W-expert slice, with ids remapped to [0,W) (out-of-wave pairs
++// clamped to slot 0). TIMING PROTOTYPE: waves OVERWRITE dst (no cross-wave accumulate/mask yet), so the
++// output is NOT correct -- this measures only whether ceil(E/W) fused kernels beat 192 small GEMMs.
++static void ggml_cuda_temporal_prefill_wavemmid_resident(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
++    const ggml_tensor * src0 = dst->src[0];   // full [n_embd, n_ff, E] resident expert tensor
++    const ggml_tensor * src1 = dst->src[1];
++    const ggml_tensor * ids  = dst->src[2];
++    const int   E  = (int) src0->ne[2];
++    const size_t be = src0->nb[2];
++    static int W = [](){const char*s=getenv("TEMPORAL_PREFILL_WAVE_W");return s?atoi(s):96;}();
++    const int nwaves = (E + W - 1) / W;
++    const int k = (int) ids->ne[0], nt = (int) ids->ne[1];
++
++    std::vector<char> ids_host(ggml_nbytes(ids));
++    CUDA_CHECK(cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, ctx.stream()));
++    CUDA_CHECK(cudaStreamSynchronize(ctx.stream()));
++
++    ggml_cuda_pool_alloc<int32_t> ids_wave_dev(ctx.pool(), (size_t)k*nt);
++    std::vector<int32_t> idw((size_t)k*nt);
++
++    for (int w = 0; w < nwaves; ++w) {
++        const int lo = w*W, hi = (lo+W < E ? lo+W : E), Wc = hi-lo;
++        for (int t = 0; t < nt; ++t)
++            for (int j = 0; j < k; ++j) {
++                int e = *(const int32_t*)(ids_host.data() + (size_t)t*ids->nb[1] + (size_t)j*ids->nb[0]);
++                idw[(size_t)t*k+j] = (e >= lo && e < hi) ? (e - lo) : 0;   // in-wave -> local slot; else clamp
++            }
++        CUDA_CHECK(cudaMemcpyAsync(ids_wave_dev.ptr, idw.data(), (size_t)k*nt*sizeof(int32_t), cudaMemcpyHostToDevice, ctx.stream()));
++
++        ggml_tensor src0_wave = *src0;
++        src0_wave.ne[2] = Wc; src0_wave.ne[3] = 1;
++        src0_wave.op = GGML_OP_VIEW; src0_wave.view_src = dst->src[0]; src0_wave.buffer = src0->buffer;
++        // TIMING PROTOTYPE: a wave-view ending at the last expert over-reads past the tensor buffer (mmq tile
++        // slack) -> crash; so for any boundary-touching wave read an in-bounds slice instead. Output is
++        // garbage regardless (overwrite prototype); the kernel dims/cost are identical, which is all we time.
++        const int lo_data = (lo + W < E) ? lo : 0;
++        src0_wave.data = (char*)src0->data + (size_t)lo_data*be;
++
++        ggml_tensor ids_wave = *ids;
++        ids_wave.nb[0] = sizeof(int32_t); ids_wave.nb[1] = (size_t)k*sizeof(int32_t);
++        ids_wave.data = ids_wave_dev.ptr;
++
++        ggml_cuda_mul_mat_q(ctx, &src0_wave, src1, &ids_wave, dst);   // stock fused mul_mat_id, OVERWRITES dst
++        CUDA_CHECK(cudaGetLastError());
++    }
++    static int announced=0; if(!announced++) fprintf(stderr,"[temporal-prefill] WAVE-MMID resident PROTOTYPE: E=%d W=%d nwaves=%d nt=%d k=%d (timing-only, dst overwritten)\n", E,W,nwaves,nt,k);
++}
++
++// ===== EXPERT-MAJOR STREAMING PREFILL (v2) =====
++// src0 is a registered R-slot tensor (only R experts fit in VRAM), but the ubatch selects up to E distinct
++// experts. Counting-sort the ubatch rows by expert (O(T*k)), gather src1, then stream each ACTIVE expert
++// once from the host-mapped pool into an independent large VRAM ring while a batch-deep copy/GEMM pipeline
++// (batched contiguous uploads via events) keeps the copy engine saturated ahead of the per-expert GEMMs.
++// Each active expert is uploaded AT MOST ONCE per op. Bit-identical target: the standard mul_mat_id
++// CPU-grouped fallback, differing only in where each expert's weights come from (FP-reorder residual only).
++static void ggml_cuda_temporal_prefill_expertmajor_impl(ggml_backend_cuda_context & ctx, ggml_tensor * dst,
++        void * slot_base, const void * pool_host, size_t be, int E, int R, bool resident) {
++    const ggml_tensor * src0 = dst->src[0];
++    const ggml_tensor * src1 = dst->src[1];
++    const ggml_tensor * ids  = dst->src[2];
++
++    GGML_TENSOR_BINARY_OP_LOCALS
++
++    cudaStream_t stream = ctx.stream();
++    static int serial = [](){const char*s=getenv("TEMPORAL_PREFILL_SERIAL");return s?atoi(s):0;}();
++    cudaStream_t copy_s = serial ? stream : ggml_cuda_temporal_copy_stream();
++
++    const ggml_type type_src1_sorted = (src0->type == GGML_TYPE_F16 && !fast_fp16_hardware_available(ggml_cuda_info().devices[ggml_cuda_get_device()].cc))
++        || ggml_is_quantized(src0->type) ? GGML_TYPE_F32 : src0->type;
++    const ggml_type type_dst_sorted  = GGML_TYPE_F32;
++    const size_t ts_src1_sorted = ggml_type_size(type_src1_sorted);
++    const size_t ts_dst_sorted  = ggml_type_size(type_dst_sorted);
++
++    const int64_t n_expert_used = ids->ne[0];
++    const int64_t ne_get_rows   = ne12 * n_expert_used;
++
++    // SKIPSEED (env TEMPORAL_PREFILL_SKIPSEED=1): the registered decode R-slot base holds experts 0..R-1,
++    // seeded at load and NOT swapped during prefill (this path bypasses the decode residency machinery), so
++    // for those experts we can GEMM straight from slot_base and skip re-uploading R/E of the pool bytes.
++    static int skipseed = [](){const char*s=getenv("TEMPORAL_PREFILL_SKIPSEED");return s?atoi(s):0;}();
++
++    ggml_cuda_pool_alloc<int32_t> ids_buf_dev(ctx.pool(), 2*ne_get_rows);
++    ggml_cuda_pool_alloc<char> src1_sorted(ctx.pool(), ne12*n_expert_used*ne10*ts_src1_sorted);
++    ggml_cuda_pool_alloc<char>  dst_sorted(ctx.pool(), ne2 *n_expert_used* ne0*ts_dst_sorted);
++
++    std::vector<char> ids_host(ggml_nbytes(ids));
++    CUDA_CHECK(cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, stream));
++    CUDA_CHECK(cudaStreamSynchronize(stream));
++
++    // COUNTING-SORT grouping: O(n_tokens * n_expert_used) instead of the O(E * n_tokens * k) reference scan
++    // (which is 56e9 iterations at 16k tokens). Bit-identical layout: within each expert the rows stay in
++    // (token, use) order, exactly as the generic mul_mat_id fallback produces.
++    std::vector<int32_t> tokens_per_expert(E, 0);
++    for (int64_t i12 = 0; i12 < ne12; ++i12)
++        for (int64_t iex = 0; iex < n_expert_used; ++iex)
++            tokens_per_expert[*(const int32_t *)(ids_host.data() + i12*ids->nb[1] + iex*ids->nb[0])]++;
++    std::vector<int32_t> off(E); { int32_t a=0; for (int e=0;e<E;++e){ off[e]=a; a+=tokens_per_expert[e]; } }
++    std::vector<int32_t> ids_to_sorted_host(ne_get_rows), ids_from_sorted_host(ne_get_rows);
++    { std::vector<int32_t> cur(off);
++      for (int64_t i12 = 0; i12 < ne12; ++i12)
++        for (int64_t iex = 0; iex < n_expert_used; ++iex) {
++            int e = *(const int32_t *)(ids_host.data() + i12*ids->nb[1] + iex*ids->nb[0]);
++            int32_t pos = cur[e]++;
++            ids_to_sorted_host[pos] = (int32_t)(i12*ne11 + iex % ne11);
++            ids_from_sorted_host[i12*n_expert_used + iex] = pos;
++        } }
++
++    std::vector<int32_t> ids_both; ids_both.reserve(2*ne_get_rows);
++    ids_both.insert(ids_both.end(), ids_to_sorted_host.begin(), ids_to_sorted_host.end());
++    ids_both.insert(ids_both.end(), ids_from_sorted_host.begin(), ids_from_sorted_host.end());
++    CUDA_CHECK(cudaMemcpyAsync(ids_buf_dev.ptr, ids_both.data(), 2*ne_get_rows*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
++    CUDA_CHECK(cudaStreamSynchronize(stream));
++
++    const int32_t * ids_to_sorted   = ids_buf_dev.ptr + 0*ne_get_rows;
++    const int32_t * ids_from_sorted = ids_buf_dev.ptr + 1*ne_get_rows;
++
++    get_rows_cuda(src1->data, src1->type, ids_to_sorted, src1_sorted.ptr, type_src1_sorted,
++        ne10, nb11, nb12, nb13,
++        ne_get_rows, 1, 1, sizeof(int32_t), ne_get_rows*sizeof(int32_t), ne_get_rows*sizeof(int32_t),
++        ne10*ts_src1_sorted, ne_get_rows*ne10*ts_src1_sorted, ne_get_rows*ne10*ts_src1_sorted, stream);
++    CUDA_CHECK(cudaGetLastError());
++
++    // active experts in ascending id order (matches src1_sorted grouping).
++    std::vector<int> active; active.reserve(E);
++    std::vector<size_t> grp_off_src1(E), grp_off_dst(E);
++    { size_t os1=0, od=0;
++      for (int e = 0; e < E; ++e) if (tokens_per_expert[e] > 0) {
++          grp_off_src1[active.size()] = os1; grp_off_dst[active.size()] = od;
++          os1 += (size_t)tokens_per_expert[e]*ne10*ts_src1_sorted;
++          od  += (size_t)tokens_per_expert[e]*ne0 *ts_dst_sorted;
++          active.push_back(e);
++      } }
++    const int n_active = (int) active.size();
++
++    // ---- streaming ring (independent of the decode R slots; shared across all ops/layers) ----
++    // A large VRAM ring is filled by the copy engine running ahead of the compute pointer. Uploads are
++    // BATCHED: a run of consecutive-id active experts is one contiguous cudaMemcpyAsync (they are contiguous
++    // in the host pool), which amortises per-copy launch/event overhead and reaches full PCIe bandwidth. At
++    // 16k every expert is active, so the whole batch is one contiguous transfer. The pipeline is batch-deep:
++    // batch b's GEMMs wait its upload; batch b's slots are refilled (batch b+NBATCH) only after b's GEMMs.
++    static int BSZ    = [](){const char*s=getenv("TEMPORAL_PREFILL_BSZ");   return s?atoi(s):8;}();
++    static int NBATCH = [](){const char*s=getenv("TEMPORAL_PREFILL_NBATCH");return s?atoi(s):12;}();
++    static int nocopy = [](){const char*s=getenv("TEMPORAL_PREFILL_NOCOPY");return s?atoi(s):0;}();
++    const int nslots = BSZ * NBATCH;
++    // The ring is a real ggml tensor [ne0,ne1,nslots] of src0's type in a CUDA buffer -- exactly the shape
++    // of the ceiling's R-slot tensor, just deeper. (A raw cudaMalloc/backend buffer of the same bytes makes
++    // mmq produce NaN: its allocation lacks the row/tile padding a ggml tensor's buffer reserves, so mmq's
++    // tile over-read faults into garbage.) Cached per (type, ne0, ne1); gate/up/down each get their own.
++    struct ring_t { ggml_context* c; ggml_backend_buffer_t buf; ggml_tensor* t; };
++    static std::vector<ring_t> g_rings;
++    ggml_tensor* ring = nullptr;  void* g_ring = nullptr;
++    if (!resident) {   // CONTROL D reads experts straight from resident src0 -> no ring, no upload
++        for (auto& r : g_rings) if (r.t->type==src0->type && r.t->ne[0]==ne00 && r.t->ne[1]==ne01) { ring = r.t; break; }
++        if (!ring) {
++            ggml_init_params ip{ ggml_tensor_overhead()*2, nullptr, true };
++            ggml_context* c = ggml_init(ip);
++            ggml_tensor* t = ggml_new_tensor_3d(c, src0->type, ne00, ne01, nslots);
++            ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(c, ggml_backend_cuda_buffer_type(ctx.device));
++            GGML_ASSERT(buf);
++            CUDA_CHECK(cudaMemset(t->data, 0, ggml_backend_buffer_get_size(buf)));   // valid (zero) quant in over-read region
++            g_rings.push_back({c, buf, t}); ring = t;
++        }
++        g_ring = ring->data;
++        GGML_ASSERT((size_t) ring->nb[2] == be);   // slot stride must equal the host-pool per-expert stride
++    }
++    static std::vector<cudaEvent_t> ev_copy, ev_gemm;
++    if ((int) ev_copy.size() < NBATCH) {
++        ev_copy.resize(NBATCH); ev_gemm.resize(NBATCH);
++        for (int i = 0; i < NBATCH; ++i) { cudaEventCreateWithFlags(&ev_copy[i], cudaEventDisableTiming); cudaEventCreateWithFlags(&ev_gemm[i], cudaEventDisableTiming); }
++    }
++    const int n_batches = (n_active + BSZ - 1) / BSZ;
++
++    auto upload_batch = [&](int b) {
++        const int p0 = b*BSZ, p1 = (p0+BSZ < n_active ? p0+BSZ : n_active);
++        const int bi = b % NBATCH, dst0 = bi*BSZ;
++        // this slot range was last written/read by the previous batch that mapped here (this op OR the prior
++        // op); wait its GEMMs before overwriting. ev_gemm are static across ops so cross-op reuse is safe;
++        // never-recorded events (first op) are already-complete -> no-op.
++        CUDA_CHECK(cudaStreamWaitEvent(copy_s, ev_gemm[bi], 0));
++        if (!nocopy) {
++            int i = 0;
++            while (i < p1-p0) {                        // split into maximal consecutive-id runs -> 1 memcpy each
++                if (skipseed && active[p0+i] < R) { i++; continue; }   // seed-resident: no upload
++                int run = 1;
++                while (i+run < p1-p0 && active[p0+i+run] == active[p0+i]+run
++                       && !(skipseed && active[p0+i+run] < R)) run++;
++                CUDA_CHECK(cudaMemcpyAsync((char*)g_ring + (size_t)(dst0+i)*be,
++                                           (const char*)pool_host + (size_t)active[p0+i]*be, (size_t)run*be,
++                                           cudaMemcpyHostToDevice, copy_s));
++                i += run;
++            }
++        }
++        CUDA_CHECK(cudaEventRecord(ev_copy[bi], copy_s));
++    };
++
++    if (!resident) for (int b = 0; b < NBATCH && b < n_batches; ++b) upload_batch(b);   // prime
++
++    for (int b = 0; b < n_batches; ++b) {
++        const int bi = b % NBATCH, p0 = b*BSZ, p1 = (p0+BSZ < n_active ? p0+BSZ : n_active);
++        if (!resident) CUDA_CHECK(cudaStreamWaitEvent(stream, ev_copy[bi], 0));     // this batch's GEMMs wait its upload
++        for (int p = p0; p < p1; ++p) {
++            const int e = active[p], slot = bi*BSZ + (p - p0);
++            ggml_tensor src0_slice = *src0;
++            src0_slice.ne[2]=1; src0_slice.nb[3]=src0_slice.nb[2];
++            if (resident) {            // CONTROL D: expert e is already resident in the full src0 tensor
++                src0_slice.op=GGML_OP_VIEW; src0_slice.view_src=dst->src[0]; src0_slice.buffer=src0->buffer;
++                src0_slice.data = (char*)src0->data + (size_t)e*be;
++            } else if (skipseed && e < R) {   // read straight from the seed-resident decode slot; no upload/ring
++                src0_slice.op=GGML_OP_VIEW; src0_slice.view_src=dst->src[0]; src0_slice.buffer=src0->buffer;
++                src0_slice.data = (char*)slot_base + (size_t)e*be;
++            } else {
++                src0_slice.op=GGML_OP_VIEW; src0_slice.view_src=ring; src0_slice.buffer=ring->buffer;
++                src0_slice.data = (char*)g_ring + (size_t)slot*be;
++            }
++
++            ggml_tensor src1_slice; memset(&src1_slice,0,sizeof(src1_slice));
++            src1_slice.buffer=src1->buffer; src1_slice.type=type_src1_sorted;
++            src1_slice.ne[0]=ne10; src1_slice.ne[1]=tokens_per_expert[e]; src1_slice.ne[2]=1; src1_slice.ne[3]=1;
++            src1_slice.nb[0]=ts_src1_sorted; src1_slice.nb[1]=src1_slice.ne[0]*src1_slice.nb[0];
++            src1_slice.nb[2]=src1_slice.ne[1]*src1_slice.nb[1]; src1_slice.nb[3]=src1_slice.ne[2]*src1_slice.nb[2];
++            src1_slice.data=(char*)src1_sorted.ptr + grp_off_src1[p];
++
++            ggml_tensor dst_slice; memset(&dst_slice,0,sizeof(dst_slice));
++            dst_slice.buffer=dst->buffer; dst_slice.type=type_dst_sorted;
++            dst_slice.ne[0]=ne0; dst_slice.ne[1]=tokens_per_expert[e]; dst_slice.ne[2]=1; dst_slice.ne[3]=1;
++            dst_slice.nb[0]=ts_dst_sorted; dst_slice.nb[1]=dst_slice.ne[0]*dst_slice.nb[0];
++            dst_slice.nb[2]=dst_slice.ne[1]*dst_slice.nb[1]; dst_slice.nb[3]=dst_slice.ne[2]*dst_slice.nb[2];
++            dst_slice.data=(char*)dst_sorted.ptr + grp_off_dst[p];
++
++            // same kernel as the ceiling's batched mul_mat_id (mmq for quantized) -> minimal FP divergence.
++            if (ggml_is_quantized(src0->type)) ggml_cuda_mul_mat_q(ctx, &src0_slice, &src1_slice, nullptr, &dst_slice);
++            else                               ggml_cuda_mul_mat  (ctx, &src0_slice, &src1_slice, &dst_slice);
++            CUDA_CHECK(cudaGetLastError());
++        }
++        if (!resident) {
++            CUDA_CHECK(cudaEventRecord(ev_gemm[bi], stream));
++            const int nb = b + NBATCH;                              // refill these slots for a future batch
++            if (nb < n_batches) upload_batch(nb);                   // upload_batch waits this slot's GEMM first
++        }
++    }
++
++    get_rows_cuda(dst_sorted.ptr, type_dst_sorted, ids_from_sorted, dst->data, dst->type,
++        ne0, ne0*ts_dst_sorted, ne_get_rows*ne0*ts_dst_sorted, ne_get_rows*ne0*ts_dst_sorted,
++        ne_get_rows, 1, 1, sizeof(int32_t), ne_get_rows*sizeof(int32_t), ne_get_rows*sizeof(int32_t),
++        nb1, nb2, nb3, stream);
++    CUDA_CHECK(cudaGetLastError());
++
++    // cheap upload accounting: total experts uploaded across all ops of this ubatch (per-op = n_active minus
++    // seed-skips). Reset+report once per ubatch via a static that the first op of each ubatch prints.
++    static long g_uploads = 0; static int g_ncalls = 0;
++    if (!resident) { int up = n_active; if (skipseed) { up=0; for (int e : active) if (e>=R) up++; } g_uploads += up; g_ncalls++; }
++    if (getenv("TEMPORAL_PREFILL_COUNT") && g_ncalls && (g_ncalls % 144 == 0)) {   // 48 layers x 3 ops = 144 ops/ubatch
++        fprintf(stderr, "[temporal-prefill] uploads: %ld expert-loads over %d ops (=%d ubatch(es), ~%.1f loads/op)\n",
++                g_uploads, g_ncalls, g_ncalls/144, (double)g_uploads/g_ncalls);
++    }
++    static int announced = 0;
++    if (!announced++) {
++        fprintf(stderr, "[temporal-prefill] EXPERT-MAJOR STREAMING v2: n_tokens=%d k=%d active=%d/%d "
++                        "ring=%d slots (%d batches x %d), be=%zuKB\n",
++                (int) ne12, (int) n_expert_used, n_active, E, nslots, NBATCH, BSZ, be/1024);
++    }
++}
++
 +static void ggml_cuda_mul_mat_id_impl(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
      const ggml_tensor * src0 = dst->src[0];
      const ggml_tensor * src1 = dst->src[1];
      const ggml_tensor * ids  = dst->src[2];
-@@ -1782,6 +1791,24 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
+@@ -1782,6 +2056,53 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
  
      const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
  
++    // Phase-3b UNIFIED + EXPERT-MAJOR STREAMING PREFILL (env TEMPORAL_PREFILL=expertmajor): for a prefill
++    // ubatch (ne2 = n_tokens > 1) the per-token decode swap machinery is wrong/OOB (it can only hold R
++    // active experts). Instead group the ubatch by expert and stream each active expert once through the R
++    // slots. Decode (ne2==1) is left on the original remap path below, unchanged.
++    if (ggml_cuda_temporal_unified() && ggml_cuda_temporal_prefill_expertmajor()
++            && ids != nullptr && ids->type == GGML_TYPE_I32 && ne2 > 1) {
++        void* slot_base=nullptr; const void* pool_host=nullptr; size_t be=0; int E=0, R=0;
++        if (ggml_cuda_temporal_slotinfo(src0->data, &slot_base, &pool_host, &be, &E, &R)) {
++            ggml_cuda_temporal_prefill_expertmajor_impl(ctx, dst, slot_base, pool_host, be, E, R, /*resident=*/false);
++            return;
++        }
++    }
++    // WAVE-MMID prototype (TEMPORAL_PREFILL=wavemmid, run WITHOUT -ncmoe): fused mul_mat_id per wave of W
++    // resident experts. Timing-only (overwrites dst). Isolates whether ceil(E/W) fused kernels beat 192 GEMMs.
++    { static int wavemmid=[](){const char*s=getenv("TEMPORAL_PREFILL");return (s&&strcmp(s,"wavemmid")==0)?1:0;}();
++      if (wavemmid && ids && ids->type==GGML_TYPE_I32 && ne2>1 && ggml_is_quantized(src0->type) && src0->ne[2] > 1) {
++          ggml_cuda_temporal_prefill_wavemmid_resident(ctx, dst);
++          return;
++      } }
++    // CONTROL config D (TEMPORAL_PREFILL_RESIDENT=1, run WITHOUT -ncmoe so src0 is the full E-expert VRAM
++    // tensor): run the exact expert-major kernel (counting-sort + per-expert GEMM + scatter) reading each
++    // expert straight from resident src0 -> ZERO host->device upload. Isolates kernel effect from streaming.
++    { static int resident=[](){const char*s=getenv("TEMPORAL_PREFILL_RESIDENT");return s?atoi(s):0;}();
++      if (resident && ggml_cuda_temporal_prefill_expertmajor() && ids && ids->type==GGML_TYPE_I32 && ne2>1
++              && ggml_is_quantized(src0->type) && src0->ne[2] > 1) {
++          ggml_cuda_temporal_prefill_expertmajor_impl(ctx, dst, nullptr, nullptr, src0->nb[2], (int)src0->ne[2], 0, /*resident=*/true);
++          return;
++      } }
++
 +    // Phase-3b UNIFIED: if src0 is a registered R-slot expert tensor, remap the selected-expert ids
 +    // [0,n_expert) -> slot [0,R) before the GEMM (so the mmvq indexes the R-slot VRAM tensor validly).
 +    ggml_tensor tu_ids_tensor;
@@ -59,7 +353,7 @@ index 98816f8..169546c 100644
      // [TAG_MUL_MAT_ID_CUDA_GRAPHS]
      if (src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
          static_assert(MMVQ_MAX_BATCH_SIZE == MMVF_MAX_BATCH_SIZE);
-@@ -1927,6 +1954,12 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
+@@ -1927,6 +2248,12 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
          nb1, nb2, nb3, stream);
  }
  
@@ -72,7 +366,7 @@ index 98816f8..169546c 100644
  static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct ggml_tensor * dst) {
      switch (dst->op) {
          case GGML_OP_ARGMAX:
-@@ -3942,6 +3975,9 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
+@@ -3942,6 +4269,9 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
  
              CUDA_CHECK(cudaStreamEndCapture(cuda_ctx->stream(), &graph->graph));
              graph_evaluated_or_captured = true; // CUDA graph has been captured
@@ -82,7 +376,7 @@ index 98816f8..169546c 100644
  
              std::lock_guard<std::mutex> lock(ggml_cuda_lock);
              if (ggml_cuda_lock_counter.fetch_sub(1, std::memory_order_relaxed) == 1) {
-@@ -3961,6 +3997,8 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
+@@ -3961,6 +4291,8 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
              ggml_cuda_graph_update_executable(cuda_ctx, graph_key);
          }
          // Launch graph
@@ -93,12 +387,13 @@ index 98816f8..169546c 100644
          GGML_UNUSED(graph_key);
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
 new file mode 100644
-index 0000000..dc44866
+index 0000000..ebe565e
 --- /dev/null
 +++ b/ggml/src/ggml-cuda/temporal.cu
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,256 @@
 +#include "temporal.cuh"
 +#include <cstdlib>
++#include <cstring>
 +
 +// ================= Phase-3b UNIFIED: ON-DEVICE residency + graph-capturable swap ===============
 +// Everything the swap needs is on-device with FIXED buffer pointers: the CPU pool is host-registered
@@ -110,6 +405,7 @@ index 0000000..dc44866
 +#include <vector>
 +struct TU {
 +    const uint8_t* pool_dev[3] = {nullptr,nullptr,nullptr};   // host-mapped device ptr of the CPU pool
++    const uint8_t* pool_host[3]= {nullptr,nullptr,nullptr};   // host ptr of the mapped CPU pool (prefill prefetch)
 +    uint8_t*       slot[3]     = {nullptr,nullptr,nullptr};    // device R-slot base
 +    size_t         be[3]       = {0,0,0};
 +    int            E=0, R=0, ready=0, primed=0;   // primed: router-early prime issued this layer (capture-time)
@@ -158,6 +454,7 @@ index 0000000..dc44866
 +    void* pdev = nullptr;
 +    cudaHostGetDevicePointer(&pdev, mapped, 0);
 +    L.pool_dev[which] = (const uint8_t*)pdev;
++    L.pool_host[which] = (const uint8_t*)mapped;
 +    L.slot[which] = (uint8_t*)rslot_data; L.be[which] = bytes_per_expert; L.E=n_expert; L.R=R;
 +    if (!L.ready) {
 +        std::vector<int> hs(R), hl(n_expert,-1);
@@ -329,12 +626,33 @@ index 0000000..dc44866
 +    *ids_out_ptr = L.remap_ids;
 +    return is_prime ? 2 : 1;   // 2 = prime: caller skips the expert GEMM (copy already issued)
 +}
++
++// ===== EXPERT-MAJOR STREAMING PREFILL support =====
++int ggml_cuda_temporal_prefill_expertmajor() {
++    static int v=[](){const char*s=getenv("TEMPORAL_PREFILL"); return (s && strcmp(s,"expertmajor")==0)?1:0;}();
++    return v;
++}
++int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
++                                size_t* bytes_per_expert, int* n_expert, int* R) {
++    auto it = g_tptr.find(src0_data); if (it==g_tptr.end()) return 0;
++    TU& L = g_L[it->second.first]; int which = it->second.second;
++    if (slot_base)       *slot_base       = L.slot[which];
++    if (pool_host)       *pool_host       = L.pool_host[which];
++    if (bytes_per_expert)*bytes_per_expert= L.be[which];
++    if (n_expert)        *n_expert        = L.E;
++    if (R)               *R               = L.R;
++    return 1;
++}
++cudaStream_t ggml_cuda_temporal_copy_stream() {
++    if (!g_copy) cudaStreamCreateWithFlags(&g_copy, cudaStreamNonBlocking);
++    return g_copy;
++}
 diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
 new file mode 100644
-index 0000000..526bfb3
+index 0000000..54ee400
 --- /dev/null
 +++ b/ggml/src/ggml-cuda/temporal.cuh
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,26 @@
 +#pragma once
 +#include "common.cuh"
 +
@@ -349,6 +667,18 @@ index 0000000..526bfb3
 +                                 int n_expert, int R, int layer, int which /*0=gate,1=up,2=down*/);
 +extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int32_t* ids_in, int32_t** ids_out_ptr,
 +                                                int n_used, int n_tokens, int stride1, cudaStream_t stream);
++
++// ===== EXPERT-MAJOR STREAMING PREFILL (env TEMPORAL_PREFILL=expertmajor) =====
++// prefill (n_tokens>1) path: group ubatch rows by expert, stream each ACTIVE expert once through the R
++// VRAM slots (double-buffered on the copy stream), one batched GEMM per expert. Decode (n_tokens==1) is
++// untouched. Returns 1 iff env TEMPORAL_PREFILL == "expertmajor".
++int ggml_cuda_temporal_prefill_expertmajor();
++// per-(layer,which) slot/pool geometry for a registered R-slot tensor. Returns 0 if src0_data is not a
++// registered slot tensor (fall back to the normal path). *pool_host is the host-mapped expert pool.
++int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
++                                size_t* bytes_per_expert, int* n_expert, int* R);
++// shared copy stream used for the swap machinery (reused for prefill weight prefetch).
++cudaStream_t ggml_cuda_temporal_copy_stream();
 diff --git a/src/llama-model.cpp b/src/llama-model.cpp
 index adacf70..792284f 100644
 --- a/src/llama-model.cpp

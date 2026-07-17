@@ -137,3 +137,23 @@ The hard engineering problems, so the next person doesn't re-derive them:
   kernels), `temporal.cuh`, `ggml-cuda.cu` (mul_mat_id hook + fusion-disable), `llama-model.cpp`
   (R-slot registration), `models/qwen3moe.cpp` (pre-attention router prime).
 - `temporal.cu`, `temporal.cuh` — readable copies of the two wholly-custom files.
+
+## Prefill kernels (2026-07 update)
+
+`systems_bench.patch` now also contains the **prefill** work (expert-major streaming, config-D
+control, ubatch handling), not just decode. Apply to `llama.cpp` at base commit **`0badc06`**
+(`git apply systems_bench.patch`), sm_86, `GGML_CUDA=ON`, `Release`. Verified to apply cleanly.
+
+Env knobs added by the patch (all default-off; decode path unchanged for `n_tokens==1`):
+- `TEMPORAL_PREFILL=expertmajor` — expert-major streaming prefill (counting-sort group by expert,
+  per-expert batched GEMM streamed through a ring, scatter). The deployable low-VRAM path.
+- `TEMPORAL_PREFILL_RESIDENT=1` — config-D control: same kernel, all experts resident, zero upload
+  (isolates kernel effect from streaming cost).
+- `TEMPORAL_PREFILL_SKIPSEED=1` — skip re-streaming the R already-resident experts.
+- `TEMPORAL_PREFILL=wavemmid` — wave-batched `mul_mat_id` prototype (timing-only; documented NO-GO
+  with the stock kernel, see paper Appendix / results/ablations/serving_benchmarks.csv notes).
+- `TEMPORAL_PREFILL_COUNT=1`, `_SERIAL=1`, `_NOCOPY=1` — diagnostics.
+
+Measured numbers: `results/ablations/serving_benchmarks.csv`. Fork base = `0badc06`; the a6000 fork's
+local commit chain was `2cb4175` (v1) -> `13cc828` (v2) -> `fb0e979` (D) -> `5c2f7b2` (skipseed) ->
+`1896afb` (wavemmid) -> `8fa7937` (counter) -> `6094183` (matched-ub sweep).

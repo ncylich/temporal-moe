@@ -12,3 +12,15 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host, 
                                  int n_expert, int R, int layer, int which /*0=gate,1=up,2=down*/);
 extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int32_t* ids_in, int32_t** ids_out_ptr,
                                                 int n_used, int n_tokens, int stride1, cudaStream_t stream);
+
+// ===== EXPERT-MAJOR STREAMING PREFILL (env TEMPORAL_PREFILL=expertmajor) =====
+// prefill (n_tokens>1) path: group ubatch rows by expert, stream each ACTIVE expert once through the R
+// VRAM slots (double-buffered on the copy stream), one batched GEMM per expert. Decode (n_tokens==1) is
+// untouched. Returns 1 iff env TEMPORAL_PREFILL == "expertmajor".
+int ggml_cuda_temporal_prefill_expertmajor();
+// per-(layer,which) slot/pool geometry for a registered R-slot tensor. Returns 0 if src0_data is not a
+// registered slot tensor (fall back to the normal path). *pool_host is the host-mapped expert pool.
+int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
+                                size_t* bytes_per_expert, int* n_expert, int* R);
+// shared copy stream used for the swap machinery (reused for prefill weight prefetch).
+cudaStream_t ggml_cuda_temporal_copy_stream();
