@@ -1,5 +1,5 @@
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 98816f8..3b5ad76 100644
+index 98816f8..de55375 100644
 --- a/ggml/src/ggml-cuda/ggml-cuda.cu
 +++ b/ggml/src/ggml-cuda/ggml-cuda.cu
 @@ -53,6 +53,7 @@
@@ -25,7 +25,7 @@ index 98816f8..3b5ad76 100644
      const bool has_bias = ffn_up_bias != nullptr || ffn_gate_bias != nullptr;
      const bool has_scale = ffn_up_scale != nullptr || ffn_gate_scale != nullptr;
  
-@@ -1770,7 +1779,201 @@ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor
+@@ -1770,7 +1779,234 @@ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor
      ggml_cuda_mul_mat_cublas(ctx, src0, src1, dst);
  }
  
@@ -67,19 +67,52 @@ index 98816f8..3b5ad76 100644
 +    CUDA_CHECK(cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, stream));
 +    CUDA_CHECK(cudaStreamSynchronize(stream));
 +
-+    // COUNTING-SORT grouping: O(n_tokens * n_expert_used) instead of the O(E * n_tokens * k) reference scan
-+    // (which is 56e9 iterations at 16k tokens). Bit-identical layout: within each expert the rows stay in
-+    // (token, use) order, exactly as the generic mul_mat_id fallback produces.
++    // TEMPORAL RESIDENCY MASK (DEFAULT): the temporal model is trained with the rolling-residency constraint
++    // applied at EVERY token position, so prefill must apply it too (else it builds a KV cache the model was
++    // never trained on, inconsistent with decode). Sequentially over the token axis, evolve a resident set of
++    // R=k slots with <=1 swap/token using the SAME index-based nominee/victim policy as the decode kernel
++    // (k_residency force1: nominee = lowest-index selected non-resident expert; victim = lowest-index
++    // evictable slot), then mask each token's selection to its resident set -- a selected expert that is not
++    // resident computes over slot-0's expert, exactly as decode's remap maps non-resident ids -> slot 0.
++    // Weights are untouched (applied downstream by the router), consistent with decode. Opt-out for the
++    // full-vs-temporal comparison: TEMPORAL_PREFILL_FULLMOE=1 (raw top-k = full-MoE); config-D (resident)
++    // is also full-MoE (it is the kernel-effect control vs the full-MoE ceiling).
++    static int fullmoe = [](){const char*s=getenv("TEMPORAL_PREFILL_FULLMOE");return s?atoi(s):0;}();
++    const bool apply_mask = !resident && !fullmoe;
++    const int k = (int) n_expert_used, Rres = (int) n_expert_used;   // resident-set size == k for this model
++    std::vector<int32_t> masked((size_t)ne12*k);
++    if (!apply_mask) {
++        for (int64_t t=0;t<ne12;++t) for (int j=0;j<k;++j)
++            masked[t*k+j] = *(const int32_t*)(ids_host.data()+t*ids->nb[1]+(size_t)j*ids->nb[0]);
++    } else {
++        std::vector<int> resident(Rres), loc(E,-1);
++        for (int s=0;s<Rres;++s){ resident[s]=s; loc[s]=s; }   // seed: experts 0..R-1 resident (matches k_residency init)
++        std::vector<uint8_t> seltok(E,0); std::vector<int> raw(k);
++        long n_masked=0;
++        for (int64_t t=0;t<ne12;++t){
++            for (int j=0;j<k;++j) raw[j] = *(const int32_t*)(ids_host.data()+t*ids->nb[1]+(size_t)j*ids->nb[0]);
++            for (int j=0;j<k;++j) seltok[raw[j]]=1;
++            int nominee=E; for (int j=0;j<k;++j){ int e=raw[j]; if(loc[e]<0 && e<nominee) nominee=e; }   // lowest-idx selected non-resident
++            int victim=Rres; for (int s=0;s<Rres;++s){ if(!seltok[resident[s]]){ victim=s; break; } }    // lowest-idx evictable slot
++            if (nominee<E && victim<Rres){ int old=resident[victim]; loc[old]=-1; resident[victim]=nominee; loc[nominee]=victim; }  // <=1 swap
++            for (int j=0;j<k;++j){ int e=raw[j]; if(loc[e]>=0) masked[t*k+j]=e; else { masked[t*k+j]=resident[0]; ++n_masked; } }
++            for (int j=0;j<k;++j) seltok[raw[j]]=0;
++        }
++        static int announced2=0; if(!announced2++) fprintf(stderr,"[temporal-prefill] RESIDENCY-MASKED temporal prefill: R=%d E=%d; first op masked %ld/%ld selections to the resident set (verified subset)\n", Rres, E, n_masked, (long)ne12*k);
++    }
++
++    // COUNTING-SORT grouping over the (masked) selections: O(n_tokens * n_expert_used). Bit-identical layout:
++    // within each expert the rows stay in (token, use) order, exactly as the generic mul_mat_id fallback.
 +    std::vector<int32_t> tokens_per_expert(E, 0);
 +    for (int64_t i12 = 0; i12 < ne12; ++i12)
 +        for (int64_t iex = 0; iex < n_expert_used; ++iex)
-+            tokens_per_expert[*(const int32_t *)(ids_host.data() + i12*ids->nb[1] + iex*ids->nb[0])]++;
++            tokens_per_expert[masked[i12*n_expert_used + iex]]++;
 +    std::vector<int32_t> off(E); { int32_t a=0; for (int e=0;e<E;++e){ off[e]=a; a+=tokens_per_expert[e]; } }
 +    std::vector<int32_t> ids_to_sorted_host(ne_get_rows), ids_from_sorted_host(ne_get_rows);
 +    { std::vector<int32_t> cur(off);
 +      for (int64_t i12 = 0; i12 < ne12; ++i12)
 +        for (int64_t iex = 0; iex < n_expert_used; ++iex) {
-+            int e = *(const int32_t *)(ids_host.data() + i12*ids->nb[1] + iex*ids->nb[0]);
++            int e = masked[i12*n_expert_used + iex];
 +            int32_t pos = cur[e]++;
 +            ids_to_sorted_host[pos] = (int32_t)(i12*ne11 + iex % ne11);
 +            ids_from_sorted_host[i12*n_expert_used + iex] = pos;
@@ -228,7 +261,7 @@ index 98816f8..3b5ad76 100644
      const ggml_tensor * src0 = dst->src[0];
      const ggml_tensor * src1 = dst->src[1];
      const ggml_tensor * ids  = dst->src[2];
-@@ -1782,6 +1985,44 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
+@@ -1782,6 +2018,44 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
  
      const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
  
@@ -273,7 +306,7 @@ index 98816f8..3b5ad76 100644
      // [TAG_MUL_MAT_ID_CUDA_GRAPHS]
      if (src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
          static_assert(MMVQ_MAX_BATCH_SIZE == MMVF_MAX_BATCH_SIZE);
-@@ -1927,6 +2168,12 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
+@@ -1927,6 +2201,12 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor *
          nb1, nb2, nb3, stream);
  }
  
@@ -286,7 +319,7 @@ index 98816f8..3b5ad76 100644
  static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct ggml_tensor * dst) {
      switch (dst->op) {
          case GGML_OP_ARGMAX:
-@@ -3942,6 +4189,9 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
+@@ -3942,6 +4222,9 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
  
              CUDA_CHECK(cudaStreamEndCapture(cuda_ctx->stream(), &graph->graph));
              graph_evaluated_or_captured = true; // CUDA graph has been captured
@@ -296,7 +329,7 @@ index 98816f8..3b5ad76 100644
  
              std::lock_guard<std::mutex> lock(ggml_cuda_lock);
              if (ggml_cuda_lock_counter.fetch_sub(1, std::memory_order_relaxed) == 1) {
-@@ -3961,6 +4211,8 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
+@@ -3961,6 +4244,8 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
              ggml_cuda_graph_update_executable(cuda_ctx, graph_key);
          }
          // Launch graph
