@@ -44,12 +44,15 @@ def panel(ax, tps_A, tps_C, title, show_8gb=True):
 
 fig, (axp, axd) = plt.subplots(1, 2, figsize=(7.4, 3.1))
 panel(axp, A_pp, C_pp, "Prefill")
-panel(axd, A_tg, C_tg, "Decode (100-token gen)", show_8gb=False)
-# one shared legend: solid=throughput lines, plus dashed=VRAM note
-h, l = axp.get_legend_handles_labels()
+panel(axd, A_tg, C_tg, "Decode (100-token gen)")
+# legend: method = color, metric = linestyle (kept separate so the dotted 8 GB line reads as VRAM)
 from matplotlib.lines import Line2D
-h += [Line2D([0],[0], color="0.45", ls="--", lw=1.4)]; l += ["peak VRAM (right axis)"]
-fig.legend(h, l, ncol=3, loc="upper center", frameon=False, bbox_to_anchor=(0.5, 1.02))
+handles = [Line2D([0],[0], color=CEIL, lw=2.2),
+           Line2D([0],[0], color=DEPL, lw=2.2),
+           Line2D([0],[0], color="0.25", lw=2.0, ls="-"),
+           Line2D([0],[0], color="0.45", lw=1.6, ls="--")]
+labels  = ["all-resident MoE", "temporal (ours)", "throughput (left axis)", "peak VRAM (right axis)"]
+fig.legend(handles, labels, ncol=4, loc="upper center", frameon=False, bbox_to_anchor=(0.5, 1.03))
 fig.tight_layout(rect=[0,0,1,0.93])
 out = f"{OUT}/serving_context_sweep_nocaption.png"
 fig.savefig(out, dpi=200); print("wrote", out)
