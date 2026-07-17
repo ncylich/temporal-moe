@@ -157,3 +157,16 @@ Env knobs added by the patch (all default-off; decode path unchanged for `n_toke
 Measured numbers: `results/ablations/serving_benchmarks.csv`. Fork base = `0badc06`; the a6000 fork's
 local commit chain was `2cb4175` (v1) -> `13cc828` (v2) -> `fb0e979` (D) -> `5c2f7b2` (skipseed) ->
 `1896afb` (wavemmid) -> `8fa7937` (counter) -> `6094183` (matched-ub sweep).
+
+### Decode/prefill defaults (fork 2447b1a)
+
+`-ncmoe <N> TEMPORAL_UNIFIED=1` alone runs the deployable config: **temporal decode**
+(resident-set + <=1 swap/token, ~160 tok/s / 0.79x the full-MoE ceiling) with copy/compute overlap,
+and **expert-major streaming prefill** (auto for n_tokens>1). No extra flags.
+- <=1-swap temporal decode is DEFAULT-ON. `TEMPORAL_UNIFIED_NOFORCE1=1` -> lazy-full-MoE decode
+  (loads all top-k; used only for the full-vs-temporal comparison; bit-identical to the all-resident
+  ceiling, which PROVES the load/swap/remap/GEMM infra is exact).
+- Overlap DEFAULT-ON (`_NOOVERLAP=1` to disable). `TEMPORAL_PREFILL_RESIDENT=1` = config-D control
+  (all-resident expert-major, no upload; paper-table decomposition only).
+- Prefill computes the full top-k per token (= full MoE, streamed for memory); the temporal
+  <=1-swap mechanism applies at DECODE. Deployment = full-MoE-exact prefill + temporal decode.

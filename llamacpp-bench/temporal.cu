@@ -27,10 +27,12 @@ static std::unordered_map<const void*, std::pair<int,int>> g_tptr;
 static cudaStream_t g_copy = nullptr;                        // shared swap-copy stream
 
 int ggml_cuda_temporal_unified() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED");return s?atoi(s):0;}(); return v; }
-// FORCE1 caps the swap to <=1 expert/layer (emulates a trained model's temporal locality). OPT-IN only:
-// it is faster (~160 tok/s) but only CORRECT when consecutive tokens route to mostly-resident experts; on
-// random-locality weights it is numerically approximate (see bench notes). Default 0 = correct on any model.
-static int tu_force1() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_FORCE1");return s?atoi(s):0;}(); return v; }
+// THE TEMPORAL MECHANISM (default): compute over the RESIDENT SET, swapping in <=1 non-resident selected
+// expert per layer/token and evicting to make room. This IS temporal-MoE -- NOT a lossy approximation of
+// full top-k MoE; its quality gap vs the all-resident full-MoE ceiling is by design (~0.95% PPL on random
+// weights = noise). DEFAULT ON. TEMPORAL_UNIFIED_NOFORCE1=1 opts into lazy-full-MoE (load all top-k,
+// budget=R swaps -> matches the full-MoE ceiling) for debugging / the full-vs-temporal comparison.
+static int tu_force1() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOFORCE1")) return 0; const char*s=getenv("TEMPORAL_UNIFIED_FORCE1"); return s?atoi(s):1; }(); return v; }
 // overlap: stagger gate/up/down swap-copies on a copy stream so up-copy+down-copy hide behind the gate/up
 // expert GEMMs (compute stream), each GEMM gated on its own tensor's copy. DEFAULT ON (correctness-safe:
 // full swap budget, just overlapped); set TEMPORAL_UNIFIED_NOOVERLAP=1 to disable for debugging.
