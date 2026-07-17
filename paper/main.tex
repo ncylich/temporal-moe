@@ -5,7 +5,7 @@
 
 \IfFileExists{neurips_2024.sty}
   {\PassOptionsToPackage{numbers}{natbib}\usepackage[preprint]{neurips_2024}}
-  {\usepackage[hmargin=1in,vmargin=0.75in]{geometry}\usepackage{lmodern}}
+  {\usepackage[hmargin=1in,vmargin=0.75in]{geometry}\usepackage{lmodern}\usepackage[numbers]{natbib}}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -39,7 +39,7 @@ of each layer resident and swaps at most one expert per token. Across FLAME-MoE 
 spanning $10^{16}$ to $10^{19}$ FLOPs, temporal MoE recovers 72--82\% of the MoE-over-dense
 quality gain at compute-optimal sizes, and zero-shot downstream accuracy at $10^{19}$ tracks the
 recovery. The fine-grained configuration holds 18 of 192 experts resident, a 5.7$\times$ cut in
-whole-model memory. A llama.cpp implementation serves an $\sim$11B-scale model at 0.83$\times$
+whole-model weight memory. A llama.cpp implementation serves an $\sim$11B-scale model at 0.83$\times$
 the all-resident decode speed in 5.1$\times$ less VRAM with bit-identical outputs. The trained
 router internalizes the constraint. Expert specialization shifts from token identity to
 surrounding context, and temporal self-consistency nearly doubles over vanilla routing.
@@ -88,7 +88,8 @@ resident logits, and $S_0$ cold-fills from the first token's top-$k$. Training u
 modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
 receives ordinary gate gradients on every resident it scores, so the function the swap rule reads
 is trained normally. The selection scan runs as a single-launch Triton kernel, verified bit-exact
-against a unit-tested reference, and adds under 50\% to step time at our scales.
+against a unit-tested reference, and costs about 1\,ms per layer call, under 1\% of step time at
+our scales.
 
 The single-swap budget is what lets the load hide behind compute. At small batch the expert FFN is
 memory-bandwidth-bound, so serving the $k-1$ already-resident experts reads $(k-1)\,b$ bytes from
@@ -140,10 +141,10 @@ MoE baselines at every budget, so the constraint does not distort scaling geomet
 \textbf{Larger budgets.} At $10^{18}$ FLOPs (Figure~\ref{fig:isoflop}, bottom left) recovery is 73\%
 against the strongest full MoE, consistent with the smaller budgets. Sometimes the
 mechanism appears nearly lossless, here outperforming
-its equally fine-grained MoE counterpart (3.977 vs.\ 4.009 nats). At the coarse granularity, with
-two seeds per arm, temporal holds parity with the strongest full MoE (seed ranges 3.904--3.909
-vs.\ 3.918--3.930 nats). Fine-graining itself hurts the full
-MoE at this scale (at 48.5M active it lands within 0.024 nats of the dense floor) while temporal
+its equally fine-grained MoE counterpart (1.335 vs.\ 1.346 BPB). At the coarse granularity, with
+two seeds per arm, temporal holds parity with the strongest full MoE (seed ranges 1.311--1.313
+vs.\ 1.316--1.320 BPB). Fine-graining itself hurts the full
+MoE at this scale (at 48.5M active it lands within 0.008 BPB of the dense floor) while temporal
 routing is robust to it, so the only fine-grained model we take to $10^{19}$ is the temporal one.
 At $10^{19}$ (Figure~\ref{fig:isoflop}, bottom right), our largest budget, the temporal models
 keep 78--81\% of the MoE-over-dense gain and the granularity preference flips: the fine-grained
@@ -196,13 +197,19 @@ from pretraining loss to task accuracy.
 
 \textbf{Serving.} Table~\ref{tab:serving} closes the loop in a real engine. The deploy row
 serves the fine-grained model at 0.83$\times$ the all-resident decode speed in 5.1$\times$ less
-VRAM. The other rows isolate two costs. Kernel overhead is granularity-independent
+VRAM. The measured 5.1$\times$ is the end-to-end counterpart of the 5.7$\times$ weight
+arithmetic in Section~\ref{sec:method}, and the gap is the KV cache and workspace buffers, which
+sit in VRAM regardless of residency. The other rows isolate two costs. Kernel overhead is granularity-independent
 (0.86--0.88$\times$). The streaming cost is set by granularity, roughly free for fine experts
 (840\,KiB per swap, hidden behind compute) but dominant for coarse ones (2.5\,MiB, 0.51$\times$).
 The asymmetry is the measured converse of the $10^{19}$ crossover. Scale pushes temporal quality
 toward fine granularity, and fine granularity is what streams cheaply, so quality and serving
 select the same design point. The router-early variant lengthens the masking window and recovers
-most of the fine model's remaining gap, as the bandwidth analysis anticipates.
+most of the fine model's remaining gap, as the bandwidth analysis anticipates. These
+measurements are batch-1 decode at 1024-token context, the operating point of local inference.
+At larger batch each sequence carries its own resident set, so the memory advantage narrows as
+batch grows. At longer context the KV term grows until it, not the expert tier, sets the memory
+floor.
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. A router
 trained under residency shows temporally banded \emph{unconstrained} preferences, and its
@@ -326,72 +333,19 @@ router-only training (zero-shot imposition is the costliest direction in Table~\
 which would make temporal routing a serving recipe for existing MoE-class models in the memory
 of their active parameters. The second is to establish the architecture's
 stability profile, weight and activation norms against the baselines, loss stability, and
-reinforcement-learning stability where MoEs are notoriously fragile, so the recipe is viable end
-to end with no caveats.
+behavior under reinforcement learning, where routing flips between the rollout engine and the
+trainer are the identified collapse driver \cite{ma2025r3,zheng2025gspo}, so the recipe is
+viable end to end with no caveats. Residency cuts both ways there. The resident set is extra
+state the trainer must replay, but the single-swap budget bounds routing drift to one expert per
+layer per token, a bound vanilla routing does not have.
 
 The end goal is local inference. If temporal routing holds at scale, a Kimi-K2-scale sparse model
 \cite{kimik2} could run in the memory of its active parameters on quantized consumer hardware.
 That would put near-state-of-the-art models within private, local reach of the average person.
 
 
-\begin{thebibliography}{10}
-
-\bibitem{shazeer2017}
-N.~Shazeer et al.
-\newblock Outrageously large neural networks: the sparsely-gated mixture-of-experts layer.
-\newblock \emph{arXiv:1701.06538}, 2017.
-
-\bibitem{dai2024deepseekmoe}
-D.~Dai et al.
-\newblock DeepSeekMoE: towards ultimate expert specialization in mixture-of-experts language models.
-\newblock \emph{arXiv:2401.06066}, 2024.
-
-\bibitem{jiang2024mixtral}
-A.~Q. Jiang et al.
-\newblock Mixtral of experts.
-\newblock \emph{arXiv:2401.04088}, 2024.
-
-\bibitem{kang2025flame}
-H.~Kang, Z.~Yu, and C.~Xiong.
-\newblock FLAME-MoE: a transparent end-to-end research platform for mixture-of-experts language models.
-\newblock \emph{arXiv:2505.20225}, 2025.
-
-\bibitem{eliseev2023}
-A.~Eliseev and D.~Mazur.
-\newblock Fast inference of mixture-of-experts language models with offloading.
-\newblock \emph{arXiv:2312.17238}, 2023.
-
-\bibitem{skliar2024}
-A.~Skliar et al.
-\newblock Mixture of cache-conditional experts for efficient mobile device inference.
-\newblock \emph{arXiv:2412.00099}, 2024.
-
-\bibitem{zhu2025}
-J.~Zhu et al.
-\newblock Not all models suit expert offloading: on local routing consistency of mixture-of-expert models.
-\newblock \emph{arXiv:2505.16056}, 2025.
-
-\bibitem{muennighoff2024olmoe}
-N.~Muennighoff et al.
-\newblock OLMoE: open mixture-of-experts language models.
-\newblock \emph{arXiv:2409.02060}, 2024.
-
-\bibitem{wang2024auxfree}
-L.~Wang et al.
-\newblock Auxiliary-loss-free load balancing strategy for mixture-of-experts.
-\newblock \emph{arXiv:2408.15664}, 2024.
-
-\bibitem{kimik2}
-Kimi Team.
-\newblock Kimi K2: open agentic intelligence.
-\newblock \emph{arXiv:2507.20534}, 2025.
-
-\bibitem{logitlens}
-nostalgebraist.
-\newblock Interpreting GPT: the logit lens.
-\newblock \emph{LessWrong}, 2020.
-
-\end{thebibliography}
+\bibliographystyle{abbrvnat}
+\bibliography{references}
 
 \appendix
 
@@ -460,8 +414,8 @@ median 15{,}932, with no word-list experts even in the tail.
   \centering\small
   \caption{Constraint swap. Unmasking makes every expert resident for a trained temporal model.
   Imposing puts a trained full MoE under rolling residency. Held-out BPB except the $10^{18}$
-  row, which is validation CE on the analysis batch (its native value accordingly differs from
-  the $10^{18}$ panel's seed-1 test value, 3.909 CE, by 0.006). Imposing costs two to five times more
+  row, which is validation CE in nats on the analysis batch (its native value accordingly differs
+  from that cell's seed-1 test CE, 3.909 nats or 1.313 BPB in Figure~\ref{fig:isoflop}, by 0.006). Imposing costs two to five times more
   than unmasking, the asymmetry expected if full-MoE experts are token-bound: a token denied its
   bespoke expert has nowhere to go, while a contextual expert serves its neighborhood
   regardless. The fine-grained full-MoE row is the sigmoid-router control, whose artifacts were

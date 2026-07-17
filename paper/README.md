@@ -70,5 +70,6 @@ with the reason it exists.
   flip; ~10-13 extra 1e18 runs (~2-3 days of H100) is only worth spending for camera-ready.
 
 ## Build
-`cd paper && pdflatex main.tex` twice (uses `neurips_2024.sty` if present, else a plain-article
-fallback). Figures are the `*_nocaption.png` variants from `analysis/plots/plot_*.py --no-caption`.
+`cd paper && pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex` (uses
+`neurips_2024.sty` if present, else a plain-article fallback; references live in `references.bib`,
+style `abbrvnat`). Figures are the `*_nocaption.png` variants from `analysis/plots/plot_*.py --no-caption`.
