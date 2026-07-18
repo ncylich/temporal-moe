@@ -10,8 +10,9 @@ comparisons are the honest ones.
 
 Values = end-of-training TEST evals (canonical; see results/ablations/FINDINGS.md):
 - 1e16/1e17: BPB = CE/2.7568 (16k), per-point data in phase0_isoflop_points.csv.
-- 1e18: BPB = CE/2.9780 (50k), single seed (1234; for the two-seed 38M coarse cells this is
-  seed 1) — flame192_leftflank_1e18.csv, flame38m_1e18_cells.csv, flame512_1e18_rightflank.csv.
+- 1e18: BPB = CE/2.9780 (50k); flanks single seed (1234), the 38M midpoint plots 3-seed means
+  on the h100 split with its local dense floor —
+  flame192_leftflank_1e18.csv, flame38m_1e18_cells.csv, flame512_1e18_rightflank.csv.
   x = non-embed active params (6.88/12.19/48.50M from the run configs).
 - 1e19: BPB = CE/2.9780, t19_1e19_curves.csv (one shape; bars). No fine full-MoE cell was trained
   at 1e19 (1e18 already showed fine-graining hurts the full MoE; temporal is the fine contender).
@@ -49,12 +50,15 @@ P17 = {
     "tmp_f":      {3.91: 1.3065, 8.23: 1.2873, 15.09: 1.3129},
 }
 P18 = {
-    "dense":      {6.88: 1.4072, 12.19: 1.3893, 48.50: 1.4256},
-    "moe_c":      {6.88: 1.3272, 12.19: 1.3158, 48.50: 1.3766},
-    "moe_f":      {6.88: 1.3570, 12.19: 1.3461, 48.50: 1.4174},
-    "tmp_c":      {6.88: 1.3198, 12.19: 1.3128, 48.50: 1.3762},
-    "tmp_f":      {6.88: 1.3379, 12.19: 1.3354, 48.50: 1.4047},
+    "dense":      {6.88: 1.4072, 12.19: 1.3911, 48.50: 1.4256},
+    "moe_c":      {6.88: 1.3272, 12.19: 1.3175, 48.50: 1.3766},
+    "moe_f":      {6.88: 1.3570, 12.19: 1.3478, 48.50: 1.4174},
+    "tmp_c":      {6.88: 1.3198, 12.19: 1.3122, 48.50: 1.3762},
+    "tmp_f":      {6.88: 1.3379, 12.19: 1.3339, 48.50: 1.4047},
 }
+# 38M midpoint seeds (h100 split, 3/arm; plotted values = means, per-seed table in the paper):
+# tmp_c {1.3128,1.3111,1.3128}  moe_c {1.3158,1.3197,1.3169}
+# tmp_f {1.3354,1.3339,1.3323}  moe_f {1.3461,1.3489,1.3483}
 P19 = [("dense", 1.1260, DENSE_C), ("temporal\ncoarse", 1.0680, TMP_COARSE),
        ("temporal\nfine", 1.0655, TMP_FINE), ("full MoE\ncoarse", 1.0514, MOE_COARSE)]
 

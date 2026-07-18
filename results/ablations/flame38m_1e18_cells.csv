@@ -15,3 +15,5 @@ flame38m_g1_moe_s3,moe,1,64,6,3,3.921314,3.921753,flame38m_overnight_seeds.csv (
 flame38m_dense_local,dense,1,,,1234,4.142699,4.142762,flame38m_overnight_seeds.csv (h100@5a30342a),LOCAL dense floor (h100 split) - replaces the cross-data caveat; a6000 dense 4.1373 agrees within 0.0055,1.3911,1.3911
 flame38m_g1_temporal_s3,temporal,1,64,6,3,3.9107,3.9125,flame38m_overnight_seeds_a6000.csv (a6000@e0a98204),third temporal seed on the A6000 split (not poolable with h100-split rows),1.3132,1.3138
 flame38m_g1_temporal_s3_h100,temporal,1,64,6,3,3.908906,3.909378,flame38m_overnight_seeds.csv (h100@c2339880),third coarse-temporal seed on the h100 local split (3-per-arm complete),1.3126,1.3128
+flame38m_g3_temporal_s3,temporal,3,192,18,3,3.967206,3.967452,flame38m_overnight_seeds.csv (h100@82522c33),"third fine-grained temporal seed (h100 split); pod-logged BPB used the 16k divisor 2.7568, corrected here to CE/2.9780",1.3322,1.3323
+flame38m_g3_moe_s3,moe,3,192,18,3,4.014764,4.015196,flame38m_overnight_seeds.csv (h100@82522c33),"third fine-grained MoE seed (h100 split); pod-logged BPB used the 16k divisor 2.7568, corrected here to CE/2.9780",1.3481,1.3483
