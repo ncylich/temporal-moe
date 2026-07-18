@@ -40,7 +40,7 @@ spanning $10^{16}$ to $10^{19}$ FLOPs, temporal MoE recovers 72--82\% of the MoE
 quality gain at compute-optimal sizes, and zero-shot downstream accuracy at $10^{19}$ tracks the
 recovery. The fine-grained configuration holds 18 of 192 experts resident, a 5.7$\times$ cut in
 whole-model weight memory. A llama.cpp implementation serves an $\sim$11B-scale model at 0.83$\times$
-the all-resident decode speed in 5.1$\times$ less VRAM with bit-identical outputs. The trained
+the all-resident decode speed in 5.1$\times$ less VRAM. The trained
 router internalizes the constraint. Expert specialization shifts from token identity to
 surrounding context, and temporal self-consistency nearly doubles over vanilla routing.
 Trained-in locality makes MoE-quality models practical to serve in the memory of their active
@@ -87,9 +87,8 @@ The token is served by $S_t$ with gates from the softmax of
 resident logits, and $S_0$ cold-fills from the first token's top-$k$. Training uses the standard language
 modeling, load-balancing, and z-losses unchanged. The swap is non-differentiable, but the router
 receives ordinary gate gradients on every resident it scores, so the function the swap rule reads
-is trained normally. The selection scan runs as a single-launch Triton kernel, verified bit-exact
-against a unit-tested reference, and costs about 1\,ms per layer call, under 1\% of step time at
-our scales.
+is trained normally. The selection scan runs as a single-launch Triton kernel and costs about 1\,ms
+per layer call, under 1\% of step time at our scales.
 
 The single-swap budget is what lets the load hide behind compute. At small batch the expert FFN is
 memory-bandwidth-bound, so serving the $k-1$ already-resident experts reads $(k-1)\,b$ bytes from
@@ -110,10 +109,11 @@ splitting \cite{dai2024deepseekmoe}). At $10^{16}$ and $10^{17}$ FLOPs we sweep 
 sizes around an exact FLAME-MoE-38M-100M replication (4.45B tokens, 50k pythia vocabulary), and at
 $10^{19}$ we train the budget's compute-optimal shape and evaluate it zero-shot on six standard
 tasks with lm-evaluation-harness. For serving, we implement rolling residency in a llama.cpp CUDA
-fork and benchmark batch-1 decode on Qwen3-MoE-shaped random-weight models ($\sim$11.3B total,
+fork and benchmark batch-1 prefill and decode on Qwen3-MoE-shaped random-weight models ($\sim$11.3B total,
 Q4\_K\_M, both granularities scaled $\sim$10$\times$), with $R=k$ expert slots held in VRAM
-against a full CPU pool and at most one swap per layer per token. Decode is verified bit-identical to the
-all-resident engine, and weights are irrelevant to a latency and memory measurement. All runs use
+against a full CPU pool and at most one swap per layer per token. Prefill runs expert-major, and each
+needed expert streams once through a fixed ring of slots and serves all of its tokens in one
+batched pass. Weights are irrelevant to a latency and memory measurement. All runs use
 locked hyperparameters and report test-set
 bits-per-byte (BPB, tokenizer-invariant, seed noise $\approx$0.003). Each shape gets a dense floor
 matched to the MoE's active parameters and FLOPs, and we define \emph{recovery} as
@@ -205,11 +205,22 @@ sit in VRAM regardless of residency. The other rows isolate two costs. Kernel ov
 The asymmetry is the measured converse of the $10^{19}$ crossover. Scale pushes temporal quality
 toward fine granularity, and fine granularity is what streams cheaply, so quality and serving
 select the same design point. The router-early variant lengthens the masking window and recovers
-most of the fine model's remaining gap, as the bandwidth analysis anticipates. These
-measurements are batch-1 decode at 1024-token context, the operating point of local inference.
-At larger batch each sequence carries its own resident set, so the memory advantage narrows as
-batch grows. At longer context the KV term grows until it, not the expert tier, sets the memory
-floor.
+most of the fine model's remaining gap, as the bandwidth analysis anticipates. Figure~\ref{fig:servingctx}
+extends the measurement to prefill and long context. Prefilling 16k tokens takes 1.6$\times$
+the all-resident time and decode holds near 0.80$\times$ throughout. Peak VRAM stays under
+3.6\,GiB against 8.0--9.3\,GiB all-resident, a gap the growing KV cache compresses from
+3.7$\times$ at 1k to 2.6$\times$ at 16k. At larger batch each sequence carries its own resident
+set, so the advantage narrows there too (protocol and kernel details in
+Appendix~\ref{app:serving}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/serving_context_sweep_nocaption.png}
+  \caption{Serving vs.\ context length (fine-grained model). Solid = throughput (left axis),
+  dashed = peak VRAM (right axis). Decode runs after the full
+  prefill, slightly below Table~\ref{tab:serving}'s decode-only setting.}
+  \label{fig:servingctx}
+\end{figure}
 
 \textbf{The constraint is internalized.} Figure~\ref{fig:locality} shows why this works. A router
 trained under residency shows temporally banded \emph{unconstrained} preferences, and its
@@ -441,6 +452,48 @@ median 15{,}932, with no word-list experts even in the tail.
 softmax-aux recipe. Held-out BPB at $R = 18/36/72/128/192$ is 1.4750 / 1.4736 / 1.4681 / 1.4580 /
 1.4519 (endpoint = the retrained full-MoE baseline). Most of the gap closes by $R = 128$, and
 expert diversity is preserved at every dose (182--186 effective experts).
+
+\section{Serving details}\label{app:serving}
+
+All measurements use the llama.cpp CUDA fork of Section~\ref{sec:method} on an RTX A6000
+(Q4\_K\_M, fine-grained model), four trials with the first discarded, decode over a 100-token
+generation after the prefill. Full rows live in
+\texttt{results/ablations/serving\_benchmarks.csv}.
+
+\textbf{Micro-batch choice.} llama.cpp processes the prompt in micro-batches (its
+\texttt{ubatch}). Table~\ref{tab:ubatch} sweeps the size at 16k context.
+Figure~\ref{fig:servingctx} runs both tiers at 2048, within 1\% of the all-resident time
+optimum and near the deploy VRAM floor, so the setting flatters neither side. Larger
+micro-batches cost the deploy tier much of its memory advantage, since activation buffers grow
+with tokens in flight, and smaller ones stall it.
+
+\begin{table}[h]
+  \centering\small
+  \caption{Prefill micro-batch sweep at 16k context, fine-grained model. Time is prefill in ms
+  (lower is better), memory is peak VRAM in MiB. Bold = the operating point of
+  Figure~\ref{fig:servingctx}.}
+  \label{tab:ubatch}
+  \vspace{4pt}
+  \begin{tabular}{@{}rrrrr@{}}
+    \toprule
+    & \multicolumn{2}{c}{all-resident} & \multicolumn{2}{c}{deploy} \\
+    \cmidrule(lr){2-3} \cmidrule(l){4-5}
+    micro-batch & ms & MiB & ms & MiB \\
+    \midrule
+    1024  & 2975 & 8894  & 5527 & 3159 \\
+    \textbf{2048}  & \textbf{2942} & \textbf{9512}  & \textbf{4499} & \textbf{3590} \\
+    4096  & 2922 & 10746 & 4132 & 4986 \\
+    16384 & 4723 & 18162 & 4247 & 13358 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Where prefill time goes.} Three configurations at 16k in one micro-batch decompose the
+cost. The stock all-resident kernel takes 4715\,ms, the expert-major kernel 4219\,ms with all
+experts resident and 4297\,ms streaming from the CPU pool. Streaming is nearly free at every
+context (1.00--1.05$\times$ the resident control), so the deploy cost is the kernel shape,
+2.4$\times$ the stock kernel at 1k and faster than it at 16k in one micro-batch. A wave-batched
+\texttt{mul\_mat\_id} prototype that avoids the expert-major reorder was a measured no-go.
 
 \section{Negative results}\label{app:negatives}
 

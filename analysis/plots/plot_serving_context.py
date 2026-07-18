@@ -23,14 +23,11 @@ PAPER = True
 plt.rcParams.update({"font.size": 9.5, "axes.titlesize": 11, "axes.labelsize": 9.5,
                      "xtick.labelsize": 8.5, "ytick.labelsize": 8.5, "legend.fontsize": 7.5})
 
-def panel(ax, tps_A, tps_C, title, show_8gb=True):
+def panel(ax, tps_A, tps_C, title):
     axr = ax.twinx()
     # VRAM (right, dashed) first so throughput draws on top
     axr.plot(ctx, A_vram, "--o", color=CEIL, ms=4, lw=1.4, alpha=0.85)
     axr.plot(ctx, C_vram, "--s", color=DEPL, ms=4, lw=1.4, alpha=0.85)
-    if show_8gb:
-        axr.axhline(8.0, color="crimson", ls=":", lw=1.2)
-        axr.text(1024, 8.15, "8 GB GPU", color="crimson", fontsize=7, va="bottom")
     axr.set_ylim(0, 11); axr.set_ylabel("peak VRAM (GB)", color=VRC)
     axr.tick_params(axis="y", labelcolor=VRC)
     # throughput (left, solid)
