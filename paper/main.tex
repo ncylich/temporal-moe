@@ -58,7 +58,7 @@ is bandwidth-infeasible. Hiding one expert miss costs roughly the fast-to-slow b
 20--110 resident-expert computations on modern hardware, while only $k\!\approx\!6$--$8$ experts of
 work exist per layer to hide it behind. Caching lowers the miss rate, not the miss cost, and
 vanilla routers give it little to work with, as consecutive tokens share only about 20\% of their
-expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,zhu2025}. The locality that serving
+expert choices \cite{jiang2024mixtral,muennighoff2024olmoe,liang2025local}. The locality that serving
 needs must be trained in, not recovered after the fact.
 
 We contribute (i) a rolling-residency MoE trained from scratch under a hard residency constraint
@@ -96,7 +96,8 @@ fast memory while the incoming expert streams its $b$ bytes from slower storage,
 fully masked when $b/\mathrm{BW}_{\mathrm{slow}}\le(k-1)\,b/\mathrm{BW}_{\mathrm{fast}}$, that
 is, once $k-1$ approaches the fast-to-slow bandwidth ratio (roughly 32 for RAM over NVMe). The
 expert size $b$ cancels, so the condition depends only on the routing width, which DeepSeek-style
-fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs. With 18
+fine-graining toward $k\!\approx\!32$ reaches without changing active parameters or FLOPs, the
+knob granularity scaling laws quantify \cite{krajewski2024granularity,clark2022unified,ludziejewski2025joint}. With 18
 of 192 experts resident (the same fraction as 6 of 64 in the coarse model) the routed-expert
 footprint shrinks 10.7$\times$ and whole-model resident memory 5.7$\times$. Section~\ref{sec:results}
 tests these calculations in a real engine, including a variant that computes the router earlier
@@ -321,6 +322,43 @@ unrepresentable while leaving weights untouched, so the router reorganizes aroun
 persists across a residency lifetime. That reorganization explains how quality survives the
 constraint, the near-doubled self-consistency of Figure~\ref{fig:locality}, and the forecastable
 demand that the anticipation direction of Section~\ref{sec:outlook} targets.
+
+\section{Related work}\label{sec:related}
+
+Serving systems keep a pool of $R > k$ experts in fast memory and manage the misses. Eliseev
+and Mazur cache experts with LRU and speculative prefetch \cite{eliseev2023}, Pre-gated MoE
+computes each layer's gate one layer early so the fetch overlaps compute \cite{hwang2023pregated},
+MoE-Infinity prefetches from activation traces \cite{xue2024moeinfinity}, ProMoE trains a
+predictor to fetch ahead of the router \cite{song2024promoe}, and a survey covers the rest of a
+crowded field \cite{liu2024moesurvey}. Skliar et al.\ instead bias a frozen router toward
+whatever is cached \cite{skliar2024}. A newer line shapes the routing itself. Oracle-MoE routes
+in a compact semantic space derived from attention so that consecutive tokens pick similar
+experts \cite{zhou2025oracle}, Sticky Routing and BlockFFN add losses that penalize switches or
+shrink the union of experts per chunk \cite{kayyam2026sticky,song2025blockffn}, CoSMoEs'
+block-wise selection loss buys fewer swaps at a measured quality cost \cite{huber2025cosmoes},
+router-only finetuning raises reuse in released checkpoints \cite{zhu2026reuse,raje2026melinoe},
+and a learned controller can decide when a checkpoint's expert set switches
+\cite{shen2026temporally}. Across both lines locality is a tendency. The pool still provisions
+for misses, so the footprint remains a knob priced in latency or quality at serving time.
+Rolling residency makes the footprint and the swap budget constraints the model trains under,
+and that is what lets the bandwidth condition of Section~\ref{sec:method} hold by construction
+rather than in expectation.
+
+A complementary axis serves capacity whose lookup key is known before any compute runs. Mixture
+of Lookup Experts trains experts that read the token embedding, then re-parameterizes them into
+offloaded tables fetched by token id \cite{jie2025mole}. Per-layer embeddings ship the same
+mechanism in Gemma's edge models \cite{gemmateam2026}, and Engram scales it to N-gram-keyed
+conditional memory \cite{cheng2026engram}. Lookup capacity is lexical by construction, and
+Section~\ref{sec:mechanism} shows token-identity binding is exactly what a free router spends
+experts on and what residency removes. The two axes therefore split the problem instead of
+competing. Tables can hold the token-keyed capacity, residency streams the context-dependent
+experts no table can express, and the combination is natural and untested.
+
+Constraints on routing structure exist along other axes and for other goals. Path-constrained
+MoE ties expert choices across neighboring layers \cite{gu2026pathmoe}, and Mixture-of-Depths
+spends its sparsity on skipping compute across the sequence \cite{raposo2024mod}. Residency is
+the time-axis member of this family, aimed at serving memory because that is the cost that
+binds at deployment.
 
 \section{Conclusion and next steps}\label{sec:outlook}
 

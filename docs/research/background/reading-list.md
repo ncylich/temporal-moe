@@ -104,6 +104,7 @@ Existing probes in-repo that already mirror these methods: `analysis/router_satu
 - **Lory** — Zhong et al., 2024 (cited in §6): fully-differentiable MoE with **causal segment routing** +
   soft expert merging; shows segment/domain-level specialization trains well. Signature: segment-routing
   quality vs. segment length.
+  - *Paper decision (2026-07)*: excluded from the related-work section — merging needs every expert resident (differentiability goal, not serving), and the paper has no block-wise/windowed appendix to host it.
 - **Temporally Extended Mixture-of-Experts** (cited in §6): a controller that learns *when to keep vs.
   switch* the expert mask — the learned form of "reuse experts over spans."
 
