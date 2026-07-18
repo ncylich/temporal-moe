@@ -137,3 +137,36 @@ The hard engineering problems, so the next person doesn't re-derive them:
   kernels), `temporal.cuh`, `ggml-cuda.cu` (mul_mat_id hook + fusion-disable), `llama-model.cpp`
   (R-slot registration), `models/qwen3moe.cpp` (pre-attention router prime).
 - `temporal.cu`, `temporal.cuh` — readable copies of the two wholly-custom files.
+
+## Prefill kernels (2026-07 update)
+
+`systems_bench.patch` now also contains the **prefill** work (expert-major streaming, config-D
+control, ubatch handling), not just decode. Apply to `llama.cpp` at base commit **`0badc06`**
+(`git apply systems_bench.patch`), sm_86, `GGML_CUDA=ON`, `Release`. Verified to apply cleanly.
+
+Env knobs added by the patch (all default-off; decode path unchanged for `n_tokens==1`):
+- `TEMPORAL_PREFILL=expertmajor` — expert-major streaming prefill (counting-sort group by expert,
+  per-expert batched GEMM streamed through a ring, scatter). The deployable low-VRAM path.
+- `TEMPORAL_PREFILL_RESIDENT=1` — config-D control: same kernel, all experts resident, zero upload
+  (isolates kernel effect from streaming cost).
+- `TEMPORAL_PREFILL_SKIPSEED=1` — skip re-streaming the R already-resident experts.
+- `TEMPORAL_PREFILL=wavemmid` — wave-batched `mul_mat_id` prototype (timing-only; documented NO-GO
+  with the stock kernel, see paper Appendix / results/ablations/serving_benchmarks.csv notes).
+- `TEMPORAL_PREFILL_COUNT=1`, `_SERIAL=1`, `_NOCOPY=1` — diagnostics.
+
+Measured numbers: `results/ablations/serving_benchmarks.csv`. Fork base = `0badc06`; the a6000 fork's
+local commit chain was `2cb4175` (v1) -> `13cc828` (v2) -> `fb0e979` (D) -> `5c2f7b2` (skipseed) ->
+`1896afb` (wavemmid) -> `8fa7937` (counter) -> `6094183` (matched-ub sweep).
+
+### Decode/prefill defaults (fork 2447b1a)
+
+`-ncmoe <N> TEMPORAL_UNIFIED=1` alone runs the deployable config: **temporal decode**
+(resident-set + <=1 swap/token, ~160 tok/s / 0.79x the full-MoE ceiling) with copy/compute overlap,
+and **expert-major streaming prefill** (auto for n_tokens>1). No extra flags.
+- <=1-swap temporal decode is DEFAULT-ON. `TEMPORAL_UNIFIED_NOFORCE1=1` -> lazy-full-MoE decode
+  (loads all top-k; used only for the full-vs-temporal comparison; bit-identical to the all-resident
+  ceiling, which PROVES the load/swap/remap/GEMM infra is exact).
+- Overlap DEFAULT-ON (`_NOOVERLAP=1` to disable). `TEMPORAL_PREFILL_RESIDENT=1` = config-D control
+  (all-resident expert-major, no upload; paper-table decomposition only).
+- Prefill computes the full top-k per token (= full MoE, streamed for memory); the temporal
+  <=1-swap mechanism applies at DECODE. Deployment = full-MoE-exact prefill + temporal decode.

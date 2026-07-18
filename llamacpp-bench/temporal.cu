@@ -1,5 +1,6 @@
 #include "temporal.cuh"
 #include <cstdlib>
+#include <cstring>
 
 // ================= Phase-3b UNIFIED: ON-DEVICE residency + graph-capturable swap ===============
 // Everything the swap needs is on-device with FIXED buffer pointers: the CPU pool is host-registered
@@ -11,6 +12,7 @@
 #include <vector>
 struct TU {
     const uint8_t* pool_dev[3] = {nullptr,nullptr,nullptr};   // host-mapped device ptr of the CPU pool
+    const uint8_t* pool_host[3]= {nullptr,nullptr,nullptr};   // host ptr of the mapped CPU pool (prefill prefetch)
     uint8_t*       slot[3]     = {nullptr,nullptr,nullptr};    // device R-slot base
     size_t         be[3]       = {0,0,0};
     int            E=0, R=0, ready=0, primed=0;   // primed: router-early prime issued this layer (capture-time)
@@ -25,11 +27,16 @@ static std::unordered_map<const void*, std::pair<int,int>> g_tptr;
 static cudaStream_t g_copy = nullptr;                        // shared swap-copy stream
 
 int ggml_cuda_temporal_unified() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED");return s?atoi(s):0;}(); return v; }
-static int tu_force1() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_FORCE1");return s?atoi(s):0;}(); return v; }
-// overlap: stagger gate/up/down swap-copies on a copy stream so up-copy+down-copy hide behind the
-// gate/up expert GEMMs (compute stream), each GEMM gated on its own tensor's copy. env
-// TEMPORAL_UNIFIED_OVERLAP=1. (Full compute-swapped-last split-GEMM is a deeper build_moe_ffn change.)
-static int tu_overlap() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_OVERLAP");return s?atoi(s):0;}(); return v; }
+// THE TEMPORAL MECHANISM (default): compute over the RESIDENT SET, swapping in <=1 non-resident selected
+// expert per layer/token and evicting to make room. This IS temporal-MoE -- NOT a lossy approximation of
+// full top-k MoE; its quality gap vs the all-resident full-MoE ceiling is by design (~0.95% PPL on random
+// weights = noise). DEFAULT ON. TEMPORAL_UNIFIED_NOFORCE1=1 opts into lazy-full-MoE (load all top-k,
+// budget=R swaps -> matches the full-MoE ceiling) for debugging / the full-vs-temporal comparison.
+static int tu_force1() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOFORCE1")) return 0; const char*s=getenv("TEMPORAL_UNIFIED_FORCE1"); return s?atoi(s):1; }(); return v; }
+// overlap: stagger gate/up/down swap-copies on a copy stream so up-copy+down-copy hide behind the gate/up
+// expert GEMMs (compute stream), each GEMM gated on its own tensor's copy. DEFAULT ON (correctness-safe:
+// full swap budget, just overlapped); set TEMPORAL_UNIFIED_NOOVERLAP=1 to disable for debugging.
+static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVERLAP")) return 0; const char*s=getenv("TEMPORAL_UNIFIED_OVERLAP"); return s?atoi(s):1; }(); return v; }
 static int tu_nocopy() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_NOCOPY");return s?atoi(s):0;}(); return v; }  // decomposition: skip swap-copy (wrong output)
 // Swap-rate EMULATION. The real mechanism swaps <=1 expert/layer/token; the trained models' measured
 // mean_swap_rate (probe_replay e1) is p in [0,1] (shipped policy ~1.0). Emulate a global rate p on this
@@ -59,6 +66,7 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host, 
     void* pdev = nullptr;
     cudaHostGetDevicePointer(&pdev, mapped, 0);
     L.pool_dev[which] = (const uint8_t*)pdev;
+    L.pool_host[which] = (const uint8_t*)mapped;
     L.slot[which] = (uint8_t*)rslot_data; L.be[which] = bytes_per_expert; L.E=n_expert; L.R=R;
     if (!L.ready) {
         std::vector<int> hs(R), hl(n_expert,-1);
@@ -229,4 +237,21 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
     }
     *ids_out_ptr = L.remap_ids;
     return is_prime ? 2 : 1;   // 2 = prime: caller skips the expert GEMM (copy already issued)
+}
+
+// ===== EXPERT-MAJOR STREAMING PREFILL support =====
+int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
+                                size_t* bytes_per_expert, int* n_expert, int* R) {
+    auto it = g_tptr.find(src0_data); if (it==g_tptr.end()) return 0;
+    TU& L = g_L[it->second.first]; int which = it->second.second;
+    if (slot_base)       *slot_base       = L.slot[which];
+    if (pool_host)       *pool_host       = L.pool_host[which];
+    if (bytes_per_expert)*bytes_per_expert= L.be[which];
+    if (n_expert)        *n_expert        = L.E;
+    if (R)               *R               = L.R;
+    return 1;
+}
+cudaStream_t ggml_cuda_temporal_copy_stream() {
+    if (!g_copy) cudaStreamCreateWithFlags(&g_copy, cudaStreamNonBlocking);
+    return g_copy;
 }
