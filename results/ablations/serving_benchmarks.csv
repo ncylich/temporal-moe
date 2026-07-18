@@ -28,3 +28,16 @@ prefill,fine,ceiling,A_matched_ub,2048,16384,2942,,9512,CHOSEN operating point (
 prefill,fine,deploy,C_matched_ub,2048,16384,4499,,3590,CHOSEN operating point; C/A 1.53x A/C-VRAM 2.65x
 prefill,fine,ceiling,A_matched_ub,1024,16384,2975,,8894,ceiling VRAM floor ~KV+all-experts
 prefill,fine,deploy,C_matched_ub,1024,16384,5527,,3159,deploy VRAM floor ~KV+ring
+# --- context-length sweep (fine model, -ub 2048 both tiers, 4 trials discard-first) ---
+# CORRECTED: deploy prefill is now TEMPORAL residency-masked (matches decode+training), not full-MoE. fork f43b81a.
+# schema differs (context sweep): phase=context_sweep; prefill_ms + prefill/decode tok/s + vram per (context,tier). A=ceiling C=deploy.
+context_sweep,fine,ceiling,ub2048,2048,1024,152,203.4,8174,pp 6756 tok/s
+context_sweep,fine,deploy,ub2048,2048,1024,352,161.7,2182,pp 2906 tok/s (temporal residency-masked)
+context_sweep,fine,ceiling,ub2048,2048,2048,309,203.0,8840,pp 6625 tok/s
+context_sweep,fine,deploy,ub2048,2048,2048,574,159.6,2926,pp 3570 tok/s (temporal residency-masked)
+context_sweep,fine,ceiling,ub2048,2048,4096,624,201.9,8936,pp 6568 tok/s
+context_sweep,fine,deploy,ub2048,2048,4096,1103,159.2,3030,pp 3715 tok/s (temporal residency-masked)
+context_sweep,fine,ceiling,ub2048,2048,8192,1304,201.1,9128,pp 6284 tok/s
+context_sweep,fine,deploy,ub2048,2048,8192,2264,159.5,3224,pp 3618 tok/s (temporal residency-masked)
+context_sweep,fine,ceiling,ub2048,2048,16384,2922,202.4,9512,pp 5608 tok/s
+context_sweep,fine,deploy,ub2048,2048,16384,4592,159.3,3614,pp 3568 tok/s (temporal residency-masked)
