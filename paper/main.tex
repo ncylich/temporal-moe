@@ -183,7 +183,10 @@ from pretraining loss to task accuracy.
   \caption{Real-engine decode throughput (tok/s at 1024-token context, llama.cpp CUDA, RTX
   A6000) for the $\sim$11.3B-total models of Section~\ref{sec:method}. Deploy holds only the
   $R=k$ active experts in VRAM (1502 vs 7672 MiB, a 5.1$\times$ total and 10.6$\times$
-  expert-tier reduction) and streams the rest from a CPU pool.}
+  expert-tier reduction) and streams the rest from a CPU pool. The vanilla-offload row is the
+  same memory budget without the trained constraint, free top-$k$ routing with every miss
+  fetched, measured at the $\sim$20\% consecutive overlap of released MoEs
+  (Appendix~\ref{app:serving}).}
   \label{tab:serving}
   \vspace{4pt}
   \begin{tabular}{@{}lrrrr@{}}
@@ -194,6 +197,7 @@ from pretraining loss to task accuracy.
     our kernel, no swaps ($p=0$)  & 176 & 0.88$\times$ & 217 & 0.86$\times$ \\
     deploy: active-only in VRAM   & \textbf{165} & \textbf{0.83$\times$} & 128 & 0.51$\times$ \\
     router-early variant          & 173 & 0.87$\times$ & 143 & 0.57$\times$ \\
+    vanilla offload: active-only, free routing & 43 & 0.22$\times$ & 42 & 0.17$\times$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -205,6 +209,8 @@ arithmetic in Section~\ref{sec:method}, and the gap is the KV cache and workspac
 sit in VRAM regardless of residency. The other rows isolate two costs. Kernel overhead is granularity-independent
 (0.86--0.88$\times$). The streaming cost is set by granularity, roughly free for fine experts
 (840\,KiB per swap, hidden behind compute) but dominant for coarse ones (2.5\,MiB, 0.51$\times$).
+The vanilla-offload row shows the same budget without the constraint. Free routing misses most
+of its experts every token and runs 3--4$\times$ slower than deploy at the same VRAM.
 The asymmetry is the measured converse of the $10^{19}$ crossover. Scale pushes temporal quality
 toward fine granularity, and fine granularity is what streams cheaply, so quality and serving
 select the same design point. The router-early variant lengthens the masking window and recovers
@@ -534,6 +540,26 @@ experts resident and 4297\,ms streaming from the CPU pool. Streaming is nearly f
 context (1.00--1.05$\times$ the resident control), so the deploy cost is the kernel shape,
 2.4$\times$ the stock kernel at 1k and faster than it at 16k in one micro-batch. A wave-batched
 \texttt{mul\_mat\_id} prototype that avoids the expert-major reorder was a measured no-go.
+
+\textbf{The vanilla-offload floor.} Figure~\ref{fig:floor} sweeps decode speed against pinned
+cold expert fetches per layer per token, measured with real PCIe transfers on a reconstruction
+of the serving models (the recipe and scripts are committed, and the rebuilt fine model
+reproduces the ceiling at 200.8 tok/s and the recorded KV growth). Free top-$k$ routing at
+active-only memory misses $k(1-k/E)\approx16$ experts per layer at chance overlap and about 14
+at the $\sim$20\% consecutive overlap of released MoEs, which lands at 39--43 tok/s. Eviction
+picks the lowest-index non-selected slot, a choice that is byte-neutral for a timing
+measurement. Points at two or fewer fetches are launch-bound and carry boost variance. The
+bandwidth-bound floor is stable.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.62\linewidth]{figures/vanilla_floor_curve_nocaption.png}
+  \caption{Decode speed vs pinned cold expert fetches per layer per token. Hollow markers are
+  launch-bound points with boost variance, enlarged markers are the rates behind
+  Table~\ref{tab:serving}'s vanilla-offload row. Dashed lines are the temporal deploy rows at
+  the same VRAM.}
+  \label{fig:floor}
+\end{figure}
 
 \section{Seed replication at $10^{18}$ FLOPs}\label{app:seeds}
 
