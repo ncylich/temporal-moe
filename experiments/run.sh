@@ -180,6 +180,33 @@ if [ "${PROBE:-0}" = "1" ]; then
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
     2>&1 | tee "$OUT/probe.log"
+elif [ "${ACTPROBE:-0}" = "1" ]; then
+  # Stability Part C: one forward pass, capture aggregate expert/trunk activation stats. Arch comes
+  # from the parametrized MODEL_ARGS above, so this runs at any shape. TEMPORAL=1 makes
+  # activation_probe.py install the residency router. Save to a throwaway dir so the --finetune
+  # warmup iters never touch the real checkpoint; only the FIRST forward (uncorrupted weights) is recorded.
+  export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  export ACT_LOG_OUT=$OUT/act_log.pt
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/activation_probe.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 \
+    --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/actprobe.log"
+elif [ "${QUANTEVAL:-0}" = "1" ]; then
+  # Stability Part E: RTN fake-quant routed-expert weights (QUANT_BITS, group QUANT_GROUP) then
+  # test-set eval. --finetune resets consumed_samples to 0 (end-of-training checkpoints have
+  # consumed_samples ~= dataset size, so plain --skip-train's eval-print path misbehaves; this path
+  # prints val+test cleanly). lr=0 freezes weights across the 2 warmup iters. fakequant_eval.py
+  # quantizes only on the first EVAL-mode forward -> lands AFTER the last optimizer FP32-master->bf16
+  # resync (which would undo it) and persists through eval. Save to throwaway; real checkpoint untouched.
+  export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/fakequant_eval.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --save /tmp/probe_junk_ckpt --eval-iters ${EVAL_ITERS:-16} $EXTRA_ARGS \
+    2>&1 | tee "$OUT/quanteval_b${QUANT_BITS}.log"
 elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   # criterion-4 per-expert load: load CKPT and run a few extra training iters so the router hook
   # fires on real forward passes of the trained model (--skip-train trips Megatron's val sampler).

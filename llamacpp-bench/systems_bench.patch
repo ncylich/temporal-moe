@@ -1,5 +1,5 @@
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 98816f8..de55375 100644
+index 98816f885..de5537527 100644
 --- a/ggml/src/ggml-cuda/ggml-cuda.cu
 +++ b/ggml/src/ggml-cuda/ggml-cuda.cu
 @@ -53,6 +53,7 @@
@@ -340,10 +340,10 @@ index 98816f8..de55375 100644
          GGML_UNUSED(graph_key);
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
 new file mode 100644
-index 0000000..a296038
+index 000000000..c4daf8d58
 --- /dev/null
 +++ b/ggml/src/ggml-cuda/temporal.cu
-@@ -0,0 +1,257 @@
+@@ -0,0 +1,280 @@
 +#include "temporal.cuh"
 +#include <cstdlib>
 +#include <cstring>
@@ -390,6 +390,12 @@ index 0000000..a296038
 +// swaps on the rest (all swaps are identical 840KiB cost, so total copy work = p*nlayers swaps/token
 +// regardless of which layers -> timing faithful). TEMPORAL_SWAP_PROB=p (unset => disabled).
 +static int tu_swap_prob_x1000(){ static int v=[](){const char*s=getenv("TEMPORAL_SWAP_PROB"); return s?(int)(atof(s)*1000.0+0.5):-1;}(); return v; }
++// FLOOR emulation (vanilla-offload). SWAP_PROB models the DEPLOY's <=1 swap/layer; the default-MoE FLOOR
++// (only R=k expert slots resident, free top-k every token, fetch-on-miss) MISSES ~k*(1-k/E) experts PER
++// layer -> many swaps/layer, far more than SWAP_PROB can express. Random-weight routing under-selects
++// misses (low diversity), so the natural budget=R rate is unrepresentative. TEMPORAL_SWAP_N=n pins EXACTLY
++// n swap-copies on EVERY layer (n<=R), measuring the floor at a pinned per-layer miss rate. Emulated.
++static int tu_swap_n(){ static int v=[](){const char*s=getenv("TEMPORAL_SWAP_N"); return s?atoi(s):-1;}(); return v; }
 +// ROUTER-EARLY experiment (TEMPORAL_ROUTER_EARLY=1): the qwen3moe graph computes the router selection
 +// from the PRE-attention input and emits a "prime" expert op there. On that prime call, unified_remap
 +// issues the swap-copy on the copy stream WITHOUT waiting, so it overlaps the attention kernels; the
@@ -494,6 +500,20 @@ index 0000000..a296038
 +        }
 +    }
 +}
++// FLOOR emulation kernel: pin EXACTLY n swap-copies/layer regardless of routing. Writes a valid list of
++// n (expert->slot) pairs (n<=R, so slots are distinct) and sets nswp=n; k_swapcopy then moves n experts'
++// bytes/layer. Timing benchmark for the vanilla-offload floor (not bit-identical to the ceiling).
++__device__ unsigned g_force_step = 0;   // persists across graph replays -> cycles the source experts
++__global__ void k_force_nswap(int* swp_e, int* swp_s, int* nswp, int n, int E, int R) {
++    int i = threadIdx.x;
++    __shared__ unsigned base;
++    // CYCLE the source experts every call so each swap is a COLD host->device PCIe read (a fixed source
++    // set would hit L2 and understate the real fetch-on-miss cost). Advances once per layer/token.
++    if (i == 0) base = atomicAdd(&g_force_step, 1u) * (unsigned)n;
++    __syncthreads();
++    if (i < n) { swp_e[i] = (int)((base + (unsigned)i) % (unsigned)E); swp_s[i] = i % R; }
++    if (i == 0) *nswp = n;
++}
 +// device-indexed swap copy: read host-mapped pool[expert] -> device slot[victim], for each recorded swap.
 +// Vectorized uint4 (16B/thread) path: host-mapped PCIe reads want wide transactions; byte-per-thread
 +// starves the link. Expert byte-sizes are quant-row multiples (16B-aligned) so nv=be/16 is exact and the
@@ -535,9 +555,10 @@ index 0000000..a296038
 +    if (L.remap_words < need) { if (L.remap_ids) cudaFree(L.remap_ids); cudaMalloc(&L.remap_ids, need*sizeof(int32_t)); L.remap_words = need; }
 +    // swap-rate emulation: this layer does the 1-swap iff layer < round(p*nlayers); else 0 swaps.
 +    const int sp1000 = tu_swap_prob_x1000();
-+    const bool emulate = sp1000 >= 0;
++    const int swap_n = tu_swap_n();
++    const bool emulate = sp1000 >= 0 || swap_n >= 0;
 +    bool layer_swaps = true;
-+    if (emulate) {
++    if (sp1000 >= 0) {
 +        const int nl = (int)g_L.size();
 +        const int n_swap_layers = (sp1000 * nl + 500) / 1000;   // round(p*nlayers)
 +        layer_swaps = it->second.first < n_swap_layers;
@@ -557,6 +578,8 @@ index 0000000..a296038
 +                                      is_prime ? nullptr : L.remap_ids);   // fused remap (prime skips it)
 +        // emulated non-swap layer: zero the swap count so every k_swapcopy early-returns (no bytes moved).
 +        if (emulate && !layer_swaps) cudaMemsetAsync(L.d_nswp, 0, sizeof(int), stream);
++        // FLOOR emulation: override the swap list to pin exactly swap_n copies on this layer.
++        if (swap_n >= 0) k_force_nswap<<<1, (swap_n>0?swap_n:1), 0, stream>>>(L.d_swp_e, L.d_swp_s, L.d_nswp, swap_n, L.E, L.R);
 +        if (overlap) {
 +            // fork a copy stream from compute after residency, then queue the gate/up/down swap-copies on
 +            // it. fork + per-op join are ordinary events inside the captured region -> graph-capturable.
@@ -603,7 +626,7 @@ index 0000000..a296038
 +}
 diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
 new file mode 100644
-index 0000000..75ec13c
+index 000000000..75ec13c2b
 --- /dev/null
 +++ b/ggml/src/ggml-cuda/temporal.cuh
 @@ -0,0 +1,24 @@
@@ -632,7 +655,7 @@ index 0000000..75ec13c
 +// shared copy stream used for the swap machinery (reused for prefill weight prefetch).
 +cudaStream_t ggml_cuda_temporal_copy_stream();
 diff --git a/src/llama-model.cpp b/src/llama-model.cpp
-index adacf70..792284f 100644
+index adacf702d..792284f98 100644
 --- a/src/llama-model.cpp
 +++ b/src/llama-model.cpp
 @@ -1638,6 +1638,56 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
@@ -693,7 +716,7 @@ index adacf70..792284f 100644
  }
  
 diff --git a/src/models/qwen3moe.cpp b/src/models/qwen3moe.cpp
-index 6f6df53..aaf658f 100644
+index 6f6df5390..aaf658f5d 100644
 --- a/src/models/qwen3moe.cpp
 +++ b/src/models/qwen3moe.cpp
 @@ -88,6 +88,25 @@ llama_model_qwen3moe::graph::graph(const llama_model & model, const llm_graph_pa

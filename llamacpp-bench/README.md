@@ -75,6 +75,32 @@ TEMPORAL_UNIFIED=1 TEMPORAL_UNIFIED_OVERLAP=1 TEMPORAL_SWAP_PROB=1.0 build/bin/l
 build/bin/llama-bench -m qwen3moe-rand-Q4_K_M.gguf -ngl 99 -fa 1 -ub 1 -b 1 -d 1024 -n 128 -r 8
 ```
 
+## Reproducing the GGUF models (was local-only; now scripted)
+
+The two random-weight benchmark models are regenerated deterministically from the recipe by
+`gen_random_qwen3moe.py` + `build_models.sh` (no local artifacts required):
+```bash
+bash build_models.sh <llama.cpp-dir> /workspace/models     # -> qwen3moe-rand-{fine,coarse}-Q4_K_M.gguf
+```
+Shared backbone (identical across granularities so total params + active FLOPs match): hidden 1024,
+**45 layers**, 8 heads / 4 KV heads (head_dim 128), Qwen3 tokenizer vocab, tied embeddings, Q4_K_M.
+Granularity: **fine** = 192 experts / top-18 / moe_ff 384; **coarse** = 64 / top-6 / moe_ff 1152
+(E·moe_ff and top_k·moe_ff are invariant → same ~10 B total + active FLOPs). Depth (45) is pinned from
+the original model's KV-cache slope in the context sweep (~89 KiB/token = n_layer·n_kv_heads·head_dim),
+which reproduces all three fingerprints: all-resident ceiling **200.8 tok/s** (orig 200) / coarse 251
+(orig 252), VRAM ≈ 7150 MiB (recorded 7672), KV ≈ 90 KiB/token.
+
+## Vanilla-offload floor (Table 2)
+
+The floor = what a **default** MoE does in our memory setup: only R=k expert slots resident, free top-k
+every token, fetch-on-miss. It misses ~k·(1−k/E) experts **per layer** (fine 16.3, coarse 5.4) — many
+swaps/layer, far more than the deploy's ≤1. Two ways to drive it, both moving real bytes:
+- `TEMPORAL_UNIFIED_NOFORCE1=1` (budget=R): swaps every selected non-resident expert, evicting the
+  lowest-index non-selected slot. Eviction is **not LRU** (forward-scan among non-selected slots). On the
+  random-weight model the router has low diversity, so its *natural* miss rate is unrepresentative.
+- `TEMPORAL_SWAP_N=n`: pin exactly n cold-miss swaps/layer (the faithful path — pins the miss rate the
+  random model won't produce). Used for the Table-2 rows at n = round(k·(1−k/E)) and round(0.8k).
+
 ## Env knobs (read once, gated, default-off = stock behavior)
 | env | effect |
 |-----|--------|
@@ -84,6 +110,7 @@ build/bin/llama-bench -m qwen3moe-rand-Q4_K_M.gguf -ngl 99 -fa 1 -ub 1 -b 1 -d 1
 | `TEMPORAL_UNIFIED_FORCE1=1` | force the ≤1-swap/layer mechanism (== the p=1.0 deploy timing) |
 | `TEMPORAL_ROUTER_EARLY=1` | route before attention so the swap-copy overlaps attention (arch variant) |
 | `TEMPORAL_COPY_BLOCKS=n` | swap-copy grid width; **use 8 with router-early** to free SMs for attention |
+| `TEMPORAL_SWAP_N=n` | **vanilla-offload floor**: force EXACTLY n cold-miss swap-copies per layer (n≤R), source experts cycled to defeat L2 caching. Emulates a default MoE with only R=k slots + fetch-on-miss at a pinned per-layer miss rate. |
 | `TEMPORAL_UNIFIED_NOCOPY=1`, `TEMPORAL_NOFUSE=1`, `TEMPORAL_GRAPHDBG=1` | diagnostics |
 
 ## Problems solved (and how)
