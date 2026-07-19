@@ -1,0 +1,16 @@
+patched
+{
+  "P1a_warm_mmap_GBps": 8.503199137742008,
+  "P1b_after_madvise_DONTNEED_GBps": 8.254000883050304,
+  "P1c_F_NOCACHE_pread_GBps": 10.458345983988144,
+  "P1d_pressure_applied_GB": 17.0,
+  "P1d_first_reread_after_pressure_GBps": 0.5517601599152966,
+  "P1d_second_reread_GBps": 1.1781366071324657,
+  "P2_pass1_GBps": 0.8580791185791348,
+  "P2_pass2_steady_GBps": 1.2041246405676707,
+  "P3_implied_floor_n16_tok_s_page_cache": 14.1,
+  "P3_implied_floor_n16_tok_s_ssd_steady": 2.4
+}
+EXIT 0
+P1d: applying ~17 GB memory pressure ...
+P2: writing 30 GB file ...

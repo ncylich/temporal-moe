@@ -1,0 +1,31 @@
+{
+  "model": "qwen3moe-rand-coarse-q4",
+  "tier": "coarse",
+  "setup": "floor_n=6",
+  "context": 1024,
+  "n": 128,
+  "reps": 8,
+  "prefill_ms": 986.7,
+  "decode_tok_s": 45.73,
+  "decode_tok_s_std": 1.347,
+  "decode_tok_s_std_pct": 2.95,
+  "per_rep_tok_s": [
+    42.6,
+    47.22,
+    44.86,
+    45.78,
+    46.45,
+    46.53,
+    46.5,
+    45.86
+  ],
+  "peak_vram_mib": 12545.5,
+  "copied_bytes_per_token": 537477120,
+  "final_cache_offset": 2176,
+  "unique_decode_ids": 2,
+  "total_decode_ids": 1152,
+  "smoke": false,
+  "seed": 0,
+  "mlx_version": "0.32.0",
+  "timestamp": "2026-07-19T17:51:06.399692+00:00"
+}

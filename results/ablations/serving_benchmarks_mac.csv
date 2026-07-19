@@ -1,0 +1,58 @@
+# CANONICAL Mac serving benchmark rows for temporal-MoE -- one row per (model, setup, regime), latest/authoritative
+# generation only. Full run log incl. reruns + superseded generations: mlx-bench/results/serving_benchmarks_mac.csv.
+# Platform: MLX 0.32.0, Apple M4 Pro 24GB unified, macOS 26.5.1. MLX affine q4 g64 (4.5 bpw): expert payload
+# fine=663552 B, coarse=1990656 B. Protocol: B=1, context 1024, n=128 greedy decode, 1 warmup + 8 reps, 10s cooldown.
+# REGIME 1 (rows without DISK_TIER note): RAM-resident cold pool = what macOS gives any RAM-fitting model
+# (demand paging keeps reused pages resident; advisory flags verified ignored). ceiling=all resident; noswap=
+# machinery only (setup b); deploy_sync=<=1 swap/layer/token, p=1.0 byte rate (setup c); deploy_overlap=2nd-Metal-
+# stream copies (measured NEGATIVE on unified memory); floor_n=N=vanilla-offload floor, N expert-copies/layer/token.
+# REGIME 2 (DISK_TIER note): canonical bigger-than-RAM tier -- 28.5GiB disk pool > 24GB RAM, blocking threaded
+# preadv fetches (QD16, single-expert fetches split 8-way), fetch-after-route causality, cycled worst-case sources.
+# deploy_early=router-early variant (setup d): route+residency+fetch-issue PRE-attention, pread overlaps GPU
+# attention, experts post-attention; bit-identical to deploy_early_NOOVERLAP control (g4 gate, delta 0.0).
+# Rows with copied_bytes==0 on deploy/floor_n>0 setups are TEMPORAL_DIAG=nocopy decomposition controls.
+# Cross-checks: real 30.6GB-expert-pool E=1024 model within ~10% (gen_xl_model.py); SLC positive control +
+# madvise/F_NOCACHE advisory tests + write-retention protocol in mlx-bench/RESULTS.md appendix.
+# Correctness: all exactness gates BITWISE (delta 0.0); per-row copied-bytes audits exact. peak_vram_mib =
+# process peak incl. bench scaffolding; unified memory has no VRAM tier -- within-column use only.
+phase,model,tier,setup,ubatch,context,prefill_ms,decode_tok_s,peak_vram_mib,note,decode_tok_s_std,copied_bytes_per_token
+decode,qwen3moe-rand-fine-q4,fine,ceiling,1,1024,845.9,74.22,6675.2,cache 1024->2176; uniq_ids=1/1152,0.618,0
+decode,qwen3moe-rand-fine-q4,fine,noswap,1,1024,681.07,63.03,12657.4,cache 1024->2176; uniq_ids=3/1152,6.233,0
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,937.58,47.93,12657.4,cache 1024->2176; uniq_ids=1/1152,7.008,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,839.76,52.7,12657.4,cache 1024->2176; uniq_ids=1/1152,1.815,0
+decode,qwen3moe-rand-fine-q4,fine,deploy_overlap,1,1024,843.8,22.42,12657.4,cache 1024->2176; uniq_ids=1/1152,0.295,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,835.5,69.96,12657.4,cache 1024->2176; uniq_ids=2/1152,0.733,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,819.72,57.06,12657.4,cache 1024->2176; uniq_ids=2/1152,4.993,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=2,1,1024,880.37,58.99,12657.4,cache 1024->2176; uniq_ids=2/1152,2.175,59719680
+decode,qwen3moe-rand-fine-q4,fine,floor_n=4,1,1024,851.67,58.55,12657.4,cache 1024->2176; uniq_ids=2/1152,0.927,119439360
+decode,qwen3moe-rand-fine-q4,fine,floor_n=8,1,1024,814.17,55.73,12657.4,cache 1024->2176; uniq_ids=2/1152,1.327,238878720
+decode,qwen3moe-rand-fine-q4,fine,floor_n=14,1,1024,826.99,47.51,12657.4,cache 1024->2176; uniq_ids=2/1152,1.742,418037760
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,844.68,46.62,12657.4,cache 1024->2176; uniq_ids=2/1152,0.426,477757440
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,809.29,68.56,12657.4,cache 1024->2176; uniq_ids=2/1152,0.191,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,820.38,45.81,12657.4,cache 1024->2176; uniq_ids=2/1152,0.83,537477120
+decode,qwen3moe-rand-coarse-q4,coarse,ceiling,1,1024,855.5,75.34,6563.3,cache 1024->2176; uniq_ids=1/1152,1.006,0
+decode,qwen3moe-rand-coarse-q4,coarse,noswap,1,1024,1067.82,64.33,12545.5,cache 1024->2176; uniq_ids=3/1152,2.329,0
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,781.37,48.25,12545.5,cache 1024->2176; uniq_ids=2/1152,1.102,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,794.05,69.92,12545.5,cache 1024->2176; uniq_ids=2/1152,0.539,0
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,760.8,57.19,12545.5,cache 1024->2176; uniq_ids=2/1152,3.665,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=2,1,1024,729.83,57.82,12545.5,cache 1024->2176; uniq_ids=2/1152,1.315,179159040
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=4,1,1024,747.92,51.55,12545.5,cache 1024->2176; uniq_ids=2/1152,1.106,358318080
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,775.68,47.9,12545.5,cache 1024->2176; uniq_ids=2/1152,2.255,447897600
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,783.01,45.46,12545.5,cache 1024->2176; uniq_ids=2/1152,1.517,537477120
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,818.74,14.48,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=1/1152,0.529,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,895.15,19.86,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=1/1152,0.079,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_early_NOOVERLAP,1,1024,837.18,12.57,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=1/1152,0.799,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,809.75,36.57,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.487,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,787.69,15.09,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.61,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=2,1,1024,833.16,10.34,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.199,59719680
+decode,qwen3moe-rand-fine-q4,fine,floor_n=4,1,1024,804.7,9.79,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.345,119439360
+decode,qwen3moe-rand-fine-q4,fine,floor_n=8,1,1024,845.09,8.07,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.4,238878720
+decode,qwen3moe-rand-fine-q4,fine,floor_n=14,1,1024,821.89,6.55,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.019,418037760
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,863.79,6.12,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.081,477757440
+decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,838.92,5.8,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.134,537477120
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,792.51,8.52,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.433,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_early,1,1024,786.02,14.38,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=3/1152,0.25,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,784.34,37.0,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.311,0
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,803.68,9.1,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.229,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,766.19,6.58,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.036,447897600
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,734.12,6.05,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=2/1152,0.014,537477120
