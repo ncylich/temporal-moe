@@ -41,6 +41,11 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `mechinterp_locus.csv` | Token-AUC vs context-AUC 'locus' of expert specialization per (layer,expert); variant col = base/kfull/kwin k-config. | a6000@29c500ab/3ce9b63e/41c8d18a/804e10b6/dd4e900e |
 | `mechinterp_logitlens.csv` | Unweighted logit-lens effective-vocab + semantic dispersion per (layer,expert). | a6000@53c381bd |
 | `mechinterp_structural.csv` | Structural routing stats (PR, generalist frac, router entropy, eff-rank, centroid dist) per model. | a6000@3ce9b63e |
+| `mechinterp_structural_1e19.csv` | Structural stats replicated at 1e19 (3 cells, same schema + budget col). | h100@8aef6c4c |
+| `mechinterp_locus_1e19.csv` | Token-vs-context locus probes at 1e19 (per layer/expert AUCs; iid null 0.500-0.502, shift null 0.502-0.505 = residency autocorrelation). | h100@696da366 |
+| `mechinterp_demand_1e19.csv` | Causal history-only demand-prediction AUC at 1e19 (0.604 moe / 0.926 t-coarse / 0.979 t-fine). | h100@fea7d5fa |
+| `mechinterp_lens_1e19.csv` | Data-weighted logit lens at 1e19 (per layer/expert eff-vocab; static no-signal ref ~30k of 50k at this scale). | h100@fc47dd0c |
+| `unmask_eval_1e19.csv` | Constraint swap at 1e19, eval-only: unmask temporal (+0.21/+0.20 BPB) and impose on moe_coarse (+0.43 BPB). | h100@54c7d767 |
 | `momr_replay.csv` | Log-ratio momentum ('momr') replay — set/mass coverage, swap rate, union across β. | h100@256ae85c |
 | `oracle_a3.csv` | Oracle A3-cacheability (with induced swap rate) vs prefetch horizon per k. | a6000@74d1d62a |
 | `oracle_horizon_map.csv` | Oracle A3 gain (Δ over baseline) vs prefetch horizon per k. | a6000@37ef31f8 |

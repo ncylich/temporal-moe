@@ -1,0 +1,4 @@
+label,run,kind,E,k,PR_median,generalist_frac,router_entropy,eff_rank,strong_corr_pairs,dist2centroid_mean,pairwise_cos_med,pairwise_cos_p99,budget
+moe_coarse_1e19,moe_coarse_1e19,full,64,6,0.2721,0.2416,0.8471,34.61,31,0.8687,0.0016,0.0055,1e19
+temporal_coarse_1e19,g1_tmoe_coarse_1e19,temporal,64,6,0.598,0.6839,0.9484,41.1,0,0.8611,0.0038,0.007,1e19
+temporal_fine_1e19,temporal_fine_g3_1e19,temporal,192,18,0.5149,0.5284,0.9516,84.78,14,0.9122,0.0026,0.008,1e19

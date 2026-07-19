@@ -1,0 +1,4 @@
+label,run,demand_AUC,n_examples
+moe_coarse_1e19,moe_coarse_1e19,0.6043,41922560
+temporal_coarse_1e19,g1_tmoe_coarse_1e19,0.9264,41922560
+temporal_fine_1e19,temporal_fine_g3_1e19,0.9789,125767680

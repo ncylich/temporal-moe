@@ -1,0 +1,7 @@
+cell,scale,trained_paradigm,metric,native_regime,native_value,cross_regime,cross_value,delta
+moe_coarse_1e19,1e19_50k,full_moe,test_CE,unconstrained,3.1299,imposed_R6,4.4145,+1.2846
+moe_coarse_1e19,1e19_50k,full_moe,test_BPB,unconstrained,1.051,imposed_R6,1.4824,+0.4314
+temporal_coarse_1e19,1e19_50k,temporal,test_CE,masked_R6,3.179,unmasked_R64,3.7938,+0.6148
+temporal_coarse_1e19,1e19_50k,temporal,test_BPB,masked_R6,1.0675,unmasked_R64,1.2739,+0.2064
+temporal_fine_1e19,1e19_50k,temporal,test_CE,masked_R18,3.1714,unmasked_R192,3.7688,+0.5974
+temporal_fine_1e19,1e19_50k,temporal,test_BPB,masked_R18,1.0649,unmasked_R192,1.2655,+0.2006
