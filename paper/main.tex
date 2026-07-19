@@ -325,6 +325,15 @@ constraint is a pure, tunable quality cost. $R$ is the number of experts held in
 the curve is the serving memory-quality frontier. The maximal constraint costs +0.023 BPB at
 roughly a tenth of the routed-expert memory.
 
+\textbf{Expert conditioning.} Usage uniformity carries into the statistics of what the experts
+learn. At $10^{19}$ the temporal model's routed experts are less heavy-tailed than the full
+MoE's in both weights (max excess kurtosis 0.57 vs 0.97) and FFN activations (median 0.31 vs
+0.46). The payoff is quantization. At 3-bit precision the temporal model loses 0.038 CE where
+the full MoE loses 0.045, and the ordering holds at every bit width, granularity, and scale we
+measured. Per-expert weight norms keep the same spread in both regimes, while the largest
+weight entries shrink at $10^{18}$ and the typical expert's peak activation drops by a third to
+a half at both budgets (Appendix~\ref{app:stability}).
+
 A free router binds experts to token identities. Rolling residency makes that binding
 unrepresentable while leaving weights untouched, so the router reorganizes around context, which
 persists across a residency lifetime. That reorganization explains how quality survives the
@@ -388,13 +397,13 @@ from the router's objective.
 Two directions follow. The first is to adapt a released MoE checkpoint to residency with
 router-only training (zero-shot imposition is the costliest direction in Table~\ref{tab:swap}),
 which would make temporal routing a serving recipe for existing MoE-class models in the memory
-of their active parameters. The second is to establish the architecture's
-stability profile, weight and activation norms against the baselines, loss stability, and
-behavior under reinforcement learning, where routing flips between the rollout engine and the
-trainer are the identified collapse driver \cite{ma2025r3,zheng2025gspo}, so the recipe is
-viable end to end with no caveats. Residency cuts both ways there. The resident set is extra
-state the trainer must replay, but the single-swap budget bounds routing drift to one expert per
-layer per token, a bound vanilla routing does not have.
+of their active parameters. The second is behavior under reinforcement learning, where routing flips between the rollout
+engine and the trainer are the identified collapse driver \cite{ma2025r3,zheng2025gspo}.
+Residency cuts both ways there. The resident set is extra state the trainer must replay, but the
+single-swap budget bounds routing drift to one expert per layer per token, a bound vanilla
+routing does not have. The rest of the stability profile is measured.
+Appendix~\ref{app:stability} finds smoother weights and activations than the full MoE's, no
+pinned experts, and better low-bit quantization.
 
 The end goal is local inference. If temporal routing holds at scale, a Kimi-K2-scale sparse model
 \cite{kimik2} could run in the memory of its active parameters on quantized consumer hardware.
@@ -585,6 +594,76 @@ Table~\ref{tab:seeds} lists the runs behind the $10^{18}$ midpoint of Figure~\re
     \bottomrule
   \end{tabular}
 \end{table}
+
+\section{Weight and activation stability}\label{app:stability}
+
+All statistics derive from the trained checkpoints and one forward pass per model over the
+fixed evaluation batch of Appendix~\ref{app:mechanism}, with the $10^{19}$ cells primary and
+the $10^{18}$ 38M cells as replication. Excess kurtosis is 0 for a Gaussian and grows with
+tail weight.
+
+\textbf{Weights and activations.} Table~\ref{tab:stability} collects the per-expert statics.
+The kurtosis gaps of Section~\ref{sec:mechanism} replicate and widen at $10^{18}$, the spread
+of per-expert weight norms is unchanged (coefficient of variation 0.39--0.49 in every cell and
+both regimes), the largest weight entries shrink at $10^{18}$ and match at $10^{19}$, and the
+typical expert's peak intermediate activation drops by a third to a half. One tail event runs
+the other way, the single largest activation at $10^{19}$ coarse is higher under temporal (41
+vs 19) against a lower typical level. Peak attention logits stay at 32--39 against the dense
+model's 38. Router row norms are uncorrelated with each expert's residency frequency
+(correlations $-0.27$ to $+0.03$ across cells), and the served set tracks the router's
+unconstrained top-$k$ within a mean gap of 0.011--0.021, so the resident-only gate gradient
+leaves no trace in the router. Figure~\ref{fig:loss} shows the $10^{19}$ training
+curves. The dense baseline has one mid-run loss spike (to 2.61 BPB at iteration 2300, recovered
+within about 200 iterations) and coarse temporal a smaller, briefer one (to 1.51 at iteration
+830, recovered within tens). The full-MoE and fine temporal runs are smooth, no run diverged,
+and gradient norms are spike-free at $10^{18}$.
+
+\begin{table}[h]
+  \centering\small
+  \caption{Per-expert statics. Weight kurtosis is the max over experts and matrices, max $|w|$
+  the largest entry, activation kurtosis and peak activation the medians over experts (FFN
+  intermediates). Dense FFN kurtosis is $\approx$0. Lower is smoother throughout.}
+  \label{tab:stability}
+  \vspace{4pt}
+  \begin{tabular}{@{}llrrrr@{}}
+    \toprule
+    budget & model & weight kurt & max $|w|$ & act kurt & act peak \\
+    \midrule
+    $10^{19}$ & temporal, 6 of 64   & 0.57 & 0.21 & 0.31 & 5.6 \\
+    $10^{19}$ & full MoE, 6 of 64   & 0.97 & 0.21 & 0.46 & 8.3 \\
+    $10^{19}$ & temporal, 18 of 192 & 1.50 & 0.24 & 0.29 & 6.5 \\
+    $10^{18}$ & temporal, 6 of 64   & 0.66 & 0.19 & 0.21 & 3.0 \\
+    $10^{18}$ & full MoE, 6 of 64   & 2.63 & 0.24 & 1.02 & 5.1 \\
+    $10^{18}$ & temporal, 18 of 192 & 2.00 & 0.22 & 0.38 & 3.8 \\
+    $10^{18}$ & full MoE, 18 of 192 & 6.01 & 0.28 & 1.04 & 8.0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.62\linewidth]{figures/loss_curves_1e19_nocaption.png}
+  \caption{Training loss at $10^{19}$ (BPB, every 10 iterations). The dense spike at iteration
+  2300 peaks at 2.61 (clipped) and recovers. Coarse temporal's smaller excursion at 830
+  recovers within tens of iterations. No run diverged.}
+  \label{fig:loss}
+\end{figure}
+
+\textbf{Quantization.} Figure~\ref{fig:fakequant} applies per-group round-to-nearest (group
+128) to routed-expert weights only and re-evaluates test CE. 8-bit is lossless everywhere. At
+4 and 3 bits the temporal model degrades less than its full-MoE pair at both granularities and
+both scales, and the $10^{19}$ models are two to three times more robust than the 38M ones.
+Smoother weights are cheaper to quantize, and the deploy stack of Section~\ref{sec:results}
+already runs at Q4\_K\_M.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fakequant_degradation_nocaption.png}
+  \caption{Test-CE cost of quantizing routed-expert weights (per-group RTN, group 128), lower
+  is better. Panels have independent scales. Temporal sits below its matched full MoE at every
+  point.}
+  \label{fig:fakequant}
+\end{figure}
 
 \section{Negative results}\label{app:negatives}
 
