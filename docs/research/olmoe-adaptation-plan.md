@@ -105,6 +105,32 @@ Gate at 1B tokens: adapted BPB strictly below impose BPB, and still descending o
 already ≥ ~25% of the gap. A flat curve below that bar stops the run and opens the stage-2b
 decision (add LoRA on expert down-projections) rather than silently spending more.
 
+## Stage 2b — escalation bake-off (protocol locked 2026-07-20, runs after the 1B gate run)
+
+The zero-shot gap (+2.08 BPB on the audited slice) is large enough that the escalation question
+gets answered by measurement, not by default. One bake-off: equal-footing arms at 0.25B tokens
+each, all from the base router init at the sweep's winning LR, same data order, evals every 50M
+tokens always at R = 8 (the serving condition), usage-entropy and swap-rate telemetry per arm.
+
+| Arm | Axis | Recipe |
+|---|---|---|
+| A (reference) | — | Router-only, cold. Reuses the incumbent 1B run's first 0.25B, no new compute |
+| B | Schedule | Annealed R: 64→8 stepwise over the first ~150M tokens, then hold. The regime-annealing lesson from AR→diffusion adaptation (DiffuLLaMA-style attention-mask annealing); every intermediate R is a well-defined mask, and the Stage-0 R-sweep showed the intermediate regimes are mild |
+| C | Calibration | Router + layernorm gains, conditional on OLMoE's norms having learnable parameters (skip and note if non-parametric) |
+| D | Objective | Router + self-distillation: 0.5 data CE + 0.5 KL toward the frozen base's free-routing logits. ~2x step cost, the standard recovery tool for surgically modified models |
+| E | Capacity | Router + LoRA r=32 on expert up/down projections (MELINOE's recipe) |
+| F (optional) | Ceiling | Low-LR full finetune (8-bit Adam). Not a candidate: calibrates the recoverable ceiling so recovery fractions are quoted honestly |
+
+Selection rule, in order: (1) disqualify arms that improve BPB while collapsing usage entropy or
+gaming swap rate (mechanisms Goodhart; the alignment-program lesson); (2) rank by audited-slice
+BPB at 0.25B against a measured eval-noise sigma (re-evals of the base model on a few subsample
+seeds); (3) an arm within sigma of the leader but with clearly steeper end-slope may win on
+headroom; (4) ties break toward the simpler claim: router-only, then +LN, then anneal, then
++LoRA, then distillation combos; (5) a 3-task lm-eval on the provisional winner's 0.25B
+checkpoint confirms BPB gains translate downstream before the 5B run. If two different-axis
+mechanisms both clear the bar, one combo arm at 0.25B tests stacking. The winning recipe runs
+Phase C: 5B tokens, full eval curve, telemetry, milestone checkpoints, then Stage 3 forensics.
+
 ## Stage 3 — evaluation (1–2 days)
 
 1. **BPB triplet** base / impose / adapted on the held-out slice, plus one external corpus
