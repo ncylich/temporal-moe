@@ -144,6 +144,26 @@ Findings:
    the difference between interactive and not, a **3.2× end-to-end win** at the target miss
    rate.
 
+**The fair fits-in-RAM baseline (budget- and pressure-matched).** The natural objection to
+this table is "a model that fits in RAM decodes at 74 tok/s — why serve a big one?" Fairly
+posed, that comparison must hold two things fixed: the RAM budget and the machine's total
+memory commitment. The E=192 model is the budget-matched baseline for the E=1024 xl model by
+construction (identical active params/token, attention, and protocol; 5.7 GB vs 30.6 GB of
+experts). Two fair framings, both measured:
+
+- *Idle machine, own footprint (capacity per byte):* all-resident E=192 = 74.2 tok/s in a
+  6.7 GB process; temporal E=1024 from SSD serves **5.4× the expert parameters** at 14.5–19.9
+  tok/s in a ~2 GB working set (real xl path) — more capacity in less RAM at ~3.7× lower speed.
+- *Matched total memory commitment (~12.7 GB):* the emulated disk-tier rows themselves commit
+  12.6 GB of process RAM, so the matched fits-in-RAM measurement is the ceiling under 6 GB of
+  external incompressible pressure: **55.2 tok/s ± 15%** (erratic reps 40–65; an immediate
+  no-pressure control re-measured 73.8 ± 1.3%, ruling out thermal/state). The all-resident
+  baseline's headline speed assumes an otherwise-idle machine; under busy-machine conditions it
+  degrades ~25% and destabilizes, narrowing its edge over big-model temporal serving to ~2.8×.
+  (Symmetric caveat: the temporal disk rows were not additionally pressured; the real xl
+  deployment's ~2 GB resident set is structurally less pressure-exposed, but that remains a
+  design argument, not a measurement.)
+
 **Deployed-setup cross-check (real >RAM model, not emulated).** A real E=1024 variant of the
 fine model (30.6 GB of real quantized experts on disk; the expert GEMM consumes the actually
 fetched bytes; exactness gates bitwise on a truncated config; `gen_xl_model.py` rebuilds it
