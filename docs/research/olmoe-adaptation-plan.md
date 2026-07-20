@@ -140,6 +140,12 @@ and Phase C. Already-committed arms D and G keep their 250M spec: G is the recip
 its floor is the decision input, and D doubles as the slow-start test of this policy (if D's 50M
 position mispredicts its 250M position, the promotion rule earns its keep).
 
+**Arm CE (combo screen, inserted 2026-07-20 after C's live 50M signal of 90.1% recovery with
+133K norm-gain params).** Router + norm gains + LoRA r32 together, under the 50M screening
+policy. The disambiguator: CE ≈ E at 50M means norms and LoRA fix the same thing (calibration)
+and the cheap surface carries the recipe; CE above E by >2 sigma means they stack. G's exact
+definition (LoRA+distill vs norms+distill) is decided after CE and C's final land.
+
 **Optional-idle block** (only if the GPU would otherwise sit before Phase C selection, in this
 order): rank screens r ∈ {8, 64} under the 50M policy (bracketing r=32: does 91% survive a 4x
 smaller adapter, does 2x larger buy anything), then arm H (LoRA + zone-anneal R 24→8, a ramp arm
