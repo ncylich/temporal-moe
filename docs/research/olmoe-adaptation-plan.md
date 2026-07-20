@@ -115,7 +115,7 @@ tokens always at R = 8 (the serving condition), usage-entropy and swap-rate tele
 | Arm | Axis | Recipe |
 |---|---|---|
 | A (reference) | — | Router-only, cold. Reuses the incumbent 1B run's first 0.25B, no new compute |
-| B | Schedule | Annealed R: 64→8 stepwise over the first ~150M tokens, then hold. The regime-annealing lesson from AR→diffusion adaptation (DiffuLLaMA-style attention-mask annealing); every intermediate R is a well-defined mask, and the Stage-0 R-sweep showed the intermediate regimes are mild |
+| B | Schedule | Annealed R: 64→8 one expert at a time (56 rungs, equal-token, ~2.7M tokens each) across the first ~150M tokens, then hold. The regime-annealing lesson from AR→diffusion adaptation (DiffuLLaMA-style attention-mask annealing); every rung runs the exact deployed mechanism at the current R, and the Stage-0 R-sweep showed the intermediate regimes are mild. Reserved refinement if the final rungs spike: tail-weighted dwell (difficulty concentrates below R≈16). Rejected: soft-mask λ-ramps (break the residency invariant mid-anneal; soft pressure Goodharts) |
 | C | Calibration | Router + layernorm gains, conditional on OLMoE's norms having learnable parameters (skip and note if non-parametric) |
 | D | Objective | Router + self-distillation: 0.5 data CE + 0.5 KL toward the frozen base's free-routing logits. ~2x step cost, the standard recovery tool for surgically modified models |
 | E | Capacity | Router + LoRA r=32 on expert up/down projections (MELINOE's recipe) |
