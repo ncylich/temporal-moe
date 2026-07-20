@@ -105,7 +105,7 @@ Gate at 1B tokens: adapted BPB strictly below impose BPB, and still descending o
 already ≥ ~25% of the gap. A flat curve below that bar stops the run and opens the stage-2b
 decision (add LoRA on expert down-projections) rather than silently spending more.
 
-## Stage 2b — escalation bake-off (protocol locked 2026-07-20, runs after the 1B gate run)
+## Stage 2b — escalation bake-off (protocol locked 2026-07-20; resequenced same day: runs directly after the LR sweep, and the 1B hard gate migrates to Phase C's eval schedule, applied to the selected recipe)
 
 The zero-shot gap (+2.08 BPB on the audited slice) is large enough that the escalation question
 gets answered by measurement, not by default. One bake-off: equal-footing arms at 0.25B tokens
