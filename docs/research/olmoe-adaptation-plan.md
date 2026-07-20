@@ -119,7 +119,7 @@ tokens always at R = 8 (the serving condition), usage-entropy and swap-rate tele
 | C | Calibration | Router + layernorm gains, conditional on OLMoE's norms having learnable parameters (skip and note if non-parametric) |
 | D | Objective | Router + self-distillation: 0.5 data CE + 0.5 KL toward the frozen base's free-routing logits. ~2x step cost, the standard recovery tool for surgically modified models |
 | E | Capacity | Router + LoRA r=32 on expert up/down projections (MELINOE's recipe) |
-| F (optional) | Ceiling | Low-LR full finetune (8-bit Adam). Not a candidate: calibrates the recoverable ceiling so recovery fractions are quoted honestly |
+| F′ (after G) | Ceiling | Staged probe, supersedes from-scratch F: merge the best adapter of {E, G} into the expert weights (exact linear merge, phase 2 starts at phase-1 quality), then full finetune at LR 1e-5 (8-bit Adam) for ~200M tokens, evals every 25M. Breaks the ~91.5% plateau = the floor was adapter capacity and Phase C adopts the staged recipe; plateaus at the same level with every parameter free = the residual is the constraint's price, matching the from-scratch story |
 
 Selection rule, in order: (1) disqualify arms that improve BPB while collapsing usage entropy or
 gaming swap rate (mechanisms Goodhart; the alignment-program lesson); (2) rank by audited-slice
@@ -129,7 +129,25 @@ headroom; (4) ties break toward the simpler claim: router-only, then +LN, then a
 +LoRA, then distillation combos; (5) a 3-task lm-eval on the provisional winner's 0.25B
 checkpoint confirms BPB gains translate downstream before the 5B run. If two different-axis
 mechanisms both clear the bar, one combo arm at 0.25B tests stacking. The winning recipe runs
-Phase C: 5B tokens, full eval curve, telemetry, milestone checkpoints, then Stage 3 forensics.
+Phase C with the full eval curve, telemetry, milestone checkpoints, then Stage 3 forensics.
+
+**Screening policy (adopted 2026-07-20, prospective).** Fast-adapting arms at standard LR capture
+95–99% of their gain by 50M tokens (arm A 95.6%, arm E 99.3%), so new mechanism arms screen at
+50M with evals every ~10M. Promotion rule: an arm within 2 sigma of the leader at 50M, or still
+visibly descending, extends to 250M by checkpoint-resume; far behind and flat stops at 50M.
+Structural exceptions run full length by design: schedule/ramp arms, low-LR floor probes (F′),
+and Phase C. Already-committed arms D and G keep their 250M spec: G is the recipe contender so
+its floor is the decision input, and D doubles as the slow-start test of this policy (if D's 50M
+position mispredicts its 250M position, the promotion rule earns its keep).
+
+**Optional-idle block** (only if the GPU would otherwise sit before Phase C selection, in this
+order): rank screens r ∈ {8, 64} under the 50M policy (bracketing r=32: does 91% survive a 4x
+smaller adapter, does 2x larger buy anything), then arm H (LoRA + zone-anneal R 24→8, a ramp arm
+so full-length by the exception rule).
+
+**Phase C sizing note.** The chosen recipe converges within ~100M tokens and tokens do not move
+floors, so Phase C defaults to 1B with cosine decay (harvesting the decay dividend E's flat-LR
+plateau leaves on the table), extending only while the decayed curve still moves.
 
 ## Stage 3 — evaluation (1–2 days)
 
