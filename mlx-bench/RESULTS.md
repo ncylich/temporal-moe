@@ -186,6 +186,16 @@ insensitive (13.5 split-1 vs 13.2 split-8); floor n=1 received the identical mas
 parity with deploy preserved, no asymmetric favor). On the RAM tier the split ordering is a
 measured pessimization (42.0 vs 63.5 fused; fused remains the RAM default).
 
+**Difficulties of serving on macOS (citable list — four artifacts, three fixed, one
+inherent).** The fourth entry is the pread-aftermath GPU-state inflation detailed above:
+~430 µs of degraded Metal execution after each uncached SSD read, proven to ride the read
+itself (busy-wait control perfectly additive; no-read control at baseline; invariant to
+reader thread/process structure, sub-read split, and QoS) and therefore charged equally to
+every fetch-bound row, floor and deploy alike. We did not pursue further mitigation
+(candidate levers — 16 KB page-aligned expert slots, cached-read paths, process-isolated
+I/O — remain as documented knobs/probes); it is cited as an inherent cost of SSD-tier
+serving on this stack, worth ~430 µs × misses/layer to any engine, ours or a competitor's.
+
 **Generation-2 harness: three macOS scheduling artifacts, found and fixed.** (1) *QoS
 demotion*: any blocking wait demotes the decode thread; subsequent graph encodes/waits run
 2-3× slower (fix: pin QOS_USER_INTERACTIVE before MLX spawns workers). (2) *E-core wake
