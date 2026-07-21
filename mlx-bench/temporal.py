@@ -677,6 +677,22 @@ class TemporalLayer:
                     self.E, self.R, k)(self.slot_mx, sel)
                 sc = mx.take_along_axis(scores, perm.reshape(1, 1, k), axis=-1)
                 kh = k - 1
+                if disk and self.ctrl.ts is not None:
+                    # STREAM ENGINE: no python-side sync at all. SignalFetch
+                    # commits the CB (handler preads + signals the layer's
+                    # shared event); the hit part encodes into the NEXT CB
+                    # (overlaps the fetch); WaitFetch gates only the fetched
+                    # expert's contribution. Whole token pipelines like the
+                    # ceiling path.
+                    ts = self.ctrl.ts
+                    self._wait_val += 1
+                    sig = ts.signal_fetch(src, self.disk_idx)
+                    hit = self._glu_c(mx.depends([x], [sig])[0],
+                                      ids_s[:kh].reshape(1, 1, kh), sc[..., :kh])
+                    gate = ts.wait_fetch(hit, sig, self.disk_idx, self._wait_val)
+                    return gate + self._glu_c(
+                        mx.depends([x], [gate])[0],
+                        ids_s[kh:].reshape(1, 1, 1), sc[..., kh:])
                 if disk:
                     self.ctrl._disk_tick_pre()
                     hit = self._glu_c(x, ids_s[:kh].reshape(1, 1, kh),
@@ -728,6 +744,24 @@ class TemporalLayer:
             # keeps causality identical to the old per-layer-mx.eval loop while
             # removing pure harness serialization.
             N, R = self.ctrl.N, self.R
+            if self.ctrl.ts is not None:
+                # STREAM ENGINE (identical machinery; fairness symmetry): the
+                # R-N hit-slot contributions overlap the N-expert fetch; the
+                # N miss slots (or, for N==0/N>=R, the whole GEMM) are gated
+                # on the layer's shared event.
+                ts = self.ctrl.ts
+                self._wait_val += 1
+                sig = ts.signal_fetch(sel, self.disk_idx)
+                if 0 < N < R:
+                    hits = R - N
+                    hit = self._glu_c(mx.depends([x], [sig])[0],
+                                      self._eff_hit, scores[..., :hits])
+                    gate = ts.wait_fetch(hit, sig, self.disk_idx, self._wait_val)
+                    return gate + self._glu_c(
+                        mx.depends([x], [gate])[0],
+                        self._eff_miss, scores[..., hits:])
+                gate = ts.wait_fetch(x, sig, self.disk_idx, self._wait_val)
+                return self._glu_c(gate, self._eff_all, scores)
             if self.ctrl.sync_inline:
                 self.ctrl._disk_tick_inline(sel, self, N)
             elif 0 < N < R and not self.ctrl.no_mask:
@@ -893,6 +927,17 @@ class TemporalController:
         # (they need parallel reads). GIL switch interval knob for the
         # contention experiment.
         self.sync_direct = os.environ.get("TEMPORAL_SYNC_DIRECT", "") == "1"
+        # TEMPORAL_STREAM=1: engine 3 -- the whole token submits as ONE
+        # pipelined graph (like the ceiling); per MoE layer a SignalFetch
+        # primitive commits the command buffer with a C++ completed-handler
+        # that preads the layer's expert(s) (offset streams byte-identical to
+        # _issue_disk) and signals a per-layer MTLSharedEvent, and a WaitFetch
+        # primitive encodes a buffer-level wait so only the fetched-expert
+        # contribution (masked split unchanged) executes post-fetch. Requires
+        # the ext/ extension + the one-line vendored MLX patch
+        # (ext/mlx_v0.32.0_temporal.patch). Old issuer engine kept for A/B.
+        self.stream_engine = os.environ.get("TEMPORAL_STREAM", "") == "1"
+        self.ts = None
         if os.environ.get("TEMPORAL_SWITCHINTERVAL"):
             import sys as _sys
             _sys.setswitchinterval(float(os.environ["TEMPORAL_SWITCHINTERVAL"]))
@@ -911,7 +956,7 @@ class TemporalController:
         self.mode = mode
         self.N = N
         _pin_thread_qos()  # decode-thread scheduling fix (see docstring)
-        self.copied_bytes = 0
+        self._copied_bytes_py = 0
         self.copy_stream = copy_stream
         self._model = model
         k = model.args.num_experts_per_tok
@@ -961,6 +1006,18 @@ class TemporalController:
             for i, tl in enumerate(self.layers):
                 tl.disk_idx = i
                 tl._dcycle = 0
+                tl._wait_val = 0
+            if self.stream_engine:
+                import sys as _sys
+                _ext_dir = os.path.join(os.path.dirname(
+                    os.path.abspath(__file__)), "ext")
+                if _ext_dir not in _sys.path:
+                    _sys.path.insert(0, _ext_dir)
+                import _temporal_stream as _ts
+                self.ts = _ts
+                nfetch = N if mode == "floor" else 1
+                _ts.setup(self.disk_path, eb, len(self.layers), nfetch,
+                          self.disk_qd)
 
     # ---- regime-2 sync-loop structure (floor + sync deploy disk rows) ----
     # Deferred-wait per-layer tick: layer L's fetch-on-miss sequence
@@ -1094,10 +1151,22 @@ class TemporalController:
             self._wait_box(p)
 
     @property
+    def copied_bytes(self):
+        if self.ts is not None:
+            return self.ts.copied_bytes()
+        return self._copied_bytes_py
+
+    @copied_bytes.setter
+    def copied_bytes(self, v):
+        self._copied_bytes_py = v
+
+    @property
     def n_moe_layers(self):
         return len(self.layers)
 
     def reset(self):
+        if self.ts is not None:
+            self.ts.reset()
         self.copied_bytes = 0
         self.retained.clear()
         self.retained_b = 0
@@ -1105,10 +1174,14 @@ class TemporalController:
         self._early_pending = None
         for tl in self.layers:
             tl.reset()
+            tl._wait_val = 0
 
     def disable(self):
         for layer in self._model.model.layers:
             layer.mlp.temporal = None
+        if self.ts is not None:
+            self.ts.teardown()
+            self.ts = None
         if self._issuer_q is not None:
             self._issuer_q.put(None)
             self._issuer_q = None

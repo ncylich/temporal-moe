@@ -1,0 +1,19 @@
+diff --git a/mlx/backend/metal/eval.cpp b/mlx/backend/metal/eval.cpp
+index e682625..4b105fb 100644
+--- a/mlx/backend/metal/eval.cpp
++++ b/mlx/backend/metal/eval.cpp
+@@ -63,7 +63,13 @@ void eval(array& arr) {
+       scheduler::notify_task_completion(s);
+     });
+   } else {
+-    command_buffer->addCompletedHandler(
++    // TEMPORAL-PATCH: re-fetch the encoder's CURRENT command buffer instead
++    // of the pointer captured before eval_gpu ran. Identical behavior for
++    // stock primitives (the pointer only changes if the primitive committed
++    // the buffer itself, which only the temporal_stream extension's
++    // SignalFetch does); prevents adding a completed-handler to an
++    // already-committed buffer.
++    encoder.get_command_buffer()->addCompletedHandler(
+         [buffers = std::move(buffers)](MTL::CommandBuffer* cbuf) {});
+   }
+ }

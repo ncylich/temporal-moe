@@ -221,8 +221,9 @@ def run(args):
         note = f"cache {args.context}->{final_offset}; uniq_ids={unique}/{len(all_ids)}"
         import os as _os
         if _os.environ.get("TEMPORAL_DISK_POOL"):
+            eng = "stream" if _os.environ.get("TEMPORAL_STREAM") == "1" else "issuer"
             note = (f"DISK_TIER pool>RAM QD={_os.environ.get('TEMPORAL_DISK_QD', '8')} "
-                    f"SPLIT={_os.environ.get('TEMPORAL_DISK_SPLIT', '8')} " + note)
+                    f"SPLIT={_os.environ.get('TEMPORAL_DISK_SPLIT', '8')} ENG={eng} " + note)
         if args.smoke:
             note = "SMOKE " + note
         row = dict(
