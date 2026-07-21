@@ -97,7 +97,28 @@ def g2b(model, config):
     ok_ii = dii <= GATE and argmax_ok
     r_ii = dict(name="G2b-ii_deploy_vs_reference", max_abs_logit_delta=dii,
                 argmax_match=argmax_ok, verdict="PASS" if ok_ii else "FAIL")
-    return [r_i, r_ii], (ok_i and ok_ii)
+
+    # G2b-iii: masked SPLIT op order (fork TEMPORAL_UNIFIED_OVERLAP analog,
+    # the structure the DISK deploy/floor rows use): fetched-expert
+    # contribution moved last and summed separately ((k-1)-sum + 1-sum).
+    # Splitting the weighted sum changes the float reduction order, so it is
+    # gated against the reference emulator running the SAME split order --
+    # both sides same math, same order, expected bitwise.
+    ctrl = TemporalController(model, "deploy")
+    ctrl.split_order = True
+    Lds = logits_path(model, ids_prefill, decode)
+    ctrl.disable()
+    ctrl = TemporalController(model, "deploy_ref")
+    ctrl.split_order = True
+    Lrs = logits_path(model, ids_prefill, decode)
+    ctrl.disable()
+    diii = float(mx.abs(Lds - Lrs).max())
+    argmax_ok3 = bool(mx.all(mx.argmax(Lds, -1) == mx.argmax(Lrs, -1)).item())
+    ok_iii = diii <= GATE and argmax_ok3
+    r_iii = dict(name="G2b-iii_deploy_splitorder_vs_reference",
+                 max_abs_logit_delta=diii, argmax_match=argmax_ok3,
+                 verdict="PASS" if ok_iii else "FAIL")
+    return [r_i, r_ii, r_iii], (ok_i and ok_ii and ok_iii)
 
 
 def floor_bytes_audit(model, config):

@@ -149,6 +149,67 @@ def _deploy_step_fast(E, R, K):
 
 
 @lru_cache(maxsize=None)
+def _deploy_step_masked(E, R, K):
+    """_deploy_step_fast plus the fork's TEMPORAL_UNIFIED_OVERLAP masking
+    order: also emits `perm` [K] -- selection positions in stable order with
+    the position of the FETCHED expert (nominee if a swap fires, else the
+    victim slot's occupant) moved LAST iff that expert is among the selected.
+    The caller runs the first K-1 (resident-hit) contributions while the
+    fetch is in flight and only the last contribution behind the fetch.
+    ids_sorted[j] = eff[perm[j]]. Residency decisions identical to
+    _deploy_step / _deploy_step_fast."""
+    src_code = f"""
+    if (thread_position_in_grid.x != 0) return;
+    const int E_ = {E}; const int R_ = {R}; const int K_ = {K};
+    int loc[K_];
+    int nom = E_;
+    for (int i = 0; i < K_; ++i) {{
+        int s = int(sel[i]); int l = -1;
+        for (int j = 0; j < R_; ++j) if (slot[j] == s) {{ l = j; break; }}
+        if (l < 0 && s < nom) nom = s;
+        loc[i] = l;
+    }}
+    int vic = R_;
+    for (int j = 0; j < R_; ++j) {{
+        bool selj = false;
+        for (int i = 0; i < K_; ++i) if (int(sel[i]) == slot[j]) {{ selj = true; break; }}
+        if (!selj) {{ vic = j; break; }}
+    }}
+    bool doswap = (nom < E_) && (vic < R_);
+    int vicc = vic < R_ ? vic : R_ - 1;
+    int f = doswap ? nom : slot[vicc];
+    src[0] = uint(f);
+    for (int j = 0; j < R_; ++j) new_slot[j] = slot[j];
+    if (doswap) new_slot[vicc] = nom;
+    int slot0 = new_slot[0];
+    int effv[K_];
+    for (int i = 0; i < K_; ++i) {{
+        int s = int(sel[i]);
+        bool now_res = (loc[i] >= 0) || (doswap && s == nom);
+        effv[i] = now_res ? s : slot0;
+    }}
+    int m = -1;
+    for (int i = 0; i < K_; ++i) if (int(sel[i]) == f) {{ m = i; break; }}
+    int w = 0;
+    for (int i = 0; i < K_; ++i) if (i != m) perm[w++] = uint(i);
+    if (m >= 0) perm[K_ - 1] = uint(m);
+    for (int j = 0; j < K_; ++j) ids_sorted[j] = uint(effv[int(perm[j])]);
+    """
+    kern = mx.fast.metal_kernel(name=f"deploy_step_masked_{E}_{R}_{K}",
+                                input_names=["slot", "sel"],
+                                output_names=["new_slot", "src", "ids_sorted",
+                                              "perm"],
+                                source=src_code)
+
+    def call(slot, sel):
+        return kern(inputs=[slot, sel], grid=(1, 1, 1), threadgroup=(1, 1, 1),
+                    output_shapes=[(R,), (1,), (K,), (K,)],
+                    output_dtypes=[mx.int32, mx.uint32, mx.uint32, mx.uint32])
+
+    return call
+
+
+@lru_cache(maxsize=None)
 def _floor_src_step(N):
     """RAM floor: cycled source ids, data-dependent on this layer's routing
     (+ sel[0]*0 -- fetch-on-miss causality, prevents Metal hoisting the copies
@@ -366,7 +427,13 @@ class TemporalLayer:
         # is a per-layer constant -- materialize once instead of per token.
         if self.ctrl.mode == "floor":
             self._eff_all = mx.arange(self.R, dtype=mx.uint32).reshape(1, 1, self.R)
-            mx.eval(self._eff_all)
+            evs = [self._eff_all]
+            N = self.ctrl.N
+            if 0 < N < self.R:                # masked split slices (disk rows)
+                self._eff_hit = self._eff_all[..., :self.R - N]
+                self._eff_miss = self._eff_all[..., self.R - N:]
+                evs += [self._eff_hit, self._eff_miss]
+            mx.eval(*evs)
         # hot slots = fresh copy of cold[:R] (so table & bytes are consistent)
         self.hot = {}
         for name in PROJ:
@@ -518,6 +585,49 @@ class TemporalLayer:
                 # G2b-ii reference emulator: SAME deploy residency rule, but the
                 # expert GEMM is computed straight from the COLD pool via
                 # effective ids -- no hot slots, no byte copies.
+                # ctrl.split_order: mirror the masked (fork
+                # TEMPORAL_UNIFIED_OVERLAP-order) structure of the bench deploy
+                # path -- fetched-expert contribution moved last and summed
+                # separately ((k-1)-sum + 1), so the float reduction order
+                # matches the split GEMM bit-for-bit.
+                if self.ctrl.split_order:
+                    loc, slot, R = self.loc, self.slot_of, self.R
+                    nominee = -1
+                    for e in range(self.E):
+                        if loc[e] < 0 and e in selset:
+                            nominee = e
+                            break
+                    victim = -1
+                    for s in range(R):
+                        re = slot[s]
+                        if re < 0 or re not in selset:
+                            victim = s
+                            break
+                    do = nominee >= 0 and victim >= 0
+                    vicc = victim if victim >= 0 else R - 1
+                    f = nominee if do else int(slot[vicc])
+                    self._resid_deploy(selset)
+                    eff = np.where(self.loc[sel_np] >= 0, sel_np,
+                                   self.slot_of[0])
+                    m = -1
+                    for i in range(self.k):
+                        if int(sel_np[i]) == f:
+                            m = i
+                            break
+                    perm = [i for i in range(self.k) if i != m]
+                    if m >= 0:
+                        perm.append(m)
+                    ids = eff[perm]
+                    sc = mx.take_along_axis(
+                        scores, mx.array(np.array(perm, dtype=np.uint32)
+                                         ).reshape(1, 1, self.k), axis=-1)
+                    kh = self.k - 1
+                    y1 = self.block.switch_mlp(
+                        x, mx.array(ids[:kh].reshape(1, 1, kh)))
+                    y2 = self.block.switch_mlp(
+                        x, mx.array(ids[kh:].reshape(1, 1, 1)))
+                    return ((y1 * sc[..., :kh, None]).sum(axis=-2)
+                            + (y2 * sc[..., kh:, None]).sum(axis=-2))
                 self._resid_deploy(selset)
                 eff = np.where(self.loc[sel_np] >= 0, sel_np, self.slot_of[0])
                 y = self.block.switch_mlp(x, mx.array(eff.reshape(1, 1, self.k)))
@@ -536,6 +646,41 @@ class TemporalLayer:
         sel = inds.reshape(self.k)
         disk_tick = None                      # (causality_arr, n_fetch)
         if mode == "deploy":
+            k = self.k
+            disk = self.ctrl.disk_fd is not None
+            masked = (k > 1 and self.ctrl.diag != "residcpu"
+                      and (disk and not self.ctrl.sync_inline
+                           or self.ctrl.split_order))
+            if masked:
+                # Fork TEMPORAL_UNIFIED_OVERLAP analog (masked split, same
+                # token): the k-1 resident-hit expert contributions execute
+                # WHILE the fetch is in flight; only the fetched expert's
+                # contribution waits on it. The step kernel emits the ids in
+                # miss-last order + the permutation for the scores.
+                self.slot_mx, src, ids_s, perm = _deploy_step_masked(
+                    self.E, self.R, k)(self.slot_mx, sel)
+                sc = mx.take_along_axis(scores, perm.reshape(1, 1, k), axis=-1)
+                kh = k - 1
+                if disk:
+                    self.ctrl._disk_tick_pre()
+                    hit = self._glu_c(x, ids_s[:kh].reshape(1, 1, kh),
+                                      sc[..., :kh])
+                    # submit hit-GEMM delta; issuer waits src then preads --
+                    # the fetch overlaps the hit-GEMM execution
+                    self.ctrl._disk_tick_post(hit, self, src, 1)
+                    out = hit + self._glu_c(x, ids_s[kh:].reshape(1, 1, 1),
+                                            sc[..., kh:])
+                    if self.disk_idx == self.ctrl.n_last:
+                        self.ctrl._flush_pending()
+                else:
+                    # RAM tier, same op order (copies stay graph-ordered)
+                    x, nb = self._stage(x, src, 1)
+                    self.ctrl.copied_bytes += nb
+                    out = (self._glu_c(x, ids_s[:kh].reshape(1, 1, kh),
+                                       sc[..., :kh])
+                           + self._glu_c(x, ids_s[kh:].reshape(1, 1, 1),
+                                         sc[..., kh:]))
+                return out
             if self.ctrl.diag == "residcpu":   # experiment: tiny residency ops on CPU stream
                 with mx.stream(mx.cpu):
                     self.slot_mx, src, eff = _deploy_step(
@@ -545,7 +690,7 @@ class TemporalLayer:
             else:
                 self.slot_mx, src, eff = _deploy_step_fast(
                     self.E, self.R, self.k)(self.slot_mx, sel)
-            if self.ctrl.disk_fd is not None:
+            if disk:
                 # causality token = src (swap decision before fetch issue)
                 if self.ctrl.sync_inline:
                     self.ctrl._disk_tick_inline(src, self, 1)
@@ -566,11 +711,24 @@ class TemporalLayer:
             # baseline). The deferred two-phase tick (see _disk_tick_pre/post)
             # keeps causality identical to the old per-layer-mx.eval loop while
             # removing pure harness serialization.
+            N, R = self.ctrl.N, self.R
             if self.ctrl.sync_inline:
-                self.ctrl._disk_tick_inline(sel, self, self.ctrl.N)
+                self.ctrl._disk_tick_inline(sel, self, N)
+            elif 0 < N < R:
+                # same masked split as deploy (fairness symmetry): the R-N
+                # hit-slot contributions execute while the N-expert fetch is
+                # in flight; the N miss-slot contributions wait on it.
+                self.ctrl._disk_tick_pre()
+                hits = R - N
+                hit = self._glu_c(x, self._eff_hit, scores[..., :hits])
+                self.ctrl._disk_tick_post(hit, self, sel, N)
+                out = hit + self._glu_c(x, self._eff_miss, scores[..., hits:])
+                if self.disk_idx == self.ctrl.n_last:
+                    self.ctrl._flush_pending()
+                return out
             else:
                 self.ctrl._disk_tick_pre()
-                disk_tick = (sel, self.ctrl.N)
+                disk_tick = (sel, N)
             eff = self._eff_all               # timing emulation: reads all R slots
         elif mode == "floor":
             N, E = self.ctrl.N, self.E
@@ -590,7 +748,8 @@ class TemporalLayer:
             raise ValueError(f"unknown temporal mode {mode!r}")
         out = self._glu_c(x, eff, scores)     # built while prev fetch flies
         if disk_tick is not None:
-            self.ctrl._disk_tick_post(disk_tick[0], self, disk_tick[1])
+            self.ctrl._disk_tick_post(disk_tick[0], self, disk_tick[0],
+                                      disk_tick[1])
             if self.disk_idx == self.ctrl.n_last:
                 self.ctrl._flush_pending()    # last layer: fetch lands before
         return out                            #   the head/GEMM can be submitted
@@ -706,6 +865,10 @@ class TemporalController:
         # sync-tick structure A/B: issuer (default) vs the pre-gen-2 fully
         # inline eval+fetch (diagnostic / fallback)
         self.sync_inline = os.environ.get("TEMPORAL_SYNC_INLINE", "") == "1"
+        # masked (fork TEMPORAL_UNIFIED_OVERLAP-order) split on the RAM deploy
+        # path + reference emulator: used by the G2 gate and the one-off RAM
+        # measurement; the DISK deploy/floor rows use the masked order always.
+        self.split_order = os.environ.get("TEMPORAL_SPLIT_ORDER", "") == "1"
         # regime-2 disk tier (bigger-than-RAM cold pool): TEMPORAL_DISK_POOL=
         # <file>, TEMPORAL_DISK_QD=<threads>. Tier-crossing fetches become real
         # SSD preads (F_NOCACHE fd; the pool exceeds RAM so the page cache
@@ -805,6 +968,10 @@ class TemporalController:
 
     def _issuer_run(self):
         _pin_thread_qos()
+        # fresh threads have no default GPU stream in MLX; bind explicitly
+        # (a second issuer thread in one process otherwise raises
+        # "There is no Stream(gpu, 0) in current thread")
+        mx.set_default_stream(mx.default_stream(mx.Device(mx.DeviceType.gpu)))
         q = self._issuer_q
         while True:
             item = q.get()
@@ -855,11 +1022,16 @@ class TemporalController:
             done.wait()
             self.copied_bytes += nb
 
-    def _disk_tick_post(self, causal, layer, n_fetch):
-        """Submit this layer's graph delta (contains the PREVIOUS layer's
-        expert GEMM -- legal, its fetch was waited in tick_pre) and hand the
-        (wait routing -> issue fetch) sequence to the issuer thread."""
-        mx.async_eval(causal)             # submit delta (incl. prev layer GEMM)
+    def _disk_tick_post(self, submit_arr, layer, causal, n_fetch):
+        """Submit this layer's graph delta up to `submit_arr` (contains the
+        PREVIOUS layer's expert GEMM -- legal, its fetch was waited in
+        tick_pre -- and, on masked rows, this layer's resident-hit GEMM part,
+        which the fetch then overlaps) and hand the (wait `causal` computed ->
+        issue fetch) sequence to the issuer thread."""
+        # submit delta (incl. prev layer GEMM); scheduling `causal` here too
+        # guarantees the issuer's eval is a pure wait (it must never have to
+        # execute graph nodes itself)
+        mx.async_eval(submit_arr, causal)
         self._pending_box = self._hand_to_issuer(causal, layer, n_fetch)
 
     def _flush_pending(self):
