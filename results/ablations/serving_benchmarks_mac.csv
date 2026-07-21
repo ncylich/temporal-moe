@@ -12,6 +12,11 @@
 # same semantics with a blocking fetch (bit-identical logits -- isolates the overlap gain: 31.55 vs 16.06 = +96%).
 # Known residual artifact: sporadic slow first rep after prefill on some rows (E-core; drags those means ~3-5%,
 # conservative). macOS scheduling findings + physics accounting: mlx-bench/RESULTS.md.
+# MASKED-tagged rows (final setup-c generation): fork TEMPORAL_UNIFIED_OVERLAP parity -- the k-1 resident-hit
+# expert contributions execute while the single-expert pread flies; only the fetched expert's contribution waits
+# (bit-identical to a mirrored-order reference, gate G2b-iii; causality control: 720/720 fetches issued strictly
+# after their layer's routing). Masking ceiling at B=1: ~220us/layer coverable of the ~1.2ms fetch+coupling --
+# the fork's small-GEMV-window finding, quantified. Post-mask, sub-read split is insensitive (13.5 s1 vs 13.2 s8).
 phase,model,tier,setup,ubatch,context,prefill_ms,decode_tok_s,peak_vram_mib,note,decode_tok_s_std,copied_bytes_per_token
 decode,qwen3moe-rand-fine-q4,fine,ceiling,1,1024,845.9,74.22,6675.2,cache 1024->2176; uniq_ids=1/1152,0.618,0
 decode,qwen3moe-rand-fine-q4,fine,noswap,1,1024,854.76,74.96,12657.4,cache 1024->2176; uniq_ids=3/1152,0.731,0
@@ -35,16 +40,16 @@ decode,qwen3moe-rand-coarse-q4,coarse,floor_n=4,1,1024,747.92,51.55,12545.5,GEN1
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,763.57,49.54,12545.5,cache 1024->2176; uniq_ids=2/1152,1.272,447897600
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,843.33,47.68,12545.5,cache 1024->2176; uniq_ids=2/1152,0.98,537477120
 decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,816.77,39.44,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,1.235,0
-decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,891.56,12.94,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.154,29859840
-decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,882.23,12.91,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.234,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,970.36,13.57,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.886,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,905.82,13.73,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.543,29859840
 decode,qwen3moe-rand-fine-q4,fine,floor_n=2,1,1024,939.24,11.13,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.101,59719680
 decode,qwen3moe-rand-fine-q4,fine,floor_n=4,1,1024,1032.64,10.25,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.336,119439360
 decode,qwen3moe-rand-fine-q4,fine,floor_n=8,1,1024,898.6,8.64,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.192,238878720
 decode,qwen3moe-rand-fine-q4,fine,floor_n=14,1,1024,950.14,6.53,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.109,418037760
 decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,1073.17,6.05,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.102,477757440
 decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,1081.2,5.83,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.058,537477120
-decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,904.32,12.68,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.321,29859840
-decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,878.51,12.93,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,0.326,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,891.17,13.54,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.499,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1066.45,13.18,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,0.791,29859840
 decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,901.42,31.55,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.308,29859840
 decode,qwen3moe-rand-fine-q4,fine,deploy_early_NOOVERLAP,1,1024,964.74,16.06,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.309,29859840
 decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,937.22,21.66,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,1.166,29859840
@@ -52,5 +57,5 @@ decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,935.09,36.81,12545.5,DISK
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,820.97,10.78,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.254,89579520
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,910.46,6.54,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.128,447897600
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,826.82,5.96,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.135,537477120
-decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,848.13,11.55,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.122,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,836.84,13.15,12545.5,MASKED DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.257,89579520
 decode,qwen3moe-rand-coarse-q4,coarse,deploy_early,1,1024,764.98,24.51,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.236,89579520

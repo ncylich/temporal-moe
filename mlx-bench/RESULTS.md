@@ -120,16 +120,16 @@ steelman fairness (full protocol, 8 reps + warmup, 10 s cooldowns, bytes audits 
 | sync-loop baseline, no fetches (floor n=0) | 39.4 | 36.8 |
 | **temporal deploy, router-early (setup d): fetch overlaps attention** | **31.6 ± 0.4** | **24.5 ± 0.3** |
 | router-early, overlap disabled (control; bit-identical logits) | 16.1 | — |
-| temporal deploy, sync (setup c) | 12.7–12.9 | 11.6 |
-| floor n=1 (same bytes as deploy, no residency machinery) | 12.9 | 10.8 |
+| temporal deploy, sync (setup c, masked: hits overlap the fetch) | **13.5 ± 0.5** | 13.2 ± 0.3 |
+| floor n=1 (same bytes as deploy, same masking) | 13.6 ± 0.9 | 10.8 |
 | vanilla-offload floor @ target miss rate | **6.05 ± 0.1** (n16) | 6.5 ± 0.1 (n5) |
 | vanilla-offload floor, all-miss (n=k) | 5.8 ± 0.06 | 6.0 ± 0.1 |
 
 Fine floor curve (tok/s): n0 36.6, n1 15.1, n2 10.3, n4 9.8, n8 8.1, n14 6.6, n16 6.1, n18 5.8.
 
 Findings:
-1. **Temporal-MoE's advantage returns once the tier is slow: 2.1× over the vanilla floor at
-   the target miss rate sync (12.8 vs 6.05), 5.2× with router-early (31.6 vs 6.05)**, with the residency machinery essentially free at disk
+1. **Temporal-MoE's advantage returns once the tier is slow: 2.2× over the vanilla floor at
+   the target miss rate sync (13.5 vs 6.05), 5.2× with router-early (31.6 vs 6.05)**, with the residency machinery essentially free at disk
    speeds (deploy 14.5 ≈ floor_n1 15.1, which moves identical bytes with no machinery).
    The two sides are differently bound — deploy is fetch-latency-bound (45 serial
    single-expert round-trips/token), the floor bandwidth-bound (~3.5 GB/s effective at QD16) —
@@ -155,6 +155,23 @@ Findings:
    concurrent GPU load, with attention, graph encodes, and builds fully packed inside the
    fetch window (residual unexplained overhead ≈ 0). The overlap control isolates the gain:
    31.6 vs 16.1 no-overlap = +96% from fetch/attention overlap alone.
+
+**Setup c is masked at fork parity (review-driven).** The A6000's deploy ran with
+`TEMPORAL_UNIFIED_OVERLAP=1` (each GEMM waits only its own tensor's copy); our first port ran
+the fetch fully in-order (GPU idle during the pread). The final setup-c rows use the masked
+split: the k−1 resident-hit expert contributions execute while the single-expert pread flies,
+and only the fetched expert's contribution waits — bit-identical to a mirrored-order reference
+(gate G2b-iii, Δ = 0.0), with an instrumented causality control (720/720 fetches issued
+strictly after their layer's routing, byte counters exact). Gain: +5–14% across the sync
+single-fetch rows. The quantified masking ceiling at B=1: ~220 µs/layer coverable (the
+resident-hit GEMVs plus launch slack) against a ~1.2 ms/layer fetch+coupling cost — ~20% of
+the fetch is coverable and is now covered; the rest is bare SSD latency with no same-token
+compute legally placeable inside it (routing follows attention by definition of setup c).
+This reproduces and quantifies the fork's "the copy cannot hide in the B=1 GEMV window"
+finding, and is exactly why router-early (setup d) exists. Post-mask, the sub-read split is
+insensitive (13.5 split-1 vs 13.2 split-8); floor n=1 received the identical masking (13.6 —
+parity with deploy preserved, no asymmetric favor). On the RAM tier the split ordering is a
+measured pessimization (42.0 vs 63.5 fused; fused remains the RAM default).
 
 **Generation-2 harness: three macOS scheduling artifacts, found and fixed.** (1) *QoS
 demotion*: any blocking wait demotes the decode thread; subsequent graph encodes/waits run
