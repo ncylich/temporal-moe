@@ -155,6 +155,42 @@ so full-length by the exception rule).
 floors, so Phase C defaults to 1B with cosine decay (harvesting the decay dividend E's flat-LR
 plateau leaves on the table), extending only while the decayed curve still moves.
 
+## O-series — MinFlow oracle scheduling program (approved 2026-07-21, queues after F′)
+
+The residual gap decomposes into weight-side terms (measured by the bake-off) and a
+scheduling-side term this program prices. Reward field: the frozen base's plain softmax mass
+over all 64 experts per token per layer (one free forward; sparsified to top-24 after verifying
+≥99.5% cumulative mass — never renormalized after truncation). Captured mass M(S,t) is the
+first-order surrogate: masked gating preserves resident ratios, so 1−M bounds the per-token
+deviation from free behavior. The hindsight schedule is then an EXACT min-cost flow per
+(layer, sequence): 8 slot-units through the experts×time graph, node capacity 1 per (e,t),
+stay arcs collect reward, switch arcs route through a capacity-m admission hub per token
+(m=1 is the paper constraint), cold fill = 8 free admissions at t=0. Milliseconds per 4096
+sequence; solvable in the dataloader.
+
+- **O-0 calibration** (GPU minutes + CPU): free forward over ~10M tokens; rank-mass histogram
+  (truncation check); captured-mass ladder replayed over stored logits with no model evals:
+  static-best-8 < greedy scan < MinFlow < per-token top-8 bound. Kill the program here if
+  MinFlow ≈ greedy in reward.
+- **O-1 m-sweep** (CPU): ladder at m ∈ {1, 2, 4}. Separates better-choices from more-budget;
+  m>1 is analysis and a serving bandwidth knob, not a method change.
+- **O-2 reward→BPB transfer** (~$3): frozen base's actual BPB under 4-5 ladder schedules. Fits
+  the surrogate's validity and yields the headline schedulability number (MinFlow zero-shot vs
+  greedy 2.7507). Tests whether better scheduling also shrinks the calibration term. Kill if
+  MinFlow ≈ greedy in BPB.
+- **O-3 learned causal MinFlow router** (~$5, 50M screen): behavior-clone the oracle's
+  admissions into the EXISTING router surface (64-way admit classification, teacher-forced
+  residency) so serving needs zero new machinery. Evaluate frozen-weights BPB vs greedy and vs
+  arm A (2σ bars). Expressible target, exogenous and frozen (Goodhart channel closed);
+  demand-prediction AUC 0.93-0.98 says the oracle's choices are largely context-predictable.
+- **O-4 restack** (~$15, conditional on O-3): norms+LoRA on top of the learned scheduler; does
+  it beat 93.2%.
+- **Deployment note**: prefill sees the whole prompt, so serving can use the exact flow
+  schedule in prefill and the learned causal router in decode.
+
+Sequencing: O-0's forward runs right after F′; O-0 analysis + O-1 (CPU) and Stage 4 port dev
+interleave with Phase C's training; O-2 onward after Phase C completes, gated orch-side.
+
 ## Stage 3 — evaluation (1–2 days)
 
 1. **BPB triplet** base / impose / adapted on the held-out slice, plus one external corpus
