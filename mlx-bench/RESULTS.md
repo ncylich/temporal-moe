@@ -203,6 +203,25 @@ at baseline). Remaining untested levers (cached-read paths, process-isolated I/O
 documented knobs; the cost is cited as inherent to SSD-tier serving on this stack, worth
 ~430 µs × misses/layer to any engine, ours or a competitor's.
 
+**Why the per-layer submission floor is structural (measured platform limitation).** The
+obvious escalation — submit the whole token as ONE stream and gate the fetched-expert
+contribution on an in-stream GPU/CPU handshake (the Metal transposition of the fork's
+zero-host-sync CUDA design) — is impossible from this stack, for a now-measured reason:
+Apple Silicon CPU/GPU shared-buffer coherency is **command-buffer-granular**. A spinning
+Metal kernel cannot observe CPU stores made after its command buffer was committed (measured
+staleness 0.5–10 s), GPU stores become host-visible only at command-buffer completion
+(measured: exactly at the 121 ms boundary), and MSL offers no system-scope atomics or fences
+to cross it. Metal's intended primitive for this pattern (MTLSharedEvent: CPU-signaled,
+GPU-scheduler-waited, all command buffers pre-committed) is not exposed by MLX 0.32's Python
+API. Hence per-layer submit-after-fetch is the strongest legal structure here, and its
+measured ~215 µs/layer eval+encode+wake cost (sync baseline 39.4 vs pipelined ceiling 74.2)
+is a structural floor for fetch-on-miss serving on Apple platforms at this API level — where
+the CUDA fork got host-mapped volatile flags inside a captured graph for free. Escalation
+path (future work, noted for the record): an MLX C++ extension exposing MTLSharedEvent plus
+command-buffer completion handlers would restore the single-stream structure at Metal's
+intended granularity. Spike evidence: `scratchpad` handshake scripts; summary table in the
+run log.
+
 **Generation-2 harness: three macOS scheduling artifacts, found and fixed.** (1) *QoS
 demotion*: any blocking wait demotes the decode thread; subsequent graph encodes/waits run
 2-3× slower (fix: pin QOS_USER_INTERACTIVE before MLX spawns workers). (2) *E-core wake
