@@ -179,6 +179,22 @@ def _pin_thread_qos():
         pass  # non-macOS or restricted environment: no-op
 
 
+def _respin(ms=100):
+    """Post-sleep P-core re-promotion spin (macOS, measured): waking from a
+    multi-second sleep lands the decode thread on an E-core roughly 1 rep in
+    8, and the ENTIRE following rep then runs there (~2.2x on-CPU time for
+    identical work; QoS stays USER_INTERACTIVE throughout, so QoS pinning
+    alone does not prevent it). A short untimed CPU burst right after the
+    cooldown sleep promotes the thread back to a P-core before the timed
+    block starts. Runs strictly OUTSIDE timed regions."""
+    import time
+    t0 = time.perf_counter()
+    x = 1.0
+    while (time.perf_counter() - t0) < ms / 1e3:
+        x = x * 1.0000001 + 1e-9
+    return x
+
+
 class _Done:
     """Completion handle for one batch of preads (single event, no per-read
     Future churn)."""
@@ -326,6 +342,18 @@ class TemporalLayer:
         # (loc is derivable from slot membership; device modes are E-array-free.)
         self.slot_mx = mx.arange(R, dtype=mx.int32)
         self._cycle = 0
+        # Fixed-shape subgraphs compiled once per layer (decode x is always
+        # [1,1,H]; no KV-cache shapes involved, so no retracing): the router
+        # and the expert-GLU+weighted-sum. Cuts per-layer graph-encode cost
+        # (MLX encodes per op; ~10 ops -> 1 compiled node each) on the
+        # latency-critical disk paths. Bitwise-identical math (exactness gates
+        # verify against the uncompiled reference emulator).
+        if self.ctrl.mode in ("deploy", "noswap", "floor"):
+            self._route_c = mx.compile(self.block.route)
+            sm = self.block.switch_mlp
+            self._glu_c = mx.compile(
+                lambda x, eff, scores:
+                    (sm(x, eff) * scores[..., None]).sum(axis=-2))
         # noswap: the table is static, so the id-remap (resident -> itself,
         # non-resident -> slot 0's occupant; the fork's loc[]-derived rule) is
         # a precomputed expert->effective-id lookup -- one gather per layer.
@@ -475,8 +503,12 @@ class TemporalLayer:
 
     # ---- forward for one decode token (x: [1,1,H]) ----
     def __call__(self, x):
-        inds, scores = self.block.route(x)          # true top-k routing (unchanged)
         mode = self.ctrl.mode
+        if mode in ("deploy_ref", "lazy_full"):
+            inds, scores = self.block.route(x)      # gate modes: uncompiled
+        else:
+            inds, scores = self._route_c(x)         # true top-k routing (unchanged
+            #   math; compiled for encode cost -- gates check bitwise vs reference)
 
         if mode in ("deploy_ref", "lazy_full"):
             # host-side gate modes: sync on the selection (slow; correctness only)
@@ -515,8 +547,11 @@ class TemporalLayer:
                     self.E, self.R, self.k)(self.slot_mx, sel)
             if self.ctrl.disk_fd is not None:
                 # causality token = src (swap decision before fetch issue)
-                self.ctrl._disk_tick_pre()
-                disk_tick = (src, 1)
+                if self.ctrl.sync_inline:
+                    self.ctrl._disk_tick_inline(src, self, 1)
+                else:
+                    self.ctrl._disk_tick_pre()
+                    disk_tick = (src, 1)
             else:
                 x, nb = self._stage(x, src, 1)
                 self.ctrl.copied_bytes += nb
@@ -531,8 +566,11 @@ class TemporalLayer:
             # baseline). The deferred two-phase tick (see _disk_tick_pre/post)
             # keeps causality identical to the old per-layer-mx.eval loop while
             # removing pure harness serialization.
-            self.ctrl._disk_tick_pre()
-            disk_tick = (sel, self.ctrl.N)
+            if self.ctrl.sync_inline:
+                self.ctrl._disk_tick_inline(sel, self, self.ctrl.N)
+            else:
+                self.ctrl._disk_tick_pre()
+                disk_tick = (sel, self.ctrl.N)
             eff = self._eff_all               # timing emulation: reads all R slots
         elif mode == "floor":
             N, E = self.ctrl.N, self.E
@@ -550,8 +588,7 @@ class TemporalLayer:
             eff = self._eff_all
         else:
             raise ValueError(f"unknown temporal mode {mode!r}")
-        y = self.block.switch_mlp(x, eff)     # built while prev fetch flies
-        out = (y * scores[..., None]).sum(axis=-2)
+        out = self._glu_c(x, eff, scores)     # built while prev fetch flies
         if disk_tick is not None:
             self.ctrl._disk_tick_post(disk_tick[0], self, disk_tick[1])
             if self.disk_idx == self.ctrl.n_last:
@@ -581,7 +618,7 @@ class TemporalLayer:
         computed; what overlaps now is python graph building (a real engine's
         CPU work) with GPU execution and with the pread flight."""
         ctrl = self.ctrl
-        inds, scores = self.block.route(r_in)
+        inds, scores = self._route_c(r_in)
         sel = inds.reshape(self.k)
         # same branchless self-copy drive as the sync deploy path
         self.slot_mx, src, eff = _deploy_step_fast(
@@ -591,20 +628,31 @@ class TemporalLayer:
         return src, eff, scores
 
     def issue_after_route(self, src):
-        """Steps 2-3: wait the swap decision (computed while attention was
-        being BUILT), then issue the overlapped single-expert fetch.
-        TEMPORAL_EARLY_NOOVERLAP=1 blocks the fetch here (sequential
-        overlap-isolation control, unchanged)."""
+        """Steps 2-3: hand (wait swap decision -> issue single-expert fetch)
+        to the issuer thread; the decode thread proceeds straight to
+        submitting attention, which the pread then overlaps. The decision is
+        still computed before the fetch issues (issuer's eval), and the fetch
+        is waited before this layer's expert GEMM can be submitted.
+        TEMPORAL_EARLY_NOOVERLAP=1 keeps the fully sequential inline control:
+        wait decision, issue, block -- no issuer, no overlap."""
         ctrl = self.ctrl
-        mx.eval(src)                      # swap decision computed -> fetch may issue
-        if ctrl.diag == "nocopy":
-            return
-        done, nb = self._issue_disk(1)
-        if ctrl.early_nooverlap:          # overlap-isolation control: block now
+        if ctrl.early_nooverlap:          # overlap-isolation control
+            mx.eval(src)                  # swap decision computed
+            if ctrl.diag == "nocopy":
+                return
+            done, nb = self._issue_disk(1)
             done.wait()
             ctrl.copied_bytes += nb
+            return
+        n = 0 if ctrl.diag == "nocopy" else 1
+        if ctrl.early_inline:
+            # inline issue: the decode thread waits the swap decision itself,
+            # issues, and defers only the fetch-completion wait (the pread
+            # then overlaps attention submission + graph building).
+            mx.eval(src)
+            ctrl._early_pending = self._issue_disk(1) if n else None
         else:
-            ctrl._early_pending = (done, nb)
+            ctrl._early_pending = ctrl._hand_to_issuer(src, self, n)
 
     def expert_finish(self, h_norm, eff, scores):
         """Steps 5-6: build the expert GLU on the POST-attention hidden state
@@ -654,6 +702,10 @@ class TemporalController:
         # (sequential) -- the overlap-isolation control (same math, no overlap).
         self.router_early = False
         self.early_nooverlap = os.environ.get("TEMPORAL_EARLY_NOOVERLAP", "") == "1"
+        self.early_inline = os.environ.get("TEMPORAL_EARLY_INLINE", "1") == "1"  # inline wins: issuer pays GIL contention
+        # sync-tick structure A/B: issuer (default) vs the pre-gen-2 fully
+        # inline eval+fetch (diagnostic / fallback)
+        self.sync_inline = os.environ.get("TEMPORAL_SYNC_INLINE", "") == "1"
         # regime-2 disk tier (bigger-than-RAM cold pool): TEMPORAL_DISK_POOL=
         # <file>, TEMPORAL_DISK_QD=<threads>. Tier-crossing fetches become real
         # SSD preads (F_NOCACHE fd; the pool exceeds RAM so the page cache
@@ -690,9 +742,10 @@ class TemporalController:
         if self.retain_bytes is None and self.layers:
             per_copy = self.layers[0].expert_bytes * (N if mode == "floor" else 1)
             self.retain_bytes = per_copy * len(self.layers)
-        self._pending = None          # deferred (causality_arr, layer, n) for
-        self._pending_done = None     #   the sync loop (two-phase tick) /
-        self._early_pending = None    #   router-early in-flight fetch
+        self._pending_box = None      # deferred fetch-completion boxes for the
+        self._early_pending = None    #   sync loop / router-early in-flight fetch
+        self._issuer_q = None         # issuer thread (started on first use)
+        self._issuer_t = None
         self.n_last = len(self.layers) - 1
         if self.disk_path and mode in ("deploy", "floor"):
             import fcntl
@@ -729,50 +782,100 @@ class TemporalController:
     # the GPU idle during the fetch itself. What changes is pure harness
     # overhead: python graph building of the next layer now overlaps the GPU's
     # execution of the submitted delta instead of serializing after it.
-    def _disk_tick_pre(self):
-        """First half of the deferred tick: wait the previous layer's routing,
-        ISSUE its fetch (nonblocking). The caller then builds this layer's
-        expert-GEMM graph while the fetch is in flight (python-only work, a
-        real engine's CPU side), and calls _disk_tick_post."""
-        p = self._pending
-        if p is None:
-            return
-        self._pending = None
-        causal, layer, n = p
-        mx.eval(causal)                   # wait: routing/decision computed
-        if n and self.diag != "nocopy":
-            self._pending_done = layer._issue_disk(n)
+    # The ISSUER THREAD owns the fetch-on-miss sequencing for one layer at a
+    # time: it waits for the layer's routing/decision array to be computed on
+    # the GPU (mx.eval from a second thread -- verified safe and GIL-releasing
+    # on mlx 0.32), then issues the pread batch, then hands the completion
+    # back through a single-item box. The decode thread therefore blocks only
+    # ONCE per layer (on fetch completion) instead of twice (GPU wait + fetch
+    # wait) -- pure harness-overhead removal. Causality is unchanged: fetches
+    # still issue only after their layer's routing/decision has executed
+    # (issuer's eval), and the next graph delta -- which contains this layer's
+    # expert GEMM -- is still submitted only after the fetch landed (decode
+    # waits the box first). For sync rows the GPU stays idle during the fetch
+    # exactly as before: nothing further has been submitted at that point.
+    def _ensure_issuer(self):
+        if self._issuer_q is None:
+            import queue
+            import threading
+            self._issuer_q = queue.SimpleQueue()
+            t = threading.Thread(target=self._issuer_run, daemon=True)
+            t.start()
+            self._issuer_t = t
 
-    def _disk_tick_post(self, causal, layer, n_fetch):
-        """Second half: wait the in-flight fetch (GPU idle -- the sync row's
-        defining cost), then submit this layer's graph delta (which contains
-        the PREVIOUS layer's expert GEMM -- hence the wait-before-submit)."""
-        d = self._pending_done
-        if d is not None:
-            self._pending_done = None
-            done, nb = d
+    def _issuer_run(self):
+        _pin_thread_qos()
+        q = self._issuer_q
+        while True:
+            item = q.get()
+            if item is None:
+                return
+            causal, layer, n, box = item
+            try:
+                mx.eval(causal)           # wait: routing/decision computed
+                if n and self.diag != "nocopy":
+                    box.put(layer._issue_disk(n))
+                else:
+                    box.put((None, 0))
+            except BaseException as e:    # surfaced at the decode-side wait
+                box.put(e)
+
+    def _hand_to_issuer(self, causal, layer, n):
+        import queue
+        self._ensure_issuer()
+        box = queue.SimpleQueue()
+        self._issuer_q.put((causal, layer, n, box))
+        return box
+
+    def _wait_box(self, box):
+        r = box.get()                     # issued (or exception)
+        if isinstance(r, BaseException):
+            raise r
+        done, nb = r
+        if done is not None:
+            done.wait()                   # fetch landed
+            self.copied_bytes += nb
+
+    def _disk_tick_pre(self):
+        """Wait the PREVIOUS layer's fetch (GPU idle during it -- the sync
+        row's defining cost; nothing later has been submitted yet)."""
+        b = self._pending_box
+        if b is None:
+            return
+        self._pending_box = None
+        self._wait_box(b)
+
+    def _disk_tick_inline(self, causal, layer, n):
+        """Pre-gen-2 fully inline sync tick (TEMPORAL_SYNC_INLINE=1): submit
+        and wait this layer's routing/decision, then fetch, blocking on the
+        decode thread. Kept as an A/B fallback."""
+        mx.eval(causal)
+        if n and self.diag != "nocopy":
+            done, nb = layer._issue_disk(n)
             done.wait()
             self.copied_bytes += nb
+
+    def _disk_tick_post(self, causal, layer, n_fetch):
+        """Submit this layer's graph delta (contains the PREVIOUS layer's
+        expert GEMM -- legal, its fetch was waited in tick_pre) and hand the
+        (wait routing -> issue fetch) sequence to the issuer thread."""
         mx.async_eval(causal)             # submit delta (incl. prev layer GEMM)
-        self._pending = (causal, layer, n_fetch)
+        self._pending_box = self._hand_to_issuer(causal, layer, n_fetch)
 
     def _flush_pending(self):
         self._disk_tick_pre()
-        d = self._pending_done
-        if d is not None:
-            self._pending_done = None
-            done, nb = d
-            done.wait()
-            self.copied_bytes += nb
 
     def _early_wait(self):
         p = self._early_pending
         if p is None:
             return
         self._early_pending = None
-        done, nb = p
-        done.wait()
-        self.copied_bytes += nb
+        if isinstance(p, tuple):          # inline issue: (done, nb)
+            done, nb = p
+            done.wait()
+            self.copied_bytes += nb
+        else:
+            self._wait_box(p)
 
     @property
     def n_moe_layers(self):
@@ -782,8 +885,7 @@ class TemporalController:
         self.copied_bytes = 0
         self.retained.clear()
         self.retained_b = 0
-        self._pending = None
-        self._pending_done = None
+        self._pending_box = None
         self._early_pending = None
         for tl in self.layers:
             tl.reset()
@@ -791,6 +893,9 @@ class TemporalController:
     def disable(self):
         for layer in self._model.model.layers:
             layer.mlp.temporal = None
+        if self._issuer_q is not None:
+            self._issuer_q.put(None)
+            self._issuer_q = None
         if self.disk_pool is not None:
             self.disk_pool.shutdown()
             self.disk_pool = None

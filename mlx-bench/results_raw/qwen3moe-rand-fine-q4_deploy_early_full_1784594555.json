@@ -1,0 +1,27 @@
+{
+  "model": "qwen3moe-rand-fine-q4",
+  "tier": "fine",
+  "setup": "deploy_early",
+  "context": 1024,
+  "n": 128,
+  "reps": 4,
+  "prefill_ms": 939.47,
+  "decode_tok_s": 18.35,
+  "decode_tok_s_std": 0.51,
+  "decode_tok_s_std_pct": 2.78,
+  "per_rep_tok_s": [
+    18.1,
+    18.32,
+    19.18,
+    17.82
+  ],
+  "peak_vram_mib": 12657.4,
+  "copied_bytes_per_token": 29859840,
+  "final_cache_offset": 1664,
+  "unique_decode_ids": 1,
+  "total_decode_ids": 640,
+  "smoke": false,
+  "seed": 0,
+  "mlx_version": "0.32.0",
+  "timestamp": "2026-07-21T00:42:35.603685+00:00"
+}

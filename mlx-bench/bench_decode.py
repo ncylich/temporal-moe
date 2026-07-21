@@ -151,20 +151,27 @@ def run(args):
     # warmup rep (untimed) then timed reps; cache keeps growing (no re-prefill).
     # Temporal residency + copies run on every decode token (warmup + timed),
     # so copied bytes accumulate over all decode tokens processed.
+    # Temporal setups: after each cooldown sleep, re-promote the decode thread
+    # to a P-core before the next timed block (see temporal._respin). Untimed.
+    def cool():
+        if args.cooldown:
+            time.sleep(args.cooldown)
+            if ctrl is not None:
+                from temporal import _respin
+                _respin()
+
     all_ids = []
     for _ in range(args.warmup):
         _, wid, y = decode_block(model, cache, y, n, pipeline=not args.no_pipeline)
         all_ids += wid
-        if args.cooldown:
-            time.sleep(args.cooldown)
+        cool()
 
     tok_s = []
     for _ in range(reps):
         elapsed, rid, y = decode_block(model, cache, y, n, pipeline=not args.no_pipeline)
         tok_s.append(n / elapsed)
         all_ids += rid
-        if args.cooldown:
-            time.sleep(args.cooldown)
+        cool()
 
     decode_tokens = n * (args.warmup + reps)
     bytes_per_token = (ctrl.copied_bytes // decode_tokens) if ctrl else 0
