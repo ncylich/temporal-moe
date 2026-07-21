@@ -62,3 +62,36 @@ decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,792.51,8.52,12545.5,DIS
 decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,895.15,19.86,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=1/1152,0.079,29859840
 decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,837.18,12.57,12657.4,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=1/1152,0.799,29859840
 decode,qwen3moe-rand-coarse-q4,coarse,deploy_early,1,1024,786.02,14.38,12545.5,DISK_TIER pool>RAM QD=16 cache 1024->2176; uniq_ids=3/1152,0.25,89579520
+decode,qwen3moe-rand-fine-q4,fine,ceiling,1,1024,858.08,71.45,6675.2,cache 1024->2176; uniq_ids=1/1152,3.225,0
+decode,qwen3moe-rand-fine-q4,fine,noswap,1,1024,922.36,62.38,12657.4,cache 1024->2176; uniq_ids=3/1152,10.756,0
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,889.13,62.35,12657.4,cache 1024->2176; uniq_ids=1/1152,3.083,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,1271.8,69.58,12657.4,cache 1024->2176; uniq_ids=2/1152,8.358,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,886.89,53.39,12657.4,cache 1024->2176; uniq_ids=2/1152,12.848,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,901.33,46.51,12657.4,cache 1024->2176; uniq_ids=2/1152,1.031,477757440
+decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,880.52,40.71,12657.4,cache 1024->2176; uniq_ids=2/1152,8.067,537477120
+decode,qwen3moe-rand-coarse-q4,coarse,noswap,1,1024,820.77,66.57,12545.5,cache 1024->2176; uniq_ids=3/1152,7.187,0
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,811.75,57.75,12545.5,cache 1024->2176; uniq_ids=2/1152,11.617,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,845.94,62.15,12545.5,cache 1024->2176; uniq_ids=2/1152,13.611,0
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,889.16,49.84,12545.5,cache 1024->2176; uniq_ids=2/1152,13.349,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,810.82,33.68,12545.5,cache 1024->2176; uniq_ids=2/1152,8.838,447897600
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,1209.75,39.02,12545.5,cache 1024->2176; uniq_ids=2/1152,8.076,537477120
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,1019.69,35.97,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,4.003,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1570.57,11.36,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.376,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=2,1,1024,939.24,11.13,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.101,59719680
+decode,qwen3moe-rand-fine-q4,fine,floor_n=4,1,1024,1032.64,10.25,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.336,119439360
+decode,qwen3moe-rand-fine-q4,fine,floor_n=8,1,1024,898.6,8.64,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.192,238878720
+decode,qwen3moe-rand-fine-q4,fine,floor_n=14,1,1024,950.14,6.53,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.109,418037760
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,1073.17,6.05,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.102,477757440
+decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,1081.2,5.83,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.058,537477120
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1044.85,11.16,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.335,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,930.31,20.2,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,6.423,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,929.26,14.3,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.729,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,908.46,11.65,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,0.78,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,1527.03,18.89,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,1.733,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,870.46,12.14,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.501,29859840
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,935.09,36.81,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,3.743,0
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,820.97,10.78,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.254,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,910.46,6.54,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.128,447897600
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,826.82,5.96,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.135,537477120
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,808.16,11.46,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.659,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_early,1,1024,852.47,23.23,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,1.862,89579520

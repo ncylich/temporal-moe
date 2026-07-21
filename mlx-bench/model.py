@@ -160,7 +160,7 @@ class Qwen3MoeDecoderLayer(nn.Module):
         # route + decide residency + ISSUE the expert fetch on the PRE-attention
         # input, run attention while the fetch is in flight, then run the experts
         # POST-attention with the pre-attention routing decision. See temporal.py
-        # route_issue/expert_finish. A trained model would need to be trained
+        # route_submit/issue_after_route/expert_finish. A trained model would need to be trained
         # this way (routing on the pre-attention input selects different experts).
         t = getattr(self.mlp, "temporal", None)
         if t is not None and getattr(t.ctrl, "router_early", False) and x.shape[1] == 1:
@@ -171,11 +171,14 @@ class Qwen3MoeDecoderLayer(nn.Module):
             # r_in: the MoE's own norm applied to the pre-attention residual --
             # our documented reading of "route on the pre-attention input".
             r_in = self.post_attention_layernorm(x)
-            eff, scores, futures, nb = t.route_issue(r_in)
+            src, eff, scores = t.route_submit(r_in)
+            # attention graph is BUILT while the GPU executes the router delta
             h = x + self.self_attn(self.input_layernorm(x), mask, cache)
-            mx.eval(h)                    # GPU runs attention while preads fly
-            y = t.expert_finish(self.post_attention_layernorm(h),
-                                eff, scores, futures, nb)
+            t.issue_after_route(src)      # decision computed -> pread issues
+            mx.async_eval(h)              # submit: GPU runs attention while the
+            #   preads fly; the fetch is waited before this layer's expert GEMM
+            #   can be submitted (next layer's route_submit / last-layer flush)
+            y = t.expert_finish(self.post_attention_layernorm(h), eff, scores)
             return h + y
         h = x + self.self_attn(self.input_layernorm(x), mask, cache)
         out = h + self.mlp(self.post_attention_layernorm(h))

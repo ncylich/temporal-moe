@@ -98,6 +98,14 @@ def run(args):
     model_dir = Path(args.model_dir)
     tier = "fine" if "fine" in model_dir.name else "coarse"
 
+    if args.setup != "ceiling":
+        # Pin the decode thread's QoS BEFORE MLX spawns its internal threads
+        # (they inherit the creator's QoS): blocking waits otherwise demote the
+        # thread and post-wake encode/wait latencies inflate 2-3x. Temporal
+        # setups only -- the ceiling path/process stays exactly as-is.
+        from temporal import _pin_thread_qos
+        _pin_thread_qos()
+
     model, config = load(model_dir)
     vocab = config["vocab_size"]
 
@@ -206,7 +214,8 @@ def run(args):
         note = f"cache {args.context}->{final_offset}; uniq_ids={unique}/{len(all_ids)}"
         import os as _os
         if _os.environ.get("TEMPORAL_DISK_POOL"):
-            note = (f"DISK_TIER pool>RAM QD={_os.environ.get('TEMPORAL_DISK_QD', '8')} " + note)
+            note = (f"DISK_TIER pool>RAM QD={_os.environ.get('TEMPORAL_DISK_QD', '8')} "
+                    f"SPLIT={_os.environ.get('TEMPORAL_DISK_SPLIT', '8')} " + note)
         if args.smoke:
             note = "SMOKE " + note
         row = dict(
