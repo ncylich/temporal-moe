@@ -120,16 +120,16 @@ steelman fairness (full protocol, 8 reps + warmup, 10 s cooldowns, bytes audits 
 | sync-loop baseline, no fetches (floor n=0) | 39.4 | 36.8 |
 | **temporal deploy, router-early (setup d): fetch overlaps attention** | **31.6 ± 0.4** | **24.5 ± 0.3** |
 | router-early, overlap disabled (control; bit-identical logits) | 16.1 | — |
-| temporal deploy, sync (setup c, masked: hits overlap the fetch) | **13.5 ± 0.5** | 13.2 ± 0.3 |
-| floor n=1 (same bytes as deploy, same masking) | 13.6 ± 0.9 | 10.8 |
+| temporal deploy, sync (setup c, masked: hits overlap the fetch) | **13.8** | 13.3 ± 0.4 |
+| floor n=1 (same bytes as deploy, same masking) | 14.7 | 10.8 |
 | vanilla-offload floor @ target miss rate | **6.05 ± 0.1** (n16) | 6.5 ± 0.1 (n5) |
 | vanilla-offload floor, all-miss (n=k) | 5.8 ± 0.06 | 6.0 ± 0.1 |
 
 Fine floor curve (tok/s): n0 36.6, n1 15.1, n2 10.3, n4 9.8, n8 8.1, n14 6.6, n16 6.1, n18 5.8.
 
 Findings:
-1. **Temporal-MoE's advantage returns once the tier is slow: 2.2× over the vanilla floor at
-   the target miss rate sync (13.5 vs 6.05), 5.2× with router-early (31.6 vs 6.05)**, with the residency machinery essentially free at disk
+1. **Temporal-MoE's advantage returns once the tier is slow: 2.3× over the vanilla floor at
+   the target miss rate sync (13.8 vs 6.05), 5.2× with router-early (31.6 vs 6.05)**, with the residency machinery essentially free at disk
    speeds (deploy 14.5 ≈ floor_n1 15.1, which moves identical bytes with no machinery).
    The two sides are differently bound — deploy is fetch-latency-bound (45 serial
    single-expert round-trips/token), the floor bandwidth-bound (~3.5 GB/s effective at QD16) —
@@ -168,7 +168,20 @@ resident-hit GEMVs plus launch slack) against a ~1.2 ms/layer fetch+coupling cos
 the fetch is coverable and is now covered; the rest is bare SSD latency with no same-token
 compute legally placeable inside it (routing follows attention by definition of setup c).
 This reproduces and quantifies the fork's "the copy cannot hide in the B=1 GEMV window"
-finding, and is exactly why router-early (setup d) exists. Post-mask, the sub-read split is
+finding, and is exactly why router-early (setup d) exists. A same-session A/B isolates the
+mask at **+11%** (masked 12.85 ± 0.4 vs unmasked 11.57 ± 0.1, both alternation pairs
+positive); the structural reason it is smaller than the fork's analogous overlap is the
+window/copy ratio — the fork hid a ~34 µs PCIe copy behind a comparable GEMV window
+(ratio > 1), ours is ~0.2. The full per-layer fetch chain was decomposed from 5,760
+instrumented fetches: **365 µs pread syscall** (solo idle-machine 290 µs — the SSD is only
++26% slower in context, NOT 3.7×) + **120 µs thread hops** + **~430 µs pread-aftermath
+GPU-state inflation** + ~250 µs real compute. The aftermath rides the pread itself: a
+CPU busy-wait of identical length is perfectly additive, the no-read control runs at the
+baseline, and the term is invariant to reader identity (worker pool / executor /
+main-thread), split shape, and QoS — platform physics on this unified-memory stack, so the
+hypothetical no-aftermath ~25 tok/s ceiling is not reachable; setup c at ~13.8–14.7 is at
+its physics (predicted 14.5 from the decomposition; measured 13.8–14.7 ✓). Cross-session
+drift on these rows is ±8%; every claimed delta rests on same-session A/Bs. Post-mask, the sub-read split is
 insensitive (13.5 split-1 vs 13.2 split-8); floor n=1 received the identical masking (13.6 —
 parity with deploy preserved, no asymmetric favor). On the RAM tier the split ordering is a
 measured pessimization (42.0 vs 63.5 fused; fused remains the RAM default).

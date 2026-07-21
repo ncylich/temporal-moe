@@ -516,6 +516,21 @@ class TemporalLayer:
             hb[vics] = mx.take(cb, srcs, axis=0)
         return self.expert_bytes * int(srcs.shape[0])
 
+    def _issue_direct(self):
+        """Single-expert fetch as ONE synchronous preadv on the calling
+        thread (sync_direct mode). Byte- and offset-identical to the pool's
+        n==1 path at TEMPORAL_DISK_SPLIT=1; the GIL is released for the
+        duration of the syscall. Returns (None, bytes)."""
+        ctrl = self.ctrl
+        eb, E_d, L = self.expert_bytes, ctrl.disk_E, self.disk_idx
+        buf = ctrl.disk_ring[ctrl.disk_ring_i]
+        ctrl.disk_ring_i = (ctrl.disk_ring_i + 1) % len(ctrl.disk_ring)
+        off = (L * E_d + (self._dcycle % E_d)) * eb
+        self._dcycle = (self._dcycle + 7919) % E_d
+        got = os.preadv(ctrl.disk_fd, [memoryview(buf)[0:eb]], off)
+        assert got == eb, f"short preadv at offset {off}: {got} != {eb}"
+        return None, eb
+
     def _issue_disk(self, n):
         """Non-blocking issue of n experts' preads from the >RAM disk pool into
         a preallocated numpy ring buffer, via the persistent worker pool.
@@ -650,6 +665,7 @@ class TemporalLayer:
             disk = self.ctrl.disk_fd is not None
             masked = (k > 1 and self.ctrl.diag != "residcpu"
                       and (disk and not self.ctrl.sync_inline
+                           and not self.ctrl.no_mask
                            or self.ctrl.split_order))
             if masked:
                 # Fork TEMPORAL_UNIFIED_OVERLAP analog (masked split, same
@@ -714,7 +730,7 @@ class TemporalLayer:
             N, R = self.ctrl.N, self.R
             if self.ctrl.sync_inline:
                 self.ctrl._disk_tick_inline(sel, self, N)
-            elif 0 < N < R:
+            elif 0 < N < R and not self.ctrl.no_mask:
                 # same masked split as deploy (fairness symmetry): the R-N
                 # hit-slot contributions execute while the N-expert fetch is
                 # in flight; the N miss-slot contributions wait on it.
@@ -867,8 +883,19 @@ class TemporalController:
         self.sync_inline = os.environ.get("TEMPORAL_SYNC_INLINE", "") == "1"
         # masked (fork TEMPORAL_UNIFIED_OVERLAP-order) split on the RAM deploy
         # path + reference emulator: used by the G2 gate and the one-off RAM
-        # measurement; the DISK deploy/floor rows use the masked order always.
+        # measurement; the DISK deploy/floor rows use the masked order always
+        # unless TEMPORAL_NO_MASK=1 (the same-session mask A/B control).
         self.split_order = os.environ.get("TEMPORAL_SPLIT_ORDER", "") == "1"
+        self.no_mask = os.environ.get("TEMPORAL_NO_MASK", "") == "1"
+        # TEMPORAL_SYNC_DIRECT=1: single-expert fetches run as a direct
+        # synchronous pread on the decode thread inside the deferred tick (no
+        # issuer thread, no GIL handoff hops); n>=2 fetches keep the pool
+        # (they need parallel reads). GIL switch interval knob for the
+        # contention experiment.
+        self.sync_direct = os.environ.get("TEMPORAL_SYNC_DIRECT", "") == "1"
+        if os.environ.get("TEMPORAL_SWITCHINTERVAL"):
+            import sys as _sys
+            _sys.setswitchinterval(float(os.environ["TEMPORAL_SWITCHINTERVAL"]))
         # regime-2 disk tier (bigger-than-RAM cold pool): TEMPORAL_DISK_POOL=
         # <file>, TEMPORAL_DISK_QD=<threads>. Tier-crossing fetches become real
         # SSD preads (F_NOCACHE fd; the pool exceeds RAM so the page cache
@@ -1005,11 +1032,25 @@ class TemporalController:
 
     def _disk_tick_pre(self):
         """Wait the PREVIOUS layer's fetch (GPU idle during it -- the sync
-        row's defining cost; nothing later has been submitted yet)."""
+        row's defining cost; nothing later has been submitted yet).
+        sync_direct mode: perform the whole (wait routing -> fetch) sequence
+        right here on the decode thread -- one thread, no GIL handoffs."""
         b = self._pending_box
         if b is None:
             return
         self._pending_box = None
+        if isinstance(b, tuple):          # sync_direct deferred (causal, layer, n)
+            causal, layer, n = b
+            mx.eval(causal)               # wait: routing/decision computed
+            if n and self.diag != "nocopy":
+                if n == 1:
+                    done, nb = layer._issue_direct()
+                else:                     # parallel batch still uses the pool
+                    done, nb = layer._issue_disk(n)
+                if done is not None:
+                    done.wait()
+                self.copied_bytes += nb
+            return
         self._wait_box(b)
 
     def _disk_tick_inline(self, causal, layer, n):
@@ -1032,7 +1073,10 @@ class TemporalController:
         # guarantees the issuer's eval is a pure wait (it must never have to
         # execute graph nodes itself)
         mx.async_eval(submit_arr, causal)
-        self._pending_box = self._hand_to_issuer(causal, layer, n_fetch)
+        if self.sync_direct:
+            self._pending_box = (causal, layer, n_fetch)
+        else:
+            self._pending_box = self._hand_to_issuer(causal, layer, n_fetch)
 
     def _flush_pending(self):
         self._disk_tick_pre()

@@ -125,3 +125,8 @@ decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,970.36,13.57,12657.4,DISK_TIE
 decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1066.45,13.18,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,0.791,29859840
 decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,905.82,13.73,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.543,29859840
 decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,836.84,13.15,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.257,89579520
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,966.38,13.83,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,1.011,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1014.85,14.72,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,1.177,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1267.6,12.59,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,1.042,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1024.19,13.02,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.726,29859840
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,866.83,13.33,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.455,89579520
