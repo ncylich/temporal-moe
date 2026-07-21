@@ -191,10 +191,17 @@ inherent).** The fourth entry is the pread-aftermath GPU-state inflation detaile
 ~430 µs of degraded Metal execution after each uncached SSD read, proven to ride the read
 itself (busy-wait control perfectly additive; no-read control at baseline; invariant to
 reader thread/process structure, sub-read split, and QoS) and therefore charged equally to
-every fetch-bound row, floor and deploy alike. We did not pursue further mitigation
-(candidate levers — 16 KB page-aligned expert slots, cached-read paths, process-isolated
-I/O — remain as documented knobs/probes); it is cited as an inherent cost of SSD-tier
-serving on this stack, worth ~430 µs × misses/layer to any engine, ours or a competitor's.
+every fetch-bound row, floor and deploy alike. The page-alignment lever was
+subsequently TESTED and exonerated: a round-robin-interleaved microbench (150 samples/variant,
+95% CIs ±9 µs) shows zero post-read GPU inflation for the misaligned q4 stride (663,552 B =
+40.5 pages), the padded 41-page slot, and the naturally-aligned fp16-sized read (2,359,296 B =
+exactly 144 × 16 KB pages) alike — all indistinguishable from the no-read control; alignment
+only shaves ~4% off the syscall itself. The aftermath is therefore not a VM/page property of
+the read in any shape; it manifests only within the full 45-layer command-stream structure
+(three microbench generations fail to reproduce it; the identical-graph no-read control runs
+at baseline). Remaining untested levers (cached-read paths, process-isolated I/O) are
+documented knobs; the cost is cited as inherent to SSD-tier serving on this stack, worth
+~430 µs × misses/layer to any engine, ours or a competitor's.
 
 **Generation-2 harness: three macOS scheduling artifacts, found and fixed.** (1) *QoS
 demotion*: any blocking wait demotes the decode thread; subsequent graph encodes/waits run
