@@ -159,6 +159,9 @@ def run(args):
             if ctrl is not None:
                 from temporal import _respin
                 _respin()
+                ts = getattr(ctrl, "ts", None)
+                if ts is not None:          # stream engine: warm the service
+                    ts.service_warm()       #   thread too (same E-core lottery)
 
     all_ids = []
     for _ in range(args.warmup):
@@ -221,7 +224,10 @@ def run(args):
         note = f"cache {args.context}->{final_offset}; uniq_ids={unique}/{len(all_ids)}"
         import os as _os
         if _os.environ.get("TEMPORAL_DISK_POOL"):
-            eng = "stream" if _os.environ.get("TEMPORAL_STREAM") == "1" else "issuer"
+            eng = "issuer"
+            if _os.environ.get("TEMPORAL_STREAM") == "1":
+                eng = "stream-" + ("v2event" if _os.environ.get(
+                    "TEMPORAL_STREAM_SIG", "commit") == "event" else "v1commit")
             note = (f"DISK_TIER pool>RAM QD={_os.environ.get('TEMPORAL_DISK_QD', '8')} "
                     f"SPLIT={_os.environ.get('TEMPORAL_DISK_SPLIT', '8')} ENG={eng} " + note)
         if args.smoke:

@@ -206,7 +206,20 @@ struct Registry {
       uint64_t v = 1;
       while (!svc_stop_.load()) {
         if (!sig_event_->waitUntilSignaledValue(v, 50)) {
-          continue;                          // timeout: re-check stop flag
+          // timeout: re-check stop flag; honor a pending keep-warm request
+          // (post-cooldown P-core re-promotion, the service-thread analog of
+          // temporal._respin -- long-idle wakes land on E-cores and the whole
+          // following rep then runs with inflated wake latency)
+          if (warm_req_.exchange(false)) {
+            uint64_t t0 = mach_absolute_time();
+            mach_timebase_info_data_t tb;
+            mach_timebase_info(&tb);
+            volatile double x = 1.0;
+            while ((mach_absolute_time() - t0) * tb.numer / tb.denom < 20000000ull) {
+              x = x * 1.0000001 + 1e-9;   // ~20 ms CPU burst
+            }
+          }
+          continue;
         }
         uint64_t t0 = trace_on_ ? mach_absolute_time() : 0;
         int layer;
@@ -355,6 +368,7 @@ struct Registry {
   std::vector<uint64_t> pending_val_;
   std::thread svc_;
   std::atomic<bool> svc_stop_{false};
+  std::atomic<bool> warm_req_{false};
   std::vector<std::array<uint64_t, 5>> trace_;
   std::vector<std::array<uint64_t, 4>> cbtrace_;
 };
@@ -491,6 +505,9 @@ NB_MODULE(_temporal_stream, m) {
       out.append(nb::make_tuple(l, v));
     }
     return out;
+  });
+  m.def("service_warm", []() {
+    temporal_stream::Registry::inst().warm_req_.store(true);
   });
   m.def("host_signal", [](int layer, uint64_t value) {
     temporal_stream::Registry::inst().host_signal(layer, value);

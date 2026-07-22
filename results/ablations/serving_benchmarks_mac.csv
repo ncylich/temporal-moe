@@ -23,6 +23,16 @@
 # perfectly additive; nocopy at baseline; invariant to reader/split/QoS) -> setup c ~13.8-14.7 IS platform
 # physics; the 25 tok/s no-aftermath ceiling is not reachable on this stack. Cross-session drift +-8% recorded;
 # all deltas rest on same-session A/Bs; rows carry per-rep spreads.
+# FINAL GENERATION (STREAM-tagged rows): MLX engine fork -- one-line patch to metal::eval (mlx v0.32.0) +
+# ~350-line C++ extension (mlx-bench/ext/): per-layer fetch gated by MTLSharedEvent scheduler waits; the fetch
+# loop lives in C++ (completion-handler or in-stream-signal service thread; pread + storeSignal, no Python/GIL).
+# Whole-token pipelined submission restored; masked split unchanged; identical engine for floor (fairness).
+# Locked config: fetch rows = STREAM-V1 (commit+completion-handler; Metal's own hot thread does the pread);
+# n0 handshake-limit row = STREAM-V2 (in-stream encodeSignalEvent; handshake ~110us/layer incl ~50-110us
+# MTLSharedEvent kernel-wait wake, 82us completion dispatch, 2us release -- stated OS floors with traces).
+# Same-day engine delta: deploy_sync 14.08 (ISSUER-ANCHOR) -> 26.13 (+86%). The former ~430us "pread-aftermath"
+# is CONFIRMED STRUCTURAL (absent in the stream engine; artifact of fractured per-layer Python submission).
+# All gates bitwise (incl stream-vs-issuer logit delta 0.0); ordering 720/720; bytes exact per row.
 phase,model,tier,setup,ubatch,context,prefill_ms,decode_tok_s,peak_vram_mib,note,decode_tok_s_std,copied_bytes_per_token
 decode,qwen3moe-rand-fine-q4,fine,ceiling,1,1024,845.9,74.22,6675.2,cache 1024->2176; uniq_ids=1/1152,0.618,0
 decode,qwen3moe-rand-fine-q4,fine,noswap,1,1024,854.76,74.96,12657.4,cache 1024->2176; uniq_ids=3/1152,0.731,0
@@ -45,23 +55,22 @@ decode,qwen3moe-rand-coarse-q4,coarse,floor_n=2,1,1024,729.83,57.82,12545.5,GEN1
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=4,1,1024,747.92,51.55,12545.5,GEN1 cache 1024->2176; uniq_ids=2/1152,1.106,358318080
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,763.57,49.54,12545.5,cache 1024->2176; uniq_ids=2/1152,1.272,447897600
 decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,843.33,47.68,12545.5,cache 1024->2176; uniq_ids=2/1152,0.98,537477120
-decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,816.77,39.44,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,1.235,0
-decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1014.85,14.72,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,1.177,29859840
-decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1024.19,13.02,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.726,29859840
-decode,qwen3moe-rand-fine-q4,fine,floor_n=2,1,1024,939.24,11.13,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.101,59719680
-decode,qwen3moe-rand-fine-q4,fine,floor_n=4,1,1024,1032.64,10.25,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.336,119439360
-decode,qwen3moe-rand-fine-q4,fine,floor_n=8,1,1024,898.6,8.64,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.192,238878720
-decode,qwen3moe-rand-fine-q4,fine,floor_n=14,1,1024,950.14,6.53,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.109,418037760
-decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,1073.17,6.05,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.102,477757440
-decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,1081.2,5.83,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.058,537477120
-decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,966.38,13.83,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,1.011,29859840
-decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1267.6,12.59,12657.4,MASKED DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,1.042,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,1075.77,45.86,12657.4,STREAM-V2 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v2event cache 1024->2176; uniq_ids=2/1152,3.922,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,1343.4,28.77,12657.4,STREAM-V1-BASELINE DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,2.642,0
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1665.49,26.13,12657.4,STREAM-V1 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=1/1152,2.282,29859840
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1641.36,14.08,12657.4,ISSUER-ANCHOR DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=issuer cache 1024->2176; uniq_ids=1/1152,0.998,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1216.14,28.61,12657.4,STREAM-V1 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,1.605,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=2,1,1024,939.24,11.13,12657.4,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.101,59719680
+decode,qwen3moe-rand-fine-q4,fine,floor_n=4,1,1024,1032.64,10.25,12657.4,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.336,119439360
+decode,qwen3moe-rand-fine-q4,fine,floor_n=8,1,1024,898.6,8.64,12657.4,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.192,238878720
+decode,qwen3moe-rand-fine-q4,fine,floor_n=14,1,1024,950.14,6.53,12657.4,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.109,418037760
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,985.93,6.81,12657.4,STREAM-V1 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,0.036,477757440
+decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,1327.01,5.92,12657.4,STREAM-V1 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,0.228,537477120
 decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,901.42,31.55,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.308,29859840
 decode,qwen3moe-rand-fine-q4,fine,deploy_early_NOOVERLAP,1,1024,964.74,16.06,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=1/1152,0.309,29859840
-decode,qwen3moe-rand-fine-q4,fine,deploy_early,1,1024,937.22,21.66,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,1.166,29859840
-decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,935.09,36.81,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,3.743,0
-decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,820.97,10.78,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.254,89579520
-decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,910.46,6.54,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.128,447897600
-decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,826.82,5.96,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.135,537477120
-decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,866.83,13.33,12545.5,MASKED DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.455,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=0,1,1024,935.09,36.81,12545.5,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,3.743,0
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=1,1,1024,820.97,10.78,12545.5,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.254,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,914.08,7.54,12545.5,STREAM-V1 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,0.207,447897600
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=6,1,1024,826.82,5.96,12545.5,ISSUER-GEN DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=2/1152,0.135,537477120
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,2252.44,21.26,12545.5,STREAM-V1 DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=3/1152,1.194,89579520
 decode,qwen3moe-rand-coarse-q4,coarse,deploy_early,1,1024,764.98,24.51,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.236,89579520

@@ -1,14 +1,14 @@
 # Mac (MLX q4) replication of the A6000 decode serving benchmark — results
 
-**One-line summary (generation-2 harness): the mechanism replicates, and once harness
-overhead is removed the technique sits at its physics in both regimes.** On an Apple M4 Pro
-(24 GB unified, macOS 26.5.1, mlx 0.32.0): with the expert pool in RAM, the temporal machinery
-is free (noswap 75.0 ≈ ceiling 74.2) and deploy runs at 0.86× ceiling — 1.4× above the
-vanilla-offload floor. With the pool bigger than RAM (28.5 GiB disk pool, real SSD misses),
-router-early temporal decodes at **31.6 tok/s vs the vanilla floor's 6.1 — a 5.2× win** at the
-target miss rate, within ~2.4× of a RAM-sized model's ceiling while serving 5.4× the expert
-parameters. Getting here required finding three macOS scheduling artifacts (documented below);
-every step is bitwise-gated.
+**One-line summary (final, engine-fork generation): the mechanism replicates, and with the
+benchmark's own MLX fork (mirroring the A6000's llama.cpp fork) the technique reaches the
+platform's measured limits in both regimes.** M4 Pro, 24 GB, macOS 26.5.1: pool-in-RAM —
+machinery free (noswap 75.0 ≈ ceiling 74.2), deploy 0.86× ceiling, 1.4× over the vanilla
+floor. Pool-bigger-than-RAM (28.5 GiB, real SSD misses) — **setup c (the paper's trained
+configuration, post-attention routing, same-token fetch) decodes at 26.1 tok/s vs the
+vanilla floor's 6.8: a 3.8× win**, within 1.2× of the router-early variant and 2.8× of a
+RAM-sized model's ceiling at 5.4× the expert capacity; every remaining microsecond is
+itemized (compute + SSD syscall + measured OS handshake floors), residual ≈ 0.
 
 Benchmark definition, semantics, and gate ladder: `mlx-bench/PLAN.md`. A6000 ground truth:
 `llamacpp-bench/README.md` + `results/ablations/serving_benchmarks.csv`. Mac raw data:
@@ -115,21 +115,43 @@ steelman fairness (full protocol, 8 reps + warmup, 10 s cooldowns, bytes audits 
   normalize by, so results are absolute tok/s among the options that actually run. (For
   context only: the same compute decodes at 74.2 tok/s when all experts fit in RAM.)
 
-| setup (B=1 decode, tok/s, higher better; gen-2) | fine 18-of-192 | coarse 6-of-64 |
+| setup (B=1 decode, tok/s, higher better; FINAL = stream-engine generation) | fine 18-of-192 | coarse 6-of-64 |
 |---|---|---|
-| sync-loop baseline, no fetches (floor n=0) | 39.4 | 36.8 |
-| **temporal deploy, router-early (setup d): fetch overlaps attention** | **31.6 ± 0.4** | **24.5 ± 0.3** |
+| no-fetch handshake-limit baseline (floor n=0, stream-v2) | 45.9 [39–51] | 36.8 (issuer gen) |
+| **temporal deploy, sync (setup c, stream engine — the paper's configuration)** | **26.1 [23–29]** | **21.3 [19–23]** |
+| temporal deploy, router-early (setup d, architectural variant) | 31.6 ± 0.4 | 24.5 ± 0.3 |
 | router-early, overlap disabled (control; bit-identical logits) | 16.1 | — |
-| temporal deploy, sync (setup c, masked: hits overlap the fetch) | **13.8** | 13.3 ± 0.4 |
-| floor n=1 (same bytes as deploy, same masking) | 14.7 | 10.8 |
-| vanilla-offload floor @ target miss rate | **6.05 ± 0.1** (n16) | 6.5 ± 0.1 (n5) |
-| vanilla-offload floor, all-miss (n=k) | 5.8 ± 0.06 | 6.0 ± 0.1 |
+| floor n=1 (same bytes as deploy, identical engine) | 28.6 | 10.8 (issuer gen) |
+| vanilla-offload floor @ target miss rate | **6.8 [6.75–6.85]** (n16) | 7.5 (n5) |
+| vanilla-offload floor, all-miss (n=k) | 5.9 | 6.0 (issuer gen) |
+
+**The engine fork (how setup c doubled).** The Python/MLX level was exhausted at ~13.8 — the
+per-layer eval/submit round trip is a structural floor there, and the in-stream GPU/CPU
+handshake is impossible from Python (command-buffer-granular coherency, no system-scope MSL
+atomics — measured, below). So the benchmark did what the A6000 benchmark did: forked the
+engine. A one-line vendored patch to MLX v0.32.0's `metal::eval` plus a ~350-line C++
+extension (`mlx-bench/ext/`) adds per-layer fetch gating at Metal's intended granularity:
+`SignalFetch` hands the routing decision to C++ (completion handler or in-stream
+`encodeSignalEvent` + pinned service thread — no Python, no GIL, pread + 2 µs
+`storeSignal`), and `WaitFetch` encodes an `MTLSharedEvent` scheduler-side wait gating only
+the fetched expert's contribution (masked hit-split unchanged; waits legally commit before
+their signals exist). Whole-token pipelined submission is restored; the floor runs the
+identical engine. Same-day engine delta at full protocol: **deploy_sync 14.08 → 26.13
+(+86%)**; floor n=1 28.6 (parity held — machinery still free); the former "~430 µs
+pread-aftermath" is **confirmed structural** — absent in the stream engine, an artifact of
+the fractured per-layer Python submission path. Remaining per-layer accounting closes with
+residual ≈ 0: compute ~283 µs + handshake (completion dispatch 82 µs / event-wait wake
+50–110 µs, release 2 µs) + pread ~335 µs. Those handshake terms are the measured OS floors —
+the new structural constants of fetch-on-miss serving on Apple platforms at engine level.
 
 Fine floor curve (tok/s): n0 36.6, n1 15.1, n2 10.3, n4 9.8, n8 8.1, n14 6.6, n16 6.1, n18 5.8.
 
 Findings:
-1. **Temporal-MoE's advantage returns once the tier is slow: 2.3× over the vanilla floor at
-   the target miss rate sync (13.8 vs 6.05), 5.2× with router-early (31.6 vs 6.05)**, with the residency machinery essentially free at disk
+1. **Temporal-MoE's advantage returns once the tier is slow: 3.8× over the vanilla floor at
+   the target miss rate in the paper's own setup c (26.1 vs 6.8), 4.6× with the router-early
+   variant (31.6)** — and setup c now sits within 1.2× of router-early, within 1.8× of the
+   no-fetch handshake limit (45.9), and within 2.8× of a RAM-sized model's untouched ceiling
+   (74.2) while serving 5.4× the expert parameters off SSD, with the residency machinery essentially free at disk
    speeds (deploy 14.5 ≈ floor_n1 15.1, which moves identical bytes with no machinery).
    The two sides are differently bound — deploy is fetch-latency-bound (45 serial
    single-expert round-trips/token), the floor bandwidth-bound (~3.5 GB/s effective at QD16) —

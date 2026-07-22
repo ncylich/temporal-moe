@@ -130,3 +130,12 @@ decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1014.85,14.72,12657.4,DISK_TI
 decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1267.6,12.59,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=1/1152,1.042,29859840
 decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1024.19,13.02,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=8 cache 1024->2176; uniq_ids=2/1152,0.726,29859840
 decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,866.83,13.33,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 cache 1024->2176; uniq_ids=3/1152,0.455,89579520
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,1075.77,45.86,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v2event cache 1024->2176; uniq_ids=2/1152,3.922,0
+decode,qwen3moe-rand-fine-q4,fine,floor_n=0,1,1024,1343.4,28.77,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,2.642,0
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1665.49,26.13,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=1/1152,2.282,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=1,1,1024,1216.14,28.61,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,1.605,29859840
+decode,qwen3moe-rand-fine-q4,fine,floor_n=16,1,1024,985.93,6.81,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,0.036,477757440
+decode,qwen3moe-rand-fine-q4,fine,floor_n=18,1,1024,1327.01,5.92,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,0.228,537477120
+decode,qwen3moe-rand-coarse-q4,coarse,deploy_sync,1,1024,2252.44,21.26,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=3/1152,1.194,89579520
+decode,qwen3moe-rand-coarse-q4,coarse,floor_n=5,1,1024,914.08,7.54,12545.5,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=stream-v1commit cache 1024->2176; uniq_ids=2/1152,0.207,447897600
+decode,qwen3moe-rand-fine-q4,fine,deploy_sync,1,1024,1641.36,14.08,12657.4,DISK_TIER pool>RAM QD=16 SPLIT=1 ENG=issuer cache 1024->2176; uniq_ids=1/1152,0.998,29859840
