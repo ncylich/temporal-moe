@@ -210,6 +210,119 @@ def _deploy_step_masked(E, R, K):
 
 
 @lru_cache(maxsize=None)
+def _deploy_copy_step(E, R, K, EB):
+    """RAM-tier fused residency + swap-copy kernel: ONE launch computes the
+    k_residency decisions (bit-identical logic to _deploy_step_fast) AND
+    copies the fetched expert's 663,552B row cold_flat[src] into a fresh
+    staging buffer at full bandwidth (each threadgroup recomputes the tiny
+    decision locally -- no cross-threadgroup sync needed -- then copies its
+    16B-chunk slice). Replaces [step kernel + take gather + astype plumbing]:
+    ~2 launches and their gaps collapse into ~1 launch + ~7us of bytes.
+    Branchless p=1.0 drive preserved: no-nominee layers self-copy the victim
+    occupant's row (real bytes, no-op math), exactly as before."""
+    assert EB % 16 == 0
+    CHUNKS = EB // 16
+    src_code = f"""
+    const int E_ = {E}; const int R_ = {R}; const int K_ = {K};
+    const uint CHUNKS_ = {CHUNKS};
+    threadgroup int tg_src;
+    if (thread_index_in_threadgroup == 0) {{
+        int loc[K_];
+        int nom = E_;
+        for (int i = 0; i < K_; ++i) {{
+            int s = int(sel[i]); int l = -1;
+            for (int j = 0; j < R_; ++j) if (slot[j] == s) {{ l = j; break; }}
+            if (l < 0 && s < nom) nom = s;
+            loc[i] = l;
+        }}
+        int vic = R_;
+        for (int j = 0; j < R_; ++j) {{
+            bool selj = false;
+            for (int i = 0; i < K_; ++i) if (int(sel[i]) == slot[j]) {{ selj = true; break; }}
+            if (!selj) {{ vic = j; break; }}
+        }}
+        bool doswap = (nom < E_) && (vic < R_);
+        int vicc = vic < R_ ? vic : R_ - 1;
+        int f = doswap ? nom : slot[vicc];
+        tg_src = f;
+        if (thread_position_in_grid.x == 0) {{
+            src[0] = uint(f);
+            for (int j = 0; j < R_; ++j) new_slot[j] = slot[j];
+            if (doswap) new_slot[vicc] = nom;
+            int slot0 = doswap && vicc == 0 ? nom : slot[0];
+            for (int i = 0; i < K_; ++i) {{
+                int s = int(sel[i]);
+                bool now_res = (loc[i] >= 0) || (doswap && s == nom);
+                eff[i] = uint(now_res ? s : slot0);
+            }}
+        }}
+    }}
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    const device uint4* srcp =
+        (const device uint4*)(cold + (ulong)tg_src * {EB});
+    device uint4* dstp = (device uint4*)staged;
+    for (uint c = thread_position_in_grid.x; c < CHUNKS_;
+         c += threads_per_grid.x) {{
+        dstp[c] = srcp[c];
+    }}
+    """
+    kern = mx.fast.metal_kernel(name=f"deploy_copy_{E}_{R}_{K}_{EB}",
+                                input_names=["slot", "sel", "cold"],
+                                output_names=["new_slot", "src", "eff",
+                                              "staged"],
+                                source=src_code)
+    tpg = 1024
+    grid = min(((CHUNKS + 3) // 4 + tpg - 1) // tpg * tpg, CHUNKS)
+    grid = ((grid + tpg - 1) // tpg) * tpg   # 4 chunks/thread grid-stride
+
+    def call(slot, sel, cold):
+        return kern(inputs=[slot, sel, cold], grid=(grid, 1, 1),
+                    threadgroup=(tpg, 1, 1),
+                    output_shapes=[(R,), (1,), (K,), (EB // 4,)],
+                    output_dtypes=[mx.int32, mx.uint32, mx.uint32, mx.uint32])
+
+    return call
+
+
+@lru_cache(maxsize=None)
+def _floor_copy_step(N, EB):
+    """RAM-floor fused copy kernel: N cycled-source expert rows (sources
+    st0+i, the existing window formula) copied cold->staging in ONE launch.
+    Taking `sel` as an input preserves fetch-on-miss causality in-graph (the
+    copy is ordered after this layer's routing; no hoisting)."""
+    assert EB % 16 == 0
+    CHUNKS = EB // 16
+    src_code = f"""
+    const uint CHUNKS_ = {CHUNKS};
+    uint c = thread_position_in_grid.x;
+    uint dummy = sel[0];               // causality: data-dependence on routing
+    if (c < CHUNKS_ * {N}) {{
+        uint row = c / CHUNKS_;
+        uint off = c % CHUNKS_;
+        uint srcrow = st0[0] + row + (dummy & 0u);
+        const device uint4* srcp =
+            (const device uint4*)(cold + (ulong)srcrow * {EB});
+        ((device uint4*)staged)[c] = srcp[off];
+    }}
+    """
+    kern = mx.fast.metal_kernel(name=f"floor_copy_{N}_{EB}",
+                                input_names=["sel", "st0", "cold"],
+                                output_names=["staged"],
+                                source=src_code)
+    tpg = 256
+    total = CHUNKS * N
+    grid = ((total + tpg - 1) // tpg) * tpg
+
+    def call(sel, st0, cold):
+        return kern(inputs=[sel, st0, cold], grid=(grid, 1, 1),
+                    threadgroup=(tpg, 1, 1),
+                    output_shapes=[(N * EB // 4,)],
+                    output_dtypes=[mx.uint32])
+
+    return call
+
+
+@lru_cache(maxsize=None)
 def _floor_src_step(N):
     """RAM floor: cycled source ids, data-dependent on this layer's routing
     (+ sel[0]*0 -- fetch-on-miss causality, prevents Metal hoisting the copies
@@ -556,6 +669,19 @@ class TemporalLayer:
             self._dcycle = (self._dcycle + n * 7919 + 1) % E_d
         return ctrl.disk_pool.issue(ctrl.disk_fd, buf, parts), eb * n
 
+    def _retain_and_order(self, x, staged, nbytes):
+        """Retention (>SLC write-target rotation over one token's span --
+        same deque semantics as _stage) + order the copy BEFORE this layer's
+        expert GEMM. Returns x with the dependency edge."""
+        ctrl = self.ctrl
+        if ctrl.retain_bytes:
+            ctrl.retained.append(staged)
+            ctrl.retained_b += staged.nbytes
+            while ctrl.retained_b > ctrl.retain_bytes:
+                ctrl.retained_b -= ctrl.retained.popleft().nbytes
+        ctrl.copied_bytes += nbytes
+        return mx.depends([x], [staged])[0]
+
     def _stage(self, x, srcs, n):
         """Bench-mode tier-crossing copy: gather `srcs` experts' bytes cold->
         fresh staging buffers (the same read+write traffic as a slot copy, none
@@ -719,26 +845,36 @@ class TemporalLayer:
                            + self._glu_c(x, ids_s[kh:].reshape(1, 1, 1),
                                          sc[..., kh:]))
                 return out
-            if self.ctrl.diag == "residcpu":   # experiment: tiny residency ops on CPU stream
-                with mx.stream(mx.cpu):
-                    self.slot_mx, src, eff = _deploy_step(
-                        self.E, self.R)(self.slot_mx, sel)
-                src = src.astype(mx.uint32)
-                eff = eff.astype(mx.uint32)
+            if not disk and self.ctrl.diag == "" and k > 1 and self.ctrl.ram_fused:
+                # RAM tier, fused engine: ONE kernel computes the residency
+                # decisions AND copies the fetched expert's row cold->staging
+                # at full bandwidth (branchless p=1.0 drive in-kernel).
+                self.slot_mx, src, eff, staged = _deploy_copy_step(
+                    self.E, self.R, k, self.expert_bytes)(
+                        self.slot_mx, sel, self.cold_flat)
+                x = self._retain_and_order(x, staged, self.expert_bytes)
+                eff = eff.reshape(1, 1, k)
             else:
-                self.slot_mx, src, eff = _deploy_step_fast(
-                    self.E, self.R, self.k)(self.slot_mx, sel)
-            if disk:
-                # causality token = src (swap decision before fetch issue)
-                if self.ctrl.sync_inline:
-                    self.ctrl._disk_tick_inline(src, self, 1)
+                if self.ctrl.diag == "residcpu":   # experiment: tiny residency ops on CPU stream
+                    with mx.stream(mx.cpu):
+                        self.slot_mx, src, eff = _deploy_step(
+                            self.E, self.R)(self.slot_mx, sel)
+                    src = src.astype(mx.uint32)
+                    eff = eff.astype(mx.uint32)
                 else:
-                    self.ctrl._disk_tick_pre()
-                    disk_tick = (src, 1)
-            else:
-                x, nb = self._stage(x, src, 1)
-                self.ctrl.copied_bytes += nb
-            eff = eff.reshape(1, 1, self.k)
+                    self.slot_mx, src, eff = _deploy_step_fast(
+                        self.E, self.R, self.k)(self.slot_mx, sel)
+                if disk:
+                    # causality token = src (swap decision before fetch issue)
+                    if self.ctrl.sync_inline:
+                        self.ctrl._disk_tick_inline(src, self, 1)
+                    else:
+                        self.ctrl._disk_tick_pre()
+                        disk_tick = (src, 1)
+                else:
+                    x, nb = self._stage(x, src, 1)
+                    self.ctrl.copied_bytes += nb
+                eff = eff.reshape(1, 1, self.k)
         elif mode == "noswap":
             # machinery on, zero swaps: id-remap through the static residency
             # table, precomputed at reset as an expert->effective-id lookup
@@ -791,13 +927,20 @@ class TemporalLayer:
             if N > 0:
                 st0 = 0 if self.ctrl.same_window else self._cycle % max(1, E - N)
                 self._cycle += N
-                # cycled sources, made DATA-DEPENDENT on this layer's router
-                # output (+ sel[0]*0): fetch-on-miss causality. Without this the
-                # indices are graph constants and Metal hoists the copies into
-                # earlier layers' compute = illegal prefetch for a floor.
-                srcs = _floor_src_step(N)(sel, mx.array(st0, dtype=mx.int32))
-                x, nb = self._stage(x, srcs, N)
-                self.ctrl.copied_bytes += nb
+                if self.ctrl.diag == "" and self.ctrl.ram_fused:
+                    # fused engine: N cycled-source rows copied cold->staging
+                    # in ONE kernel; taking `sel` as input keeps fetch-on-miss
+                    # causality in-graph (no hoisting).
+                    staged = _floor_copy_step(N, self.expert_bytes)(
+                        sel, mx.array([st0], dtype=mx.uint32), self.cold_flat)[0]
+                    x = self._retain_and_order(x, staged, N * self.expert_bytes)
+                else:
+                    # diag paths (nocopy etc.): original staged-take form.
+                    # cycled sources, DATA-DEPENDENT on this layer's router
+                    # output (+ sel[0]*0): fetch-on-miss causality.
+                    srcs = _floor_src_step(N)(sel, mx.array(st0, dtype=mx.int32))
+                    x, nb = self._stage(x, srcs, N)
+                    self.ctrl.copied_bytes += nb
             # timing emulation: GEMM shape/cost identical for any R ids
             eff = self._eff_all
         else:
@@ -933,6 +1076,9 @@ class TemporalController:
         # (they need parallel reads). GIL switch interval knob for the
         # contention experiment.
         self.sync_direct = os.environ.get("TEMPORAL_SYNC_DIRECT", "") == "1"
+        # TEMPORAL_RAM_FUSED=0: fall back to the unfused RAM engine (step
+        # kernel + staged take) for A/B; default = fused single-kernel engine.
+        self.ram_fused = os.environ.get("TEMPORAL_RAM_FUSED", "1") == "1"
         # TEMPORAL_STREAM=1: engine 3 -- the whole token submits as ONE
         # pipelined graph (like the ceiling); per MoE layer a SignalFetch
         # primitive commits the command buffer with a C++ completed-handler
