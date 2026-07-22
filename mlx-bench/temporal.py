@@ -689,6 +689,12 @@ class TemporalLayer:
                     sig = ts.signal_fetch(src, self.disk_idx)
                     hit = self._glu_c(mx.depends([x], [sig])[0],
                                       ids_s[:kh].reshape(1, 1, kh), sc[..., :kh])
+                    # NOTE (measured): Metal defers starting a CB whose stream
+                    # holds an unsatisfied event wait, so these hits do NOT
+                    # overlap the fetch (0/3599 in the trace control). Forcing
+                    # them into their own CB via ts.commit_boundary(hit) makes
+                    # them overlap but costs an extra CB boundary -- a wash at
+                    # B=1 (~40us window vs ~50us boundary). Left un-split.
                     gate = ts.wait_fetch(hit, sig, self.disk_idx, self._wait_val)
                     return gate + self._glu_c(
                         mx.depends([x], [gate])[0],
@@ -1020,7 +1026,7 @@ class TemporalController:
                 # pinned service thread (v2); "commit" = per-layer CB commit +
                 # completion handler (v1). TEMPORAL_STREAM_TRACE=1 records the
                 # hop-by-hop handshake timestamps (mach time) in C++.
-                sig_mode = {"commit": 0, "event": 1, "spin": 2}[
+                sig_mode = {"commit": 0, "event": 1, "spin": 2, "mtlio": 3}[
                     os.environ.get("TEMPORAL_STREAM_SIG", "commit")]
                 _ts.setup(self.disk_path, eb, len(self.layers), nfetch,
                           self.disk_qd, sig_mode,

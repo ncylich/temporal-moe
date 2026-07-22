@@ -146,6 +146,7 @@ struct Registry {
     teardown();
     sig_mode_ = sig_mode;
     trace_on_ = trace;
+    pool_path_ = path;
     fd_ = ::open(path.c_str(), O_RDONLY);
     if (fd_ < 0) {
       throw std::runtime_error("[temporal_stream] cannot open pool: " + path);
@@ -197,6 +198,69 @@ struct Registry {
     if (sig_mode_ == 1 || sig_mode_ == 2) {
       start_service();
     }
+    if (sig_mode_ == 3 && io_queue_ == nullptr) {
+      NS::Error* err = nullptr;
+      auto* url = NS::URL::fileURLWithPath(NS::String::string(
+          pool_path_.c_str(), NS::UTF8StringEncoding));
+      io_fh_ = mtl->newIOHandle(url, &err);
+      auto* qd = MTL::IOCommandQueueDescriptor::alloc()->init();
+      qd->setType(MTL::IOCommandQueueTypeSerial);
+      qd->setPriority(MTL::IOPriorityHigh);
+      io_queue_ = mtl->newIOCommandQueue(qd, &err);
+      qd->release();
+      if (!io_fh_ || !io_queue_) {
+        throw std::runtime_error("[temporal_stream] MTLIO init failed");
+      }
+      size_t sz = (size_t)std::max(1, nfetch_) * eb_;
+      for (int i = 0; i < 2; ++i) {
+        io_bufs_.push_back(mtl->newBuffer(sz, MTL::ResourceStorageModeShared));
+      }
+    }
+    io_err_.store(false);
+    {
+      std::lock_guard<std::mutex> lk(log_m_);
+      io_done_log_.clear();
+    }
+  }
+
+  // v4: called from SignalFetch::eval_gpu (encode/eval time). Builds and
+  // commits the layer's IO command buffer: [wait sig@v] -> load(s) ->
+  // [signal rel@v]. Offsets are the SAME encode-time cycled counters the
+  // other engines use (emulation semantics: sources never depend on routing;
+  // the LOAD's causality is event-enforced by the in-stream routing signal).
+  void encode_io_fetch(int layer, uint64_t v) {
+    auto* icb = io_queue_->commandBuffer();
+    icb->wait(sig_event_.get(), v);
+    if (nfetch_ > 0) {
+      auto* buf = io_bufs_[io_buf_i_];
+      io_buf_i_ = (io_buf_i_ + 1) % (int)io_bufs_.size();
+      uint64_t L = (uint64_t)layer;
+      if (nfetch_ == 1) {
+        uint64_t off = (L * disk_E_ + (dcycle_[layer] % disk_E_)) * eb_;
+        dcycle_[layer] = (dcycle_[layer] + 7919) % disk_E_;
+        icb->loadBuffer(buf, 0, eb_, io_fh_, off);
+      } else {
+        for (int i = 0; i < nfetch_; ++i) {
+          uint64_t off =
+              (L * disk_E_ + (dcycle_[layer] + (uint64_t)i * 7919) % disk_E_) * eb_;
+          icb->loadBuffer(buf, (uint64_t)i * eb_, eb_, io_fh_, off);
+        }
+        dcycle_[layer] = (dcycle_[layer] + (uint64_t)nfetch_ * 7919 + 1) % disk_E_;
+      }
+      bytes_.fetch_add(eb_ * (uint64_t)nfetch_);
+      fetches_.fetch_add(1);
+    }
+    icb->signalEvent(rel_event_.get(), v);
+    icb->addCompletedHandler(
+        MTL::IOCommandBufferHandlerFunction([this, layer, v](MTL::IOCommandBuffer* b) {
+          if (b->status() != MTL::IOStatusComplete) {
+            io_err_.store(true);
+          }
+          std::lock_guard<std::mutex> lk(log_m_);
+          io_done_log_.push_back({(uint64_t)layer, v, mach_absolute_time()});
+          seq_log_.emplace_back(layer, v);
+        }));
+    icb->commit();
   }
 
   void start_service() {
@@ -322,6 +386,19 @@ struct Registry {
 
   void teardown() {
     stop_service();
+    if (io_queue_) {
+      io_queue_->release();
+      io_queue_ = nullptr;
+    }
+    if (io_fh_) {
+      io_fh_->release();
+      io_fh_ = nullptr;
+    }
+    for (auto* b : io_bufs_) {
+      b->release();
+    }
+    io_bufs_.clear();
+    io_buf_i_ = 0;
     events_.clear();
     sig_event_.reset();
     rel_event_.reset();
@@ -405,6 +482,7 @@ struct Registry {
   }
 
   int fd_ = -1;
+  std::string pool_path_;
   uint64_t eb_ = 0, disk_E_ = 0;
   int n_layers_ = 0, nfetch_ = 0;
   std::vector<uint64_t> dcycle_, sigval_;
@@ -426,6 +504,14 @@ struct Registry {
   std::thread svc_;
   std::atomic<bool> svc_stop_{false};
   std::atomic<bool> warm_req_{false};
+  // v4 (mtlio): IO queue path -- pre-committed IO command buffers parked on
+  // the in-stream routing signal; zero CPU in the fetch loop.
+  MTL::IOCommandQueue* io_queue_ = nullptr;
+  MTL::IOFileHandle* io_fh_ = nullptr;
+  std::vector<MTL::Buffer*> io_bufs_;
+  int io_buf_i_ = 0;
+  std::atomic<bool> io_err_{false};
+  std::vector<std::array<uint64_t, 3>> io_done_log_;  // layer, value, t_done
   std::vector<std::array<uint64_t, 5>> trace_;
   std::vector<std::array<uint64_t, 4>> cbtrace_;
 };
@@ -446,10 +532,16 @@ class SignalFetch : public mx::Primitive {
     auto& reg = Registry::inst();
     enc.end_encoding();
     if (reg.sig_mode_ >= 1) {
-      // v2/v3: in-stream signal -- fires when the GPU PASSES this point (no CB
-      // drain, no per-layer commit; the token stays deeply pipelined).
+      // v2/v3/v4: in-stream signal -- fires when the GPU PASSES this point
+      // (no CB drain, no per-layer commit; the token stays deeply pipelined).
       uint64_t v = reg.assign_value(layer_);
       enc.get_command_buffer()->encodeSignalEvent(reg.sig_event_.get(), v);
+      if (reg.sig_mode_ == 3) {
+        // v4: pre-commit the layer's IO command buffer, parked on sig@v; it
+        // loads the expert bytes on Metal's IO queue and signals rel@v --
+        // zero CPU in the fetch loop.
+        reg.encode_io_fetch(layer_, v);
+      }
     } else {
       int layer = layer_;
       MTL::CommandBuffer* cbuf = enc.get_command_buffer();  // borrowed; alive
@@ -500,6 +592,34 @@ class WaitFetch : public mx::Primitive {
   uint64_t value_;
 };
 
+class CommitBoundary : public mx::Primitive {
+ public:
+  explicit CommitBoundary(mx::Stream stream) : mx::Primitive(stream) {}
+  void eval_cpu(const std::vector<mx::array>& inputs, std::vector<mx::array>& outputs) override {
+    throw std::runtime_error("[commit_boundary] GPU only");
+  }
+  void eval_gpu(const std::vector<mx::array>& inputs, std::vector<mx::array>& outputs) override {
+    // Plain command-buffer boundary (no handler, no event): commands encoded
+    // BEFORE this point (the masked hit contributions) land in their own CB
+    // with no event wait, so Metal kicks it off immediately after the
+    // previous CB -- the hits really execute DURING the fetch. Without this,
+    // Metal defers starting any CB whose stream contains an unsatisfied
+    // event wait, serializing the hits behind the release (measured 0/3599).
+    outputs[0].copy_shared_buffer(inputs[0]);
+    auto& enc = mx::metal::get_command_encoder(stream());
+    enc.end_encoding();
+    enc.commit();
+  }
+  const char* name() const override {
+    return "CommitBoundary";
+  }
+};
+
+mx::array commit_boundary(const mx::array& x, mx::StreamOrDevice s) {
+  return mx::array(x.shape(), x.dtype(),
+                   std::make_shared<CommitBoundary>(mx::to_stream(s)), {x});
+}
+
 mx::array signal_fetch(const mx::array& x, int layer, mx::StreamOrDevice s) {
   return mx::array(
       x.shape(), x.dtype(),
@@ -518,9 +638,130 @@ mx::array wait_fetch(
       {x, sig_dep});
 }
 
+// ------------------------- MTLIO spike (Stage A, v4) -------------------------
+// Measures Metal 3 fast-resource-streaming as a fetch path: load latency at
+// our offsets, event-chained round trip, and cache behavior. Self-contained;
+// uses its own IO/compute queues, not MLX's stream.
+static nb::dict mtlio_spike(const std::string& path, int iters, bool aligned,
+                            bool chain, int priority, uint64_t seed) {
+  nb::dict out;
+  auto* pool = NS::AutoreleasePool::alloc()->init();
+  auto* dev = mx::metal::device(mx::Device::gpu).mtl_device();
+  NS::Error* err = nullptr;
+  auto* url = NS::URL::fileURLWithPath(
+      NS::String::string(path.c_str(), NS::UTF8StringEncoding));
+  MTL::IOFileHandle* fh = dev->newIOHandle(url, &err);
+  if (!fh) {
+    throw std::runtime_error("newIOHandle failed");
+  }
+  auto* qd = MTL::IOCommandQueueDescriptor::alloc()->init();
+  qd->setType(MTL::IOCommandQueueTypeSerial);
+  qd->setPriority((MTL::IOPriority)priority);
+  MTL::IOCommandQueue* ioq = dev->newIOCommandQueue(qd, &err);
+  if (!ioq) {
+    throw std::runtime_error("newIOCommandQueue failed");
+  }
+  const uint64_t EB = 663552, PG = 16384;
+  uint64_t fsz = 0;
+  {
+    struct stat st;
+    ::stat(path.c_str(), &st);
+    fsz = (uint64_t)st.st_size;
+  }
+  auto* buf = dev->newBuffer(EB + 2 * PG, MTL::ResourceStorageModeShared);
+  mach_timebase_info_data_t tb;
+  mach_timebase_info(&tb);
+  auto ns_of = [&](uint64_t t) { return t * tb.numer / tb.denom; };
+  uint64_t cyc = seed;
+  auto next_off = [&]() {
+    cyc = (cyc + 7919) % ((fsz - 2 * PG) / EB);
+    return cyc * EB;
+  };
+  std::vector<double> lat;
+  // (i) single-load latency, cycled offsets
+  for (int i = 0; i < iters; ++i) {
+    uint64_t off = next_off();
+    uint64_t o = off, len = EB;
+    if (aligned) {
+      o = (off / PG) * PG;
+      len = ((off - o + EB + PG - 1) / PG) * PG;
+    }
+    auto* icb = ioq->commandBuffer();
+    icb->loadBuffer(buf, 0, len, fh, o);
+    uint64_t t0 = mach_absolute_time();
+    icb->commit();
+    icb->waitUntilCompleted();
+    lat.push_back(ns_of(mach_absolute_time() - t0) / 1e3);
+    if (icb->status() != MTL::IOStatusComplete) {
+      out["io_error"] = true;
+    }
+  }
+  std::sort(lat.begin(), lat.end());
+  out["load_med_us"] = lat[lat.size() / 2];
+  out["load_p90_us"] = lat[(size_t)(lat.size() * 0.9)];
+  out["load_min_us"] = lat.front();
+  // warm-repeat: same offset 40x (cache probe)
+  {
+    uint64_t off = next_off();
+    std::vector<double> w;
+    for (int i = 0; i < 40; ++i) {
+      auto* icb = ioq->commandBuffer();
+      icb->loadBuffer(buf, 0, EB, fh, off);
+      uint64_t t0 = mach_absolute_time();
+      icb->commit();
+      icb->waitUntilCompleted();
+      w.push_back(ns_of(mach_absolute_time() - t0) / 1e3);
+    }
+    std::sort(w.begin(), w.end());
+    out["warm_repeat_med_us"] = w[w.size() / 2];
+  }
+  if (chain) {
+    // (ii) event-chained round trip: [compute signal E@v] -> [IO waits E@v,
+    // loads, signals E@v+1] -> [compute waits E@v+1]; IO CB pre-committed.
+    auto* cq = dev->newCommandQueue();
+    auto* ev = dev->newSharedEvent();
+    std::vector<double> ch;
+    uint64_t v = 0;
+    for (int i = 0; i < iters; ++i) {
+      uint64_t off = next_off();
+      auto* icb = ioq->commandBuffer();
+      icb->wait(ev, v + 1);
+      icb->loadBuffer(buf, 0, EB, fh, off);
+      icb->signalEvent(ev, v + 2);
+      icb->commit();                       // pre-committed, parked on the wait
+      auto* ca = cq->commandBuffer();
+      ca->encodeSignalEvent(ev, v + 1);
+      auto* cb = cq->commandBuffer();
+      cb->encodeWait(ev, v + 2);
+      uint64_t t0 = mach_absolute_time();
+      ca->commit();
+      cb->commit();
+      cb->waitUntilCompleted();
+      ch.push_back(ns_of(mach_absolute_time() - t0) / 1e3);
+      v += 2;
+    }
+    std::sort(ch.begin(), ch.end());
+    out["chain_med_us"] = ch[ch.size() / 2];
+    out["chain_p90_us"] = ch[(size_t)(ch.size() * 0.9)];
+    out["chain_min_us"] = ch.front();
+    cq->release();
+    ev->release();
+  }
+  buf->release();
+  ioq->release();
+  qd->release();
+  fh->release();
+  pool->release();
+  return out;
+}
+
 } // namespace temporal_stream
 
 NB_MODULE(_temporal_stream, m) {
+  m.def("mtlio_spike", &temporal_stream::mtlio_spike, nb::arg("path"),
+        nb::arg("iters") = 100, nb::arg("aligned") = false,
+        nb::arg("chain") = false, nb::arg("priority") = 0,
+        nb::arg("seed") = 13);
   m.doc() = "TEMPORAL-PATCH: shared-event fetch stream primitives for the Mac serving bench";
   m.def("setup",
         [](const std::string& path, uint64_t eb, int n_layers, int nfetch,
@@ -581,6 +822,10 @@ NB_MODULE(_temporal_stream, m) {
   m.def("host_signal", [](int layer, uint64_t value) {
     temporal_stream::Registry::inst().host_signal(layer, value);
   });
+  m.def(
+      "commit_boundary",
+      [](const mx::array& x) { return temporal_stream::commit_boundary(x, {}); },
+      nb::arg("x"));
   m.def(
       "signal_fetch",
       [](const mx::array& x, int layer) {

@@ -158,6 +158,22 @@ mode; the no-fetch row tolerates late delivery and uses event mode; spin wins no
 engine choice is now explained by a measured constant, and setup c's 26.6 tok/s stands as the
 maximum this API surface offers: compute (283 µs, ceiling-parity) + fastest notification
 (82 µs) + SSD read (335 µs) + inter-CB drain (~150 µs), residual ≈ 0.
+A fourth engine (`TEMPORAL_STREAM_SIG=mtlio`) closed the last avenue — Metal's own
+fast-resource-streaming API (`MTLIOCommandQueue`, file loads on pre-committed IO command
+buffers event-chained to compute, zero CPU in the loop): its loads are pread-class (373 µs
+cold at our cycled offsets; alignment irrelevant, third confirmation; loads are page-cached
+but the >RAM cycled pattern keeps them SSD-priced, audited), yet the IO-queue's unpark pays
+the same **~250 µs mid-stream event-delivery constant** — now measured on three independent
+consumers (CPU listener, CPU spin-poll, IO command queue), cementing it as a driver/firmware
+property of mid-command-buffer event propagation. v4 loses every row (deploy 18.3, and 34.3
+on n0 with *empty* IO chains). A related scheduling subtlety was caught and quantified en
+route: Metal defers kickoff of any command buffer whose stream holds an unsatisfied event
+wait, so the stream engine's masked hits do not actually overlap the fetch (0/3,599 traced
+layers); splitting them into a wait-free CB is a measured wash at B=1 (~40 µs window vs
+~50 µs boundary cost) and is documented rather than adopted. With Python, C++ extension,
+patched-MLX, and MTLIO surfaces all measured, 26.6–27.7 tok/s is the platform maximum for
+setup c, full stop; the binding constants (82 µs / 250 µs notification, 335–373 µs SSD read)
+belong to macOS, Metal, and the SSD.
 
 Fine floor curve (tok/s): n0 36.6, n1 15.1, n2 10.3, n4 9.8, n8 8.1, n14 6.6, n16 6.1, n18 5.8.
 
