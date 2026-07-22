@@ -5,8 +5,8 @@ benchmark's own MLX fork (mirroring the A6000's llama.cpp fork) the technique re
 platform's measured limits in both regimes.** M4 Pro, 24 GB, macOS 26.5.1: pool-in-RAM —
 machinery free (noswap 75.0 ≈ ceiling 74.2), deploy 0.86× ceiling, 1.4× over the vanilla
 floor. Pool-bigger-than-RAM (28.5 GiB, real SSD misses) — **setup c (the paper's trained
-configuration, post-attention routing, same-token fetch) decodes at 26.1 tok/s vs the
-vanilla floor's 6.8: a 3.8× win**, within 1.2× of the router-early variant and 2.8× of a
+configuration, post-attention routing, same-token fetch) decodes at 26.6 tok/s vs the
+vanilla floor's 6.9: a 3.9× win**, within 1.2× of the router-early variant and 2.8× of a
 RAM-sized model's ceiling at 5.4× the expert capacity; every remaining microsecond is
 itemized (compute + SSD syscall + measured OS handshake floors), residual ≈ 0.
 
@@ -117,13 +117,18 @@ steelman fairness (full protocol, 8 reps + warmup, 10 s cooldowns, bytes audits 
 
 | setup (B=1 decode, tok/s, higher better; FINAL = stream-engine generation) | fine 18-of-192 | coarse 6-of-64 |
 |---|---|---|
-| no-fetch handshake-limit baseline (floor n=0, stream-v2) | 45.9 [39–51] | 36.8 (issuer gen) |
-| **temporal deploy, sync (setup c, stream engine — the paper's configuration)** | **26.1 [23–29]** | **21.3 [19–23]** |
+| no-fetch handshake-limit baseline (floor n=0, stream-v2) | 46.8 ± 3.3 | 32.1 (v1) |
+| **temporal deploy, sync (setup c, stream engine — the paper's configuration)** | **26.6 ± 2.2** | **18.9 ± 1.0** |
 | temporal deploy, router-early (setup d, architectural variant) | 31.6 ± 0.4 | 24.5 ± 0.3 |
 | router-early, overlap disabled (control; bit-identical logits) | 16.1 | — |
-| floor n=1 (same bytes as deploy, identical engine) | 28.6 | 10.8 (issuer gen) |
-| vanilla-offload floor @ target miss rate | **6.8 [6.75–6.85]** (n16) | 7.5 (n5) |
-| vanilla-offload floor, all-miss (n=k) | 5.9 | 6.0 (issuer gen) |
+| floor n=1 (same bytes as deploy, identical engine) | 26.4 ± 1.2 | 19.3 ± 1.4 |
+| vanilla-offload floor @ target miss rate | **6.86 ± 0.09** (n16) | 7.85 ± 0.06 (n5) |
+| vanilla-offload floor, all-miss (n=k) | 6.02 ± 0.09 | 6.53 ± 0.08 |
+
+Uniform final sweep (all disk rows same-day, AC, one locked engine): fine floor curve n0 29.6
+(v1) / 46.8 (v2), n1 26.4, n2 22.9, n4 16.5, n8 11.6, n14 7.5, n16 6.9, n18 6.0 — monotone,
+bandwidth-bound at high N; the stream engine lifts the floor's mid-curve as much as deploy
+(n2 11.1 → 22.9 vs the issuer generation), i.e., the fair engine helps both sides.
 
 **The engine fork (how setup c doubled).** The Python/MLX level was exhausted at ~13.8 — the
 per-layer eval/submit round trip is a structural floor there, and the in-stream GPU/CPU
@@ -147,10 +152,10 @@ the new structural constants of fetch-on-miss serving on Apple platforms at engi
 Fine floor curve (tok/s): n0 36.6, n1 15.1, n2 10.3, n4 9.8, n8 8.1, n14 6.6, n16 6.1, n18 5.8.
 
 Findings:
-1. **Temporal-MoE's advantage returns once the tier is slow: 3.8× over the vanilla floor at
-   the target miss rate in the paper's own setup c (26.1 vs 6.8), 4.6× with the router-early
+1. **Temporal-MoE's advantage returns once the tier is slow: 3.9× over the vanilla floor at
+   the target miss rate in the paper's own setup c (26.6 vs 6.86), 4.6× with the router-early
    variant (31.6)** — and setup c now sits within 1.2× of router-early, within 1.8× of the
-   no-fetch handshake limit (45.9), and within 2.8× of a RAM-sized model's untouched ceiling
+   no-fetch handshake limit (46.8), and within 2.8× of a RAM-sized model's untouched ceiling
    (74.2) while serving 5.4× the expert parameters off SSD, with the residency machinery essentially free at disk
    speeds (deploy 14.5 ≈ floor_n1 15.1, which moves identical bytes with no machinery).
    The two sides are differently bound — deploy is fetch-latency-bound (45 serial
