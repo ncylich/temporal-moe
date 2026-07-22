@@ -148,6 +148,16 @@ the fractured per-layer Python submission path. Remaining per-layer accounting c
 residual ≈ 0: compute ~283 µs + handshake (completion dispatch 82 µs / event-wait wake
 50–110 µs, release 2 µs) + pread ~335 µs. Those handshake terms are the measured OS floors —
 the new structural constants of fetch-on-miss serving on Apple platforms at engine level.
+A third engine iteration (spin-polling service thread, `TEMPORAL_STREAM_SIG=spin`) completed
+the map by elimination: polling `MTLSharedEvent.signaledValue` costs 2.3 ns, yet detection
+still lags the GPU's arrival at the signal point by **~250 µs — in-stream event-value
+delivery to the CPU is itself command-buffer-coherency-bound**, and a permanently spinning
+P-core costs the GPU ~13% package headroom. Hence the final mechanistic picture: CB-completion
+dispatch (82 µs) is the platform's fastest GPU→CPU notification, so fetch rows use commit
+mode; the no-fetch row tolerates late delivery and uses event mode; spin wins nothing. Every
+engine choice is now explained by a measured constant, and setup c's 26.6 tok/s stands as the
+maximum this API surface offers: compute (283 µs, ceiling-parity) + fastest notification
+(82 µs) + SSD read (335 µs) + inter-CB drain (~150 µs), residual ≈ 0.
 
 Fine floor curve (tok/s): n0 36.6, n1 15.1, n2 10.3, n4 9.8, n8 8.1, n14 6.6, n16 6.1, n18 5.8.
 

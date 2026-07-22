@@ -194,7 +194,7 @@ struct Registry {
       pending_val_.assign(n_layers_, 0);
     }
     stop_service();
-    if (sig_mode_ == 1) {
+    if (sig_mode_ == 1 || sig_mode_ == 2) {
       start_service();
     }
   }
@@ -203,8 +203,65 @@ struct Registry {
     svc_stop_.store(false);
     svc_ = std::thread([this] {
       pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+      mach_timebase_info_data_t tb;
+      mach_timebase_info(&tb);
       uint64_t v = 1;
       while (!svc_stop_.load()) {
+        if (sig_mode_ == 2) {
+          // v3: SPIN-POLL the shared event's signaledValue (objc property
+          // read ~100ns) with ISB pauses -- a thread that never blocks never
+          // loses the macOS wake-placement lottery. Safety valve: after 50ms
+          // without progress, fall back to ONE blocking timed wait (idle
+          // gaps/cooldowns land here; the next signal wakes it and the loop
+          // returns to spinning).
+          uint64_t spin_start = mach_absolute_time();
+          bool got = false;
+          while (!svc_stop_.load()) {
+            if (sig_event_->signaledValue() >= v) {
+              got = true;
+              break;
+            }
+            for (int i = 0; i < 8; ++i) {
+              __builtin_arm_isb(15);
+            }
+            if ((mach_absolute_time() - spin_start) * tb.numer / tb.denom >
+                50000000ull) {
+              break;                       // 50ms: yield the core
+            }
+          }
+          if (!got) {
+            if (!sig_event_->waitUntilSignaledValue(v, 50)) {
+              if (warm_req_.exchange(false)) {
+                // (spin mode: nothing to warm -- the spin IS the warmth)
+              }
+              continue;
+            }
+          }
+          uint64_t t0 = trace_on_ ? mach_absolute_time() : 0;
+          int layer = -1;
+          {
+            std::lock_guard<std::mutex> lk(vmap_m_);
+            if (v - 1 < val_layer_.size()) {
+              layer = val_layer_[v - 1];
+            }
+          }
+          if (layer < 0) {
+            continue;   // value observed before its encode bookkeeping: re-spin
+          }
+          do_fetch(layer);
+          uint64_t t1 = trace_on_ ? mach_absolute_time() : 0;
+          rel_event_->setSignaledValue(v);
+          if (trace_on_) {
+            std::lock_guard<std::mutex> lk(log_m_);
+            trace_.push_back({(uint64_t)layer, v, t0, t1, mach_absolute_time()});
+          }
+          {
+            std::lock_guard<std::mutex> lk(log_m_);
+            seq_log_.emplace_back(layer, v);
+          }
+          ++v;
+          continue;
+        }
         if (!sig_event_->waitUntilSignaledValue(v, 50)) {
           // timeout: re-check stop flag; honor a pending keep-warm request
           // (post-cooldown P-core re-promotion, the service-thread analog of
@@ -388,8 +445,8 @@ class SignalFetch : public mx::Primitive {
     auto& enc = mx::metal::get_command_encoder(stream());
     auto& reg = Registry::inst();
     enc.end_encoding();
-    if (reg.sig_mode_ == 1) {
-      // v2: in-stream signal -- fires when the GPU PASSES this point (no CB
+    if (reg.sig_mode_ >= 1) {
+      // v2/v3: in-stream signal -- fires when the GPU PASSES this point (no CB
       // drain, no per-layer commit; the token stays deeply pipelined).
       uint64_t v = reg.assign_value(layer_);
       enc.get_command_buffer()->encodeSignalEvent(reg.sig_event_.get(), v);
@@ -424,7 +481,7 @@ class WaitFetch : public mx::Primitive {
     auto& enc = mx::metal::get_command_encoder(stream());
     auto& reg = Registry::inst();
     enc.end_encoding();
-    if (reg.sig_mode_ == 1) {
+    if (reg.sig_mode_ >= 1) {
       // the paired SignalFetch encoded first (dataflow dependency), so the
       // layer's pending global value is the one to gate on
       enc.get_command_buffer()->encodeWait(
@@ -505,6 +562,18 @@ NB_MODULE(_temporal_stream, m) {
       out.append(nb::make_tuple(l, v));
     }
     return out;
+  });
+  m.def("poll_cost_ns", [](int iters) {
+    auto& r = temporal_stream::Registry::inst();
+    mach_timebase_info_data_t tb;
+    mach_timebase_info(&tb);
+    uint64_t t0 = mach_absolute_time();
+    uint64_t acc = 0;
+    for (int i = 0; i < iters; ++i) {
+      acc += r.sig_event_->signaledValue();
+    }
+    uint64_t dt = (mach_absolute_time() - t0) * tb.numer / tb.denom;
+    return nb::make_tuple((double)dt / iters, acc);
   });
   m.def("service_warm", []() {
     temporal_stream::Registry::inst().warm_req_.store(true);
