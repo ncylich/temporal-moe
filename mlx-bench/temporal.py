@@ -1016,8 +1016,15 @@ class TemporalController:
                 import _temporal_stream as _ts
                 self.ts = _ts
                 nfetch = N if mode == "floor" else 1
+                # TEMPORAL_STREAM_SIG: "event" = in-stream encodeSignalEvent +
+                # pinned service thread (v2); "commit" = per-layer CB commit +
+                # completion handler (v1). TEMPORAL_STREAM_TRACE=1 records the
+                # hop-by-hop handshake timestamps (mach time) in C++.
+                sig_mode = 1 if os.environ.get(
+                    "TEMPORAL_STREAM_SIG", "commit") == "event" else 0
                 _ts.setup(self.disk_path, eb, len(self.layers), nfetch,
-                          self.disk_qd)
+                          self.disk_qd, sig_mode,
+                          os.environ.get("TEMPORAL_STREAM_TRACE", "") == "1")
 
     # ---- regime-2 sync-loop structure (floor + sync deploy disk rows) ----
     # Deferred-wait per-layer tick: layer L's fetch-on-miss sequence

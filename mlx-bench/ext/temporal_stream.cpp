@@ -29,7 +29,10 @@
 // events (recreated on reset: MTLSharedEvent values are monotonic), and a
 // small C++ pread pool for n>=2 batches (QD workers, no GIL anywhere).
 
+#include <array>
 #include <atomic>
+#include <mach/mach_time.h>
+#include <pthread/qos.h>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -137,8 +140,12 @@ struct Registry {
       uint64_t expert_bytes,
       int n_layers,
       int n_per_fetch,
-      int qd) {
+      int qd,
+      int sig_mode = 0,   // 0 = commit+completion-handler, 1 = encodeSignalEvent+service thread
+      bool trace = false) {
     teardown();
+    sig_mode_ = sig_mode;
+    trace_on_ = trace;
     fd_ = ::open(path.c_str(), O_RDONLY);
     if (fd_ < 0) {
       throw std::runtime_error("[temporal_stream] cannot open pool: " + path);
@@ -175,6 +182,59 @@ struct Registry {
       }
       events_.push_back(NS::TransferPtr(e));
     }
+    // v2 (event-signal mode): ONE GPU->CPU signal event + ONE CPU->GPU release
+    // event, shared across layers with globally monotonic values (encode order
+    // == stream order). The service thread consumes values sequentially.
+    sig_event_ = NS::TransferPtr(mtl->newSharedEvent());
+    rel_event_ = NS::TransferPtr(mtl->newSharedEvent());
+    encode_val_.store(0);
+    {
+      std::lock_guard<std::mutex> lk(vmap_m_);
+      val_layer_.clear();
+      pending_val_.assign(n_layers_, 0);
+    }
+    stop_service();
+    if (sig_mode_ == 1) {
+      start_service();
+    }
+  }
+
+  void start_service() {
+    svc_stop_.store(false);
+    svc_ = std::thread([this] {
+      pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+      uint64_t v = 1;
+      while (!svc_stop_.load()) {
+        if (!sig_event_->waitUntilSignaledValue(v, 50)) {
+          continue;                          // timeout: re-check stop flag
+        }
+        uint64_t t0 = trace_on_ ? mach_absolute_time() : 0;
+        int layer;
+        {
+          std::lock_guard<std::mutex> lk(vmap_m_);
+          layer = val_layer_.at(v - 1);
+        }
+        do_fetch(layer);
+        uint64_t t1 = trace_on_ ? mach_absolute_time() : 0;
+        rel_event_->setSignaledValue(v);
+        if (trace_on_) {
+          std::lock_guard<std::mutex> lk(log_m_);
+          trace_.push_back({(uint64_t)layer, v, t0, t1, mach_absolute_time()});
+        }
+        {
+          std::lock_guard<std::mutex> lk(log_m_);
+          seq_log_.emplace_back(layer, v);
+        }
+        ++v;
+      }
+    });
+  }
+
+  void stop_service() {
+    if (svc_.joinable()) {
+      svc_stop_.store(true);
+      svc_.join();
+    }
   }
 
   void reset() {
@@ -191,7 +251,10 @@ struct Registry {
   }
 
   void teardown() {
+    stop_service();
     events_.clear();
+    sig_event_.reset();
+    rel_event_.reset();
     pool_.reset();
     if (fd_ >= 0) {
       ::close(fd_);
@@ -202,7 +265,7 @@ struct Registry {
   // The per-layer fetch, run on the Metal completion thread. Offset streams
   // are byte-identical to temporal.py::_issue_disk (split-1 single pread for
   // n==1; n whole-expert reads through the pool for n>=2).
-  void on_signal(int layer) {
+  void do_fetch(int layer) {
     if (nfetch_ > 0 && fd_ >= 0) {
       auto& ring = ring_[ring_i_];
       ring_i_ = (ring_i_ + 1) % ring_.size();
@@ -227,13 +290,40 @@ struct Registry {
       bytes_.fetch_add(eb_ * (uint64_t)nfetch_);
       fetches_.fetch_add(1);
     }
-    // ordering-control log + release
+  }
+
+  // v1 commit-mode completion handler body
+  void on_signal(int layer, MTL::CommandBuffer* cbuf) {
+    uint64_t t0 = trace_on_ ? mach_absolute_time() : 0;
+    do_fetch(layer);
+    uint64_t t1 = trace_on_ ? mach_absolute_time() : 0;
     uint64_t v = ++sigval_[layer];
     {
       std::lock_guard<std::mutex> lk(log_m_);
       seq_log_.emplace_back(layer, v);
     }
     events_[layer]->setSignaledValue(v);
+    if (trace_on_ && cbuf) {
+      // GPUStart/EndTime are seconds in the mach timebase domain
+      uint64_t gs = (uint64_t)(cbuf->GPUStartTime() * 1e9);
+      uint64_t ge = (uint64_t)(cbuf->GPUEndTime() * 1e9);
+      std::lock_guard<std::mutex> lk(log_m_);
+      trace_.push_back({(uint64_t)layer, v, t0, t1, mach_absolute_time()});
+      cbtrace_.push_back({(uint64_t)layer, v, gs, ge});
+    }
+  }
+
+  // v2 encode-time bookkeeping: assign the next global value to this layer
+  uint64_t assign_value(int layer) {
+    uint64_t v = encode_val_.fetch_add(1) + 1;
+    std::lock_guard<std::mutex> lk(vmap_m_);
+    val_layer_.push_back(layer);
+    pending_val_[layer] = v;
+    return v;
+  }
+  uint64_t pending_value(int layer) {
+    std::lock_guard<std::mutex> lk(vmap_m_);
+    return pending_val_[layer];
   }
 
   void host_signal(int layer, uint64_t value) { // test aid
@@ -255,6 +345,18 @@ struct Registry {
   std::unique_ptr<PreadPool> pool_;
   std::mutex log_m_;
   std::vector<std::pair<int, uint64_t>> seq_log_;
+  // v2 members
+  int sig_mode_ = 0;
+  bool trace_on_ = false;
+  NS::SharedPtr<MTL::SharedEvent> sig_event_, rel_event_;
+  std::atomic<uint64_t> encode_val_{0};
+  std::mutex vmap_m_;
+  std::vector<int> val_layer_;
+  std::vector<uint64_t> pending_val_;
+  std::thread svc_;
+  std::atomic<bool> svc_stop_{false};
+  std::vector<std::array<uint64_t, 5>> trace_;
+  std::vector<std::array<uint64_t, 4>> cbtrace_;
 };
 
 // ------------------------------ primitives ----------------------------------
@@ -270,9 +372,20 @@ class SignalFetch : public mx::Primitive {
   void eval_gpu(const std::vector<mx::array>& inputs, std::vector<mx::array>& outputs) override {
     outputs[0].copy_shared_buffer(inputs[0]);
     auto& enc = mx::metal::get_command_encoder(stream());
+    auto& reg = Registry::inst();
     enc.end_encoding();
-    int layer = layer_;
-    enc.commit([layer]() { Registry::inst().on_signal(layer); });
+    if (reg.sig_mode_ == 1) {
+      // v2: in-stream signal -- fires when the GPU PASSES this point (no CB
+      // drain, no per-layer commit; the token stays deeply pipelined).
+      uint64_t v = reg.assign_value(layer_);
+      enc.get_command_buffer()->encodeSignalEvent(reg.sig_event_.get(), v);
+    } else {
+      int layer = layer_;
+      MTL::CommandBuffer* cbuf = enc.get_command_buffer();  // borrowed; alive
+      enc.commit([layer, cbuf]() {                          //  during handlers
+        Registry::inst().on_signal(layer, cbuf);
+      });
+    }
   }
 
   const char* name() const override {
@@ -295,8 +408,16 @@ class WaitFetch : public mx::Primitive {
   void eval_gpu(const std::vector<mx::array>& inputs, std::vector<mx::array>& outputs) override {
     outputs[0].copy_shared_buffer(inputs[0]);
     auto& enc = mx::metal::get_command_encoder(stream());
+    auto& reg = Registry::inst();
     enc.end_encoding();
-    enc.get_command_buffer()->encodeWait(Registry::inst().event(layer_), value_);
+    if (reg.sig_mode_ == 1) {
+      // the paired SignalFetch encoded first (dataflow dependency), so the
+      // layer's pending global value is the one to gate on
+      enc.get_command_buffer()->encodeWait(
+          reg.rel_event_.get(), reg.pending_value(layer_));
+    } else {
+      enc.get_command_buffer()->encodeWait(Registry::inst().event(layer_), value_);
+    }
   }
 
   const char* name() const override {
@@ -330,8 +451,29 @@ mx::array wait_fetch(
 
 NB_MODULE(_temporal_stream, m) {
   m.doc() = "TEMPORAL-PATCH: shared-event fetch stream primitives for the Mac serving bench";
-  m.def("setup", [](const std::string& path, uint64_t eb, int n_layers, int nfetch, int qd) {
-    temporal_stream::Registry::inst().setup(path, eb, n_layers, nfetch, qd);
+  m.def("setup",
+        [](const std::string& path, uint64_t eb, int n_layers, int nfetch,
+           int qd, int sig_mode, bool trace) {
+          temporal_stream::Registry::inst().setup(
+              path, eb, n_layers, nfetch, qd, sig_mode, trace);
+        },
+        nb::arg("path"), nb::arg("eb"), nb::arg("n_layers"), nb::arg("nfetch"),
+        nb::arg("qd"), nb::arg("sig_mode") = 0, nb::arg("trace") = false);
+  m.def("trace_ns", []() {
+    auto& r = temporal_stream::Registry::inst();
+    mach_timebase_info_data_t tb;
+    mach_timebase_info(&tb);
+    auto to_ns = [&](uint64_t t) { return t * tb.numer / tb.denom; };
+    std::lock_guard<std::mutex> lk(r.log_m_);
+    nb::list out;
+    for (auto& e : r.trace_) {   // layer, value, t_start, t_fetch_done, t_signal_set (mach)
+      out.append(nb::make_tuple(e[0], e[1], to_ns(e[2]), to_ns(e[3]), to_ns(e[4])));
+    }
+    nb::list cbs;
+    for (auto& e : r.cbtrace_) { // layer, value, gpu_start_ns, gpu_end_ns
+      cbs.append(nb::make_tuple(e[0], e[1], e[2], e[3]));
+    }
+    return nb::make_tuple(out, cbs);
   });
   m.def("reset", []() { temporal_stream::Registry::inst().reset(); });
   m.def("teardown", []() { temporal_stream::Registry::inst().teardown(); });
