@@ -84,3 +84,20 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `temporal_router_tau_ema_sweep.csv` | Temporal-router τ (min-logit eviction threshold) × EMA-β sweep — swap rate & coverage (audit-scored). | a6000@6f9e02bc |
 | `temporal_router_tau_ema_sweep_selfscored.csv` | Same τ×EMA sweep, self-scored coverage. | a6000@6f9e02bc |
 | `unmask_eval.csv` | Unmask / cross-regime eval — native vs cross-regime metric per scale & paradigm. | a6000@d3fbc238 |
+| `olmoe_adapt_impose.csv` | OLMoE-1B-7B-0125 Stage-0 zero-shot impose (R=k=8 of 64) + R-sweep coherence + audited-slice restatement (base 0.6727 / impose 2.7507 BPB, D=3.1089 byte-derived). | h100@29556cc6, restated h100@dbc9461a |
+| `olmoe_adapt_corpus_audit.md` | Adaptation program provenance: no-unconsumed-tail finding, parent-pool corpus recipe (1B tok, dedup counts), ReMoE/MELINOE budget priors, throughput root cause (HF per-expert python dispatch loop). | h100@92ccb2f2 + updates |
+| `olmoe_adapt_sweep.csv` | Stage-2 router-only LR sweep under R=8 (3e-5/1e-4/3e-4 × 0.25B, full 50M eval series; winner 3e-4, 70.7% recovery, late crossover). | h100@358818ab |
+| `olmoe_adapt_bakeoff.csv` | Stage-2b escalation bake-off, all 11 arms + curves + eval-noise sigma (A/B/D routing 70%; C norms 91.4% == E LoRA; CE winner 93.2%; F' full-FT 93.4% = constraint price; G distill hurts; Er8/Er64 rank saturation; H zone-anneal null). | h100 per-arm commits 0065–0101 |
+| `olmoe_adapt_lmeval_impose.csv` | Stage-0 3-task downstream impose (arc_easy/piqa/obqa collapse under cold R=8 mask). | h100@dbc9461a |
+| `olmoe_adapt_downstream.csv` | Stage-3 downstream 10-task lm-eval, 5 cells: base-free / impose-R8 / CE-adapted-R8 / OLMo-1B-0724 / OLMo-7B-0724 (74.4% accuracy recovery; CE-adapt 0.589 vs dense-1B 0.601; base 0.682 vs dense-7B 0.677). | h100@15200735 + dense bracket h100@01170b04 |
+| `olmoe_adapt_forensics.csv` | Stage-3 de-lex probe battery, CE-adapt vs base-impose (locus flips token->context: ctx-tok -0.004 -> +0.049; generalists -> 0; demand AUC ~0.96 both = non-discriminator). | h100@0124 result commit |
+| `olmoe_adapt_telemetry.csv` | Stage-3 routing telemetry of CE-adapted @R=8 (swap 0.9997 ~= ceiling, dwell 13.4 tok, usage entropy 0.9988). | h100@0125 result commit |
+| `olmoe_scratch_ladder.csv` | Baseline-equivalence: c4val harness validation (ours 2.4730 vs OLMoE-0924 wandb 2.4807) + from-scratch 0924 checkpoint ladder on our slice (20B..524B) -> crossings ~28B (C) / ~46B (CE) tokens, agrees with wandb train-curve 25.7/42.8B. | h100@61db892b + ladder commits |
+| `olmoe_minflow_calib.csv` | O-series captured-mass ladder per layer (windowed + full-4096: static 0.213 / greedy 0.277 / MinFlow-m1 0.327 / top-8 bound 0.405; flat-router coverage finding top-24=0.684). | h100@2aa82d49 + full h100@0137 |
+| `olmoe_minflow_msweep.csv` | O-1 swap-budget m-sweep {1,2,4} (m>1 diagnostic-only, non-deployable: m× fetch bandwidth). | h100@f54f3fb3 |
+| `olmoe_minflow_bpb.csv` | O-2/O-close reward->BPB transfer + the three decisive pairs: replay headroom 0.0231±0.0076; free-vs-drift 0.4034±0.0178; CE winner-gate scan-oracle -0.0113±0.0021 (live scan BEATS forced free-logit oracle -> offline scheduling dead). | h100@0110–0138 commits, final 0130a03a |
+| `olmoe_minflow_capture_meta.json` | O-0 reward-field capture metadata (rank-mass histogram, coverage). | h100@2aa82d49 |
+| `olmoe_cal0.csv` | Cal-0 closed-form moment-matching probe: REJECTED (raw 1.1% / clipped 31.5% recovery; not benign under free routing; cos~0.01 vs learned gains). | h100@e6795ec0 |
+| `olmoe_cal2.csv` | Cal-2 calibrated-init training screen: NULL, undone-to-single-basin (final 0.9262 vs C@50M 0.8791; cos-to-init 1.0->0.17, cos-to-C -0.03->0.44; init axis closed). | h100@9f0ca8ae |
+| `olmoe_adapt_RESULTS.md` | Full adaptation-study writeup (11-arm table, four-part mechanism story, recommendations). | h100@0101 closeout |
+| `adapt_ckpts/*.safetensors` | Router-only checkpoints (~4MB each): LR-sweep arms, bake-off router arms (B/C/D), Cal-2. LoRA-bearing ckpts (474MB) remain pod-local by policy. | h100 arm commits |

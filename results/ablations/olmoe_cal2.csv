@@ -1,0 +1,13 @@
+# Cal-2 (orch 0132): INIT-AXIS screen. Arm-C surface (router+65 norm gains both trainable), lr 3e-04, 50M tok,
+# norm gains INITIALIZED from clipped closed-form g' (Cal-0 2.0965-BPB start); router from base. Eval @R=8, D=3.1089.
+# Bar: beat arm C like-for-like C@50M=0.8791 by >2sigma(0.012). Ladder: base 0.6727 / arm C 0.8505 / impose 2.7507.
+# cos_prime=cos(log(g_t/g_base),log(g'/g_base)) [retain g'?]; cos_C=cos(log(g_t/g_base),log(g_C/g_base)) [undo toward arm C?]
+tok_M,BPB,recovery,swap_rate,usage_entropy,cos_prime,cos_C
+0,2.0965,0.3148,0.9997,0.9941,1.0000,-0.0342
+10,1.0241,0.8309,0.9997,0.9963,0.2822,0.3087
+20,0.9730,0.8555,0.9997,0.9964,0.2337,0.3570
+30,0.9502,0.8665,0.9997,0.9968,0.2040,0.3839
+40,0.9362,0.8732,0.9998,0.9971,0.1842,0.4152
+50,0.9262,0.8780,0.9998,0.9975,0.1702,0.4397
+# FINAL @ 50M: BPB=0.9262 rec=0.878 cos_prime=0.1702 cos_C=0.4397 (UNDOES g' toward arm C (g_C))
+# VERDICT: NULL: g'-init WORSE by 0.0471 -> init axis CLOSED (arm C's from-base start is not improved)

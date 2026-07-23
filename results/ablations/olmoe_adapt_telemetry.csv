@@ -1,0 +1,6 @@
+# Stage 3 (3) routing telemetry summary — CE-adapted OLMoE @ R=8 (from bake-off eval telemetry + resident-mask trace on captured logits, 8 seqs x 16 layers).
+metric,value,note
+swap_rate_per_token_per_layer,0.9997,"CE-final eval telemetry (adapted @R8); at the <=1/token ceiling — residency churns nearly every token/layer"
+swap_rate_from_scan_trace,0.9986,"greedy R=8 scan (evict=min_logit) on captured base logits — confirms ~1.0"
+mean_expert_dwell_tokens,13.42,"mean consecutive-resident run length per expert (median 6.1) — an expert stays resident ~13 tokens before eviction"
+usage_entropy_normalized,0.9988,"expert firing-count entropy / ln(64); near 1.0 = near-uniform expert usage over time, NO collapse / no swap-gaming"

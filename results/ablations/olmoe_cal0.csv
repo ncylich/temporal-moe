@@ -1,0 +1,75 @@
+# Cal-0 (orch 0114): closed-form moment-matched norm gains g'=g*RMS_free/RMS_masked, ZERO training.
+# stats 512 packs; eval 256 packs audited slice D=3.1089. Ladder: impose 2.7507 / A(router) 1.2825 / C(router+norms) 0.8505 / base 0.6727.
+row,BPB,recovery,note
+matched_norms_R8,2.7278,0.0110,closed-form g' + base router @R8 (NO training)
+matched_clipped_R8,2.0965,0.3148,g' clamped[0.5|2] @R8
+matched_norms_free,2.2264,0.2523,sanity: g_prime + FREE routing (should ~=base 0.6727)
+matched_clipped_free,1.5282,0.5883,sanity: clipped g_prime + FREE routing
+# per-norm cosine( log(g'/g) , log(gC/g) ) — direction agreement of closed-form vs arm C learned:
+norm_idx,cos_sim
+0,nan
+1,nan
+2,nan
+3,nan
+4,0.0283
+5,0.0028
+6,-0.1553
+7,0.6403
+8,-0.0627
+9,0.0186
+10,-0.5432
+11,0.8283
+12,-0.0334
+13,0.0336
+14,-0.4025
+15,0.9643
+16,-0.0000
+17,0.0105
+18,-0.6968
+19,0.9675
+20,0.0134
+21,0.0179
+22,-0.9174
+23,0.9615
+24,-0.0114
+25,0.0217
+26,-0.9345
+27,0.9525
+28,0.0236
+29,-0.0241
+30,-0.9357
+31,0.9342
+32,0.0253
+33,0.0215
+34,-0.9354
+35,0.9130
+36,-0.0568
+37,0.0459
+38,-0.9328
+39,0.8777
+40,-0.1331
+41,-0.0183
+42,-0.9091
+43,0.7262
+44,-0.0104
+45,-0.0379
+46,-0.7466
+47,0.4099
+48,-0.0344
+49,0.1000
+50,-0.4507
+51,-0.0490
+52,-0.0351
+53,0.0534
+54,0.0291
+55,-0.3862
+56,-0.0542
+57,0.0142
+58,0.4517
+59,-0.5410
+60,-0.0229
+61,0.0044
+62,0.5482
+63,-0.4961
+64,0.5379
+# mean cos-sim = 0.0100; median = 0.0028; frac>0.5 = 0.197

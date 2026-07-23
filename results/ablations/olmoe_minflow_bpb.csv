@@ -1,0 +1,20 @@
+# O-2 reward->BPB transfer (orch 0106). Frozen base @ R=8, audited slice (D=3.1089), 16 packs, TW=256.
+# ALL schedules windowed at TW=256 incl. greedy (its own baseline, != canonical impose 2.7507).
+# free_top8 = base free routing anchor (no residency). Lower BPB = better.
+schedule,captured_mass_windowed,BPB,CE_nats_per_tok,delta_BPB_vs_greedy
+# NOTE: m=1 is the deployable budget (<=1 slow-storage expert fetch/token/layer). m=2/m=4 = m x streaming bandwidth = NON-DEPLOYABLE, analysis-only. Operative schedulability = the m=1 row.
+free_top8,0.405,0.6703,2.0839,-1.6250
+static,0.213,2.7544,8.5631,+0.4591
+greedy,0.277,2.2953,7.1359,+0.0000
+minflow_m1,0.327,2.2881,7.1135,-0.0072
+minflow_m2,0.363,2.0051,6.2337,-0.2902
+minflow_m4,0.394,1.8668,5.8037,-0.4285
+# reward->BPB fit (5 residency schedules): Pearson r = -0.970 (captured-mass vs BPB, negative=more mass->lower BPB).
+# SCHEDULABILITY HEADLINE: MinFlow m1 BPB 2.2881 vs windowed-greedy 2.2953 = -0.0072 (~1 sigma; captured-mass +18% but BPB transfer WEAK at m=1). Budget (m>1) is the lever: m2 -0.290, m4 -0.429.
+# NOTE free_top8 (mass 0.405, BPB 0.670) vs MinFlow m4 (mass 0.394, BPB 1.867): near-equal captured mass, 1.2-BPB gap -> softmax-mass is a loose BPB predictor; serving the RIGHT experts matters more than the mass total.
+# UNWINDOWED PAIRED (orch 0128) N=24 full-4096 C=32: greedy 2.3012 MinFlow_m1 2.2781; paired diff 0.0231 +/- 0.0076 BPB (t=3.0) -> MinFlow beats greedy by 0.0231 at full sequence.
+# RECONCILIATION (orch 0130-1) N=24 packs, paired, full-4096 C=32. Decompose the ~0.46 replay-vs-live gap.
+# replay-greedy (free-logit schedule forced) 2.3012 +/- 0.0147; replay-MinFlow_m1 2.2781 +/- 0.0184; live-greedy (LIVE residency, drifted logits) 2.7047 +/- 0.0290.
+# 0.46 headline (canonical impose 2.7507 - replay-greedy 2.3012 = 0.4495) = pack-sampling 0.0460 (2.7507 vs live-greedy-24 2.7047) + free-vs-drift 0.4034 +/- 0.0178 (t=22.6, live-greedy - replay-greedy same packs).
+# => replay scheduling headroom greedy->MinFlow = 0.0231 +/- 0.0076 (t=3.0) sits INSIDE a 0.40 free-vs-drift gap: the 0.023 certificate is REPLAY-INTERNAL; live transfer is what the CE O-3 gate tests.
+# CE-ADAPTED O-3 GATE (orch 0130-2) N=24 full-4096 C=32: CE-scan 0.8184 (~=0.8149 sanity), CE-oracle(MinFlow m1 on CE free logits) 0.8296, CE-greedy(replay) 0.8335; paired scan-oracle -0.0113 +/- 0.0021 BPB (t=-5.4) -> O-3 DEAD on winner: CE LIVE adaptive scan 0.8184 BEATS the offline MinFlow-m1 oracle 0.8296 (computed on CE free logits) by 0.0113 +/- 0.0021 (t=5.4). Free-logit schedule does not survive the model's own logit drift; online scan already captures more than an offline free-logit optimum. MinFlow still > greedy WITHIN replay (0.8296<0.8335) but BOTH replay schedules lose to the live scan.

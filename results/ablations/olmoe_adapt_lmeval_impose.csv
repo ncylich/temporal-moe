@@ -1,0 +1,7 @@
+task,metric,base,impose_mask_R8,delta
+arc_easy,acc,0.7715,0.2689,-0.5025
+arc_easy,acc_norm,0.7677,0.2593,-0.5084
+piqa,acc,0.7856,0.5299,-0.2557
+piqa,acc_norm,0.796,0.5136,-0.2824
+openbookqa,acc,0.328,0.142,-0.186
+openbookqa,acc_norm,0.454,0.278,-0.176

@@ -1,0 +1,23 @@
+# !!! COMPARATIVE-ONLY (windowed TW=256, cold-fill-inflated) — NEVER quote as absolutes. Superseded for absolute captured-mass by olmoe_minflow_full.csv (full-4096, per orch 0109).
+# O-0/O-1 captured-mass ladder (mean served base-softmax mass per token, per layer; reward never renormalized).
+# 6 audited-slice seqs, windowed at TW=256 (cold-fill per window) for exact-MinFlow tractability;
+# all policies share the windows so MinFlow-vs-greedy is apples-to-apples. m in [1]. captured in [0,1]/token.
+# NOTE base router softmax is FLAT: top-8 covers ~0.406, top-24 ~0.684 (plan's >=0.995 premise fails); top-24 still suffices (schedules serve top-8ish).
+layer,static_best8,greedy_scan,minflow_m1,top8_bound
+0,0.15790,0.21379,0.27286,0.35887
+1,0.13637,0.18589,0.23644,0.30799
+2,0.16018,0.21323,0.26061,0.32355
+3,0.17533,0.22884,0.27910,0.34868
+4,0.19046,0.24424,0.28063,0.32418
+5,0.20229,0.25774,0.29060,0.33372
+6,0.20467,0.25571,0.29898,0.35196
+7,0.20475,0.26805,0.30503,0.36275
+8,0.20725,0.26132,0.30672,0.37835
+9,0.21930,0.27866,0.32848,0.41868
+10,0.22590,0.29306,0.34957,0.46274
+11,0.25086,0.32184,0.37544,0.46227
+12,0.25369,0.33404,0.39673,0.49744
+13,0.27368,0.35559,0.41291,0.50799
+14,0.26970,0.34925,0.41437,0.51592
+15,0.28071,0.36412,0.42484,0.53084
+ALL,0.21331,0.27658,0.32708,0.40537

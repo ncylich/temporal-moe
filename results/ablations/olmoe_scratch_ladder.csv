@@ -1,0 +1,12 @@
+# OLMoE baseline-equivalence / scratch-ladder (orch 0095/0096/0098). Two kinds of rows:
+#  (a) source=c4val_ours: harness-validation — OUR eval of the BASE model on c4 en-validation (their eval corpus),
+#      CE nats/token, for direct cross-check vs OLMoE-0924 wandb eval/c4_en-validation/CrossEntropyLoss.
+#  (b) source=ckpt_ladder: intermediate-checkpoint BPB on OUR Stage-1 audited slice (D=3.1089), free routing.
+# CE_nats = mean next-token cross-entropy (natural log); BPB = CE_nats/(ln2*bytes_per_token). ppl=exp(CE).
+source,ckpt,tokens_B,corpus,CE_nats,BPB,note
+c4val_ours,OLMoE-1B-7B-0125,final,c4_en-validation,2.4730,0.7902,"free top8 no-residency; fp32; our harness (direct next-token CE == perplexity path, ppl=11.858); n_pred_tokens=2002455, n_bytes_utf8=9043681, bytes/tok=4.5152, seq=4096, 489 packs; VALIDATED: 0924 wandb eval/c4_en-val CE=2.4807 (anneal end); ours 2.4730 is 0.0077 LOWER = expected (0125>0924). cross-check PASSED (orch 0106)"
+ckpt_ladder,0924@step10000-tokens41B,41,audited_slice,2.5438,0.8182,free top8 no-residency bf16; from-scratch pretraining ckpt; vs adapted CE 0.8147/C 0.8505
+ckpt_ladder,0924@step25000-tokens104B,104,audited_slice,2.4164,0.7772,free top8 no-residency bf16; from-scratch pretraining ckpt; vs adapted CE 0.8147/C 0.8505
+ckpt_ladder,0924@step55000-tokens230B,230,audited_slice,2.3519,0.7565,free top8 no-residency bf16; from-scratch pretraining ckpt; vs adapted CE 0.8147/C 0.8505
+ckpt_ladder,0924@step125000-tokens524B,524,audited_slice,2.3102,0.7431,free top8 no-residency bf16; from-scratch pretraining ckpt; vs adapted CE 0.8147/C 0.8505
+ckpt_ladder,0924@step5000-tokens20B,20,audited_slice,2.7048,0.8700,free top8 no-residency bf16; from-scratch pretraining ckpt; vs adapted CE 0.8147/C 0.8505

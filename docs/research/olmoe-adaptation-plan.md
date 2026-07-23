@@ -262,3 +262,31 @@ CSVs land in `results/ablations/` with provenance rows in its README, as usual.
 | transformers/harness version drift | Pinned venv, same workaround as the stderr program |
 | Pod wipe | Off-pod checkpoint pushes at every eval point |
 | Timeline | ~1.5–2 weeks total against a ~9-week runway; Stage 4 parallelizes with Stages 2–3 after the first checkpoint |
+
+## Program close-out and corrections (2026-07-22)
+
+The program completed with the evidence record in `results/ablations/` (see the README's
+olmoe_* rows and `olmoe_adapt_RESULTS.md` for the full table). Corrections and lessons the
+plan's original text got wrong, kept here so the doc reads honestly against the record:
+
+- **Windowed evaluation understates accumulation.** TW=256 replay cold-fills masked most of the
+  greedy-vs-oracle gap (0.007 windowed vs 0.023 full-sequence). Schedule comparisons must run
+  at full sequence length.
+- **Replay scheduling is ~0.40 BPB more optimistic than live serving.** Schedules computed on
+  frozen free-routing logits misalign under the model's own residency-induced logit drift
+  (free-vs-drift 0.4034 +/- 0.0178). The decisive test on the adapted winner came out NEGATIVE:
+  the live scan beats a forced free-logit MinFlow optimum by 0.0113 +/- 0.0021 — online
+  adaptivity beats offline optimality under drift, and offline residency scheduling (O-3) is
+  dead on the winner, not merely unnecessary.
+- **The exact flow solver costs ~36 s per (layer, 4096-sequence) with C=32 pruning**, not the
+  milliseconds the O-series spec estimated; supervision at training volumes is intractable,
+  evaluation ladders are fine.
+- **Both the path axis and the init axis are closed.** Five path variations (anneal x2,
+  distill x2, surface identity C=E=F') and the calibrated-init screen (Cal-2:
+  undone-to-single-basin, detour cost 0.047) all converge to the same endpoint. Closed-form
+  moment matching is neither a solution (Cal-0: 31.5% clipped, cos~0.01 to the learned gains)
+  nor a useful starting point.
+- **m>1 swap budgets are diagnostic-only** (each extra swap is another expert fetch of
+  slow-storage bandwidth per layer per token); m=1 is the only deployment budget.
+- Stage 4 (serving artifact) was cancelled by decision 2026-07-22: the program's deliverable is
+  the scientific answer. Phase C (1B cosine run) remains optional and unlaunched.

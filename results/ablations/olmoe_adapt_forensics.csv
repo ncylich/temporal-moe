@@ -1,0 +1,6 @@
+# Stage 3 (2) de-lex probe battery, HF OLMoE. layers 2-6, 16 packs x 2048 tok, R=8.
+# selectivity: PR_median (low=selective), generalist_frac (PR>0.5); demand_AUC (history-only firing forecast);
+# locus: token_AUC vs context_AUC (context>token = de-lexicalized: fires on context not identity).
+cell,PR_median,generalist_frac,router_entropy,demand_AUC,token_AUC,context_AUC,ctx_minus_tok,demand_n,locus_n
+base_impose_R8,0.0652,0.0250,0.4708,0.9673,0.6069,0.6028,-0.0041,10480640,320
+CE_adapt_R8,0.0876,0.0000,0.4598,0.9606,0.6235,0.6728,0.0493,10480640,320

@@ -1,0 +1,45 @@
+# OLMoE-1B-7B-0125 Stage-2 router-only LR sweep under the hard residency constraint (R=k=8 of 64),
+# constraint ON from step 0. Trainable = the 16 OlmoeTopKRouter.weight linears (~2.10M params); all
+# else frozen. bf16 compute + fp32 master, AdamW betas(0.9,0.95) wd=0, grad-clip 1.0, MB=16 packs of
+# 4096, grad-checkpointing. Loss = LM CE (through resident-masked softmax) + 0.01*aux + 0.001*z-loss,
+# aux+z on the MASKED distribution. Corpus = 1B-token finetune pool (70% dclm-baseline global-shard_05
+# + 30% dolmino dclm/math/pes2o/stackexchange/wiki), n-gram-deduped vs the held-out BPB slice; SAME
+# data order (seed 0) across all three arms. 0.25B training tokens/arm, eval every 50M.
+#
+# METRIC: BPB (bits-per-byte, LOWER is better) on the Stage-1 AUDITED held-out slice (dolmino dclm/024*,
+# 256x4096 subsample). Divisor byte-derived for THIS tokenizer+slice: D = ln2*bytes/tok = 3.1089
+# (house rule: never inherit a divisor). References (from olmoe_adapt_impose.csv, audited slice):
+#   base BPB (residency OFF, free top-8)         = 0.6727
+#   impose BPB (R=8 mask, NO training)           = 2.7507   -> impose gap = +2.0780 BPB
+# RECOVERY = 1 - (adapted_BPB - base)/(impose - base); range (-inf,1], HIGHER is better; 1.0 = fully
+#   closes the residency gap back to the free-routing base, 0.0 = no better than the untrained mask.
+# THROUGHPUT: 19.7k tok/s steady-state (all arms identical; compute-bound — see note below).
+#
+lr,tok_M,adapted_BPB,recovery
+3e-5,50,1.6406,0.5343
+3e-5,100,1.5211,0.5918
+3e-5,150,1.4340,0.6337
+3e-5,200,1.3904,0.6547
+3e-5,250,1.3618,0.6684
+1e-4,50,1.4358,0.6329
+1e-4,100,1.3475,0.6754
+1e-4,150,1.3180,0.6896
+1e-4,200,1.2994,0.6985
+1e-4,250,1.2897,0.7032
+3e-4,50,1.3468,0.6758
+3e-4,100,1.3067,0.6951
+3e-4,150,1.2901,0.7031
+3e-4,200,1.2824,0.7068
+3e-4,250,1.2825,0.7068
+# WINNER = lr 3e-4: final BPB 1.2825, recovery 70.7% (plateaued 200->250M: 1.2824 -> 1.2825).
+#   Margin over 1e-4 (1.2897, 70.3%) = 0.0072 BPB (~0.4 recovery pts) — small; 3e-4 also converged
+#   fastest and flattest. 3e-5 clearly undertrained (still descending at 250M, 66.8%).
+# Bake-off (Stage 2b) uses the WINNER LR = 3e-4 for all arms.
+#
+# THROUGHPUT ROOT CAUSE (recorded per 0059): 19.7k tok/s is compute-bound, NOT residency-scan-bound.
+#   transformers' OlmoeExperts.forward dispatches experts with a PYTHON for-loop over the (up to 64)
+#   hit experts per layer — `for expert_idx in expert_hit: nn.functional.linear(hidden[token_idx], ...)`
+#   — i.e. one gather + 2 matmuls + index_add per active expert, serialized on the host. With top-8 of
+#   64 across 16 layers this is the dominant cost; the residency scan (triton accel path, verified ==
+#   torch reference) is negligible beside it. Grad-checkpointing (use_reentrant=False) recomputes this
+#   loop on the backward, which is why MB=16 fits 71GB but tok/s is loop-limited rather than memory-limited.
