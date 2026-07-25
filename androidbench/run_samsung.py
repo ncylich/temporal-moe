@@ -31,7 +31,9 @@ MODEL = "qwen3moe-rand-fine-Q4pure.gguf"
 SIDE  = "qwen3moe-rand-fine-Q4pure-repacked.bin"
 NEXP  = 192
 K     = 18
-RATED = {0: 3628800, 6: 4742400}     # SM8850: policy0 (6x perf), policy6 (2x prime)
+RATED = {0: 3628800, 6: 4742400}
+P0    = "/sys/devices/system/cpu/cpufreq/policy0"
+P6    = "/sys/devices/system/cpu/cpufreq/policy6"     # SM8850: policy0 (6x perf), policy6 (2x prime)
 
 # the Pixel production config, minus the Pixel-specific knobs (-t, the fetch-shape
 # pair) and minus TWOPASS, which each arm sets explicitly.
@@ -104,6 +106,21 @@ def wait_cool(timeout_s=900):
     return False
 
 
+def _tis(out, marker):
+    """Parse one `time_in_state` snapshot (khz -> jiffies) following its marker."""
+    try:
+        body = out.split(marker, 1)[1]
+    except IndexError:
+        return {}
+    d = {}
+    for line in body.splitlines()[1:]:
+        f = line.split()
+        if len(f) != 2 or not f[0].isdigit() or not f[1].isdigit():
+            break          # snapshot ends at the next non-"<khz> <time>" line
+        d[int(f[0])] = int(f[1])
+    return d
+
+
 def run_arm(key, ntok, reps, tag=""):
     label, extra, threads, R = ARMS[key]
     # a resident arm needs ~5.7 GB and background apps creep back between arms; on a
@@ -112,7 +129,15 @@ def run_arm(key, ntok, reps, tag=""):
         sh("am kill-all", timeout=120)
         time.sleep(3)
     cool = wait_cool()
-    s = ("#!/system/bin/sh\n" + f"cd {DEV}\n" + "echo 1000 > /proc/self/oom_score_adj\n")
+    # This device cannot be DVFS-pinned (no root), and pinning exists precisely to remove
+    # the asymmetry between a continuously-busy arm and one that idles on storage (S3-23:
+    # worth 1.25x on the Pixel). Since it cannot be removed here, MEASURE it: cpufreq
+    # time_in_state deltas give the exact residency histogram over the arm at zero
+    # sampling cost. (A 5 Hz shell poll was tried first and was itself ~20 forks/sec of
+    # load on the device under test -- do not reintroduce it.)
+    s = ("#!/system/bin/sh\n" + f"cd {DEV}\n" + "echo 1000 > /proc/self/oom_score_adj\n"
+         + f"echo TIS0_BEFORE; cat {P0}/stats/time_in_state\n"
+         + f"echo TIS6_BEFORE; cat {P6}/stats/time_in_state\n")
     for kv in (BASE + " " + extra + f" LLAMA_TEMPORAL_R={R}").split():
         s += f"export {kv}\n"
     s += (f"./llama-bench-temporal -m {MODEL} -t {threads} -p 0 -n {ntok} -r {reps} "
@@ -127,7 +152,9 @@ def run_arm(key, ntok, reps, tag=""):
           "  sleep 1\n"
           "done\n"
           "wait $P\n"
-          "echo PEAKSWAP_KB=$MAXSW\n")
+          "echo PEAKSWAP_KB=$MAXSW\n"
+          f"echo TIS0_AFTER; cat {P0}/stats/time_in_state\n"
+          f"echo TIS6_AFTER; cat {P6}/stats/time_in_state\n")
     with open("/tmp/_sam_arm.sh", "w") as f:
         f.write(s)
     subprocess.run(["adb", "push", "/tmp/_sam_arm.sh", f"{DEV}/_sam_arm.sh"], capture_output=True)
@@ -144,9 +171,27 @@ def run_arm(key, ntok, reps, tag=""):
     pool = re.search(r"temporal-pool: fetches=.*", out)
     swap = re.search(r"PEAKSWAP_KB=(\d+)", out)
     sw = int(swap.group(1)) // 1024 if swap else -1
+    ck = ""
+    parts = []
+    for pol in ("0", "6"):
+        b = _tis(out, f"TIS{pol}_BEFORE")
+        a = _tis(out, f"TIS{pol}_AFTER")
+        if not b or not a:
+            continue
+        # residency-weighted mean frequency over exactly this arm
+        num = den = 0
+        for f_khz, t in a.items():
+            d = t - b.get(f_khz, 0)
+            if d > 0:
+                num += f_khz * d
+                den += d
+        if den:
+            parts.append(f"cpu{pol}={num/den/1e6:.2f}GHz")
+    if parts:
+        ck = "  mean_clk " + " ".join(parts)
     flag = "" if cool else "  [COOL TIMEOUT]"
     print(f"{label+tag:32s} t={threads} R={R:<3} decode={dec} sd={sd} "
-          f"wall={wall:.0f}s peak_swap={sw}MB{flag}", flush=True)
+          f"wall={wall:.0f}s peak_swap={sw}MB{ck}{flag}", flush=True)
     if prof: print(f"   {prof.group(0)[:145]}", flush=True)
     if pool: print(f"   {pool.group(0)[:145]}", flush=True)
     if dec is None:

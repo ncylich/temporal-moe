@@ -2443,7 +2443,8 @@ throughput cost.** In-engine `wall/fetch` is 343 us here against 508-525 us on t
 and the compute is roughly 2x faster, so the fetch is entirely hidden behind it. The
 entire S3-36 problem simply does not exist on this SoC.
 
-**2. The two-pass enforced-swap POLICY is the whole cost: 62.5 -> 32.6, a 1.9x loss,
+**2. PROVISIONAL -- see the DVFS caveat at the end of this entry before quoting this.**
+The two-pass enforced-swap POLICY appears to be the whole cost: 62.5 -> 32.6, a 1.9x loss,
 paid even when nothing is streamed.** So on the Samsung, temporal at R=18 runs at
 **52% of the plain resident ceiling** and **100% of its own same-policy ceiling** -- the
 mirror image of the Pixel, where the fetch stall was the entire gap.
@@ -2489,3 +2490,43 @@ faster SoC does not make temporal streaming look better -- it makes the storage 
 vanish and exposes the policy overhead that the storage cost was hiding. Any config
 lifted between devices must have its ceiling AND its counters re-measured, not just its
 tok/s re-read.
+
+### DVFS caveat on this device -- what is solid and what is provisional (S3-37b)
+
+**This device cannot be DVFS-pinned.** It is unrooted; writing `scaling_min_freq` returns
+`Permission denied`. The Pixel protocol is "pin the floor, gate on the ceiling"; here only
+the second half is possible. Every arm above passed the cool-gate at full rated clock
+BEFORE starting, but nothing prevented the governor dropping the clock DURING an arm --
+and that is precisely the artifact pinning exists to remove (S3-23 measured it at 1.25x,
+because the engine idles on storage, the governor drops the core, and the next compute
+burst runs while the clock ramps; a continuously-busy arm never does this).
+
+Consequence, and it is asymmetric across the arms:
+
+- **"Streaming is free" (32.5 streamed vs 32.6 resident, at 3.5x the I/O) is SOLID.**
+  Both arms run the identical policy with near-identical wait profiles, so any governor
+  effect applies equally to both and cancels in the comparison.
+- **"The two-pass policy costs 1.9x" (62.5 -> 32.6) is PROVISIONAL.** That comparison puts
+  a continuously-busy arm (plain resident, no waits) against arms that idle
+  (`wait_ms` ~2300-3600). An unknown share of the gap may be the governor rather than the
+  policy. Do not quote the 1.9x as a design cost until this is settled.
+
+**How to settle it without root:** `cpufreq/stats/time_in_state` deltas around each arm
+give the exact residency-weighted mean clock at ZERO sampling cost. Wired into
+`run_samsung.py`. (A 5 Hz shell poll of `scaling_cur_freq` was tried first and rejected:
+it is ~20 forks/sec of load on the device under test, i.e. the instrument perturbs the
+measurement. Do not reintroduce it.)
+
+**A trap found while chasing this, and a self-inflicted one.** After the runs, both
+clusters sat at `scaling_max_freq` = 1.997/1.978 GHz against rated 3.63/4.74 -- a 45-58%
+cut that did not recover over ~20 minutes of idle, a doze exit, or a wake lock. It was
+NOT thermal: CPU cores read 28 C, PMIC 37 C, and the framework reported
+`Thermal Status: 0`. Two candidate causes, not separated:
+(a) a `cmd thermalservice override-status 0` probe run during the investigation, which was
+    reset afterwards -- but `reset` clears only the AOSP-side flag, not vendor HAL state;
+(b) normal Samsung mitigation on SKIN temperature (the 37 C PMIC), which persists long
+    after the cores read cold.
+Either way it is transient state cleared by a reboot. **Do not poke `thermalservice` on a
+benchmarking device**, and treat a non-recovering `scaling_max_freq` as a reason to reboot
+rather than to wait. Note also that the cool-gate cannot distinguish "thermally throttled"
+from "capped for another reason" -- it just waits, silently, for up to its timeout.

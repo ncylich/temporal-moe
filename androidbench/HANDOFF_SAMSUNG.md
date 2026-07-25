@@ -24,6 +24,12 @@ The Pixel is rooted and DVFS-pinned; this device is unrooted and stock-governor.
 
 **Temporal = 52% of the plain resident ceiling, and 100% of its own same-policy ceiling.**
 
+> **Read S3-37b before quoting the 52%.** This device cannot be DVFS-pinned (unrooted), and
+> the plain ceiling is a no-wait arm while every policy arm idles on storage — the exact
+> asymmetry pinning removes. The 100%-of-same-policy figure is solid (both arms wait alike);
+> the 52% is **provisional** until the per-arm clock residency is measured. The measurement
+> is wired into `run_samsung.py` (`time_in_state` deltas) and has NOT yet been run.
+
 ## The one-line difference from the Pixel
 **Streaming is free here.** R=18 streamed does 3.5x the I/O of the resident arm (4613 vs
 1313 MiB) for zero throughput cost — the fetch is entirely hidden behind a ~2x faster
@@ -39,6 +45,16 @@ the ceiling is the **two-pass enforced-swap policy**, which costs 1.9x even full
 - **Single-pass streaming is unanswered, not rejected.** The `ENFORCE`-without-`TWOPASS`
   path does not evict at all (`evictions=0`, residency unbounded), so its 25.05 is not the
   technique. Wiring eviction into the single-pass path is a prerequisite to asking.
+
+## Do this FIRST
+Run `run_samsung.py ceilplain ceiling temporal ceilplain ceiling temporal` and read the
+per-arm `mean_clk`. If the plain arm's residency-weighted clock is materially higher than
+the policy arms', the 1.9x policy cost is partly governor and the ledger needs revising.
+Everything in the next list is downstream of that answer.
+
+Device hygiene learned the hard way: hold it awake (`svc power stayon true`), never poke
+`thermalservice`, and if `scaling_max_freq` is stuck below rated, reboot rather than wait —
+the cool-gate cannot tell "throttled" from "capped" and blocks silently.
 
 ## Next, in order of leverage
 1. **The madvise.** Skipping it entirely is worth **+26%** here (32.6 -> 41.0). That is the

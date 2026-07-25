@@ -332,3 +332,22 @@ device it was measured on. (S3-37.)
 The Samsung has 12.5 GB of zram. A resident arm that does not fit does not fail — it swaps
 3450 MB, keeps running, and prints a plausible 7.70 tok/s. Sample peak `VmSwap` from
 `/proc/<pid>/status` for the life of every arm and void any arm that swapped. (S3-37.)
+
+### 21. On an unpinnable device, a busy-vs-idle comparison is not safe
+Pinning `scaling_min_freq` exists to remove the asymmetry between an arm that is
+continuously busy and one that idles on storage — worth 1.25x on the Pixel (S3-23). On an
+unrooted device it cannot be applied, and gating on `scaling_max_freq` only checks the
+clock at arm START. Comparisons between arms with SIMILAR wait profiles stay valid
+(the governor effect cancels); a comparison between a no-wait arm and a waiting arm does
+not. Measure the residency-weighted mean clock per arm from `cpufreq/stats/time_in_state`
+deltas — zero cost — and never from a `scaling_cur_freq` poll, which at 5 Hz is ~20
+forks/sec of load on the device under test. (S3-37b.)
+
+### 22. Do not poke `thermalservice` on a benchmarking device
+`cmd thermalservice override-status 0` changes device state, and `cmd thermalservice reset`
+clears only the AOSP-side flag, not vendor HAL mitigation. After such a probe both clusters
+sat at ~55% of rated `scaling_max_freq` for 20+ minutes with CPU cores at 28 C and
+`Thermal Status: 0` — indistinguishable from ordinary Samsung skin-temperature mitigation,
+so the cause could not be attributed. A non-recovering `scaling_max_freq` is a reason to
+reboot, not to keep waiting: the cool-gate cannot tell "throttled" from "capped" and will
+silently block for its full timeout. (S3-37b.)
