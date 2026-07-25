@@ -306,3 +306,29 @@ went into "the gate is hanging" before this was the answer. The output gate is n
 `adb shell "... -p \"a b c\""` reaches the device shell unbalanced; it prints `>` forever and
 the binary never runs. The harness then compares two EMPTY outputs and reports them equal.
 Write the command to a script file, `adb push` it, and run that. (S3-36.)
+
+### 17. A presence-parsed env flag is ENABLED by setting it to 0
+`LLAMA_TEMPORAL_TWOPASS` (and several siblings) are read as `getenv(...) != nullptr`, so
+`LLAMA_TEMPORAL_TWOPASS=0` turns the two-pass path **on**. A "no two-pass" arm must OMIT
+the variable. Setting it to 0 and reading the resulting tok/s as a no-two-pass ceiling
+would have silently compared an arm against itself. (S3-37.)
+
+### 18. Read the pool counters before believing an arm ran the configuration you asked for
+An `ENFORCE`-without-`TWOPASS` arm at R=192 measured 64.66 tok/s and looked like proof
+that the swap policy is free. Its pool line said `fetches=0 evictions=0` — it performed
+no swaps at all and was a replicate of the plain arm. The same check invalidated a
+single-pass STREAMED arm: `evictions=0` and 3110 MiB fetched against the two-pass arm's
+4613 MiB, i.e. residency was never bounded, because all residency management lives in the
+two-pass window-fill op and not in `mul_mat_id`. `fetches`, `evictions` and `fetched_mib`
+are the proof that an arm is the configuration named in its label. (S3-37.)
+
+### 19. A rejection measured on one device does not transfer to another
+`EVICT_DEFER` was rejected at −4.1% on the fetch-bound Pixel. On the Samsung the fetch is
+entirely hidden and the madvise is worth +26%, so that rejection says nothing there. Every
+tuning decision in `ENGINE_FLAGS.md` is conditional on the compute:storage ratio of the
+device it was measured on. (S3-37.)
+
+### 20. On a device with large zram, "does not fit in RAM" is silent
+The Samsung has 12.5 GB of zram. A resident arm that does not fit does not fail — it swaps
+3450 MB, keeps running, and prints a plausible 7.70 tok/s. Sample peak `VmSwap` from
+`/proc/<pid>/status` for the life of every arm and void any arm that swapped. (S3-37.)

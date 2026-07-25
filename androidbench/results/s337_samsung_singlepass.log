@@ -1,0 +1,23 @@
+CEILING R=192 plain (no 2pass) #1 t=6 R=192 decode=60.004567 sd=0.3772 wall=8s peak_swap=0MB
+   temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=0.0 qwait_hi_us=0.0 wait_ms=0.0 odirect=1 
+TEMPORAL Pixel cfg (t4) #2       t=4 R=18  decode=32.944516 sd=3.116156 wall=6s peak_swap=0MB
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=343us sys/fetch=342us first_call=342us outside_sys=0us max_call=22196us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=685.1 qwait_hi_us=607.8 wait_ms
+TEMPORAL R=18 single-pass #3     t=6 R=18  decode=24.555547 sd=2.813471 wall=8s peak_swap=0MB
+   temporal-fetchprof: fetches=29484 syscalls/fetch=1.00 wall/fetch=236us sys/fetch=236us first_call=236us outside_sys=0us max_call=18037us short_re
+   temporal-pool: fetches=14742 fetched_mib=3109.6 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=472.6 qwait_hi_us=30.6 wait_ms=3487
+TEMPORAL R=18 single-pass t4 #4  t=4 R=18  decode=24.37209 sd=3.407342 wall=8s peak_swap=0MB
+   temporal-fetchprof: fetches=29484 syscalls/fetch=1.00 wall/fetch=236us sys/fetch=236us first_call=236us outside_sys=0us max_call=4592us short_rea
+   temporal-pool: fetches=14742 fetched_mib=3109.6 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=471.6 qwait_hi_us=28.1 wait_ms=3533
+TEMPORAL Pixel cfg (t4) #5       t=4 R=18  decode=32.473309 sd=4.889442 wall=6s peak_swap=0MB
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=338us sys/fetch=337us first_call=337us outside_sys=0us max_call=19390us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=675.1 qwait_hi_us=644.5 wait_ms
+TEMPORAL R=18 single-pass #6     t=6 R=18  decode=25.537742 sd=3.958708 wall=7s peak_swap=0MB
+   temporal-fetchprof: fetches=29484 syscalls/fetch=1.00 wall/fetch=235us sys/fetch=235us first_call=235us outside_sys=0us max_call=21619us short_re
+   temporal-pool: fetches=14742 fetched_mib=3109.6 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=469.2 qwait_hi_us=30.1 wait_ms=3629
+
+=== summary (STOCK GOVERNOR -- not comparable to Pixel pinned numbers) ===
+CEILING R=192 plain (no 2pass)   [60.0]  mean=60.00
+TEMPORAL Pixel cfg (t4)          [32.94, 32.47]  mean=32.71
+TEMPORAL R=18 single-pass        [24.56, 25.54]  mean=25.05
+TEMPORAL R=18 single-pass t4     [24.37]  mean=24.37

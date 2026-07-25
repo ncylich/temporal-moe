@@ -1,0 +1,5 @@
+A resident R=192           PPL = 185534.4155 +/- 4953.03236
+   temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=0.0 qwait_hi_us=0.0 wait_ms=0.0 odirect=1 workers=6 sibli
+B streamed R=18            PPL = 185534.4155 +/- 4953.03236
+   temporal-pool: fetches=13092 fetched_mib=2761.6 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=445.8 qwait_hi_us=43.7 wait_ms=2309.9 odirect=1 wo
+GATE PASS: PPL bit-identical (resident vs streamed)

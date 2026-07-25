@@ -2399,3 +2399,93 @@ behind, which is the K sweep.**
 restored stock); the untouched LUNs sdb/sdc/sdd all read 512, so 512 is stock. Restored to
 512 before any measurement here. Every number in S3-35 and earlier that assumed 512 was
 taken at 512; the leak affected only the idle window between sessions.
+
+---
+
+## S3-37  Ported to the Samsung SM-S942U1: streaming is FREE there, and the two-pass policy is the entire cost
+
+The Pixel is fetch-bound; this device is not. Porting the tuned config to the Samsung
+(SM8850, 11.4 GB, UNROOTED) inverts which term matters, and the config itself mostly
+transfers.
+
+**Rig differences that are not optional to state.** No root, so `scaling_min_freq`
+cannot be pinned and **every number here is STOCK GOVERNOR** -- never compare one to a
+Pixel pinned number (pitfall #7 measured that artifact at 1.25x). No UFS driver monitor,
+so the device-side concurrency instrument from S3-36 is unavailable. No io_uring (EPERM
+in the `shell` domain; rejected anyway). CPU is 6x perf @3.63 GHz + 2x prime @4.74 GHz
+with **no little cores**, so the Pixel's `-t 4` loses its original justification -- but
+it still measures best (see below).
+
+**E=192 fits fully resident here (5.94 GB of 11.4 GB), so the ceiling arm and the
+temporal arm are the SAME MODEL.** No BASELINE_POLICY compromise was needed. It only
+fits after `am kill-all`: with background apps loaded it silently swaps 3450 MB into the
+12.5 GB zram and reports a plausible-looking 7.70 tok/s. Every arm below reports peak
+VmSwap and all were 0.
+
+**Correctness gate PASSED in its strongest form** before any timing: resident R=192 vs
+streamed R=18, `PPL = 185534.4155 +/- 4953.03236`, bit-identical -- and equal to the
+Pixel's value on the same model. Caveat recorded honestly: both gate arms report
+`evictions=0`, so the perplexity gate exercises the residency barrier but NOT the
+eviction path; eviction is only exercised by the decode arms (19440 evictions).
+
+### Results (stock governor, E=192 K=18 ff=384, -n 48 -r 3, interleaved)
+
+| arm | R | swaps? | tok/s | fetched |
+|---|---|---|---|---|
+| plain resident, no swap machinery | 192 | no | **62.5** (60.00, 62.24, 62.53, 63.02, 64.66; sd 1.7) | 0 MiB |
+| two-pass + enforced swap, **madvise skipped** (NOMADV) | 192 | yes | 41.04 | 1313 MiB |
+| two-pass + enforced swap, resident | 192 | yes | 32.6 (32.03, 33.21) | 1313 MiB |
+| **two-pass + enforced swap, STREAMED** | **18** | yes | **32.5** (31.30, 32.48, 32.94, 32.47, 33.40) | **4613 MiB** |
+
+**1. Streaming is free on this device.** R=18 streamed (32.5) equals R=192 resident under
+the identical policy (32.6). That is **3.5x more I/O -- 4613 vs 1313 MiB -- for zero
+throughput cost.** In-engine `wall/fetch` is 343 us here against 508-525 us on the Pixel,
+and the compute is roughly 2x faster, so the fetch is entirely hidden behind it. The
+entire S3-36 problem simply does not exist on this SoC.
+
+**2. The two-pass enforced-swap POLICY is the whole cost: 62.5 -> 32.6, a 1.9x loss,
+paid even when nothing is streamed.** So on the Samsung, temporal at R=18 runs at
+**52% of the plain resident ceiling** and **100% of its own same-policy ceiling** -- the
+mirror image of the Pixel, where the fetch stall was the entire gap.
+
+**3. About a quarter of the policy cost is the madvise.** Skipping the page release
+(NOMADV, diagnostic only -- residency becomes unbounded) recovers 32.6 -> 41.0, **+26%**.
+On the Pixel the madvise FLAVOUR was worth 7.6% (S3-25); here the madvise ITSELF is worth
+26%, because faster compute makes the TLB shootdown across the compute threads relatively
+larger. **This is the biggest identified lever on this device.**
+
+**4. Thread count: the Pixel's `-t 4` transfers.** t4 32.7, t6 31.5, t8 26.3 (sd ~4, so
+t4 and t6 are not separable; t8 is clearly worse). The original justification -- keeping
+A520 little cores out of the ggml barriers -- does not exist here, so the transfer is a
+coincidence of a different mechanism (contention with the fetch workers), not the same one.
+
+### RETRACTED within this entry: "the enforced swap is free"
+An arm run as `LLAMA_TEMPORAL_ENFORCE=1` without TWOPASS at R=192 measured 64.66 tok/s,
+which looked like "the swap policy costs nothing". Its pool line reads
+`fetches=0 evictions=0`: **it performed no swaps at all.** It is a replicate of the plain
+arm, not a separate condition, and it establishes nothing about policy cost. Caught by
+checking the counters rather than the tok/s.
+
+### Single-pass streaming: NOT ANSWERED, because the config is invalid
+The obvious follow-up -- if the fetch is already hidden, drop the two-pass split -- was
+run at R=18 with `ENFORCE` and measured 25.05 (vs 32.5 two-pass). **That number must not
+be used.** Its pool line reads `evictions=0` with only 3110 MiB fetched against the
+two-pass arm's 4613 MiB: the single-pass path does not bound residency at all, because
+all residency management lives in the two-pass window-fill op ("not in mul_mat_id", by
+construction). So it is not the technique, it is an unbounded-residency regime that
+happens to be slower. The question stands open and needs eviction wired into the
+single-pass path before it can be asked.
+
+### What to attack on this device
+Not storage. The ranked levers are (a) the madvise, worth up to +26% and currently
+unoptimised for this SoC -- `EVICT_DEFER` was rejected on the Pixel at -4.1% (S3-27) but
+that rejection was made against a fetch-bound machine and does not transfer; (b) the
+two-pass graph split itself, which costs ~1.5x beyond the madvise and exists purely to
+overlap a fetch that this device no longer needs overlapped.
+
+### Standing lesson
+**The optimum is a property of the compute:storage ratio, not of the technique.** A
+faster SoC does not make temporal streaming look better -- it makes the storage cost
+vanish and exposes the policy overhead that the storage cost was hiding. Any config
+lifted between devices must have its ceiling AND its counters re-measured, not just its
+tok/s re-read.
