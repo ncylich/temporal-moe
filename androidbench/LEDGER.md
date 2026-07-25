@@ -2437,14 +2437,17 @@ eviction path; eviction is only exercised by the decode arms (19440 evictions).
 | two-pass + enforced swap, resident | 192 | yes | 32.6 (32.03, 33.21) | 1313 MiB |
 | **two-pass + enforced swap, STREAMED** | **18** | yes | **32.5** (31.30, 32.48, 32.94, 32.47, 33.40) | **4613 MiB** |
 
-**1. Streaming is free on this device.** R=18 streamed (32.5) equals R=192 resident under
-the identical policy (32.6). That is **3.5x more I/O -- 4613 vs 1313 MiB -- for zero
-throughput cost.** In-engine `wall/fetch` is 343 us here against 508-525 us on the Pixel,
+**1. Streaming is CHEAP on this device -- but not free.** *(Corrected in S3-37c: the two
+arms compared here had different thread counts, `-t 4` vs `-t 6`. At matched `-t 6` the
+figures are 36.79 resident -> 33.23 streamed, i.e. streaming costs **9.7%**, not 0%.)*
+R=18 streamed carries **3.5x more I/O -- 4613 vs 1313 MiB -- for a tenth of the
+throughput.** In-engine `wall/fetch` is 343 us here against 508-525 us on the Pixel,
 and the compute is roughly 2x faster, so the fetch is entirely hidden behind it. The
 entire S3-36 problem simply does not exist on this SoC.
 
-**2. PROVISIONAL -- see the DVFS caveat at the end of this entry before quoting this.**
-The two-pass enforced-swap POLICY appears to be the whole cost: 62.5 -> 32.6, a 1.9x loss,
+**2. CONFIRMED in S3-37c** (governor eliminated as an explanation; corrected magnitude
+**1.71x**, from 62.89 -> 36.79 at matched threads, n=3 rounds).
+The two-pass enforced-swap POLICY is the dominant cost: a 1.71x loss,
 paid even when nothing is streamed.** So on the Samsung, temporal at R=18 runs at
 **52% of the plain resident ceiling** and **100% of its own same-policy ceiling** -- the
 mirror image of the Pixel, where the fetch stall was the entire gap.
@@ -2503,13 +2506,13 @@ burst runs while the clock ramps; a continuously-busy arm never does this).
 
 Consequence, and it is asymmetric across the arms:
 
-- **"Streaming is free" (32.5 streamed vs 32.6 resident, at 3.5x the I/O) is SOLID.**
-  Both arms run the identical policy with near-identical wait profiles, so any governor
-  effect applies equally to both and cancels in the comparison.
-- **"The two-pass policy costs 1.9x" (62.5 -> 32.6) is PROVISIONAL.** That comparison puts
-  a continuously-busy arm (plain resident, no waits) against arms that idle
-  (`wait_ms` ~2300-3600). An unknown share of the gap may be the governor rather than the
-  policy. Do not quote the 1.9x as a design cost until this is settled.
+- ~~**"Streaming is free" is SOLID.**~~ **WRONG on both counts -- see S3-37c.** The two
+  arms had different thread counts (`-t 4` vs `-t 6`), so the comparison was invalid, and
+  at matched threads streaming costs **9.7%**. The reasoning below (identical policy, so
+  the governor cancels) was sound; the arms were not the ones I thought I was comparing.
+- ~~**"The two-pass policy costs 1.9x" is PROVISIONAL.**~~ **Settled in S3-37c: CONFIRMED
+  at 1.71x.** The clock residency shows the waiting arms run the perf cluster HIGHER, not
+  lower, so the governor does not explain the gap.
 
 **How to settle it without root:** `cpufreq/stats/time_in_state` deltas around each arm
 give the exact residency-weighted mean clock at ZERO sampling cost. Wired into
@@ -2530,3 +2533,65 @@ Either way it is transient state cleared by a reboot. **Do not poke `thermalserv
 benchmarking device**, and treat a non-recovering `scaling_max_freq` as a reason to reboot
 rather than to wait. Note also that the cool-gate cannot distinguish "thermally throttled"
 from "capped for another reason" -- it just waits, silently, for up to its timeout.
+
+## S3-37c  SETTLED: the governor is not the explanation, the policy cost is real (1.71x), and "streaming is free" is RETRACTED
+
+Ran the matched-thread, n=3-rounds replicate that S3-37b called for. All arms `-t 6`,
+all `peak_swap=0`, interleaved, after a reboot that restored full rated clocks.
+
+| arm | readings | mean | vs previous |
+|---|---|---|---|
+| plain resident, no swap machinery | 62.86, 61.27, 64.53 | **62.89** | unchanged |
+| + two-pass enforced swap (resident) | 36.88, 37.07, 36.44 | **36.79** | — |
+| + streaming at R=18 | 33.12, 33.47, 33.09 | **33.23** | — |
+
+Spreads are now +/-0.3 to +/-1.6 rather than the +/-4-6 of the first pass, because the
+arms are matched and the device was freshly rebooted.
+
+### 1. The governor confound is ELIMINATED, not merely bounded
+Residency-weighted mean clock per arm, from `cpufreq/stats/time_in_state` deltas:
+
+| arm | perf cluster (cpu0) | prime cluster (cpu6) |
+|---|---|---|
+| plain (no waits) | 2.55-2.63 GHz | 4.31-4.35 GHz |
+| same-policy (waits) | 2.70-2.76 GHz | 4.13-4.22 GHz |
+| streamed (waits) | 3.27-3.29 GHz | 3.86-3.89 GHz |
+
+**The waiting arms do not run at a lower clock -- they run the perf cluster HIGHER.**
+The feared artifact (governor drops the core during a storage wait, next compute burst
+runs while the clock ramps, S3-23) does not appear on this device at these arm lengths.
+Plausibly because the arms are only 6-9 s and the waits are short enough that the
+governor never settles. **So the S3-37 policy-cost claim is promoted from PROVISIONAL to
+CONFIRMED, with a corrected magnitude: 62.89 -> 36.79 = 1.71x, not the 1.9x quoted from
+the noisier first pass.**
+
+### 2. RETRACTED: "streaming is free"
+S3-37 claimed streaming costs nothing, from temporal 32.5 vs same-policy ceiling 32.6.
+**Those two arms had different thread counts** -- `temporal` is defined at `-t 4` and
+`ceiling` at `-t 6`. My own harness introduced the confound and I did not notice it until
+the clock data made the arms comparable.
+
+At matched `-t 6`: **36.79 resident -> 33.23 streamed = streaming costs 9.7%**, not 0%.
+(The earlier single t6 reading, 31.50 against 32.6, implied ~3.4% and pointed the same
+way; it was overridden by the mismatched pair.) Streaming on this device is CHEAP -- 3.5x
+the I/O for a tenth of the throughput -- but it is not free, and the S3-37 wording
+overstated it.
+
+### Corrected picture for this device (stock governor, matched t6, n=3 rounds)
+
+```
+plain resident ceiling                       62.89 tok/s
+  + two-pass enforced-swap policy            36.79   (-41%, the dominant cost)
+  + streaming R=18 of 192                    33.23   (-9.7%)
+  => temporal = 53% of the plain ceiling at ~10.6x less expert RAM
+```
+
+The ranking of what to attack is unchanged and now rests on tight data: the policy costs
+4x more than the streaming does.
+
+### Method note
+Two arms in the same table differing in `-t` is the whole lesson here. The harness now
+carries thread count per arm precisely so it is visible in the label, and the label is
+printed with every reading -- but a matched-threads check is still a manual act. When
+comparing any two arms, diff their FULL configuration, not the one knob that is the
+subject of the comparison.

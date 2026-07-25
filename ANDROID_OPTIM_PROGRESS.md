@@ -351,3 +351,10 @@ sat at ~55% of rated `scaling_max_freq` for 20+ minutes with CPU cores at 28 C a
 so the cause could not be attributed. A non-recovering `scaling_max_freq` is a reason to
 reboot, not to keep waiting: the cool-gate cannot tell "throttled" from "capped" and will
 silently block for its full timeout. (S3-37b.)
+
+### 23. Diff the FULL configuration of two arms, not just the knob under test
+`temporal` was defined at `-t 4` and `ceiling` at `-t 6` in the same arm table. Comparing
+them yielded "streaming is free" (32.5 vs 32.6), which survived two commits before the
+mismatch was noticed. At matched `-t 6` streaming costs 9.7%. The label printed with every
+reading carried the thread count the whole time — it was there to be read. Before quoting
+any A-vs-B, diff every field of both arms' configuration. (S3-37c.)

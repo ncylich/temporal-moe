@@ -127,7 +127,9 @@ def run_arm(key, ntok, reps, tag=""):
     # device with 12.5 GB of zram, not fitting is silent (see PEAKSWAP below).
     if R >= NEXP:
         sh("am kill-all", timeout=120)
-        time.sleep(3)
+        # 3 s was not enough immediately after a reboot: background apps were still
+        # coming up and a plain-ceiling arm swapped 2635 MB and reported a void 51.6.
+        time.sleep(15)
     cool = wait_cool()
     # This device cannot be DVFS-pinned (no root), and pinning exists precisely to remove
     # the asymmetry between a continuously-busy arm and one that idles on storage (S3-23:

@@ -15,20 +15,24 @@ The Pixel is rooted and DVFS-pinned; this device is unrooted and stock-governor.
 
 ## State (stock governor — not comparable to Pixel pinned numbers)
 
+Matched threads (all `-t 6`), n=3 rounds, interleaved, all `peak_swap=0` (S3-37c):
+
 | arm | tok/s |
 |---|---|
-| plain resident E=192, no swap machinery | **62.5** |
-| two-pass + enforced swap, resident E=192 | 32.6 |
-| **two-pass + enforced swap, streamed R=18** | **32.5** |
-| same, madvise skipped (NOMADV, diagnostic only) | 41.0 |
+| plain resident E=192, no swap machinery | **62.89** |
+| two-pass + enforced swap, resident E=192 | 36.79 |
+| **two-pass + enforced swap, streamed R=18** | **33.23** |
+| same, madvise skipped (NOMADV, diagnostic only) | ~41 |
 
-**Temporal = 52% of the plain resident ceiling, and 100% of its own same-policy ceiling.**
+**Temporal = 53% of the plain resident ceiling, at ~10.6x less expert RAM.**
+The policy costs **1.71x**; the streaming costs a further **9.7%**.
 
-> **Read S3-37b before quoting the 52%.** This device cannot be DVFS-pinned (unrooted), and
-> the plain ceiling is a no-wait arm while every policy arm idles on storage — the exact
-> asymmetry pinning removes. The 100%-of-same-policy figure is solid (both arms wait alike);
-> the 52% is **provisional** until the per-arm clock residency is measured. The measurement
-> is wired into `run_samsung.py` (`time_in_state` deltas) and has NOT yet been run.
+> **Settled in S3-37c.** This device cannot be DVFS-pinned (unrooted), so the concern was
+> that the no-wait plain arm was flattered by the governor. Measured via
+> `cpufreq/stats/time_in_state` deltas: the waiting arms run the perf cluster **higher**
+> (3.27 GHz vs 2.58), not lower. The governor does not explain the gap; the policy cost is
+> real. An earlier claim that "streaming is free" was **retracted** — those two arms had
+> different thread counts.
 
 ## The one-line difference from the Pixel
 **Streaming is free here.** R=18 streamed does 3.5x the I/O of the resident arm (4613 vs
@@ -42,17 +46,15 @@ the ceiling is the **two-pass enforced-swap policy**, which costs 1.9x even full
 - Correctness gate passes in its strongest form (resident vs streamed, PPL bit-identical).
   Note it does NOT exercise eviction (`evictions=0` in both gate arms).
 - Thread count: t4 32.7, t6 31.5 (not separable), t8 26.3. Keep `-t 4`.
+- Governor confound eliminated (S3-37c): waiting arms run the perf cluster higher, not lower.
+- **Always diff the FULL arm config before comparing two arms.** `temporal` is `-t 4` and
+  `ceiling` is `-t 6`; comparing them produced a wrong "streaming is free" conclusion that
+  stood for two commits.
 - **Single-pass streaming is unanswered, not rejected.** The `ENFORCE`-without-`TWOPASS`
   path does not evict at all (`evictions=0`, residency unbounded), so its 25.05 is not the
   technique. Wiring eviction into the single-pass path is a prerequisite to asking.
 
-## Do this FIRST
-Run `run_samsung.py ceilplain ceiling temporal ceilplain ceiling temporal` and read the
-per-arm `mean_clk`. If the plain arm's residency-weighted clock is materially higher than
-the policy arms', the 1.9x policy cost is partly governor and the ledger needs revising.
-Everything in the next list is downstream of that answer.
-
-Device hygiene learned the hard way: hold it awake (`svc power stayon true`), never poke
+## Device hygiene learned the hard way: hold it awake (`svc power stayon true`), never poke
 `thermalservice`, and if `scaling_max_freq` is stuck below rated, reboot rather than wait —
 the cool-gate cannot tell "throttled" from "capped" and blocks silently.
 
