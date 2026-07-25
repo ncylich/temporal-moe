@@ -1,0 +1,40 @@
+temporal t6 #1                   t=6 R=18  decode=31.310584 sd=6.083866 wall=6s peak_swap=0MB  mean_clk cpu0=3.32GHz cpu6=4.06GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=328us sys/fetch=328us first_call=328us outside_sys=0us max_call=21507us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=656.4 qwait_hi_us=629.3 wait_ms
+temporal EVICT_DEFER #2          t=6 R=18  decode=31.159181 sd=2.914539 wall=6s peak_swap=0MB  mean_clk cpu0=3.28GHz cpu6=3.94GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=352us sys/fetch=352us first_call=352us outside_sys=0us max_call=14555us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=704.0 qwait_hi_us=610.4 wait_ms
+temporal JANITOR_NOLOCK #3       t=6 R=18  decode=30.528931 sd=7.023984 wall=6s peak_swap=0MB  mean_clk cpu0=3.33GHz cpu6=4.05GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=333us sys/fetch=333us first_call=333us outside_sys=0us max_call=4781us short_rea
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=665.6 qwait_hi_us=542.7 wait_ms
+temporal DEFER+NOLOCK #4         t=6 R=18  decode=32.708336 sd=1.563556 wall=6s peak_swap=0MB  mean_clk cpu0=3.24GHz cpu6=3.87GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=347us sys/fetch=347us first_call=347us outside_sys=0us max_call=21968us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=694.0 qwait_hi_us=581.7 wait_ms
+temporal MADV_DONTNEED #5        t=6 R=18  decode=33.309677 sd=0.946693 wall=5s peak_swap=0MB  mean_clk cpu0=3.48GHz cpu6=4.19GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=315us sys/fetch=314us first_call=314us outside_sys=0us max_call=22321us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=629.2 qwait_hi_us=607.8 wait_ms
+temporal t6 #6                   t=6 R=18  decode=32.148299 sd=5.087414 wall=6s peak_swap=0MB  mean_clk cpu0=3.27GHz cpu6=3.92GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=321us sys/fetch=321us first_call=321us outside_sys=0us max_call=21598us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=642.0 qwait_hi_us=598.4 wait_ms
+temporal EVICT_DEFER #7          t=6 R=18  decode=32.047772 sd=2.350122 wall=6s peak_swap=0MB  mean_clk cpu0=3.27GHz cpu6=3.93GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=349us sys/fetch=349us first_call=349us outside_sys=0us max_call=22108us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=697.8 qwait_hi_us=571.6 wait_ms
+temporal JANITOR_NOLOCK #8       t=6 R=18  decode=32.663377 sd=3.812159 wall=6s peak_swap=0MB  mean_clk cpu0=3.26GHz cpu6=3.85GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=330us sys/fetch=330us first_call=330us outside_sys=0us max_call=7554us short_rea
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=659.8 qwait_hi_us=571.3 wait_ms
+temporal DEFER+NOLOCK #9         t=6 R=18  decode=32.816055 sd=1.344906 wall=6s peak_swap=0MB  mean_clk cpu0=3.22GHz cpu6=3.83GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=344us sys/fetch=344us first_call=344us outside_sys=0us max_call=7347us short_rea
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=688.3 qwait_hi_us=558.7 wait_ms
+temporal MADV_DONTNEED #10       t=6 R=18  decode=32.911454 sd=1.633845 wall=6s peak_swap=0MB  mean_clk cpu0=3.24GHz cpu6=3.81GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=315us sys/fetch=315us first_call=315us outside_sys=0us max_call=22047us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=630.8 qwait_hi_us=640.5 wait_ms
+temporal t6 #11                  t=6 R=18  decode=33.355339 sd=2.701511 wall=6s peak_swap=0MB  mean_clk cpu0=3.25GHz cpu6=3.82GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=321us sys/fetch=321us first_call=321us outside_sys=0us max_call=22111us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=642.6 qwait_hi_us=579.6 wait_ms
+
+=== summary (STOCK GOVERNOR -- not comparable to Pixel pinned numbers) ===
+temporal t6                      [31.31, 32.15, 33.36]  mean=32.27
+temporal EVICT_DEFER             [31.16, 32.05]  mean=31.60
+temporal JANITOR_NOLOCK          [30.53, 32.66]  mean=31.60
+temporal DEFER+NOLOCK            [32.71, 32.82]  mean=32.76
+temporal MADV_DONTNEED           [33.31, 32.91]  mean=33.11

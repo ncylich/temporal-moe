@@ -82,7 +82,20 @@ ARMS = {
     "split3":    ("temporal split=3",  TP + "LLAMA_TEMPORAL_SPLIT=3 LLAMA_TEMPORAL_FETCH_THREADS=6", 6, K),
     "fw4":       ("temporal fetch_thr=4", TP + "LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=4", 6, K),
     "fw8":       ("temporal fetch_thr=8", TP + "LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=8", 6, K),
+    # --- eviction-cost levers (S3-38). The madvise is ~40 us per call x 135 calls/token
+    # here; these are the knobs that already exist, so they cost nothing to test. Each
+    # was measured on the fetch-bound Pixel where eviction barely mattered, so none of
+    # those verdicts transfer (pitfall #19).
+    "ev_defer":  ("temporal EVICT_DEFER",   TP + SHAPE + " LLAMA_TEMPORAL_EVICT_DEFER=1", 6, K),
+    "ev_nolock": ("temporal JANITOR_NOLOCK",TP + SHAPE + " LLAMA_TEMPORAL_JANITOR_NOLOCK=1", 6, K),
+    "ev_both":   ("temporal DEFER+NOLOCK",  TP + SHAPE +
+                  " LLAMA_TEMPORAL_EVICT_DEFER=1 LLAMA_TEMPORAL_JANITOR_NOLOCK=1", 6, K),
+    # MADV_FREE is in BASE; this arm drops it, i.e. falls back to MADV_DONTNEED.
+    "ev_dontneed":("temporal MADV_DONTNEED",
+                   (TP + SHAPE).replace("", ""), 6, K),
 }
+# ev_dontneed must OMIT LLAMA_TEMPORAL_MADV_FREE rather than set it to 0 (presence-parsed)
+NO_MADV_FREE = {"ev_dontneed"}
 
 
 def sh(cmd, timeout=3600):
@@ -123,6 +136,9 @@ def _tis(out, marker):
 
 def run_arm(key, ntok, reps, tag=""):
     label, extra, threads, R = ARMS[key]
+    # Doze caps scaling_max_freq to ~55% of rated on this device and the cool-gate cannot
+    # tell "throttled" from "capped" -- it just blocks for its full timeout. Hold it awake.
+    sh("svc power stayon true", timeout=60)
     # a resident arm needs ~5.7 GB and background apps creep back between arms; on a
     # device with 12.5 GB of zram, not fitting is silent (see PEAKSWAP below).
     if R >= NEXP:
@@ -140,7 +156,11 @@ def run_arm(key, ntok, reps, tag=""):
     s = ("#!/system/bin/sh\n" + f"cd {DEV}\n" + "echo 1000 > /proc/self/oom_score_adj\n"
          + f"echo TIS0_BEFORE; cat {P0}/stats/time_in_state\n"
          + f"echo TIS6_BEFORE; cat {P6}/stats/time_in_state\n")
-    for kv in (BASE + " " + extra + f" LLAMA_TEMPORAL_R={R}").split():
+    base = BASE
+    if key in NO_MADV_FREE:
+        # presence-parsed: MADV_FREE=0 would still select MADV_FREE. Drop the variable.
+        base = " ".join(w for w in BASE.split() if not w.startswith("LLAMA_TEMPORAL_MADV_FREE"))
+    for kv in (base + " " + extra + f" LLAMA_TEMPORAL_R={R}").split():
         s += f"export {kv}\n"
     s += (f"./llama-bench-temporal -m {MODEL} -t {threads} -p 0 -n {ntok} -r {reps} "
           f"-mmp 0 -ot _exps=CPU -o csv &\n"

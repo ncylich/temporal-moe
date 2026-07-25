@@ -358,3 +358,12 @@ them yielded "streaming is free" (32.5 vs 32.6), which survived two commits befo
 mismatch was noticed. At matched `-t 6` streaming costs 9.7%. The label printed with every
 reading carried the thread count the whole time — it was there to be read. Before quoting
 any A-vs-B, diff every field of both arms' configuration. (S3-37c.)
+
+### 24. When a diagnostic flag is worth 1.8x but every implementation of it measures neutral, instrument instead of A/B-ing
+`NOMADV` was worth 1.83x, yet `EVICT_DEFER`, `JANITOR_NOLOCK` and `MADV_DONTNEED` all
+measured neutral. Two sessions of A/B could not explain that. One trace run did: the
+madvise SYSCALL is only 2.6 ms/token and runs off the critical path, while the real cost is
+a 32% inflation of every GEMV **with the median unmoved** — a tail, i.e. TLB shootdown IPIs,
+not call overhead. That immediately killed the planned "batch the madvise calls" work
+before a line of it was written. Mean-up/median-flat is a shootdown or contention
+signature; mean-and-median-both-up is genuine per-call cost. (S3-38.)

@@ -58,13 +58,31 @@ the ceiling is the **two-pass enforced-swap policy**, which costs 1.9x even full
 `thermalservice`, and if `scaling_max_freq` is stuck below rated, reboot rather than wait —
 the cool-gate cannot tell "throttled" from "capped" and blocks silently.
 
-## Next, in order of leverage
-1. **The madvise.** Skipping it entirely is worth **+26%** here (32.6 -> 41.0). That is the
-   largest identified lever on this device. `EVICT_DEFER` was rejected at -4.1% on the
-   Pixel, but that was a fetch-bound machine and the rejection does not transfer (pitfall
-   #19). Batching or deferring the reclaim into the compute window is worth measuring here.
-2. **The two-pass graph split**, which costs ~1.5x beyond the madvise and exists solely to
-   overlap a fetch this device no longer needs overlapped. Needs (a) eviction in the
-   single-pass path, then (b) a fair single- vs two-pass comparison.
-3. K sweep — but note the motivation is the OPPOSITE of the Pixel's. There, storage was
-   bought and unused so more compute was free. Here compute is the scarce side.
+## Next, in order of leverage (S3-38 settled the ordering)
+
+**1. An R-slot expert pool — the only identified route to 70%.**
+Eviction is worth **1.83x** (NOMADV: 28.73 -> 52.70 at R=192, identical workload). But the
+madvise SYSCALL is only ~2.6 ms/token and runs on the janitor thread, off the critical
+path. The real cost is a **32% inflation of every GEMV with the median unmoved** — the
+signature of TLB shootdown, 135 IPIs per token against 6 compute threads.
+So: batching the madvise is dead, deferring it is dead (both measured, see S3-38). The only
+way to remove a shootdown is to never madvise — allocate **R slots per tensor instead of E**
+and let the refetch overwrite the evicted expert in place, with an expert-id -> slot
+indirection. Residency becomes bounded structurally.
+Capturing all of it: ~59 tok/s = 94% of ceiling. Half: ~46 tok/s = 73%.
+Scope: the indirection must go into `mul_mat_id` **and** `repack.cpp`'s
+`forward_mul_mat_id` — pitfall #8, an omission there is silent. The resident-vs-streamed
+PPL gate is what catches it.
+
+**2. The two-pass graph split**, ~1.5x beyond eviction, and it exists solely to overlap a
+fetch that costs only 9.7% here. Needs eviction wired into the single-pass path first.
+
+**3. K sweep** — but the motivation is the OPPOSITE of the Pixel's. There storage was bought
+and unused so more compute was free; here compute is the scarce side, so a K sweep buys
+*ratio* (it amortises the fixed per-swap policy cost) and costs absolute speed.
+
+### Dead ends, measured, do not retry
+`EVICT_DEFER`, `JANITOR_NOLOCK`, both together, and `MADV_DONTNEED` are all NEUTRAL on the
+streamed arm — every one inside the baseline's own positional drift band (31.31 -> 33.36).
+Note MADV_DONTNEED is not worse here, which does not reproduce the Pixel's 7.6% preference
+for MADV_FREE.

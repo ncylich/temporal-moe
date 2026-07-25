@@ -1,0 +1,35 @@
+CEILING R=192 plain (no 2pass) #1 t=6 R=192 decode=60.302466 sd=0.398425 wall=7s peak_swap=0MB  mean_clk cpu0=2.67GHz cpu6=4.27GHz
+   temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=0.0 qwait_hi_us=0.0 wait_ms=0.0 odirect=1 
+CEILING R=192 same-policy #2     t=6 R=192 decode=29.544307 sd=7.813367 wall=10s peak_swap=0MB  mean_clk cpu0=2.87GHz cpu6=4.27GHz
+   temporal-fetchprof: fetches=12444 syscalls/fetch=1.00 wall/fetch=529us sys/fetch=528us first_call=528us outside_sys=0us max_call=4706us short_rea
+   temporal-pool: fetches=6222 fetched_mib=1312.5 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1057.0 qwait_hi_us=71.8 wait_ms=
+CEILING R=192 2pass, NOMADV #3   t=6 R=192 decode=47.992971 sd=5.089905 wall=8s peak_swap=0MB  mean_clk cpu0=2.68GHz cpu6=4.10GHz
+   temporal-fetchprof: fetches=12444 syscalls/fetch=1.00 wall/fetch=398us sys/fetch=398us first_call=398us outside_sys=0us max_call=2633us short_rea
+   temporal-pool: fetches=6222 fetched_mib=1312.5 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=796.9 qwait_hi_us=39.4 wait_ms=6
+temporal t6 #4                   t=6 R=18  decode=30.50712 sd=6.674381 wall=6s peak_swap=0MB  mean_clk cpu0=3.43GHz cpu6=4.15GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=312us sys/fetch=312us first_call=312us outside_sys=0us max_call=4541us short_rea
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=624.4 qwait_hi_us=478.3 wait_ms
+CEILING R=192 same-policy #5     t=6 R=192 decode=30.756158 sd=6.840306 wall=10s peak_swap=0MB  mean_clk cpu0=2.78GHz cpu6=4.13GHz
+   temporal-fetchprof: fetches=12444 syscalls/fetch=1.00 wall/fetch=525us sys/fetch=524us first_call=524us outside_sys=0us max_call=2593us short_rea
+   temporal-pool: fetches=6222 fetched_mib=1312.5 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1049.1 qwait_hi_us=67.7 wait_ms=
+CEILING R=192 2pass, NOMADV #6   t=6 R=192 decode=47.029304 sd=4.543695 wall=8s peak_swap=0MB  mean_clk cpu0=2.73GHz cpu6=4.16GHz
+   temporal-fetchprof: fetches=12444 syscalls/fetch=1.00 wall/fetch=399us sys/fetch=399us first_call=399us outside_sys=0us max_call=2248us short_rea
+   temporal-pool: fetches=6222 fetched_mib=1312.5 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=798.3 qwait_hi_us=41.8 wait_ms=6
+temporal t6 #7                   t=6 R=18  decode=30.843943 sd=6.262719 wall=6s peak_swap=0MB  mean_clk cpu0=3.35GHz cpu6=4.05GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=315us sys/fetch=315us first_call=315us outside_sys=0us max_call=4463us short_rea
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=630.1 qwait_hi_us=501.8 wait_ms
+CEILING R=192 same-policy #8     t=6 R=192 decode=33.27305 sd=2.881844 wall=9s peak_swap=0MB  mean_clk cpu0=2.80GHz cpu6=4.26GHz
+   temporal-fetchprof: fetches=12444 syscalls/fetch=1.00 wall/fetch=525us sys/fetch=525us first_call=525us outside_sys=0us max_call=2965us short_rea
+   temporal-pool: fetches=6222 fetched_mib=1312.5 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1050.4 qwait_hi_us=64.4 wait_ms=
+CEILING R=192 2pass, NOMADV #9   t=6 R=192 decode=40.896636 sd=7.491276 wall=8s peak_swap=0MB  mean_clk cpu0=2.77GHz cpu6=4.23GHz
+   temporal-fetchprof: fetches=12444 syscalls/fetch=1.00 wall/fetch=550us sys/fetch=550us first_call=550us outside_sys=0us max_call=9384us short_rea
+   temporal-pool: fetches=6222 fetched_mib=1312.5 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1100.9 qwait_hi_us=45.6 wait_ms=
+temporal t6 #10                  t=6 R=18  decode=30.737527 sd=6.924522 wall=6s peak_swap=0MB  mean_clk cpu0=3.38GHz cpu6=4.09GHz
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=317us sys/fetch=317us first_call=317us outside_sys=0us max_call=10315us short_re
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=634.6 qwait_hi_us=518.1 wait_ms
+
+=== summary (STOCK GOVERNOR -- not comparable to Pixel pinned numbers) ===
+CEILING R=192 plain (no 2pass)   [60.3]  mean=60.30
+CEILING R=192 same-policy        [29.54, 30.76, 33.27]  mean=31.19
+CEILING R=192 2pass, NOMADV      [47.99, 47.03, 40.9]  mean=45.31
+temporal t6                      [30.51, 30.84, 30.74]  mean=30.70

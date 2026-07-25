@@ -2595,3 +2595,76 @@ carries thread count per arm precisely so it is visible in the label, and the la
 printed with every reading -- but a matched-threads check is still a manual act. When
 comparing any two arms, diff their FULL configuration, not the one knob that is the
 subject of the comparison.
+
+## S3-38  The eviction cost is TLB shootdown, not the syscall -- batching is dead, and only a slot-pool redesign reaches 70%
+
+S3-37c left the two-pass policy as the dominant cost on the Samsung and eviction as its
+biggest line item. This entry prices eviction properly and finds that the obvious fix
+(fewer/larger madvise calls) cannot work, because the cost is not in the calls.
+
+### Step 1: the existing knobs are all NEUTRAL
+Streamed arm, matched `-t 6`, interleaved, n=2-3 each:
+
+| arm | readings | mean |
+|---|---|---|
+| baseline | 31.31, 32.15, 33.36 | 32.27 |
+| `EVICT_DEFER=1` | 31.16, 32.05 | 31.60 |
+| `JANITOR_NOLOCK=1` | 30.53, 32.66 | 31.60 |
+| both | 32.71, 32.82 | 32.76 |
+| `MADV_DONTNEED` (drop MADV_FREE) | 33.31, 32.91 | 33.11 |
+
+The baseline itself drifts 31.31 -> 33.36 with arm position, so every arm is inside the
+baseline's own band. **Nothing here is real.** Note in particular that MADV_DONTNEED is
+not worse, which does NOT reproduce the Pixel's 7.6% preference for MADV_FREE (S3-25) --
+another rejection that does not transfer between devices (pitfall #19).
+
+### Step 2: where the time actually goes (LLAMA_TEMPORAL_TRACE)
+R=192 resident so the arms are memory-neutral, back-to-back, IDENTICAL workload in both
+(`fetches=372`, `evictions=4320`, 481140 GEMV spans). Only the page release differs:
+
+| span | base | NOMADV | delta |
+|---|---|---|---|
+| decode | 28.73 tok/s | **52.70 tok/s** | **1.83x** |
+| GEMV mean | 5.16 us | **3.51 us** | **-32%** |
+| GEMV median | 2.92 us | 2.87 us | ~0 |
+| GEMV total (thread-time) | 2481.7 ms | 1690.7 ms | -791 ms |
+| FETCH mean | 714 us | 587 us | -18% |
+| **EVICT total** | **82.7 ms** | 0.2 ms | -82.5 ms |
+| WAIT total | 97.4 ms | 60.3 ms | -37 ms |
+
+**The madvise SYSCALL costs 19.1 us x 4320 = 82.7 ms, i.e. ~2.6 ms/token, and it runs on
+the JANITOR thread -- off the critical path.** That is a small fraction of the ~1.8x the
+flag is worth.
+
+**The cost is a 32% inflation of every GEMV, with the MEDIAN unmoved.** Mean up, median
+flat, is the signature of a tail: a minority of GEMVs are badly stalled while most are
+untouched. That is TLB shootdown -- each madvise IPIs every core running this mm, and
+there are 135 of them per token against 6 compute threads.
+
+### Consequence: two ideas killed, one route left
+- **Batching the madvise calls is DEAD.** `process_madvise` with an iovec, or coalescing
+  the 3 per-swap ranges, attacks the 2.6 ms/token of syscall time on a thread that is not
+  on the critical path. Best case it recovers a few percent. Killed before implementation,
+  on measurement rather than intuition.
+- **Deferring/reordering eviction is DEAD** -- measured neutral above, and the mechanism
+  explains why: moving *when* the shootdown happens does not stop it happening.
+- **The only route that removes a TLB shootdown is not doing the madvise at all**, which
+  means the refetch must overwrite the evicted expert's pages IN PLACE. That is a true
+  R-slot pool -- allocate R slots per tensor rather than E, and add an expert-id -> slot
+  indirection. Residency is then bounded structurally, with no page release ever.
+
+### What that buys, and the honest scope
+NOMADV is worth **1.83x** here. A slot pool that captured all of it would put the streamed
+arm at ~59 tok/s = **94% of the 62.89 plain ceiling**; capturing even half is ~46 tok/s =
+**73%**, which clears the 70% target. **It is the only identified route to 70% on this
+device.**
+
+The scope is real: both matmul kernels index experts by row offset into one contiguous
+tensor, so the indirection has to be added to `mul_mat_id` AND to `repack.cpp`'s
+`forward_mul_mat_id` -- and pitfall #8 says an omission there is silent, not loud. The
+correctness gate (resident vs streamed, bit-identical PPL) is what catches it.
+
+### Method note
+The trace answered in one run what two sessions of A/B could not, because it measures
+WHERE the time goes rather than IF a knob helps. When a flag is worth 1.8x and every
+plausible implementation of that flag measures neutral, stop A/B-ing and instrument.
