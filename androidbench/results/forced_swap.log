@@ -1,0 +1,3 @@
+[08:57:52]   ->      0 slices/s: decode=22.326312 +-16.905096 prefill=15.947915 read=6409MiB
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (0s)
+    cooling... clocks={0: 3302400, 6: 3648000, 7: 3648000} thermal=0 (20s)

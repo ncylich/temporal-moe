@@ -1,0 +1,7 @@
+0.15.520.570 I Final estimate: PPL = 181920.0251 +/- 5119.75777
+iolat R=36 rep1                    decode=28.686642 sd=1.821358 wall=10s clock_after_min=3187200
+    temporal-pool: fetches=22025 fetched_mib=4645.9 evictions=43058 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=641.1 wait_ms=2548.0 odirect=1 workers=8 sibling=1 split=1
+iolat R=36 rep2                    decode=27.718844 sd=1.790298 wall=11s clock_after_min=2880000
+    temporal-pool: fetches=21991 fetched_mib=4638.7 evictions=43026 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=666.7 wait_ms=2723.3 odirect=1 workers=8 sibling=1 split=1
+iolat R=36 rep3                    decode=28.41503 sd=1.911221 wall=10s clock_after_min=3187200
+    temporal-pool: fetches=22017 fetched_mib=4644.2 evictions=43048 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=672.1 wait_ms=2672.1 odirect=1 workers=8 sibling=1 split=1

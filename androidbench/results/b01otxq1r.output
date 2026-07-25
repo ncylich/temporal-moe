@@ -1,0 +1,12 @@
+PIX R=36 t4 w8: COOL TIMEOUT, running anyway (flagged)
+PIX R=36 t4 w8                     decode=13.802837 sd=0.297452 wall=16s clock_after_min=1950000
+    temporal-pool: fetches=24789 fetched_mib=5228.9 evictions=19902 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1125.1 wait_ms=5123.1 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=56125 out=76994 pages, memavail_before=3538MiB
+PIX R=36 t4 w4: COOL TIMEOUT, running anyway (flagged)
+PIX R=36 t4 w4                     decode=10.460132 sd=0.438533 wall=20s clock_after_min=1950000
+    temporal-pool: fetches=24762 fetched_mib=5223.2 evictions=19879 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1131.1 wait_ms=8092.7 odirect=1 workers=4 sibling=1 split=1
+    swap delta: in=56871 out=85161 pages, memavail_before=3509MiB
+PIX R=36 t5 w8: COOL TIMEOUT, running anyway (flagged)
+PIX R=36 t5 w8                     decode=4.924905 sd=0.162837 wall=41s clock_after_min=1950000
+    temporal-pool: fetches=24845 fetched_mib=5240.7 evictions=19969 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1241.3 wait_ms=5790.2 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=33592 out=46562 pages, memavail_before=3527MiB

@@ -1,0 +1,18 @@
+    cooling... clocks={0: 3513600, 6: 4262400, 7: 4262400} thermal=1 (0s)
+[06:05:10]   -> rep_coarse_temporal2_b: decode=34.250924 +-0.039496 prefill=24.76246 read=6405MiB
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (0s)
+    cooling... clocks={0: 2745600, 6: 2668800, 7: 2668800} thermal=0 (20s)
+    cooling... clocks={0: 3513600, 6: 4070400, 7: 4070400} thermal=0 (40s)
+[06:15:00]   -> rep_coarse_mmap0_b: decode=33.706662 +-0.061179 prefill=6.945223 read=18488MiB
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (0s)
+    cooling... clocks={0: 2745600, 6: 2668800, 7: 2668800} thermal=0 (20s)
+    cooling... clocks={0: 3513600, 6: 3974400, 7: 3974400} thermal=0 (40s)
+[06:26:22]   -> rep_coarse_temporal2_c: decode=22.978301 +-19.303563 prefill=9.675708 read=7023MiB
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (0s)
+    cooling... clocks={0: 2899200, 6: 2880000, 7: 2880000} thermal=0 (20s)
+    cooling... clocks={0: 3513600, 6: 3974400, 7: 3974400} thermal=0 (40s)
+[06:45:03]   -> rep_fine_temporal2_c: decode=12.529226 +-16.573496 prefill=4.356961 read=6864MiB
+    cooling... clocks={0: 2496000, 6: 2438400, 7: 2438400} thermal=0 (0s)
+    cooling... clocks={0: 3513600, 6: 4070400, 7: 4070400} thermal=0 (20s)
+[06:55:12]   -> rep_fine_mmap0_b: decode=30.699234 +-0.298306 prefill=6.913757 read=21471MiB
+[06:55:12] REPLICATION COMPLETE

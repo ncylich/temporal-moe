@@ -1,0 +1,69 @@
+======================================================================================================================
+SAMSUNG SM-S942U1 (Snapdragon 8 Elite Gen 5) -- temporal-MoE, Qwen3-MoE fine 18-of-192, 10.5B, Q4_K_M, 6.5 GiB
+======================================================================================================================
+
+CEILING (--mmap 0, weights in anonymous RAM, verified not swapped):
+  decode  29.84 tok/s   inter-run spread 0.66 (2.2%)   n=3
+  prefill 43.11 tok/s
+  targets: decode >= 22.38 tok/s (75%), prefill >= 21.56 tok/s (50%)
+
+RUN                          BACKEND         CACHE  DECODE  RATIO        STORAGE READ        RESIDENCY      CLOCK  STATUS
+----------------------------------------------------------------------------------------------------------------------
+  ceiling_mmap0_r0           cpu             cold    30.22 101.3%  sd= 0.07  read=   6741p MiB  res=  0.0-> 10.5%   1978MHz  degraded_clock_42pct
+  ceiling_mmap0_r1           cpu             cold    29.74  99.7%  sd= 0.68  read=   6740p MiB  res=  0.0-> 10.2%   1862MHz  degraded_clock_39pct
+  ceiling_mmap0_r2           cpu             cold    29.56  99.1%  sd= 0.75  read=   6740p MiB  res=  0.0->  8.9%   1747MHz  degraded_clock_37pct
+  mmap_warm                  cpu             warm    26.30  88.1%  sd= 9.51  read=  21846p MiB  res= 91.3-> 31.4%   1978MHz  degraded_clock_42pct
+  mmap_cold                  cpu             cold    30.01 100.6%  sd= 1.02  read=  18355p MiB  res=  0.0-> 27.3%   1978MHz  degraded_clock_42pct
+  direct_io                  cpu             cold    29.53  99.0%  sd= 0.07  read=   6714p MiB  res=  0.0->  0.1%   1978MHz  degraded_clock_42pct
+  pressure_2000mib           cpu             warm    27.85  93.3%  sd= 7.04  read=  17326p MiB  res= 82.1-> 29.6%   1978MHz  degraded_clock_42pct
+  pressure_3000mib           cpu             warm    19.59  65.6%  sd=15.46  read=  21380p MiB  res= 62.8-> 26.4%   2227MHz  degraded_clock_47pct
+  pressure_4000mib           cpu             warm    25.38  85.0%  sd=12.14  read=  14023d MiB  res= 52.2-> 29.9%   2227MHz  degraded_clock_47pct
+  pressure_5000mib           cpu             warm    18.95  63.5%  sd=15.83  read=  18713p MiB  res= 41.5-> 24.7%   2227MHz  degraded_clock_47pct
+  threads_2                  cpu             warm    24.46  82.0%  sd= 1.35  read=  13450p MiB  res= 92.3-> 33.2%   1978MHz  degraded_clock_42pct
+  threads_4                  cpu             warm    12.56  42.1%  sd=15.51  read=  12741p MiB  res= 98.9-> 18.8%   2227MHz  degraded_clock_47pct
+  threads_8                  cpu             warm    13.54  45.4%  sd=17.62  read=  17492p MiB  res= 86.3-> 25.5%   2227MHz  degraded_clock_47pct
+  ab_cpu_balloon0_r0         cpu             cold     6.84  22.9%  sd=14.21  read=  19289p MiB  res=  0.0-> 25.7%   2227MHz  degraded_clock_47pct
+  diversity_n16              cpu-temporal2   cold    34.97 117.2%  sd= 0.00  read=   6197p MiB  res=  0.0-> 27.0%   2227MHz  degraded_clock_47pct
+  diversity_n64              cpu-temporal2   cold     0.10   0.4%  sd= 0.00  read=   6198p MiB  res=  0.0-> 30.3%   2227MHz  degraded_clock_47pct
+  diversity_n256             cpu-temporal2   cold     0.35   1.2%  sd= 0.00  read=   6201p MiB  res=  0.0-> 20.7%   2227MHz  degraded_clock_47pct
+  ab2_cpu_balloon0           cpu             cold    21.37  71.6%  sd=17.37  read=  18916p MiB  res=  0.0-> 32.7%   2227MHz  degraded_clock_47pct
+  ab2_cpu-temporal2_balloon0 cpu-temporal2   cold    28.49  95.5%  sd= 0.55  read=   7021d MiB  res=  0.0-> 22.1%   2227MHz  degraded_clock_47pct
+  ab2_cpu-temporal2_balloon4000 cpu-temporal2   cold    21.90  73.4%  sd=18.39  read=   7673p MiB  res=  0.0-> 27.9%   2227MHz  degraded_clock_47pct
+  ab2_cpu_balloon4000        cpu             cold     1.85   6.2%  sd= 1.03  read=  28732p MiB  res=  0.0-> 28.5%   2227MHz  degraded_clock_47pct
+  gran_fine_temporal2        cpu-temporal2   cold     2.32   7.8%  sd= 1.30  read=   6955p MiB  res=  0.0-> 20.8%   2227MHz  degraded_clock_47pct
+  gran_coarse_temporal2      cpu-temporal2   cold    34.36 103.6%  sd= 0.01  read=   8773p MiB  res=  0.0-> 33.2%   2227MHz  degraded_clock_47pct
+  gran_coarse_mmap0          cpu             cold    32.66  98.4%  sd= 0.09  read=   6714p MiB  res=  0.0-> 11.3%   1978MHz  degraded_clock_42pct
+  rep_coarse_temporal2_b     cpu-temporal2   cold    34.25 103.2%  sd= 0.04  read=   6405p MiB  res=  0.0-> 27.7%   2227MHz  degraded_clock_47pct
+  rep_coarse_mmap0_b         cpu             cold    33.71 101.6%  sd= 0.06  read=  18488p MiB  res=  0.0-> 26.1%   2227MHz  degraded_clock_47pct
+  rep_coarse_temporal2_c     cpu-temporal2   cold    22.98  69.2%  sd=19.30  read=   7023p MiB  res=  0.0-> 25.5%   2227MHz  degraded_clock_47pct
+  rep_fine_temporal2_c       cpu-temporal2   cold    12.53  42.0%  sd=16.57  read=   6864p MiB  res=  0.0-> 28.4%   2227MHz  degraded_clock_47pct
+  rep_fine_mmap0_b           cpu             cold    30.70 102.9%  sd= 0.30  read=  21471p MiB  res=  0.0-> 25.1%   2227MHz  degraded_clock_47pct
+
+  (coarse rows rated against the coarse ceiling: 33.18 tok/s)
+
+======================================================================================================================
+ROUTING DIVERSITY (Phase G) -- does the working set grow with decode length?
+----------------------------------------------------------------------------------------------------------------------
+  n=16   read    6197 MiB from storage   (fixed-expert-set prediction ~1752 MiB, fully-diverse prediction ~6707 MiB)
+  n=64   read    6198 MiB from storage   (fixed-expert-set prediction ~1752 MiB, fully-diverse prediction ~6707 MiB)
+  n=256  read    6201 MiB from storage   (fixed-expert-set prediction ~1752 MiB, fully-diverse prediction ~6707 MiB)
+
+  reads grew 1.00x while decode length grew 16x
+  => VERDICT: reads PLATEAU. The router reuses a near-fixed expert set,
+     so the working set is ~513 MiB TOTAL, not per token. Any paging win
+     here is 'a small fixed slice stays cached', NOT 'temporal residency
+     works under diverse routing'. Random weights are the likely cause.
+
+======================================================================================================================
+BEST NON-CEILING CONFIG: gran_coarse_temporal2 (cpu-temporal2, cold cache)
+  decode 34.36 tok/s = 103.6% of ceiling [target 75%: MET]
+  prefill 21.78 tok/s = 79.5% of ceiling [target 50%: MET]
+  measured with page cache 0.0% resident at start, 8773 MiB actually read from storage
+
+======================================================================================================================
+ROOFLINE SANITY (M31)
+  active expert weights per token: 513 MiB
+  measured UFS cold sequential:    1.92 GB/s
+  => decode is capped at 3.74 tok/s IF every active expert is fetched from storage each token.
+  Any decode above that is only possible with experts already resident in RAM.
+    ceiling_mmap0_r0: 30.2 tok/s implies 15.5 GB/s expert traffic -> served from RAM, not storage

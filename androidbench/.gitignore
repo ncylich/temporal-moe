@@ -1,0 +1,14 @@
+# Test models (29 GB) -- regenerate with ../llamacpp-bench/gen_random_qwen3moe.py
+models/
+
+# Chrome-trace dumps from LLAMA_TEMPORAL_TRACE (~70 MB each). Regenerate on demand;
+# the derived timeline lives in results/timeline_artifact.html via make_timeline.py.
+results/*.json
+
+# Probe binaries -- cross-compile from the sources next to them (see probes/README.md)
+balloon
+pagecache_tool
+qd_probe
+ram_probe
+revoke_test
+uring_probe

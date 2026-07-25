@@ -30,7 +30,21 @@ TOKENIZER_ID = "Qwen/Qwen3-0.6B"   # only tokenizer files are pulled; sets vocab
 
 VARIANTS = {
     "fine":   dict(num_experts=192, top_k=18, moe_ff=384),
+    "e128":   dict(num_experts=128, top_k=18, moe_ff=384),
+    "e112":   dict(num_experts=112, top_k=18, moe_ff=384),   # largest MoE (K=18 active) fitting fully resident on Pixel
+    # Narrow-expert reshape: K*ff and E*ff held invariant vs "fine" (6912 / 73728), so
+    # identical active params, identical total params, identical FLOPs -- but an expert is
+    # 432 KiB instead of 648 KiB. Two storage wins: (1) 33% fewer bytes per swap, the only
+    # attack on the physics link term; (2) 3 slices fit under the block layer's
+    # max_sectors_kb=512, so a fused read is ONE request instead of a 512+136 split.
+    # ff must be a multiple of 64 or expert_bytes (= ff*576) stops being 4K-aligned and
+    # half the fetches fall off the O_DIRECT zero-copy path (ff=288 fails this; 256 passes).
+    "narrow":  dict(num_experts=288, top_k=27, moe_ff=256),
+    "e176n":   dict(num_experts=176, top_k=27, moe_ff=256),   # resident baseline for "narrow"
     "coarse": dict(num_experts=64,  top_k=6,  moe_ff=1152),
+    "k24":    dict(num_experts=256, top_k=24, moe_ff=288),   # fair vs fine: K*ff & E*ff invariant
+    "k36":    dict(num_experts=384, top_k=36,  moe_ff=192),
+    "k72":    dict(num_experts=768, top_k=72,  moe_ff=96),
 }
 
 

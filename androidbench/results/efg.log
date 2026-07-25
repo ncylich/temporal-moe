@@ -1,0 +1,8 @@
+[03:35:35] === PHASE E: temporal mmap A/B, interleaved + order-rotated ===
+[03:35:35]   balloon=0 MiB rep=0 order=['cpu', 'cpu-temporal', 'cpu-temporal2']
+[03:37:35]     memory settled: avail=8901400 kB swap_used=1598472 kB
+    cooling... clocks={0: 2745600, 6: 2668800, 7: 2668800} thermal=0 (0s)
+    cooling... clocks={0: 3513600, 6: 3974400, 7: 3974400} thermal=0 (20s)
+[04:08:19]   -> ab_cpu_balloon0_r0: decode=6.835693 +-14.20634 prefill=15.501923 status=degraded_clock_47pct resident=0.0% read=19289MiB
+[04:08:34]     memory settled: avail=8557036 kB swap_used=1548732 kB
+    cooling... clocks={0: 3187200, 6: 3129600, 7: 3129600} thermal=0 (0s)

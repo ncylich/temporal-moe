@@ -1,0 +1,7 @@
+fetch path: pread pool
+  110592 ( 108 KiB) n=24 : nr=10926   dev_avg=   349us min=   87us max=  1235us sum=   3814ms busy=   1099ms OVERLAP=3.47 MiB=1152   decode=19.985404 wall/fetch=520us
+  110592 ( 108 KiB) n=96 : nr=29702   dev_avg=   350us min=   78us max=  2731us sum=  10382ms busy=   3148ms OVERLAP=3.30 MiB=3132   decode=20.67674 wall/fetch=513us
+=== uring ===
+fetch path: io_uring
+  110592 ( 108 KiB) n=24 : nr=9156    dev_avg=   805us min=  144us max=  4092us sum=   7375ms busy=   1048ms OVERLAP=7.04 MiB=965    decode=17.712322 wall/fetch=1827us
+  110592 ( 108 KiB) n=96 : nr=27763   dev_avg=   513us min=  137us max=  4195us sum=  14248ms busy=   3139ms OVERLAP=4.54 MiB=2928   decode=18.095167 wall/fetch=1072us

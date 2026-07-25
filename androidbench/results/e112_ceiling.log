@@ -1,0 +1,12 @@
+  MemAvailable=4074MiB
+E112 CEILING rep1                  decode=27.720465 sd=0.438426 wall=13s clock_after_min=1950000
+    
+    swap delta: in=339811 out=517320
+  MemAvailable=4631MiB
+E112 CEILING rep2                  decode=28.906356 sd=0.342161 wall=11s clock_after_min=1950000
+    
+    swap delta: in=7026 out=51541
+  MemAvailable=4879MiB
+E112 CEILING rep3                  decode=28.351482 sd=1.13383 wall=10s clock_after_min=1950000
+    
+    swap delta: in=1525 out=18168

@@ -1,0 +1,6 @@
+PIX R=48 rep1                      decode=10.97799 sd=1.029794 wall=19s clock_after_min=1950000
+    swap delta: in=8 out=0, memavail_before=3757MiB
+PIX R=48 rep2                      decode=10.711286 sd=1.103592 wall=20s clock_after_min=1950000
+    swap delta: in=0 out=0, memavail_before=3746MiB
+PIX R=48 rep3                      decode=7.948416 sd=4.870053 wall=41s clock_after_min=1795000
+    swap delta: in=14 out=0, memavail_before=3742MiB

@@ -1,0 +1,9 @@
+PIX R=64 rep1                      decode=11.763406 sd=0.323464 wall=18s clock_after_min=1950000
+    temporal-pool: fetches=20056 fetched_mib=4230.6 evictions=11396 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1491.5 wait_ms=5780.9 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=0 out=0 [ok], memavail_before=3705MiB
+PIX R=64 rep2                      decode=12.001894 sd=0.587487 wall=18s clock_after_min=1950000
+    temporal-pool: fetches=20024 fetched_mib=4223.8 evictions=11364 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1441.0 wait_ms=5687.2 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=1025 out=0 [ok], memavail_before=3691MiB
+PIX R=64 rep3                      decode=11.50693 sd=0.229786 wall=19s clock_after_min=1950000
+    temporal-pool: fetches=20036 fetched_mib=4226.3 evictions=11379 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1515.9 wait_ms=5774.4 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=13 out=0 [ok], memavail_before=3691MiB

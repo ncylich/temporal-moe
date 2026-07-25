@@ -1,0 +1,18 @@
+PIX R=18 t4 rep1                   decode=5.661164 sd=0.195903 wall=35s clock_after_min=1950000
+    temporal-pool: fetches=54464 fetched_mib=11488.5 evictions=51932 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1377.5 wait_ms=16272.3 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=0 out=0 pages, memavail_before=3552MiB
+PIX R=36 t4 rep1                   decode=10.689525 sd=0.457274 wall=19s clock_after_min=1950000
+    temporal-pool: fetches=24886 fetched_mib=5249.4 evictions=20003 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1436.8 wait_ms=7064.1 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=0 out=0 pages, memavail_before=3533MiB
+PIX R=18 t4 rep2                   decode=5.623869 sd=0.185799 wall=36s clock_after_min=1950000
+    temporal-pool: fetches=54547 fetched_mib=11506.0 evictions=52012 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1392.4 wait_ms=16138.5 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=0 out=0 pages, memavail_before=3536MiB
+PIX R=36 t4 rep2                   decode=10.186695 sd=0.400624 wall=20s clock_after_min=1950000
+    temporal-pool: fetches=24885 fetched_mib=5249.2 evictions=20005 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1476.4 wait_ms=7525.3 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=0 out=0 pages, memavail_before=3532MiB
+PIX R=18 t4 rep3                   decode=5.676976 sd=0.326413 wall=35s clock_after_min=1950000
+    temporal-pool: fetches=54341 fetched_mib=11462.6 evictions=51814 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1374.8 wait_ms=16275.5 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=0 out=0 pages, memavail_before=3534MiB
+PIX R=36 t4 rep3                   decode=10.584753 sd=0.542318 wall=20s clock_after_min=1950000
+    temporal-pool: fetches=24835 fetched_mib=5238.6 evictions=19952 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1420.4 wait_ms=7168.9 odirect=1 workers=8 sibling=1 split=1
+    swap delta: in=1 out=0 pages, memavail_before=3533MiB

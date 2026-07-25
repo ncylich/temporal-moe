@@ -1,0 +1,6 @@
+Q4pure R=48 rep1                   decode=28.006819 sd=1.277632 wall=10s clock_after_min=3398400
+    temporal-pool: fetches=19290 fetched_mib=4069.0 evictions=38712 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=653.6 wait_ms=2220.5 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=48 rep2                   decode=28.946708 sd=0.861018 wall=10s clock_after_min=3398400
+    temporal-pool: fetches=19302 fetched_mib=4071.5 evictions=38721 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=638.7 wait_ms=2191.3 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=48 rep3                   decode=28.939207 sd=0.601472 wall=10s clock_after_min=3398400
+    temporal-pool: fetches=19290 fetched_mib=4069.0 evictions=38713 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=640.4 wait_ms=2190.7 odirect=1 workers=8 sibling=1 split=1

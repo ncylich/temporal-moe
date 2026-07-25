@@ -1,0 +1,96 @@
+diff --git a/src/llama-mmap.cpp b/src/llama-mmap.cpp
+index ed572da7..19fdb44b 100644
+--- a/src/llama-mmap.cpp
++++ b/src/llama-mmap.cpp
+@@ -447,10 +447,28 @@ struct llama_mmap::impl {
+         int fd = file->file_id();
+         int flags = MAP_SHARED;
+         if (numa) { prefetch = 0; }
++
++        // LLAMA_TEMPORAL_MMAP: demand-paged residency for MoE on memory-constrained
++        // devices. The default path populates the ENTIRE file (MAP_POPULATE +
++        // MADV_WILLNEED + FADV_SEQUENTIAL). On a phone whose usable RAM is smaller than
++        // the model that forces thrashing: the kernel evicts expert pages it just read
++        // in order to read the next ones, even though only top_k of E experts are
++        // touched per token. Setting this leaves the kernel to fault in only what is
++        // actually referenced -- the temporal-residency behaviour we want to measure.
++        //   1 = demand-page the whole file (MADV_RANDOM everywhere)
++        //   2 = per-tensor policy, applied by llama-model-loader: experts get
++        //       MADV_RANDOM, everything else MADV_WILLNEED. Mode 1 evicts attention and
++        //       embedding weights too, which are needed on EVERY token, so mode 2 exists
++        //       to keep the always-hot tensors resident and stream only the experts --
++        //       the same split the CUDA kernel makes.
++        const char * temporal_env = getenv("LLAMA_TEMPORAL_MMAP");
++        const int temporal_mode = temporal_env ? atoi(temporal_env) : 0;
++        const bool temporal = temporal_mode >= 1;
++        if (temporal) { prefetch = 0; }
+ #ifdef __linux__
+-        if (posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL)) {
+-            LLAMA_LOG_WARN("warning: posix_fadvise(.., POSIX_FADV_SEQUENTIAL) failed: %s\n",
+-                    strerror(errno));
++        if (posix_fadvise(fd, 0, 0, temporal ? POSIX_FADV_RANDOM : POSIX_FADV_SEQUENTIAL)) {
++            LLAMA_LOG_WARN("warning: posix_fadvise(.., %s) failed: %s\n",
++                    temporal ? "POSIX_FADV_RANDOM" : "POSIX_FADV_SEQUENTIAL", strerror(errno));
+         }
+         if (prefetch) { flags |= MAP_POPULATE; }
+ #endif
+@@ -465,12 +483,18 @@ struct llama_mmap::impl {
+                         strerror(errno));
+             }
+         }
+-        if (numa) {
++        if (numa || temporal_mode == 1) {
+             if (posix_madvise(addr, file->size(), POSIX_MADV_RANDOM)) {
+                 LLAMA_LOG_WARN("warning: posix_madvise(.., POSIX_MADV_RANDOM) failed: %s\n",
+                         strerror(errno));
+             }
+         }
++        // Emitted unconditionally so a result row can prove which mmap policy the
++        // binary actually used, rather than which one we believe we passed (M27).
++        LLAMA_LOG_INFO("%s: mmap policy = %s (populate=%s, advise=%s)\n", __func__,
++                temporal ? "TEMPORAL" : "default",
++                prefetch ? "yes" : "no",
++                (numa || temporal) ? "RANDOM" : "WILLNEED/SEQUENTIAL");
+ 
+         mapped_fragments.emplace_back(0, file->size());
+     }
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+index 28f8bb79..a8820526 100644
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@ -13,6 +13,10 @@
+ #include <future>
+ #include <regex>
+ 
++#if defined(_POSIX_MAPPED_FILES) || defined(__unix__) || defined(__APPLE__)
++#include <sys/mman.h>   // posix_madvise, for the LLAMA_TEMPORAL_MMAP=2 per-tensor policy
++#endif
++
+ static const size_t kiB = 1024;
+ static const size_t MiB = 1024*kiB;
+ static const size_t GiB = 1024*MiB;
+@@ -1550,6 +1554,24 @@ bool llama_model_loader::load_all_data(
+             }
+             uint8_t * data = (uint8_t *) mapping->addr() + weight->offs;
+ 
++#if defined(_POSIX_MAPPED_FILES)
++            // LLAMA_TEMPORAL_MMAP=2: per-tensor residency policy for MoE on devices whose
++            // RAM is smaller than the model. Expert tensors (*_exps) are the only ones
++            // sparsely used -- top_k of E per token -- so only they are marked evictable.
++            // Attention, norm and embedding weights are touched on every token and are
++            // marked WILLNEED so the kernel keeps them resident instead of thrashing them
++            // alongside the experts (which is what mode 1 does wrong).
++            {
++                static const char * tm = getenv("LLAMA_TEMPORAL_MMAP");
++                static const int temporal_mode = tm ? atoi(tm) : 0;
++                if (temporal_mode == 2) {
++                    const bool is_expert = strstr(cur->name, "_exps") != nullptr;
++                    posix_madvise(data, n_size,
++                                  is_expert ? POSIX_MADV_RANDOM : POSIX_MADV_WILLNEED);
++                }
++            }
++#endif
++
+             if (check_tensors) {
+                 validation_result.emplace_back(std::async(std::launch::async, [cur, data, n_size] {
+                     return std::make_pair(cur, ggml_validate_row_data(cur->type, data, n_size));

@@ -1,0 +1,12 @@
+single-pass rep1                   decode=10.114718 sd=0.423365 wall=21s clock_after_min=1950000
+    temporal-pool: fetches=28242 fetched_mib=5957.3 evictions=25726 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1206.3 qwait_hi_us=202.2 wait_ms=9222.6 odirect=1 workers=6 sibling=1 split=1
+single-pass rep2                   decode=9.754568 sd=0.331757 wall=21s clock_after_min=1950000
+    temporal-pool: fetches=28254 fetched_mib=5959.8 evictions=25734 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1241.6 qwait_hi_us=195.1 wait_ms=9450.8 odirect=1 workers=6 sibling=1 split=1
+single-pass rep3                   decode=9.721919 sd=0.487632 wall=22s clock_after_min=1950000
+    temporal-pool: fetches=28249 fetched_mib=5958.8 evictions=25736 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1237.3 qwait_hi_us=204.8 wait_ms=9344.9 odirect=1 workers=6 sibling=1 split=1
+TWO-PASS rep1                      decode=11.726684 sd=0.673469 wall=18s clock_after_min=1950000
+    temporal-pool: fetches=28350 fetched_mib=5980.1 evictions=25920 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1167.2 qwait_hi_us=594.4 wait_ms=6125.8 odirect=1 workers=6 sibling=1 split=1
+TWO-PASS rep2                      decode=12.284585 sd=0.957302 wall=18s clock_after_min=1950000
+    temporal-pool: fetches=28350 fetched_mib=5980.1 evictions=25920 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1117.2 qwait_hi_us=516.7 wait_ms=5621.7 odirect=1 workers=6 sibling=1 split=1
+TWO-PASS rep3                      decode=11.62202 sd=0.599883 wall=18s clock_after_min=1849000
+    temporal-pool: fetches=28350 fetched_mib=5980.1 evictions=25920 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1143.9 qwait_hi_us=626.7 wait_ms=5539.3 odirect=1 workers=6 sibling=1 split=1

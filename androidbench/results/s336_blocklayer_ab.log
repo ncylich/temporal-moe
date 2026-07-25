@@ -1,0 +1,29 @@
+A pread pool (root) #1         decode=21.037386 sd=0.590315 wall=8s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=508us sys/fetch=508us first_call=508us outside_sys=0us max_call=1886us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1015.8 qwait_hi_us=546.8 wait_ms=245
+   UFS nr=42034 dev_lat_avg=352us min=73us max=1095us busy=4504ms OVERLAP=3.29 MiB=4433
+D pread, sda sched=none #2     decode=20.379404 sd=0.191724 wall=8s  SDAQ sched=[none] mq-deadline kyber bfq rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=521us sys/fetch=520us first_call=520us outside_sys=0us max_call=5373us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1041.5 qwait_hi_us=536.6 wait_ms=235
+   UFS nr=43736 dev_lat_avg=367us min=76us max=902us busy=4733ms OVERLAP=3.39 MiB=4612
+A pread pool (root) #3         decode=19.72229 sd=0.185435 wall=9s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=525us sys/fetch=525us first_call=525us outside_sys=0us max_call=8442us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1050.4 qwait_hi_us=555.0 wait_ms=236
+   UFS nr=42146 dev_lat_avg=364us min=73us max=894us busy=4700ms OVERLAP=3.26 MiB=4445
+D pread, sda sched=none #4     decode=19.061729 sd=0.239421 wall=9s  SDAQ sched=[none] mq-deadline kyber bfq rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=527us sys/fetch=527us first_call=527us outside_sys=0us max_call=11587us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1054.7 qwait_hi_us=548.2 wait_ms=188
+   UFS nr=43736 dev_lat_avg=365us min=92us max=973us busy=4785ms OVERLAP=3.33 MiB=4612
+E pread, rq_affinity=0 #5      decode=21.006475 sd=0.539601 wall=8s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=0 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=509us sys/fetch=509us first_call=509us outside_sys=0us max_call=1600us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1018.0 qwait_hi_us=531.0 wait_ms=241
+   UFS nr=42656 dev_lat_avg=359us min=73us max=878us busy=4584ms OVERLAP=3.34 MiB=4498
+A pread pool (root) #6         decode=19.70508 sd=0.211136 wall=9s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=524us sys/fetch=524us first_call=524us outside_sys=0us max_call=8837us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1047.8 qwait_hi_us=563.0 wait_ms=252
+   UFS nr=41522 dev_lat_avg=368us min=74us max=928us busy=4712ms OVERLAP=3.24 MiB=4379
+
+=== summary (interleaved) ===
+A pread pool (root)            [21.04, 19.72, 19.71]  mean=20.15
+D pread, sda sched=none        [20.38, 19.06]  mean=19.72
+E pread, rq_affinity=0         [21.01]  mean=21.01

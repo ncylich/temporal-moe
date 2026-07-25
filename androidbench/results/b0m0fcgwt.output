@@ -1,0 +1,9 @@
+PIX split2 R=36 rep1               decode=10.248532 sd=0.750462 wall=20s clock_after_min=1950000
+    temporal-pool: fetches=24821 fetched_mib=5235.7 evictions=19938 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1848.1 wait_ms=7873.4 odirect=1 workers=8 sibling=1 split=2
+    swap delta: in=0 out=0
+PIX split2 R=36 rep2               decode=10.341754 sd=0.979415 wall=20s clock_after_min=1950000
+    temporal-pool: fetches=24773 fetched_mib=5225.6 evictions=19887 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1843.1 wait_ms=7604.4 odirect=1 workers=8 sibling=1 split=2
+    swap delta: in=17 out=0
+PIX split2 R=36 rep3               decode=8.187402 sd=2.562904 wall=27s clock_after_min=1696000
+    temporal-pool: fetches=24791 fetched_mib=5229.4 evictions=19907 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=1922.1 wait_ms=7852.7 odirect=1 workers=8 sibling=1 split=2
+    swap delta: in=81 out=0

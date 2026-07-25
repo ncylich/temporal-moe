@@ -1,0 +1,16 @@
+A pread pool (root) #1         decode=20.59807 sd=0.337229 wall=8s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=508us sys/fetch=507us first_call=507us outside_sys=0us max_call=9344us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1015.2 qwait_hi_us=562.0 wait_ms=248
+B io_uring 1-submitter #2      decode=17.576449 sd=0.961124 wall=10s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=953us sys/fetch=953us first_call=953us outside_sys=0us max_call=7265us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1905.1 qwait_hi_us=191.8 wait_ms=322
+A pread pool (root) #3         decode=19.074284 sd=0.330626 wall=9s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=541us sys/fetch=540us first_call=540us outside_sys=0us max_call=9532us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1081.7 qwait_hi_us=547.1 wait_ms=189
+B io_uring 1-submitter #4      decode=17.922817 sd=0.083514 wall=9s  SDAQ sched=[mq-deadline] kyber bfq none rq_affinity=2 max_sectors_kb=512
+   temporal-fetchprof: fetches=43740 syscalls/fetch=1.00 wall/fetch=951us sys/fetch=951us first_call=951us outside_sys=0us max_call=8172us short_reads=0
+   temporal-pool: fetches=21870 fetched_mib=4613.2 evictions=19440 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1901.8 qwait_hi_us=193.3 wait_ms=332
+
+=== summary (interleaved) ===
+A pread pool (root)            [20.6, 19.07]  mean=19.84
+B io_uring 1-submitter         [17.58, 17.92]  mean=17.75

@@ -1,0 +1,22 @@
+clean
+gate 1: R=0, pool fetched_bytes vs /proc/diskstats device reads
+  pool fetched_mib=9822 disk_delta_mib=15580 (minus load 5667 -> 9913) -> PASS
+  temporal-pool: fetches=46562 fetched_mib=9821.7 evictions=70052 tensors=135 hook_calls=2295 hook_miss=0 avg_fetch_us=696.9 wait_ms=6341.8 odirect=1 workers=8 sibling=1 split=1
+gate 2: PPL bit-identity (2 chunks) vs plain-kernel baseline 181920.0251 (Q4pure)
+  PPL = 181920.0251 -> PASS
+honesty gates: ALL PASS
+=== Q4pure block ===
+Q4pure CEIL R=192                  decode=47.81397 sd=3.554281 wall=9s clock_after_min=3302400
+    temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=0.0 wait_ms=0.0 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=24 rep1                   decode=24.460919 sd=0.620444 wall=11s clock_after_min=3398400
+    temporal-pool: fetches=29263 fetched_mib=6172.7 evictions=51907 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=604.1 wait_ms=3145.5 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=36 rep1                   decode=27.290194 sd=0.943281 wall=11s clock_after_min=3398400
+    temporal-pool: fetches=22053 fetched_mib=4651.8 evictions=43087 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=637.0 wait_ms=2510.3 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=24 rep2                   decode=24.232772 sd=0.428347 wall=11s clock_after_min=3302400
+    temporal-pool: fetches=29281 fetched_mib=6176.5 evictions=51928 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=623.1 wait_ms=3264.2 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=36 rep2                   decode=27.263138 sd=0.919842 wall=11s clock_after_min=3187200
+    temporal-pool: fetches=22044 fetched_mib=4649.9 evictions=43081 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=640.1 wait_ms=2522.3 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=24 rep3                   decode=24.1492 sd=0.628798 wall=12s clock_after_min=3302400
+    temporal-pool: fetches=29294 fetched_mib=6179.2 evictions=51943 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=628.4 wait_ms=3249.9 odirect=1 workers=8 sibling=1 split=1
+Q4pure R=36 rep3                   decode=27.245178 sd=0.540711 wall=11s clock_after_min=3302400
+    temporal-pool: fetches=22043 fetched_mib=4649.7 evictions=43078 tensors=135 hook_calls=26055 hook_miss=0 avg_fetch_us=644.7 wait_ms=2497.9 odirect=1 workers=8 sibling=1 split=1

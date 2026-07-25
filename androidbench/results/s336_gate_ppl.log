@@ -1,0 +1,5 @@
+A pread worker pool        PPL = 185534.4155 +/- 4953.03236
+   temporal-pool: fetches=13092 fetched_mib=2761.6 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=926.0 qwait_hi_us=47.9 wait_ms=6201.6 odirect=1 wo
+B io_uring                 PPL = 185534.4155 +/- 4953.03236
+   temporal-pool: fetches=13092 fetched_mib=2761.6 evictions=0 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=987.0 qwait_hi_us=26.7 wait_ms=5974.5 odirect=1 wo
+GATE PASS: PPL bit-identical

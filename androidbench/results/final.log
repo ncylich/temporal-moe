@@ -1,0 +1,50 @@
+[04:10:02] === PHASE G: routing diversity (runs first: it decides what everything means) ===
+[04:17:03]     WARNING: memory not settled in 420s
+    cooling... clocks={0: 2745600, 6: 2668800, 7: 2668800} thermal=0 (0s)
+    cooling... clocks={0: 2745600, 6: 2668800, 7: 2668800} thermal=0 (20s)
+    cooling... clocks={0: 2899200, 6: 2880000, 7: 2880000} thermal=0 (40s)
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (60s)
+    cooling... clocks={0: 2496000, 6: 2438400, 7: 2438400} thermal=0 (80s)
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (100s)
+    cooling... clocks={0: 2745600, 6: 2668800, 7: 2668800} thermal=0 (120s)
+    cooling... clocks={0: 2899200, 6: 2880000, 7: 2880000} thermal=0 (141s)
+    cooling... clocks={0: 2899200, 6: 2880000, 7: 2880000} thermal=0 (161s)
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (181s)
+    cooling... clocks={0: 2227200, 6: 2227200, 7: 2227200} thermal=0 (201s)
+    cooling... clocks={0: 1996800, 6: 1977600, 7: 1977600} thermal=1 (221s)
+    cooling... clocks={0: 3187200, 6: 3129600, 7: 3129600} thermal=1 (241s)
+[04:24:43]   -> diversity_n16: decode=34.971065 +-0.0 prefill=None status=degraded_clock_47pct res=0.0->27.0% read=6197MiB
+[04:24:43]   n=16: 6197 MiB read, resident_after=27.0%
+[04:24:59]     settled: avail=8715388 kB swap_used=1462404 kB
+    cooling... clocks={0: 3398400, 6: 3763200, 7: 3763200} thermal=0 (0s)
+[04:37:25]   -> diversity_n64: decode=0.104839 +-0.0 prefill=None status=degraded_clock_47pct res=0.0->30.3% read=6198MiB
+[04:37:25]   n=64: 6198 MiB read, resident_after=30.3%
+[04:37:40]     settled: avail=8799156 kB swap_used=1418628 kB
+    cooling... clocks={0: 3513600, 6: 4070400, 7: 4070400} thermal=0 (0s)
+[04:51:57]   -> diversity_n256: decode=0.349777 +-0.0 prefill=None status=degraded_clock_47pct res=0.0->20.7% read=6201MiB
+[04:51:57]   n=256: 6201 MiB read, resident_after=20.7%
+[04:51:57] === PHASE E (compact): default mmap vs temporal mode 2 ===
+[04:52:13]     settled: avail=8396792 kB swap_used=1479648 kB
+    cooling... clocks={0: 3187200, 6: 3398400, 7: 3398400} thermal=0 (0s)
+[05:00:18]   -> ab2_cpu_balloon0: decode=21.368475 +-17.365391 prefill=20.615211 status=degraded_clock_47pct res=0.0->32.7% read=18916MiB
+[05:00:33]     settled: avail=8463908 kB swap_used=1569324 kB
+    cooling... clocks={0: 2899200, 6: 2880000, 7: 2880000} thermal=0 (0s)
+    cooling... clocks={0: 3513600, 6: 4262400, 7: 4262400} thermal=0 (20s)
+[05:10:21]   -> ab2_cpu-temporal2_balloon0: decode=28.494572 +-0.547099 prefill=5.069935 status=degraded_clock_47pct res=0.0->22.1% read=7021MiB
+[05:10:37]     settled: avail=8621520 kB swap_used=1558824 kB
+    cooling... clocks={0: 3513600, 6: 4185600, 7: 4185600} thermal=0 (0s)
+[05:23:27]   -> ab2_cpu-temporal2_balloon4000: decode=21.903569 +-18.389119 prefill=5.292581 status=degraded_clock_47pct res=0.0->27.9% read=7673MiB
+[05:23:42]     settled: avail=8776164 kB swap_used=1608480 kB
+[05:38:04]   -> ab2_cpu_balloon4000: decode=1.849179 +-1.029842 prefill=12.166999 status=degraded_clock_47pct res=0.0->28.5% read=28732MiB
+[05:38:04] === PHASE F: expert granularity ===
+[05:38:19]     settled: avail=8657408 kB swap_used=1335668 kB
+    cooling... clocks={0: 3398400, 6: 3763200, 7: 3763200} thermal=0 (0s)
+[05:49:33]   -> gran_fine_temporal2: decode=2.322217 +-1.301283 prefill=9.793415 status=degraded_clock_47pct res=0.0->20.8% read=6955MiB
+[05:49:48]     settled: avail=8578424 kB swap_used=1386024 kB
+    cooling... clocks={0: 3302400, 6: 3648000, 7: 3648000} thermal=0 (0s)
+[05:55:05]   -> gran_coarse_temporal2: decode=34.362631 +-0.008523 prefill=21.778972 status=degraded_clock_47pct res=0.0->33.2% read=8773MiB
+[05:55:20]     settled: avail=8828900 kB swap_used=1433104 kB
+    cooling... clocks={0: 2496000, 6: 2438400, 7: 2438400} thermal=0 (0s)
+    cooling... clocks={0: 3187200, 6: 3398400, 7: 3398400} thermal=0 (20s)
+[05:57:12]   -> gran_coarse_mmap0: decode=32.662106 +-0.085094 prefill=47.818367 status=degraded_clock_42pct res=0.0->11.3% read=6714MiB
+[05:57:12] FINAL PHASES COMPLETE
