@@ -157,7 +157,10 @@ temporal model (1.065 BPB) now edges out the coarse one (1.068).
   \centering\small
   \caption{Zero-shot downstream accuracy at $10^{19}$ FLOPs (lm-evaluation-harness, acc\_norm
   except WinoGrande which reports acc). Avg$-$chance subtracts each task's chance floor (0.5 for
-  WinoGrande and PIQA, 0.25 elsewhere) before averaging. Bold = best per column.}
+  WinoGrande and PIQA, 0.25 elsewhere) before averaging. Bold = best per column. Per-task
+  standard errors are 0.005--0.020 (largest on OpenBookQA), so single-task bold margins of a
+  point or two (WinoGrande, ARC-c) are within noise and the aggregate columns carry the
+  comparison.}
   \label{tab:lmeval}
   \vspace{4pt}
   \begin{tabular}{@{}lrrrrrrrr@{}}
@@ -175,7 +178,10 @@ temporal model (1.065 BPB) now edges out the coarse one (1.068).
 \textbf{Downstream tasks.} Zero-shot accuracy at $10^{19}$ (Table~\ref{tab:lmeval}) tracks the
 pretraining picture. The full MoE lifts the dense average from 0.392 to 0.424 (0.059 to 0.091
 above chance), and the temporal models keep 86\% (coarse) and 76\% (fine) of that above-chance
-gain. On WinoGrande and PIQA the coarse temporal model matches the full MoE. Recovery transfers
+gain. The dense-to-MoE average gap spans several standard errors while the MoE-to-temporal gaps
+sit within one, so the lift over dense is statistically clean and the residual temporal deficit
+is not resolved at this scale. On WinoGrande and PIQA the coarse temporal model matches the
+full MoE. Recovery transfers
 from pretraining loss to task accuracy.
 
 \begin{table}[t]

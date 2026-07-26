@@ -20,7 +20,9 @@ Values = end-of-training TEST evals (canonical; see results/ablations/FINDINGS.m
 Outputs results/phase0/figures/isoflop_panel_1e{16,17,18,19}_nocaption.png (paper tiles) and a
 captioned 2x2 overview isoflop_panels_all.png for the repo.
 """
+import argparse
 import os
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -29,6 +31,18 @@ from matplotlib.lines import Line2D
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUTD = f"{REPO}/results/phase0/figures"
+
+# NON-DEFAULT deck variant: --highlight-deck fades two series (temporal coarse, fine MoE)
+# and emphasizes the other three (dense, coarse MoE, temporal fine) for a talk slide. Without
+# the flag every output below is byte-identical to the paper figures. --no-caption is accepted
+# only for CLI parity (these tiles are already caption-less).
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--highlight-deck", action="store_true")
+_ap.add_argument("--no-caption", action="store_true")
+_ap.add_argument("--out", default=f"{REPO}/paper/talk_figures/slide06_isoflop_highlight.png")
+ARGS, _ = _ap.parse_known_args()
+FADE_KEYS = {"moe_f", "tmp_c"}          # curve series faded on the deck variant
+FADE_BARS = {"temporal\ncoarse"}        # 1e19 bar faded on the deck variant
 
 DENSE_C = "#7f7f7f"
 MOE_COARSE, MOE_FINE = "#5aa0dd", "#0d3b66"
@@ -71,7 +85,13 @@ def curve_panel(ax, data, title, legend=False, ticks=None, xlabel=True, ylabel=T
     for key, color, lw in STYLE:
         d = data[key]
         xs = sorted(d); ys = [d[x] for x in xs]
-        ax.plot(xs, ys, "-o", color=color, mfc=color, mec=color, ms=6, lw=lw, alpha=0.9)
+        a, lwx, ms = 0.9, lw, 6
+        if ARGS.highlight_deck:
+            if key in FADE_KEYS:
+                a, lwx, ms = 0.15, 1.2, 4
+            else:
+                a, lwx, ms = 1.0, lw + 0.8, 7
+        ax.plot(xs, ys, "-o", color=color, mfc=color, mec=color, ms=ms, lw=lwx, alpha=a)
     ax.set_xscale("log")
     # clean ticks at the swept sizes only — no garbled log-minor labels
     if ticks:
@@ -90,9 +110,12 @@ def curve_panel(ax, data, title, legend=False, ticks=None, xlabel=True, ylabel=T
 def bar_panel(ax, title, ylabel=True):
     labels = [p[0] for p in P19]; vals = [p[1] for p in P19]; cols = [p[2] for p in P19]
     bars = ax.bar(labels, vals, color=cols, width=0.66, edgecolor="k", linewidth=0.6)
-    for b, v in zip(bars, vals):
+    for b, v, lab in zip(bars, vals, labels):
+        faded = ARGS.highlight_deck and lab in FADE_BARS
+        if faded:
+            b.set_alpha(0.2)
         ax.text(b.get_x()+b.get_width()/2, v + 0.002, f"{v:.3f}", ha="center",
-                fontsize=9, fontweight="bold")
+                fontsize=9, fontweight="bold", alpha=0.25 if faded else 1.0)
     ax.set_ylim(1.0, 1.16)
     ax.grid(True, axis="y", ls=":", alpha=0.4)
     ax.set_title(title)
@@ -105,6 +128,22 @@ plt.rcParams.update({"font.size": 9.5, "axes.titlesize": 11, "axes.labelsize": 1
 TICKS = {"1e16": ([0.77, 1.4, 3.85], ["0.8", "1.4", "3.9"]),
          "1e17": ([3.85, 8.17, 14.9], ["3.9", "8.1", "15"]),
          "1e18": ([6.88, 12.19, 48.50], ["6.9", "12", "49"])}
+
+# --highlight-deck: emit ONLY the faded talk-slide 2x2 and stop (paper outputs untouched).
+if ARGS.highlight_deck:
+    fig, axes = plt.subplots(2, 2, figsize=(7.0, 4.15))
+    curve_panel(axes[0][0], P16, "$10^{16}$ FLOPs · 16k vocab", ticks=TICKS["1e16"], xlabel=False)
+    curve_panel(axes[0][1], P17, "$10^{17}$ FLOPs · 16k vocab", ticks=TICKS["1e17"], xlabel=False, ylabel=False)
+    curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"])
+    bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab", ylabel=False)
+    fig.legend([Line2D([0], [0], color=c, lw=2.4) for _, c, _ in STYLE], LEG,
+               ncol=5, loc="upper center", fontsize=8.5, frameon=False,
+               bbox_to_anchor=(0.5, 1.005), columnspacing=1.4, handlelength=1.6)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    fig.subplots_adjust(wspace=0.16, hspace=0.42)
+    os.makedirs(os.path.dirname(ARGS.out), exist_ok=True)
+    fig.savefig(ARGS.out, dpi=200); print("wrote", ARGS.out); plt.close(fig)
+    sys.exit(0)
 for name, data, vocab, legend in [("1e16", P16, "16k", True), ("1e17", P17, "16k", False), ("1e18", P18, "50k", False)]:
     fig, ax = plt.subplots(figsize=(3.7, 2.35))
     curve_panel(ax, data, f"$10^{{{name[2:]}}}$ FLOPs · {vocab} vocab", legend=legend, ticks=TICKS[name])
