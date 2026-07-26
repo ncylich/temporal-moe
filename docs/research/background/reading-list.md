@@ -8,7 +8,7 @@ it) and what it implies for us. ★ = highest mechanistic payoff / best figures.
 
 Complements `temporal-moe.md §6` (systems/offloading prior work) and `cache-conditional-experts.md`.
 Existing probes in-repo that already mirror these methods: `analysis/router_saturation.py`,
-`analysis/expert_coactivation.py`, `empirical_analysis/expert_specialization.*`.
+`analysis/expert_coactivation.py`, `analysis/flame_moe_upstream/expert_specialization.*`.
 
 ### Exact figures to open (verified against the papers)
 - **Mixtral** [2401.04088] §5: **Table 5** (% consecutive expert-assignment repetitions ← the mechanism),
