@@ -18,11 +18,13 @@ Two things this adds beyond those gates, both from failures observed on THIS dev
    with posix_fadvise(DONTNEED) and verified, not assumed.
 """
 from __future__ import annotations
-import argparse, csv, io, json, subprocess, sys, threading, time
+import argparse, csv, io, json, os, subprocess, sys, threading, time
 from dataclasses import dataclass, field, asdict
 
 DEV_DIR = "/data/local/tmp/tmoe"
-SERIAL = "RFGL42B1VLW"
+# Device this campaign was run on. Override for any other handset with
+# ANDROID_SERIAL (adb's own variable) or EXPECT_SERIAL, matching run_android_bench.sh.
+SERIAL = os.environ.get("ANDROID_SERIAL") or os.environ.get("EXPECT_SERIAL") or "RFGL42B1VLW"
 HW_MAX = {0: 3628800, 6: 4742400, 7: 4742400}   # cpuinfo_max_freq, verified on device
 TOOL = f"{DEV_DIR}/pagecache_tool"
 

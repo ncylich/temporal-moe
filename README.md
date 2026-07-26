@@ -1,97 +1,46 @@
-# FLAME-MoE :fire:​: A Transparent End-to-End Research Platform for Mixture-of-Experts Language Models
+# Temporal Mixture-of-Experts
 
-> **Note — personal playground fork.** This is a private, personal copy of
-> [cmu-flame/FLAME-MoE](https://github.com/cmu-flame/FLAME-MoE), maintained by
-> [@ncylich](https://github.com/ncylich) purely for my own experimentation and
-> learning. It is **not** affiliated with or endorsed by the original FLAME-MoE
-> authors — all credit for the platform and research goes to them
-> ([paper](https://www.arxiv.org/abs/2505.20225)). Expect ad-hoc, possibly-broken
-> changes; this is a playground, not a maintained release.
+A sparse MoE computes only `k` experts per token but still needs the whole expert pool in
+fast memory to serve. Temporal MoE trains the model under a rolling-residency constraint
+that keeps only the `k` active experts of each layer resident and swaps at most one expert
+per token, so the incoming expert streams in behind the compute of the ones already there.
+Serving memory then scales with active parameters instead of total parameters.
 
-**FLAME-MoE** is a transparent, end-to-end research platform for Mixture-of-Experts (MoE) language models. It is designed to facilitate scalable training, evaluation, and experimentation with MoE architectures. [arXiv](https://www.arxiv.org/abs/2505.20225)
+The constraint is trained in rather than applied at inference, so the router reorganises
+around it. Expert selection moves off token identity and onto surrounding context, which
+is why quality holds up.
 
-## 🔗 Model Checkpoints
+## Results
 
-Explore our publicly released checkpoints on Hugging Face:
+Trained from scratch on isoFLOP sweeps from 10^16 to 10^19 FLOPs, at 6-of-64 and
+18-of-192 expert granularity.
 
-* [FLAME-MoE-1.7B-10.3B](https://huggingface.co/CMU-FLAME/FLAME-MoE-1.7B-10.3B)
-* [FLAME-MoE-721M-3.8B](https://huggingface.co/CMU-FLAME/FLAME-MoE-721M-3.8B)
-* [FLAME-MoE-419M-2.2B](https://huggingface.co/CMU-FLAME/FLAME-MoE-419M-2.2B)
-* [FLAME-MoE-290M-1.3B](https://huggingface.co/CMU-FLAME/FLAME-MoE-290M-1.3B)
-* [FLAME-MoE-115M-459M](https://huggingface.co/CMU-FLAME/FLAME-MoE-115M-459M)
-* [FLAME-MoE-98M-349M](https://huggingface.co/CMU-FLAME/FLAME-MoE-98M-349M)
-* [FLAME-MoE-38M-100M](https://huggingface.co/CMU-FLAME/FLAME-MoE-38M-100M)
+* Retains 72-82% of the MoE-over-dense quality gain at compute-optimal sizes.
+* Holds 18 of 192 experts resident, cutting whole-model weight memory 5.7x.
+* Serves an 11B-scale model in llama.cpp using 5.1x less memory, with a 17% decode
+  slowdown on an RTX A6000 and 30% on a Pixel 10a (Tensor G4), compared to the baseline
+  where all experts are in memory.
 
----
+## Layout
 
-## 🚀 Getting Started
+| Path | Contents |
+|---|---|
+| `paper/` | Write-up |
+| `temporal/` | Rolling-residency router |
+| `docs/` | Design docs, mechanism analyses, ablations, evaluation methodology |
+| `results/` | Measured results |
+| `llamacpp-bench/`, `mlx-bench/`, `androidbench/` | Serving benchmarks on A6000, Apple Silicon, and Android |
+| `experiments/`, `configs/`, `scripts/`, `analysis/` | Training and figures |
 
-### 1. Clone the Repository
+`Megatron-LM`, `TransformerEngine`, `apex`, and `lm-evaluation-harness` are submodules
+from the training platform. Clone with `--recursive`.
 
-Ensure you clone the repository **recursively** to include all submodules:
+The Android harness defaults to the handset it was developed on. Set `ANDROID_SERIAL` for
+your own device. `HW_MAX` in `androidbench/bench.py` holds per-core clock ratings for that
+handset and needs updating for other hardware.
 
-```bash
-git clone --recursive https://github.com/cmu-flame/MoE-Research
-cd MoE-Research
-```
+## Credit
 
-### 2. Set Up the Environment
-
-Set up the Conda environment using the provided script:
-
-```bash
-sbatch scripts/miscellaneous/install.sh
-```
-
-> **Note:** This assumes you're using a SLURM-managed cluster. Adapt accordingly if running locally.
-
----
-
-## 📚 Data Preparation
-
-### 3. Download and Tokenize the Dataset
-
-Use the following SLURM jobs to download and tokenize the dataset:
-
-```bash
-sbatch scripts/dataset/download.sh
-sbatch scripts/dataset/tokenize.sh
-```
-
----
-
-## 🧠 Training
-
-### 4. Train FLAME-MoE Models
-
-Launch training jobs for the desired model configurations:
-
-```bash
-bash scripts/release/flame-moe-1.7b.sh
-bash scripts/release/flame-moe-721m.sh
-bash scripts/release/flame-moe-419m.sh
-bash scripts/release/flame-moe-290m.sh
-bash scripts/release/flame-moe-115m.sh
-bash scripts/release/flame-moe-98m.sh
-bash scripts/release/flame-moe-38m.sh
-```
-
----
-
-## 📈 Evaluation
-
-### 5. Evaluate the Model
-
-To evaluate a trained model, set the appropriate job ID and iteration number before submitting the evaluation script:
-
-```bash
-export JOBID=...    # Replace with your training job ID
-export ITER=...     # Replace with the iteration to evaluate (e.g., 11029)
-sbatch scripts/evaluate.sh
-```
-
----
-
-### 6. WandB Workspace
-
-All the loss curves during training for both the scaling law studies and the final releases can be found in the following WandB workspace: https://wandb.ai/haok/flame-moe
+Built on [FLAME-MoE](https://github.com/cmu-flame/FLAME-MoE)
+([paper](https://www.arxiv.org/abs/2505.20225)) by the CMU FLAME team. This is a research
+fork, not affiliated with or endorsed by them.
