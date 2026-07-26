@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" font-family="'IBM Plex Sans','Helvetica Neue',Arial,sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+      <path d="M0,0 L8,3.5 L0,7 Z" fill="#333333"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="640" height="260" fill="#ffffff"/>
+
+  <!-- black box -->
+  <rect x="40" y="70" width="180" height="120" rx="14" fill="#111111"/>
+  <text x="130" y="138" text-anchor="middle" font-size="26" font-weight="700" fill="#ffffff">black box</text>
+
+  <!-- arrow labeled ??? -->
+  <text x="320" y="118" text-anchor="middle" font-size="34" font-weight="700" fill="#333333">???</text>
+  <line x1="240" y1="130" x2="410" y2="130" stroke="#333333" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <!-- paper / document icon -->
+  <g>
+    <path d="M446 62 h118 a4 4 0 0 1 4 4 v128 a4 4 0 0 1 -4 4 h-146 a4 4 0 0 1 -4 -4 v-100 z"
+          fill="#ffffff" stroke="#0B5394" stroke-width="3"/>
+    <path d="M446 62 v32 h32 z" fill="#e6eef6" stroke="#0B5394" stroke-width="3"/>
+    <line x1="432" y1="118" x2="558" y2="118" stroke="#c3d3e3" stroke-width="3"/>
+    <line x1="432" y1="134" x2="558" y2="134" stroke="#c3d3e3" stroke-width="3"/>
+    <line x1="432" y1="150" x2="558" y2="150" stroke="#c3d3e3" stroke-width="3"/>
+    <line x1="432" y1="166" x2="520" y2="166" stroke="#c3d3e3" stroke-width="3"/>
+  </g>
+  <text x="500" y="228" text-anchor="middle" font-size="22" font-weight="700" fill="#0B5394">ICLR main paper</text>
+</svg>

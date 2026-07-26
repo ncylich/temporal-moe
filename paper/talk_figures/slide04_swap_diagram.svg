@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" style="width:100%;display:block;background:#fff;border:1px solid #dbe6f1;border-radius:2px;font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Router evicts the worst active resident and admits the top-scored non-resident, which lands at a different slot">
+          <defs>
+            <marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#0B5394"></path></marker>
+          </defs>
+          <rect x="10" y="20" width="58" height="178" rx="6" fill="#f6f9fc" stroke="#e1e9f1"></rect>
+          <rect x="252" y="20" width="58" height="178" rx="6" fill="#f6f9fc" stroke="#e1e9f1"></rect>
+          <text x="39" y="14" text-anchor="middle" font-size="8" font-weight="700" letter-spacing=".04em" fill="#0B5394">TOKEN t</text>
+          <text x="281" y="14" text-anchor="middle" font-size="8" font-weight="700" letter-spacing=".04em" fill="#0B5394">TOKEN t+1</text>
+
+          <!-- carried-over active expert stays in place -->
+          <line x1="62" y1="38.5" x2="258" y2="38.5" stroke="#8fbf9f" stroke-width="1" stroke-dasharray="2 3"></line>
+          <text x="160" y="35" text-anchor="middle" font-size="6.5" fill="#4a8a63">stays resident</text>
+
+          <!-- router input -->
+          <text x="160" y="69" text-anchor="middle" font-size="7.5" fill="#4a4f57">token + context</text>
+          <line x1="160" y1="74" x2="160" y2="93" stroke="#0B5394" stroke-width="1.4" marker-end="url(#ah)"></line>
+
+          <!-- eviction into router (worst active resident, slot 5) -->
+          <line x1="63" y1="141" x2="121" y2="128" stroke="#0B5394" stroke-width="1.4" stroke-dasharray="3 2.5" marker-end="url(#ah)"></line>
+          <text x="95" y="152" text-anchor="middle" font-size="6" fill="#0B5394">evict worst</text>
+          <text x="95" y="160" text-anchor="middle" font-size="6" fill="#0B5394">active</text>
+
+          <!-- router -->
+          <rect x="124" y="96" width="72" height="40" rx="6" fill="#fff" stroke="#0B5394" stroke-width="1.5"></rect>
+          <text x="160" y="112" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0B5394">ROUTER</text>
+          <text x="160" y="124" text-anchor="middle" font-size="6.5" fill="#7d8794">scores all experts</text>
+
+          <!-- admit new expert, lands at a different slot (5 -> 7) -->
+          <line x1="196" y1="130" x2="256" y2="181" stroke="#0B5394" stroke-width="1.4" marker-end="url(#ah)"></line>
+          <text x="222" y="172" text-anchor="middle" font-size="6" fill="#0B5394">admit top</text>
+          <text x="222" y="180" text-anchor="middle" font-size="6" fill="#0B5394">non-resident</text>
+
+          <rect x="16" y="30" width="46" height="17" rx="3.5" fill="#e6f6ec" stroke="#1f9d55" stroke-width="1.4"></rect><rect x="16" y="50.5" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="16" y="71" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="16" y="91.5" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="16" y="112" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="16" y="132.5" width="46" height="17" rx="3.5" fill="#e6f6ec" stroke="#1f9d55" stroke-width="1.4" stroke-dasharray="3.5 2.5"></rect><rect x="16" y="153" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="16" y="173.5" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect>
+          <rect x="258" y="30" width="46" height="17" rx="3.5" fill="#e6f6ec" stroke="#1f9d55" stroke-width="1.4"></rect><rect x="258" y="50.5" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="258" y="71" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="258" y="91.5" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="258" y="112" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="258" y="132.5" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="258" y="153" width="46" height="17" rx="3.5" fill="#eef2f6" stroke="#d3dbe4"></rect><rect x="258" y="173.5" width="46" height="17" rx="3.5" fill="#1f9d55"></rect>
+        </svg>
