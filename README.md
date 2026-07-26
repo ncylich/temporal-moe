@@ -10,6 +10,9 @@ The constraint is trained in rather than applied at inference, so the router reo
 around it. Expert selection moves off token identity and onto surrounding context, which
 is why quality holds up.
 
+[Paper](paper/main.pdf) ·
+[Talk slides](https://docs.google.com/presentation/d/1AwLRFUdAcEJ-jtT-_qNqcqennXaoVzB_GslD9otz6rg/edit?usp=sharing)
+
 ## Results
 
 Trained from scratch on isoFLOP sweeps from 10^16 to 10^19 FLOPs, at 6-of-64 and
