@@ -26,4 +26,4 @@ Cross-compile with the NDK, push to `/data/local/tmp/tmoe/`, run as shell (root 
    *inverts* under real compute load. Never size an engine change from these alone; use
    `LLAMA_TEMPORAL_FETCHPROF=1` inside the engine instead.
 
-See `../../ANDROID_OPTIM_PROGRESS.md` § MEASUREMENT PITFALLS for the full rule list.
+See `../ANDROID_OPTIM_PROGRESS.md` § MEASUREMENT PITFALLS for the full rule list.

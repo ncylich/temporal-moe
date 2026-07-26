@@ -1,6 +1,6 @@
 # Baseline policy for on-device temporal-MoE benchmarks
 
-> Companion: **`../ANDROID_OPTIM_PROGRESS.md` § MEASUREMENT PITFALLS** lists the 12
+> Companion: **`ANDROID_OPTIM_PROGRESS.md` § MEASUREMENT PITFALLS** lists the 12
 > benchmarking mistakes actually made in this campaign, as rules. Read it first.
 
 **Standing rule. Applies to every number we publish from `androidbench/`.**
