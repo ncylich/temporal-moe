@@ -435,7 +435,7 @@ all three failed:
 
 None of storage, swap, or reclaim accounts for the lost time. Recorded as an open
 question rather than attributed to a plausible-sounding cause -- this is exactly the
-failure mode M38 warns about, where a wrong-layer explanation was published
+failure mode M38 warns about, where a wrong-layer explanation is published
 and later retracted.
 
 ### Phase D (levers) -- ABANDONED, contaminated by a harness artifact
