@@ -18,7 +18,7 @@ swaps/token) so the resident weights can be streamed from SSD/RAM rather than he
 ## Running the tests
 
 ```
-PYTHONPATH=Megatron-LM:. $PY -m pytest temporal/tests analysis/probes -q
+PYTHONPATH=Megatron-LM:.:analysis:analysis/probes:analysis/plots $PY -m pytest temporal/tests analysis/probes -q
 ```
 
 The router-vs-replay cross-checks import `analysis/probes/probe_replay.py`; co-collecting

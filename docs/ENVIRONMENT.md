@@ -144,6 +144,42 @@ still uses them, and `graphs_BC()` runs only in that case, since it genuinely ne
 scripts/artifacts.py pull --glob 'run_captures/*/router_log.pt'   # 22 files, 4.56 GiB, needs torch
 ```
 
+## Reproduction status
+
+An end-to-end reproduction of `g3_tmoe_s2_1e17` was run on a fresh clone against the published
+corpus. Recording the outcome because it is not a clean pass.
+
+| | test CE | test BPB |
+|---|---|---|
+| published | 3.553032 | **1.2873** |
+| retrained from scratch, same config and seed | 3.562365 | **1.2907** |
+| delta | +0.009333 | **+0.0034** |
+
++0.0034 is roughly 1.7x the ~0.002 seed noise quoted for this family, so **retraining does not
+reproduce the published number within tolerance**. Training itself was clean: exit 0, zero NaN,
+zero skipped iterations, and the loss matched the original to 2.9e-5 at iteration 10.
+
+**The artifact chain reproduces exactly.** The published checkpoint, pulled with
+`scripts/artifacts.py` and evaluated in the same fresh environment, returns CE 3.553074 against the
+published 3.553032, a delta of +0.000042 CE and +0.0000 BPB. `g3_tmoe_sm1_1e16` likewise reproduces
+its published 1.4976 as 1.4982, inside noise. So the evaluation pipeline, the corpus and the
+published weights are all sound. What differs is the model produced by retraining.
+
+Two candidate causes, one ruled out:
+
+- **Ruled out: evaluation split composition.** `run.sh` builds `--data-path` with `find`, which
+  returns filesystem order rather than sorted order, and Megatron's `--split 90,5,5` partitions the
+  concatenated corpus by index. Two runs on different machines therefore evaluate different test
+  splits: 10 of the 12 shards sat in different positions between these two runs. This looked like
+  the explanation, but forcing the original shard order at evaluation time moved the result by
+  +0.0000 BPB, so it accounts for none of the gap.
+- **Not tested: training split composition.** The same ordering effect also changes which documents
+  fall in the 90% training split, and that was not isolated. Testing it means retraining with the
+  shard order pinned, about 106 minutes on one H100. This is the leading remaining hypothesis.
+
+The shard ordering is left as-is deliberately. Sorting it is a one-line change and is more correct,
+but it silently redefines which documents every published number was measured on.
+
 ## Environment contract
 
 `scripts/env.sh` is the single source of truth. Source it first from any launcher:

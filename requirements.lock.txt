@@ -2,6 +2,7 @@
 # A RECORD, not an install target: transformer-engine and apex were built from source
 # against this exact torch/CUDA pair, so `pip install -r` will not reproduce them alone.
 # Build TE first and keep torch pinned. See docs/ENVIRONMENT.md.
+apex==0.1  # built from source with --cpp_ext --cuda_ext, see docs/ENVIRONMENT.md
 absl-py==2.4.0
 accelerate==1.14.0
 aiohappyeyeballs==2.7.1
