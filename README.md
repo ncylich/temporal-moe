@@ -24,68 +24,101 @@ Trained from scratch on isoFLOP sweeps from 10^16 to 10^19 FLOPs, at 6-of-64 and
   slowdown on an RTX A6000 and 30% on a Pixel 10a (Tensor G4), compared to the baseline
   where all experts are in memory.
 
-## Quickstart
+## Train a temporal MoE
 
-Reproducing the figures needs no accelerator. Timings are measured on a fresh clone, not estimated.
-
-**1. Clone.**
+**1. Prerequisites.** Longest first, so you know what you're in for:
 
 ```bash
-git clone https://github.com/ncylich/temporal-moe.git && cd temporal-moe   # 17 s
-git submodule update --init --recursive                                    # training only, ~3 min, 2.1 GiB
+git submodule update --init --recursive     # ~3 min, 2.1 GiB
+scripts/setup.sh train                      # installs deps, then states what it cannot install
 ```
 
-The submodules are only needed to train, or to read raw checkpoints. Skip them for analysis.
+Then TransformerEngine built from source against the pinned torch and CUDA (~45 min) and apex
+(~20 min). `requirements.lock.txt` is a record of a working environment, not an install target —
+a resolver that swaps torch will break the driver match. Build order and pinned versions are in
+[docs/ENVIRONMENT.md](docs/ENVIRONMENT.md). You need a GPU from here on.
 
-**2. Set up the analysis environment.** No GPU, no torch, no CUDA. numpy, pandas and matplotlib only.
+**2. Smoke run.** The smallest shape at a token budget small enough to finish in minutes — 41
+iterations. It exercises the whole path including a checkpoint write, so if this passes, the setup
+above is sound:
 
 ```bash
-scripts/setup.sh analysis      # 170 s, creates .venv
-. scripts/env.sh               # exports ROOT, PY, TMOE_ROOT, DATA_DIR, ...
+SHAPE=sm1 TARGET_FLOPS=1e14 TEMPORAL=1 bash experiments/run.sh
 ```
 
-**3. Fetch artifacts.** Checkpoints, router traces and the tokenized corpus live in four public
-Hugging Face repositories; `results/MANIFEST.csv` maps all 1,352 files with sizes and sha256.
-`artifacts.py` pulls into the layout the analysis scripts expect, verifying each file.
+**3. Real runs.** The same shape and budget trains three ways, which is how every comparison in
+the paper was produced:
 
 ```bash
-scripts/artifacts.py pull --glob 'ablations/*.csv'                     # result tables, 4.5 MiB
-scripts/artifacts.py pull --glob 'g3_moe_s?_1e17/train.log' \
-                          --glob 'g3_moe_s?_1e17/run.meta'             # three runs' logs, 1.0 MiB
-$PY analysis/summarize.py g3_moe                                       # -> s1 1.2861, s2 1.2723, s3 1.2830
+SHAPE=s2 TARGET_FLOPS=1e17 TEMPORAL=1 GRAIN=3  bash experiments/run.sh   # rolling residency
+SHAPE=s2 TARGET_FLOPS=1e17            GRAIN=3  bash experiments/run.sh   # free-routing MoE
+SHAPE=s2 TARGET_FLOPS=1e17 DENSE=1             bash experiments/run.sh   # dense floor
 ```
 
-The full set is 214 GiB, so take a subset. Filters compose: `--repo`, `--run`, `--cited`, `--glob`
-and `--max-bytes`. Add `--dry-run` to see the size first — `--run g3_moe_s2_1e17` on its own is
-757 MiB, because it includes the checkpoint. Downloads use the standard library alone, so no token
-and no `huggingface_hub`.
+MoE is the default; `TEMPORAL=1` adds the residency constraint on top of it and `DENSE=1` drops
+the experts entirely for the isoFLOP floor.
 
-**4. Replot.** Nothing to download; the CSVs behind the figures are committed.
+`run.sh` derives `train_iters` so that `C = 6ND` hits `TARGET_FLOPS`, so a shape and a budget fully
+specify a run — the three above are 3,917 iterations each. Iteration count follows from the budget
+and is not set directly. Shapes `sm1` and `s0`–`s6` span 96 to 512 hidden. Checkpoints, `train.log`
+and a `run.meta` recording the exact geometry land in `results/phase0/runs/$RUN_NAME/`.
+
+The constraint knobs:
+
+| variable | default | what it does |
+|---|---|---|
+| `TEMPORAL` | `0` | trains under rolling residency: only `k` experts per layer resident, at most one swap per token |
+| `TEMPORAL_EVICT` | `min_logit` | which resident expert leaves when a new one is admitted |
+| `TEMPORAL_RHO` | — | selection margin a challenger must clear to trigger a swap |
+| `TEMPORAL_EMA_BETA` | — | smoothing on the demand signal the eviction decision reads |
+| `GRAIN` | `1` | expert granularity: `1` is 6-of-64, `3` is 18-of-192, `5` is 30-of-320 |
+
+The 1e18 and 1e19 results came through `experiments/scale_1e18_1e19/`, which pins the published
+geometries instead of deriving them from a FLOP budget, and so takes `TRAIN_ITERS` directly. It
+also spells the paradigms differently — `MOE_FULL=1` for free-routing MoE, where `run.sh` treats
+that as the default. The overlap-architecture variants additionally need
+`overlap_arch/overlap_variants_megatron.patch` applied, since the submodule pins vanilla
+Megatron-LM.
+
+## Reproduce the published results
+
+No GPU, no torch, no submodules.
 
 ```bash
-for f in analysis/plots/*.py; do $PY "$f"; done          # 44 s
+scripts/setup.sh analysis                    # creates .venv: numpy, pandas, matplotlib
+. scripts/env.sh                             # exports ROOT, PY, TMOE_ROOT, DATA_DIR, ...
+for f in analysis/plots/*.py; do $PY "$f"; done
 ```
 
-All 11 scripts run, writing 42 PNGs to `results/phase0/figures/`: 31 distinct figures (isoFLOP
+All 11 scripts run and write 42 PNGs to `results/phase0/figures/` — 31 distinct figures (isoFLOP
 panels, loss curves, residency and swap-rate analyses, the de-lexicalization locus scatter, serving
-sweeps) plus caption-free variants for the paper, which `--no-caption` produces on their own.
+sweeps) plus caption-free variants for the paper, which `--no-caption` produces on their own. The
+CSVs behind them are committed, so nothing downloads.
 
-**Bare clone to 42 figures: about 3.9 minutes, no accelerator.**
+For anything backed by raw run artifacts, `results/MANIFEST.csv` maps all 1,352 published files to
+four public Hugging Face repositories with sizes and sha256, and `artifacts.py` fetches and
+verifies them:
 
-## What a fresh clone can and cannot do
+```bash
+scripts/artifacts.py pull --glob 'g3_moe_s?_1e17/train.log' \
+                          --glob 'g3_moe_s?_1e17/run.meta'    # 1.0 MiB
+$PY analysis/summarize.py g3_moe                              # -> s1 1.2861, s2 1.2723, s3 1.2830
+```
 
-Analysis and figures work completely, with no accelerator, no submodules and no downloads beyond the
-clone. Training works but is not one command: it needs the submodules initialised, a GPU, the
-tokenized corpus pulled or rebuilt, and a TransformerEngine built from source against the pinned
-torch and CUDA. `requirements.lock.txt` is a record of a working environment, not an install target,
-and `scripts/setup.sh train` initialises the submodules and then says exactly that rather than
-pretending otherwise. The overlap-architecture variants additionally need
-`overlap_arch/overlap_variants_megatron.patch` applied, since the submodule pins vanilla Megatron-LM.
-Serving is not automated at all: `llamacpp-bench/` and `mlx-bench/` target an RTX A6000 and Apple
-silicon and are documented as manual builds, and `androidbench/` is pinned to one handset. So do not
-expect to clone this and train or serve without setup work. Do expect every published number and
-figure to be reproducible on a laptop. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for pinned
-versions, the environment contract and the full artifact workflow.
+The full set is 214 GiB, so filter. `--repo`, `--run`, `--cited`, `--glob` and `--max-bytes`
+compose, and `--dry-run` sizes a selection first — `--run g3_moe_s2_1e17` alone is 757 MiB because
+it includes the checkpoint. Downloads use the standard library, so no token and no
+`huggingface_hub`.
+
+## What this repository will not do for you
+
+Training is not one command, and the prerequisites above are the reason. Serving is not automated
+at all: `llamacpp-bench/` and `mlx-bench/` target an RTX A6000 and Apple silicon as manual builds,
+and `androidbench/` is pinned to one handset.
+
+Every published number and figure is reproducible on a laptop. A 1e17 cell retrained from a clean
+checkout lands within measured seed variance of its published value, and a checkpoint pulled from
+Hugging Face reproduces its evaluation exactly.
 
 ## Layout
 
@@ -99,7 +132,7 @@ versions, the environment contract and the full artifact workflow.
 | `experiments/`, `configs/`, `scripts/`, `analysis/` | Training and figures |
 
 `Megatron-LM`, `TransformerEngine`, `apex`, and `lm-evaluation-harness` are submodules
-from the training platform, needed for training but not for analysis. See the quickstart.
+from the training platform, needed for training but not for analysis.
 
 The Android harness defaults to the handset it was developed on. Set `ANDROID_SERIAL` for
 your own device. `HW_MAX` in `androidbench/bench.py` holds per-core clock ratings for that
