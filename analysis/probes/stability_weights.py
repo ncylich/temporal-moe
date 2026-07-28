@@ -20,7 +20,8 @@ import os, sys, csv, re, torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ckpt_read
 
-ROOT = "/workspace/FLAME-MoE"
+ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
+                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 RUNS_DIR = os.path.join(ROOT, "results/phase0/runs")
 OUT = os.path.join(ROOT, "results/ablations/stability_weights.csv")
 

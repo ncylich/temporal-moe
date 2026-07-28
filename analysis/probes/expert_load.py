@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure per-expert load (acceptance criterion 4) for a trained FLAME-MoE checkpoint.
+"""Measure per-expert load (acceptance criterion 4) for a trained temporal-MoE checkpoint.
 
 Monkeypatches TopKRouter.forward to accumulate per-expert token counts, then runs Megatron's
 normal eval (driven by --skip-train + --load) so the routers fire on validation batches.

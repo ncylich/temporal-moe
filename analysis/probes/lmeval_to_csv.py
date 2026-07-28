@@ -3,7 +3,9 @@
 model,task,metric,value,stderr  (metric in acc, acc_norm). Verifies acc reproduces t19_lmeval.csv.
 """
 import os, sys, csv, json, glob
-ROOT="/workspace/FLAME-MoE"; RUNS=os.path.join(ROOT,"results/phase0/runs")
+ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
+                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+RUNS=os.path.join(ROOT,"results/phase0/runs")
 OUT=os.path.join(ROOT,"results/ablations/t19_lmeval_stderr.csv")
 MODELS=["dense_1e19","moe_coarse_1e19","g1_tmoe_coarse_1e19","temporal_fine_g3_1e19"]
 LABEL={"dense_1e19":"dense_1e19","moe_coarse_1e19":"moe_coarse_1e19",

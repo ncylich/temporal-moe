@@ -10,7 +10,9 @@ import os, sys, csv, numpy as np, torch
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-ROOT = "/workspace/FLAME-MoE"; RUNS = os.path.join(ROOT, "results/phase0/runs")
+ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
+                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+RUNS = os.path.join(ROOT, "results/phase0/runs")
 OUT = os.path.join(ROOT, "results/ablations/mechinterp_demand_1e19.csv")
 LAYERS = [2, 3, 4, 5, 6]
 CELLS = [("moe_coarse_1e19", "moe_coarse_1e19"),

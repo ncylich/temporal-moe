@@ -15,7 +15,8 @@ layer_number (1-indexed) internally and are realigned here by -1.
 """
 import os, sys, csv, torch
 
-ROOT = "/workspace/FLAME-MoE"
+ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
+                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 RUNS = os.path.join(ROOT, "results/phase0/runs")
 ACT_OUT = os.path.join(ROOT, "results/ablations/stability_activations.csv")
 TRUNK_OUT = os.path.join(ROOT, "results/ablations/stability_trunk.csv")
