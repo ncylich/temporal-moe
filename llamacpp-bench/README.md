@@ -58,7 +58,7 @@ input selects different experts, so a trained model would need to be trained tha
 benchmark validates it's feasible and worth ~+6%; the ~164 headline is for the existing
 post-attention-routed model.
 
-Swap-rate → tok/s emulation curve: `results/phase0/figure_data/p2b_swaprate_emul.csv`.
+Swap-rate → tok/s emulation curve: `results/ablations/p2b_swaprate_emul.csv`.
 
 ## Build & run
 ```bash

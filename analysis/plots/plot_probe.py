@@ -33,6 +33,8 @@ def topk_ids(logits, k):
     idx = np.argpartition(-logits, k-1, axis=-1)[..., :k]
     m = np.zeros_like(logits, bool); np.put_along_axis(m, idx, True, axis=-1); return m
 
+HAVE_LOGS = os.path.exists(f"{RUNS}/tmoe_minlogit_sh1_s2_1e17/router_log.pt")
+
 # tag, active-params(M), temporal run, full-MoE run (or None)
 PAIRS = [("s0 @1e16", 1.36, "tmoe_minlogit_sh1_s0_1e16", "v16k_d_s0_1e16"),
          ("s2 @1e17", 8.12, "tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17"),
@@ -45,15 +47,20 @@ def _raster_csv(outfile, panels, k, E, L):
     """Condensed data behind a raster: the active (token, expert) cells per panel — a few thousand
     rows (~k per token), the tiny stand-in for the raw router_log.pt this raster was drawn from."""
     import csv
-    figdata = OUT.replace("figures", "figure_data"); os.makedirs(figdata, exist_ok=True)
+    # These per-model files are the components of the committed
+    # results/ablations/expert_selection_per_token.csv, which is the three of them concatenated
+    # with the active_params_M column distinguishing them. They used to be written to
+    # results/phase0/figure_data/, which no longer exists.
+    out_dir = os.path.join(REPO, "results", "ablations"); os.makedirs(out_dir, exist_ok=True)
     name = outfile.replace(".png", ".csv")            # caption-independent name
-    with open(f"{figdata}/{name}", "w", newline="") as f:
-        w = csv.writer(f); w.writerow(["panel", "token", "expert", "num_experts_E", "topk_k", "moe_layer"])
+    with open(f"{out_dir}/{name}", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["panel", "token", "expert", "num_experts_E", "topk_k", "moe_layer"])
         for title, M, _ in panels:                    # M is [W tokens, E experts] bool
             tok, exp = np.where(M)
             for tt, ee in zip(tok.tolist(), exp.tolist()):
                 w.writerow([title.strip(), tt, ee, E, k, L])
-    print("wrote", f"{figdata}/{name}")
+    print("wrote", f"{out_dir}/{name}")
 
 
 def _draw_raster(panels, k, E, L, tag, outfile):
@@ -93,15 +100,21 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
     _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
     _draw_raster(panels, k, E, L, tag, outfile)
 
-def raster_from_csv(csv_name, outfile):
-    """Redraw a raster from its condensed CSV (no raw logs needed) — same draw path as raster()."""
+def raster_from_csv(active_params_M, outfile):
+    """Redraw a raster from the committed condensed CSV (no raw logs needed), same draw path as
+    raster(). All three models live in results/ablations/expert_selection_per_token.csv and are
+    selected on active_params_M."""
     import csv
-    figdata = OUT.replace("figures", "figure_data")
+    src = os.path.join(REPO, "results", "ablations", "expert_selection_per_token.csv")
     by_panel = {}; E = k = L = None
-    with open(f"{figdata}/{csv_name}") as f:
+    with open(src) as f:
         for r in csv.DictReader(f):
+            if int(float(r["active_params_M"])) != active_params_M:
+                continue
             E, k, L = int(r["num_experts_E"]), int(r["topk_k"]), r["moe_layer"]
             by_panel.setdefault(r["panel"], []).append((int(r["token"]), int(r["expert"])))
+    if not by_panel:
+        raise SystemExit(f"no rows with active_params_M={active_params_M} in {src}")
     W = 1 + max(tok for cells in by_panel.values() for tok, _ in cells)
     panels = []
     for title, cells in by_panel.items():              # dict preserves CSV (panel) order
@@ -120,10 +133,12 @@ def overlap(run):
     return float(np.mean(vals))
 
 def a3_scale():
-    if PAPER:   # read the committed exact series (no raw logs needed); coarse models = the plotted line
+    # Read the committed exact series whenever the raw logs are absent, not just in paper mode:
+    # the CSV path needs no torch, the overlap() path does. Coarse models = the plotted line.
+    if PAPER or not HAVE_LOGS:
         import csv
         rows = []
-        with open(f"{REPO}/results/phase0/figure_data/learned_locality_vs_scale.csv") as f:
+        with open(f"{REPO}/results/ablations/learned_locality_vs_scale.csv") as f:
             for r in csv.DictReader(f):
                 if "coarse" not in r["model"]:
                     continue
@@ -236,13 +251,16 @@ def graphs_BC():
         fig.savefig(f"{OUT}/{outname(fname)}", dpi=140); plt.close(fig); print("wrote", f"{OUT}/{outname(fname)}")
 
 if __name__ == "__main__":
-    have_logs = os.path.exists(f"{RUNS}/tmoe_minlogit_sh1_s2_1e17/router_log.pt")
-    if PAPER and not have_logs:
-        # local run without raw logs: redraw rasters + learned-locality from the committed CSVs
-        for csvf, out in [("expert_selection_per_token_8M_model.csv",  "expert_selection_per_token_8M_model.png"),
-                          ("expert_selection_per_token_15M_model.csv", "expert_selection_per_token_15M_model.png"),
-                          ("expert_selection_per_token_38M_model.csv", "expert_selection_per_token_38M_model.png")]:
-            raster_from_csv(csvf, out)
+    if not HAVE_LOGS:
+        # No raw router_log.pt here: redraw rasters + learned-locality from the committed CSVs in
+        # results/ablations/. This path needs no torch, so it works under scripts/setup.sh analysis.
+        # graphs_BC() is skipped because it genuinely requires the raw logs.
+        # (Previously gated on PAPER too, so a plain no-argument run crashed on `import torch`
+        #  instead of falling back.)
+        for mparams, out in [(8,  "expert_selection_per_token_8M_model.png"),
+                             (15, "expert_selection_per_token_15M_model.png"),
+                             (38, "expert_selection_per_token_38M_model.png")]:
+            raster_from_csv(mparams, out)
         a3_scale()
     else:
         raster("tmoe_minlogit_sh1_s2_1e17", "v16k_sweep_s2_1e17", "full MoE vs temporal, 8.1M active @ 10^17 FLOPs", "expert_selection_per_token_8M_model.png")

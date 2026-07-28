@@ -52,6 +52,57 @@ parsing.
 Everything else, including both smoke paths in `experiments/run.sh` and
 `experiments/scale_1e18_1e19/`, runs on the unpatched submodule.
 
+## Getting the artifacts
+
+The repository holds code and result tables. Checkpoints, router traces and the tokenized corpus
+live in four public Hugging Face repositories, and `results/MANIFEST.csv` maps all 1,352 files to
+their origin path, size and sha256.
+
+```bash
+scripts/setup.sh analysis                                  # CPU only, ~3 min
+. scripts/env.sh
+scripts/artifacts.py pull --glob 'ablations/*.csv'         # result tables, ~5 MiB
+scripts/artifacts.py pull --run g3_moe_s2_1e17             # one run's checkpoint + logs
+scripts/artifacts.py pull --cited --repo extras            # everything a published number needs
+scripts/artifacts.py verify                                # check what is already on disk
+```
+
+Every file is verified against its recorded sha256; a file that fails is deleted rather than left
+partial, so re-running retries only what failed. `--repo`, `--run`, `--cited`, `--glob` and
+`--max-bytes` all narrow the selection, because the full set is 214 GiB.
+
+### What the analysis-only environment can reproduce
+
+**All eleven** scripts in `analysis/plots/` run under `setup.sh analysis` with no GPU, no
+submodules, no torch and no downloads, in both default and `--no-caption` paper mode, entirely from
+the CSVs committed in `results/ablations/`.
+
+They did not always. `plot_mechinterp.py` and `plot_probe.py` read from a
+`results/phase0/figure_data/` directory that no longer exists. Every file they wanted had been
+consolidated into `results/ablations/` under a different name, and the scripts were never updated:
+
+| the script asked for | where it actually lives | selected by |
+|---|---|---|
+| `expert_selection_per_token_{8,15,38}M_model.csv` | `expert_selection_per_token.csv` | `active_params_M` in {8, 15, 38} |
+| `mechinterp_softmax_locus.csv` | `mechinterp_locus.csv` | `label` = `s0_SOFTMAX_BASELINE` |
+| `mechinterp_locus_kfull.csv` | `mechinterp_locus.csv` | `label` in {`s2_FULL`, `s0_TEMPORAL`, `s2_TEMPORAL`} |
+| `mechinterp_softmax_floors.csv` | `mechinterp_floors.csv` | `model` column, same five labels |
+| `learned_locality_vs_scale.csv`, `rsweep.csv`, `mechinterp_floors.csv` | same names in `results/ablations/` | — |
+
+Nothing needed regenerating and nothing needed downloading.
+
+`analysis/paths.py` used to export a `FIGDATA` constant naming that dead directory, which is how the
+staleness survived. It has been removed in favour of `ABLATIONS`, and `probe_replay.py` now writes
+its CSVs there too, alongside the ten of its twelve outputs that are already committed.
+
+`plot_probe.py` falls back to the committed CSVs whenever `router_log.pt` is absent, rather than
+only in paper mode, so a plain run no longer dies on `import torch`. With the raw logs present it
+still uses them, and `graphs_BC()` runs only in that case, since it genuinely needs them:
+
+```bash
+scripts/artifacts.py pull --glob 'run_captures/*/router_log.pt'   # 22 files, 4.56 GiB, needs torch
+```
+
 ## Environment contract
 
 `scripts/env.sh` is the single source of truth. Source it first from any launcher:
@@ -75,7 +126,7 @@ Every one is `${VAR:-default}`, so all of them can be overridden from the caller
 without editing a script. Nothing is tied to a checkout location.
 
 Python analysis code uses `analysis/paths.py`, which resolves `ROOT` from `$TMOE_ROOT`, then git,
-then its own location, and exposes `ROOT`, `RUNS`, `CACHE`, `FIGDATA`.
+then its own location, and exposes `ROOT`, `RUNS`, `CACHE`, `ABLATIONS`.
 
 Running from a checkout somewhere else, against data that lives elsewhere:
 
