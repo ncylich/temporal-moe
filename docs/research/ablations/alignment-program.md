@@ -2,7 +2,7 @@
 
 **Status: program COMPLETE (2026-07-03). Findings doc only — none of this is in the paper yet.**
 Plan of record: `docs/research/decision-time-alignment-plan.md` (including its wrong-directions header,
-which still binds). Raw rows: `results/phase0/figure_data/alignment_cells.csv` and
+which still binds). Raw rows: `results/ablations/alignment_cells.csv` and
 `karen_promotion_s2_1e17.csv` (pod branches); Track-B table in `comms/h100/0027-h100-result.md`.
 
 ## TL;DR

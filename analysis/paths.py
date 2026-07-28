@@ -6,16 +6,16 @@ Resolution order:
   3. this file's parent directory (analysis/../), so a plain copy still works
 
 Usage:
-    from analysis.paths import ROOT, RUNS, CACHE, FIGDATA
+    from analysis.paths import ROOT, RUNS, CACHE, ABLATIONS
 
 or, when the probe is run as a script from inside analysis/:
-    from paths import ROOT, RUNS, CACHE, FIGDATA
+    from paths import ROOT, RUNS, CACHE, ABLATIONS
 """
 
 import os
 import subprocess
 
-__all__ = ["ROOT", "RUNS", "CACHE", "FIGDATA"]
+__all__ = ["ROOT", "RUNS", "CACHE", "ABLATIONS"]
 
 
 def _root() -> str:
@@ -38,4 +38,6 @@ def _root() -> str:
 ROOT = _root()
 RUNS = os.path.join(ROOT, "results/phase0/runs")
 CACHE = os.path.join(ROOT, "results/phase0/probe_batch_cache")
-FIGDATA = os.path.join(ROOT, "results/phase0/figure_data")  # small CSVs behind every figure
+# The small CSVs behind every figure. These used to be written to results/phase0/figure_data/
+# and were later consolidated here; the old directory is gone and nothing should recreate it.
+ABLATIONS = os.path.join(ROOT, "results/ablations")

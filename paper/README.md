@@ -53,7 +53,7 @@ with the reason it exists.
   panels + *small, not tiny* dots so streaks stay distinct (dots ended at 60% of an earlier size,
   not smaller); label the top expert index (`0 / 31 / 63`), don't stop at 50; y-label "expert idx".
 - **Regenerate from real data.** Noah pushes the data so graphs can be remade directly; when raw
-  logs aren't local, redraw from the committed CSV stand-ins in `results/phase0/figure_data/`.
+  logs aren't local, redraw from the committed CSV stand-ins in `results/ablations/`.
 - **IsoFLOP standard encoding (use for every quality-vs-params graph):** color = method (dense gray,
   MoE blue, temporal green), shade = granularity (coarse normal / fine-grained dark), marker =
   compute budget (circle $10^{16}$, triangle $10^{17}$), equal line weight + opacity. One canonical

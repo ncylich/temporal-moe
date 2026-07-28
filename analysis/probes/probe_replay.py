@@ -32,17 +32,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from plot_probe import load, topk_ids, OUT, rolling, overlap, sweep, PAIRS, G3  # reuse helpers/paths
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from paths import CACHE, FIGDATA
+from paths import CACHE, ABLATIONS
 RAM_RATIO = 32.0                              # r_ram / r (SSD->RAM bandwidth ratio) for s_max budget
 
 
 def _csv(name, header, rows):
     """Write one tidy CSV of the exact series behind a figure (small; committed to the repo)."""
     import csv
-    os.makedirs(FIGDATA, exist_ok=True)
-    with open(f"{FIGDATA}/{name}", "w", newline="") as f:
+    os.makedirs(ABLATIONS, exist_ok=True)
+    with open(f"{ABLATIONS}/{name}", "w", newline="") as f:
         w = csv.writer(f); w.writerow(header); w.writerows(rows)
-    print("wrote", f"{FIGDATA}/{name}")
+    print("wrote", f"{ABLATIONS}/{name}")
 
 # ---- run registry (active non-embedding params in millions; matched full-MoE pair; grain) ----
 META = {
@@ -902,7 +902,7 @@ def _fig_e8(out):
 # =====================================================================================
 def _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
                         e5_table, e6_perlayer, e7_curves, e8_out):
-    """Write the small, tidy CSV behind every figure to results/phase0/figure_data/.
+    """Write the small, tidy CSV behind every figure to results/ablations/.
     These are the concise, committed stand-in for the (large) raw router_log.pt tensors."""
     _csv("e1_swap_rate_by_layer.csv", ["model", "layer", "mean_swap_rate", "p95_burst_len"],
          [[label(r), ln, f"{sr:.5f}", f"{p95:.2f}"] for (r, ln, sr, p95) in e1_rows])

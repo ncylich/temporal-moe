@@ -3,13 +3,17 @@
 
 Left: per-expert locus scatter -- token-only AUC (x) vs context-excluding-token AUC (y) at the
 residency-lifetime window (w = k). One point per expert, four cells:
-  full MoE 18/192 @1e16  results/phase0/figure_data/mechinterp_softmax_locus.csv (retrained
-                         softmax-aux baseline, w=18)
-  temporal 18/192 @1e16  mechinterp_locus_kfull.csv s0_TEMPORAL (w=18)
-  full MoE 6/64  @1e17   mechinterp_locus_kfull.csv s2_FULL (w=6, softmax-aux baseline)
-  temporal 6/64  @1e17   mechinterp_locus_kfull.csv s2_TEMPORAL (w=6)
-Chance floors (permutation + circular-shift nulls) all 0.500 +/- 0.002: mechinterp_floors.csv,
-mechinterp_softmax_floors.csv.
+All four cells come from results/ablations/mechinterp_locus.csv, selected on its `label` column:
+  full MoE 18/192 @1e16  label s0_SOFTMAX_BASELINE (retrained softmax-aux baseline, w=18)
+  temporal 18/192 @1e16  label s0_TEMPORAL (w=18)
+  full MoE 6/64  @1e17   label s2_FULL (w=6, softmax-aux baseline)
+  temporal 6/64  @1e17   label s2_TEMPORAL (w=6)
+Chance floors (permutation + circular-shift nulls) all 0.500 +/- 0.002:
+results/ablations/mechinterp_floors.csv, `model` column, same five labels.
+
+These were once separate files under results/phase0/figure_data/ (mechinterp_softmax_locus.csv,
+mechinterp_locus_kfull.csv, mechinterp_softmax_floors.csv). They were consolidated into the two
+files above and that directory no longer exists.
 
 Right: residency dose -- held-out BPB vs cache size R at fixed FLOPs (192E, k=18, 1e16), from
 rsweep.csv; R=192 endpoint is the retrained softmax baseline (seed 1234, definitive 1.4519).
@@ -26,7 +30,7 @@ import matplotlib.pyplot as plt
 
 PAPER = "--no-caption" in sys.argv
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DATA = os.path.join(REPO, "results", "phase0", "figure_data")
+DATA = os.path.join(REPO, "results", "ablations")
 OUT = os.path.join(REPO, "results", "phase0", "figures")
 
 if PAPER:
@@ -48,10 +52,10 @@ def read(name, label):
 
 # ---------------- left: locus scatter ----------------
 SERIES = [  # (points, color, label)
-    (read("mechinterp_softmax_locus.csv", "s0_SOFTMAX_BASELINE"), "#0d3b66", "full MoE 18/192"),
-    (read("mechinterp_locus_kfull.csv", "s2_FULL"), "#5aa0dd", "full MoE 6/64"),
-    (read("mechinterp_locus_kfull.csv", "s0_TEMPORAL"), "#145a14", "temporal 18/192"),
-    (read("mechinterp_locus_kfull.csv", "s2_TEMPORAL"), "#5cc85c", "temporal 6/64"),
+    (read("mechinterp_locus.csv", "s0_SOFTMAX_BASELINE"), "#0d3b66", "full MoE 18/192"),
+    (read("mechinterp_locus.csv", "s2_FULL"), "#5aa0dd", "full MoE 6/64"),
+    (read("mechinterp_locus.csv", "s0_TEMPORAL"), "#145a14", "temporal 18/192"),
+    (read("mechinterp_locus.csv", "s2_TEMPORAL"), "#5cc85c", "temporal 6/64"),
 ]
 fig, ax = plt.subplots(figsize=(4.5, 4.15) if PAPER else (7.2, 6.6))
 lo, hi = 0.35, 1.0
