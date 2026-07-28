@@ -1,0 +1,12 @@
+# O-series closing: UNWINDOWED (full-4096, single realistic cold-fill) BPB pair, C=32 exact solver, 8 packs, D=3.1089.
+# Removes the windowing asterisk. NOTE: 8 packs (noisier than the 256-pack evals); greedy vs MinFlow is PAIRED (same packs).
+# Compare to the WINDOWED pair (olmoe_minflow_bpb.csv, 16 cold-fills/seq): greedy 2.2953 / MinFlow_m1 2.2881, gap -0.0072.
+schedule,BPB,delta_vs_greedy
+free_top8,0.6850,
+greedy,2.2872,+0.0000
+minflow_m1,2.2522,-0.0350
+# FINDING: at FULL sequence (1 cold-fill), MinFlow m=1 beats greedy by 0.0350 BPB — ~5x the windowed 0.0072.
+# The windowing (frequent free cold-fills) reset both policies and UNDERSTATED the scheduling headroom.
+# So the paper claim needs care: greedy is NOT within ~1sigma of the hindsight-optimal <=1-swap schedule at full
+# sequence; the oracle is ~0.035 BPB better. Still tiny vs the weight-side recovery (CE closes 2.078->0.14),
+# so scheduling is a minor lever (~1.7% of the impose gap), but not the ~0 the windowed check implied.

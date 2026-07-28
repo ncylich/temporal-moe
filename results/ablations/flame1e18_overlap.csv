@@ -1,0 +1,16 @@
+# Overlap-arch 1e18-g3 promotion cells (orch 0150/0160). V1 early-router only (V2 failed the 1e17 gate).
+# Exact flame38m 1e18 config: GRAIN=3 (192 exp/top-18), H256/L9 (moe-layer-freq [0]*1+[1]*8 = 8 MoE layers),
+# gb1024/mb32/2121it/seed1234/WSD, pythia-50k. BPB = test_CE / 2.9780, LOWER better.
+# Standard-arch 1e18-g3 comparators (seed1234): temporal 1.3354 (CE 3.976762), moe 1.3461 (CE 4.008667).
+# FLAG: the 1e17-s2 (L=6, 5 MoE layers) screen predicted early-router tax +0.0036 (temporal); the 1e18-flame38m
+# (L=9, 8 MoE layers) MEASUREMENT is far larger -> the screen did NOT transfer across depth. moe cell pending.
+variant,cell,method,test_ce_nats,test_bpb,std_bpb,delta,screen_predicted
+v1_early_router,flame38m_g3_temporal_ovlEarly,temporal,4.108881,1.3798,1.3354,+0.0444,+0.0036
+v1_early_router,flame38m_g3_moe_ovlEarly,moe,4.456250,1.4964,1.3461,+0.1503,+0.0004
+# VERDICT: V1 early-router FAILS at 1e18 depth on BOTH legs, far beyond the 1e17 screen's prediction.
+#   temporal +0.0444 (screen said +0.0036, 12x)   moe +0.1503 (screen said +0.0004, 375x)
+# The MoE leg is now WORSE THAN THE DENSE FLOOR (1.4964 vs 1.3911). Clean converged runs (no nan/skips).
+# => this is a DEPTH effect, not temporal-specific: the 1e17 screen was s2 (L=6, 5 MoE layers), the 1e18
+#    cell is flame38m (L=9, 8 MoE layers); pre-attention routing degrades compound per MoE layer, and the
+#    free-MoE leg (which re-routes every layer with no residency smoothing) is hurt worst.
+# => the screen->promotion protocol must screen AT THE DEPLOYMENT DEPTH. V1 should not have promoted.
