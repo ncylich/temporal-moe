@@ -52,6 +52,46 @@ parsing.
 Everything else, including both smoke paths in `experiments/run.sh` and
 `experiments/scale_1e18_1e19/`, runs on the unpatched submodule.
 
+## Getting the artifacts
+
+The repository holds code and result tables. Checkpoints, router traces and the tokenized corpus
+live in four public Hugging Face repositories, and `results/MANIFEST.csv` maps all 1,352 files to
+their origin path, size and sha256.
+
+```bash
+scripts/setup.sh analysis                                  # CPU only, ~3 min
+. scripts/env.sh
+scripts/artifacts.py pull --glob 'ablations/*.csv'         # result tables, ~5 MiB
+scripts/artifacts.py pull --run g3_moe_s2_1e17             # one run's checkpoint + logs
+scripts/artifacts.py pull --cited --repo extras            # everything a published number needs
+scripts/artifacts.py verify                                # check what is already on disk
+```
+
+Every file is verified against its recorded sha256; a file that fails is deleted rather than left
+partial, so re-running retries only what failed. `--repo`, `--run`, `--cited`, `--glob` and
+`--max-bytes` all narrow the selection, because the full set is 214 GiB.
+
+### What the analysis-only environment can reproduce
+
+Nine of the eleven scripts in `analysis/plots/` run under `setup.sh analysis` with no GPU, no
+submodules and no torch, producing 42 figures from the CSVs committed in `results/ablations/`.
+
+Two cannot, and both fail for the same reason: they read `results/phase0/figure_data/*.csv`, which
+is **not committed, not published, and not present on the machine the runs were produced on**.
+
+- `plot_mechinterp.py`
+- `plot_probe.py` (including its `--no-caption` paper mode)
+
+Those CSVs are a regenerable intermediate, not lost data. `analysis/probes/probe_replay.py` writes
+them, from the per-run `router_log.pt` tensors, which **are** published (22 files, 4.56 GiB, in
+`temporal-moe-extras` under `run_captures/`). Regenerating them is CPU-only but needs torch, so it
+does not fit the analysis path:
+
+```bash
+scripts/artifacts.py pull --glob 'run_captures/*/router_log.pt'
+$PY analysis/probes/probe_replay.py      # writes results/phase0/figure_data/
+```
+
 ## Environment contract
 
 `scripts/env.sh` is the single source of truth. Source it first from any launcher:
