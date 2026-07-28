@@ -15,7 +15,8 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"   # fork-safe; parallelism comes from NPROC
 os.environ.setdefault("RAYON_NUM_THREADS", "2")
 
-ROOT = "/workspace/FLAME-MoE"
+ROOT = os.environ.get("TMOE_ROOT") or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, f"{ROOT}/Megatron-LM")
 # PARTS_GLOB may contain multiple whitespace-separated glob patterns.
 _pat = os.environ.get("PARTS_GLOB", f"{ROOT}/data/dclm_parts/part*.jsonl")

@@ -6,16 +6,18 @@ import json, glob, os
 from tokenizers import ByteLevelBPETokenizer
 from transformers import PreTrainedTokenizerFast
 
+ROOT = os.environ.get("TMOE_ROOT") or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", ".."))
 VOCAB = 16000
-OUT = "/workspace/FLAME-MoE/data/tok16k"
-SAMPLE_TXT = "/workspace/FLAME-MoE/data/tok16k_sample.txt"
+OUT = f"{ROOT}/data/tok16k"
+SAMPLE_TXT = f"{ROOT}/data/tok16k_sample.txt"
 os.makedirs(OUT, exist_ok=True)
 
 # Build a text sample (~part00 + part01 = ~500k docs, plenty for a 16k BPE).
 if not os.path.exists(SAMPLE_TXT):
     n = 0
     with open(SAMPLE_TXT, "w") as out:
-        for pf in sorted(glob.glob("/workspace/FLAME-MoE/data/dclm_parts/part0[0-1].jsonl")):
+        for pf in sorted(glob.glob(f"{ROOT}/data/dclm_parts/part0[0-1].jsonl")):
             for line in open(pf):
                 try:
                     t = json.loads(line).get("text")

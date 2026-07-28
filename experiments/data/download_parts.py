@@ -16,7 +16,8 @@ REPO = "mlfoundations/dclm-baseline-1.0-parquet"
 PREFIX = ("filtered/OH_eli5_vs_rw_v2_bigram_200k_train/"
           "fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/"
           "global-shard_01_of_10/local-shard_0_of_10/")
-ROOT = "/workspace/FLAME-MoE"
+ROOT = os.environ.get("TMOE_ROOT") or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", ".."))
 PARTS_DIR = f"{ROOT}/data/dclm_parts"
 RAW_DIR = f"{ROOT}/data/dclm_raw"
 
