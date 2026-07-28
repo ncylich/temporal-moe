@@ -3,6 +3,30 @@
 The versions every published number in this repository was produced on, plus the contract the
 scripts use to find things. Recorded so a rerun can reproduce the toolchain, not just the code.
 
+## First-time setup, required
+
+A fresh clone cannot train. All four vendored dependencies are git submodules and are **empty**
+until initialised, so `experiments/run.sh` builds its arguments correctly and then dies at
+`torchrun` with `can't open file '.../Megatron-LM/pretrain_gpt.py'`. This is the single biggest gap
+between "cloned" and "working".
+
+```bash
+git submodule update --init --recursive
+```
+
+| submodule | pinned commit | upstream |
+|---|---|---|
+| `Megatron-LM` | `cbaf684` | `github.com/yuzc19/Megatron-LM`, branch `multi-nodes` |
+| `TransformerEngine` | `fc03478` | `github.com/NVIDIA/TransformerEngine`, branch `release_v1.11` |
+| `apex` | `c02c6c8` | `github.com/NVIDIA/apex` |
+| `lm-evaluation-harness` | `0c8c0d8` | `github.com/yuzc19/lm-evaluation-harness`, branch `megatron` |
+
+The `TransformerEngine` pin `fc03478` is the same build hash recorded in the installed version
+string, `1.11.0+fc034785`, so the submodule and the pinned wheel agree.
+
+Analysis and probe scripts that only read checkpoints still need `Megatron-LM` present, because the
+distributed-checkpoint metadata pickle references megatron classes. See `analysis/probes/ckpt_read.py`.
+
 ## Environment contract
 
 `scripts/env.sh` is the single source of truth. Source it first from any launcher:
