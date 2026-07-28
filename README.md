@@ -138,6 +138,29 @@ The Android harness defaults to the handset it was developed on. Set `ANDROID_SE
 your own device. `HW_MAX` in `androidbench/bench.py` holds per-core clock ratings for that
 handset and needs updating for other hardware.
 
+## Contributing
+
+Work happens on a branch and lands through a pull request. Nothing is committed to `main`
+directly, including small fixes and documentation.
+
+```bash
+git switch -c <topic>          # branch off main
+git push -u origin <topic>     # then open a PR against main
+```
+
+One setup step per clone, before the first commit:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+That enables `.githooks/commit-msg`, which rejects any message naming an AI assistant or
+vendor. Git will not run hooks out of a tracked directory without being told to, so the
+config line is required in every clone — a fresh checkout, or a remote GPU pod. History
+here was scrubbed of those references once already, and a force-push cannot undo the
+attribution once a commit carrying one has been pushed: the commit stays reachable by SHA
+and keeps counting.
+
 ## Credit
 
 Built on [FLAME-MoE](https://github.com/cmu-flame/FLAME-MoE)

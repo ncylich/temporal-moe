@@ -1,0 +1,30 @@
+#!/bin/sh
+# Reject commit messages that name an AI assistant or vendor.
+# This repo is public and its history was deliberately scrubbed of such references;
+# agent tooling adds a Co-Authored-By trailer by default, so this enforces rather
+# than relies on the rule being remembered.
+#
+# Tracked, so every clone has the file. Git will not run hooks out of a tracked
+# directory on its own — each clone opts in once:
+#
+#     git config core.hooksPath .githooks
+#
+# Bypass for a one-off with:  git commit --no-verify
+
+msg_file="$1"
+
+# Strip comment lines git adds to the template before matching.
+payload=$(grep -v '^#' "$msg_file")
+
+if printf '%s' "$payload" | grep -qiE 'claude|anthropic|copilot|chatgpt|openai'; then
+    echo "commit-msg: rejected — the message names an AI assistant or vendor." >&2
+    echo >&2
+    printf '%s' "$payload" | grep -inE 'claude|anthropic|copilot|chatgpt|openai' \
+        | sed 's/^/    /' >&2
+    echo >&2
+    echo "  This repo is public and its history was scrubbed of these references." >&2
+    echo "  Remove the line (usually a Co-Authored-By trailer) and commit again." >&2
+    exit 1
+fi
+
+exit 0
