@@ -1,0 +1,83 @@
+diff --git a/lm_eval/tasks/hellaswag/hellaswag.yaml b/lm_eval/tasks/hellaswag/hellaswag.yaml
+index c0735bbd..be2d94bf 100644
+--- a/lm_eval/tasks/hellaswag/hellaswag.yaml
++++ b/lm_eval/tasks/hellaswag/hellaswag.yaml
+@@ -1,7 +1,7 @@
+ tag:
+   - multiple_choice
+ task: hellaswag
+-dataset_path: hellaswag
++dataset_path: Rowan/hellaswag
+ dataset_name: null
+ output_type: multiple_choice
+ training_split: train
+diff --git a/lm_eval/tasks/openbookqa/openbookqa.yaml b/lm_eval/tasks/openbookqa/openbookqa.yaml
+index bdfcd196..f0ea5d5e 100644
+--- a/lm_eval/tasks/openbookqa/openbookqa.yaml
++++ b/lm_eval/tasks/openbookqa/openbookqa.yaml
+@@ -1,5 +1,5 @@
+ task: openbookqa
+-dataset_path: openbookqa
++dataset_path: allenai/openbookqa
+ dataset_name: main
+ output_type: multiple_choice
+ training_split: train
+diff --git a/lm_eval/tasks/piqa/piqa.yaml b/lm_eval/tasks/piqa/piqa.yaml
+index 1a34cc66..030d9e19 100644
+--- a/lm_eval/tasks/piqa/piqa.yaml
++++ b/lm_eval/tasks/piqa/piqa.yaml
+@@ -1,5 +1,5 @@
+ task: piqa
+-dataset_path: piqa
++dataset_path: ybisk/piqa
+ dataset_name: null
+ output_type: multiple_choice
+ training_split: train
+diff --git a/lm_eval/tasks/sciq/sciq.yaml b/lm_eval/tasks/sciq/sciq.yaml
+index 926d66b1..141059e4 100644
+--- a/lm_eval/tasks/sciq/sciq.yaml
++++ b/lm_eval/tasks/sciq/sciq.yaml
+@@ -1,5 +1,5 @@
+ task: sciq
+-dataset_path: sciq
++dataset_path: allenai/sciq
+ dataset_name: null
+ output_type: multiple_choice
+ training_split: train
+diff --git a/lm_eval/tasks/super_glue/boolq/default.yaml b/lm_eval/tasks/super_glue/boolq/default.yaml
+index 1123761d..0eaec518 100644
+--- a/lm_eval/tasks/super_glue/boolq/default.yaml
++++ b/lm_eval/tasks/super_glue/boolq/default.yaml
+@@ -1,7 +1,7 @@
+ tag:
+   - super-glue-lm-eval-v1
+ task: boolq
+-dataset_path: super_glue
++dataset_path: aps/super_glue
+ dataset_name: boolq
+ output_type: multiple_choice
+ training_split: train
+diff --git a/lm_eval/tasks/super_glue/copa/default.yaml b/lm_eval/tasks/super_glue/copa/default.yaml
+index 9e2d1a2f..fff4312a 100644
+--- a/lm_eval/tasks/super_glue/copa/default.yaml
++++ b/lm_eval/tasks/super_glue/copa/default.yaml
+@@ -1,7 +1,7 @@
+ tag:
+   - super-glue-lm-eval-v1
+ task: copa
+-dataset_path: super_glue
++dataset_path: aps/super_glue
+ dataset_name: copa
+ output_type: multiple_choice
+ training_split: train
+diff --git a/lm_eval/tasks/winogrande/default.yaml b/lm_eval/tasks/winogrande/default.yaml
+index 12e0077a..4c4500f5 100644
+--- a/lm_eval/tasks/winogrande/default.yaml
++++ b/lm_eval/tasks/winogrande/default.yaml
+@@ -1,5 +1,5 @@
+ task: winogrande
+-dataset_path: winogrande
++dataset_path: allenai/winogrande
+ dataset_name: winogrande_xl
+ output_type: multiple_choice
+ training_split: train

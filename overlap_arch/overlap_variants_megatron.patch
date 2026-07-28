@@ -1,0 +1,123 @@
+diff --git a/megatron/core/transformer/moe/moe_layer.py b/megatron/core/transformer/moe/moe_layer.py
+index b062d3dc..e999b381 100644
+--- a/megatron/core/transformer/moe/moe_layer.py
++++ b/megatron/core/transformer/moe/moe_layer.py
+@@ -121,7 +121,7 @@ class MoELayer(BaseMoELayer):
+             if self.shared_expert_overlap:
+                 self.token_dispatcher.set_shared_experts(self.shared_experts)
+ 
+-    def forward(self, hidden_states: torch.Tensor):
++    def forward(self, hidden_states: torch.Tensor, router_hidden_states: torch.Tensor = None):
+         if (
+             self.training
+             and self.config.tensor_model_parallel_size > 1
+@@ -132,9 +132,14 @@ class MoELayer(BaseMoELayer):
+                 "are enabled without also enabling sequence parallelism."
+             )
+ 
++        # overlap V1 (early-router): route on a DIFFERENT tensor than the expert input. When
++        # router_hidden_states is None this is byte-identical to baseline (router sees hidden_states).
++        if router_hidden_states is None:
++            router_hidden_states = hidden_states
++
+         # process MoE
+-        def custom_forward(hidden_states):
+-            probs, routing_map = self.router(hidden_states)
++        def custom_forward(hidden_states, router_hidden_states):
++            probs, routing_map = self.router(router_hidden_states)
+ 
+             # capture the activated expert ids
+             if not self.training and self.config.test_mode:
+@@ -158,8 +163,10 @@ class MoELayer(BaseMoELayer):
+             return output, mlp_bias
+ 
+         if self.moe_layer_recompute:
+-            output, mlp_bias = tensor_parallel.checkpoint(custom_forward, False, hidden_states)
++            output, mlp_bias = tensor_parallel.checkpoint(
++                custom_forward, False, hidden_states, router_hidden_states
++            )
+         else:
+-            output, mlp_bias = custom_forward(hidden_states)
++            output, mlp_bias = custom_forward(hidden_states, router_hidden_states)
+ 
+         return output, mlp_bias
+diff --git a/megatron/core/transformer/transformer_config.py b/megatron/core/transformer/transformer_config.py
+index 27b4e035..95c41086 100644
+--- a/megatron/core/transformer/transformer_config.py
++++ b/megatron/core/transformer/transformer_config.py
+@@ -347,6 +347,19 @@ class TransformerConfig(ModelParallelConfig):
+     GEMM feature introduced since CUTLASS 2.8 (https://github.com/fanshiqing/grouped_gemm).
+     """
+ 
++    overlap_early_router: bool = False
++    """Overlap-friendly V1 (MoE layers only): compute the MoE router logits from the PRE-attention
++    normalized hidden state (input_layernorm output) instead of the post-attention pre_mlp_layernorm
++    output; experts still process the post-attention stream. Moves the routing decision one sublayer
++    earlier so expert streaming can overlap the attention-compute window. OFF == baseline exactly.
++    """
++
++    overlap_parallel_ffn: bool = False
++    """Overlap-friendly V2 (MoE layers only): PaLM/GPT-J parallel block y = x + Attn(LN1(x)) + MoE(LN2(x)).
++    The MoE branch (and its router) reads the pre-attention layer input x rather than the post-attention
++    hidden state. OFF == baseline exactly.
++    """
++
+     moe_use_legacy_grouped_gemm: bool = False
+     """Use legacy GroupedMLP rather than TEGroupedMLP.
+     Note: The legacy one will be deprecated soon."""
+diff --git a/megatron/core/transformer/transformer_layer.py b/megatron/core/transformer/transformer_layer.py
+index f08605de..8b5595a2 100644
+--- a/megatron/core/transformer/transformer_layer.py
++++ b/megatron/core/transformer/transformer_layer.py
+@@ -382,6 +382,9 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
+ 
+         # Residual connection.
+         residual = hidden_states
++        # V2 (overlap_parallel_ffn): remember the PRE-attention layer input x; the MoE/LN2 branch
++        # reads it so the block computes y = x + Attn(LN1(x)) + MoE(LN2(x)). (No-op reference otherwise.)
++        overlap_layer_input = hidden_states
+ 
+         # Optional Input Layer norm
+         input_layernorm_output = self.input_layernorm(hidden_states)
+@@ -434,10 +437,24 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
+         residual = hidden_states
+ 
+         # Optional Layer norm post the cross-attention.
+-        pre_mlp_layernorm_output = self.pre_mlp_layernorm(hidden_states)
++        # V2 (overlap_parallel_ffn): feed the MoE/LN2 the PRE-attention layer input x instead of the
++        # post-attention hidden state, giving the parallel block y = x + Attn(LN1(x)) + MoE(LN2(x)).
++        # The residual for the MoE add below stays the post-attention stream. OFF -> baseline exactly.
++        pre_mlp_ln_input = (
++            overlap_layer_input if self.config.overlap_parallel_ffn else hidden_states
++        )
++        pre_mlp_layernorm_output = self.pre_mlp_layernorm(pre_mlp_ln_input)
+ 
+         # MLP.
+-        mlp_output_with_bias = self.mlp(pre_mlp_layernorm_output)
++        # V1 (overlap_early_router): route the MoE on the PRE-attention normalized state LN1(x)
++        # (input_layernorm_output) while experts still process the post-attention pre_mlp_layernorm
++        # output. Guarded to MoE layers (self.mlp has a router); OFF / dense layer-0 -> baseline exactly.
++        if self.config.overlap_early_router and hasattr(self.mlp, "router"):
++            mlp_output_with_bias = self.mlp(
++                pre_mlp_layernorm_output, router_hidden_states=input_layernorm_output
++            )
++        else:
++            mlp_output_with_bias = self.mlp(pre_mlp_layernorm_output)
+ 
+         # TODO: could we move `bias_dropout_add_exec_handler` itself
+         # inside the module provided in the `bias_dropout_add_spec` module?
+diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
+index 51901dd0..9fd9bce7 100644
+--- a/megatron/training/arguments.py
++++ b/megatron/training/arguments.py
+@@ -2283,6 +2283,10 @@ def _add_moe_args(parser):
+                        'Only effective when moe-shared-expert-intermediate-size is set.')
+     group.add_argument('--moe-grouped-gemm', action='store_true',
+                        help='When there are multiple experts per rank, launch multiple local GEMM kernels in multiple streams to improve the utilization and performance with GroupedLinear in TransformerEngine.')
++    group.add_argument('--overlap-early-router', action='store_true',
++                       help='Overlap-friendly V1 (MoE layers only): route on the PRE-attention normalized hidden state (input_layernorm output); experts still process the post-attention stream. OFF == baseline.')
++    group.add_argument('--overlap-parallel-ffn', action='store_true',
++                       help='Overlap-friendly V2 (MoE layers only): PaLM/GPT-J parallel block y = x + Attn(LN1(x)) + MoE(LN2(x)); MoE branch reads the pre-attention layer input. OFF == baseline.')
+     # Router arguments
+     group.add_argument('--moe-router-load-balancing-type', type=str,
+                        choices=['aux_loss', 'seq_aux_loss', 'sinkhorn', 'none'],

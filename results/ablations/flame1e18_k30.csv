@@ -1,0 +1,10 @@
+# FLAME K=30 super-fine 1e18 cell (orch 0141/0143): GRAIN=5 = 320 experts, top-30, routed moe_ffn=36, SHARED_INT=352 (stock).
+# H256/L9, gb1024, mb32, 2121 iters, seed1234, WSD 3e-4->3e-5, pythia-50k. Divisor 2.9780 (CE nats -> BPB). Lower BPB better.
+# Panel (test BPB) for context: temporal G1(64/6)~1.312, temporal G3(192/18)~1.334; moe G1~1.316, G3~1.348; dense floor 1.3911.
+# NOTE: orch 0141 cited "temporal-coarse midpoint ~1.3911" but 1.3911 is the DENSE floor (flame38m_dense_local); temporal-coarse G1 3-seed mean is ~1.312.
+run,method,grain,experts,topk,shared_int,seed,test_ce_nats,test_bpb,note
+flame38m_g5_temporal,temporal,5,320,30,352,1234,4.017667,1.3491,K=30 native rolling residency R=k=30; single-variable vs panel (GRAIN only)
+flame38m_g5_moe,moe,5,320,30,352,1234,4.057665,1.3625,K=30 full-MoE free top-30 reference
+# SUMMARY: at K=30/G5, temporal 1.3491 < moe 1.3625 (temporal better by 0.0134). Fine-graining ladder (test BPB):
+#   temporal G1 1.312 -> G3 1.334 -> G5 1.349 (+0.037);  moe G1 1.316 -> G3 1.348 -> G5 1.3625 (+0.047).
+#   Fine-graining monotonically hurts both, hurts MoE MORE; temporal's advantage widens then holds. Both beat dense floor 1.3911.

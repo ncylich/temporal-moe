@@ -1,0 +1,15 @@
+# Overlap-arch 1e17-g3-s2 SCREENS (orch 0150 step 3). Standard g3-s2-1e17 config (16k G3-era corpus,
+# cosine, gb256/mb64/lr3e-3/3861it/seed1234, GRAIN=3=192exp/top18/moe_ffn58/shared352, CE_FUSION).
+# BPB = test_CE_nats / 2.7600 (byte-derived, 3.9819 bytes/tok; the G3-era 16k corpus divisor, NOT the
+# original-bpe-16k 2.7568). LOWER better. Standard-arch comparators (same corpus/divisor): temporal 1.2873, moe 1.2708.
+# GATE (0150 step4): variant promotes iff temporal_BPB <= 1.2873+0.005=1.2923 AND moe_BPB <= 1.2708+0.010=1.2808.
+# UNTESTED/NOT-BUILT variant (per orch 0155): V1 could alternatively route on LN2(x) (same norm as experts, isolates
+# earliness from the norm) instead of LN1(x); not implemented - V2 already spans the LN2(x)-reading axis.
+variant,cell,method,test_ce_nats,test_bpb,std_bpb,delta,bar,gate
+v1_early_router,g3_tmoe_s2_1e17_ovlEarly,temporal,3.562969,1.2909,1.2873,+0.0036,0.005,PASS
+v1_early_router,g3_moe_s2_1e17_ovlEarly,moe,3.508395,1.2712,1.2708,+0.0004,0.010,PASS
+v2_parallel_ffn,g3_tmoe_s2_1e17_ovlParFFN,temporal,3.625855,1.3137,1.2873,+0.0264,0.005,FAIL
+v2_parallel_ffn,g3_moe_s2_1e17_ovlParFFN,moe,3.560735,1.2901,1.2708,+0.0193,0.010,FAIL
+# VERDICT: V1 early-router PROMOTES (temporal +0.0036<=0.005 AND moe +0.0004<=0.010) -> 1e18-g3.
+#          V2 parallel-ffn FAILS both (temporal +0.0264, moe +0.0193). Routing one sublayer earlier is
+#          nearly free; the full PaLM-parallel restructure costs too much quality at this budget.
