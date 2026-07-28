@@ -357,9 +357,9 @@ A real memory reduction on this hardware requires an SSD cold tier — explicitl
 
 ```bash
 cd mlx-bench
-.venv/bin/python tests/g0_probes.py          # physics + elision audit
-.venv/bin/python tests/g2_exactness.py       # bitwise gates
-.venv/bin/python bench_decode.py --model-dir models/qwen3moe-rand-fine-q4 \
+$PY tests/g0_probes.py          # physics + elision audit
+$PY tests/g2_exactness.py       # bitwise gates
+$PY bench_decode.py --model-dir models/qwen3moe-rand-fine-q4 \
   --setup floor_n=16 --cooldown 10 --csv results/serving_benchmarks_mac.csv
 ```
 Models regenerate deterministically (seed 0) via `gen_random_qwen3moe_mlx.py`.

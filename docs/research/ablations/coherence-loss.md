@@ -35,7 +35,7 @@ hit-rate).
     z-loss / load-balancing aux loss) and logs `coherence_loss` to the aux-loss tracker.
 - `temporal/tests/test_ablation_mechanisms.py` — 6 CPU unit tests (alignment→0, anti-alignment large,
   gradient sign = retention direction, target-detachment vs analytic gradient, retention lowers
-  loss). Run: `.venv/bin/python -m pytest temporal/tests/test_ablation_mechanisms.py`.
+  loss). Run: `$PY -m pytest temporal/tests/test_ablation_mechanisms.py`.
 
 **Env knob** (no `run.sh` change needed — read from the environment):
 - `TEMPORAL_COHERENCE_LAMBDA` (default `0` = off) — loss weight.
@@ -98,7 +98,7 @@ go lower (0.005, 0.01); interior best → refine around it.
 
 Common env:
 ```bash
-export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full
+export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7600 GRAIN=3 MICRO_BATCH=64 EVAL_AT_END=1
 export TEMPORAL=1 TEMPORAL_EVICT=min_logit PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ```

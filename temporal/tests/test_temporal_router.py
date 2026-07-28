@@ -3,7 +3,7 @@
 
 Pure-function tests for `compute_resident_mask` (+ the GPU accel scan, the tau/ema_beta trigger
 knobs, and the residency-set-size R knob) — no Megatron, GPU only where marked, CPU torch otherwise.
-Run: .venv/bin/python -m pytest temporal/tests/test_temporal_router.py
+Run: $PY -m pytest temporal/tests/test_temporal_router.py
 
 Experimental (default-off, negative-result) scoring/loss knobs are tested separately in
 test_ablation_mechanisms.py.
