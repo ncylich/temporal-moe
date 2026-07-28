@@ -66,5 +66,17 @@ if [ -n "$NV" ]; then
 fi
 
 # Megatron builds datasets/helpers_cpp with `make` calling bare python3/python3-config,
-# so the chosen interpreter has to come first on PATH for pybind11 includes to resolve.
+# so the chosen interpreter has to come first on PATH.
 export PATH="$(dirname "$PY"):$PATH"
+
+# That Makefile also needs the pybind11 headers, and PATH ordering alone does not supply them:
+# pybind11 is a pip package, so its include dir has to be on the compiler search path explicitly.
+# Derived at runtime for the same reason $NV is, rather than hardcoded to one site-packages path.
+if [ -z "${TMOE_NO_PYBIND_INCLUDE:-}" ]; then
+    _pb=$("$PY" -c 'import pybind11; print(pybind11.get_include())' 2>/dev/null) || _pb=""
+    if [ -n "$_pb" ]; then
+        export CPLUS_INCLUDE_PATH="$_pb:${CPLUS_INCLUDE_PATH:-}"
+        export C_INCLUDE_PATH="$_pb:${C_INCLUDE_PATH:-}"
+    fi
+    unset _pb
+fi

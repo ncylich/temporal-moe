@@ -66,6 +66,34 @@ PY
     printf "    nvcc   : %s\n" "$(command -v nvcc >/dev/null && nvcc --version | tail -2 | head -1 || echo 'not found')"
     printf "    driver : %s\n" "$(command -v nvidia-smi >/dev/null && nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 || echo 'no nvidia-smi')"
     printf "    python : %s\n" "$($PY -V 2>&1)"
+    # Pure-python runtime deps Megatron imports. Installed under a torch constraint so a
+    # resolver can never swap the pinned build out from under the driver. Every one of these was
+    # a separate hard failure on a fresh clone: regex (tokenizer import), pybind11 (the runtime
+    # helpers_cpp compile), the rest on first use.
+    echo
+    echo "  installing Megatron's pure-python runtime deps (torch pinned, never upgraded)"
+    printf 'torch==%s\n' "$("$PY" -c 'import torch;print(torch.__version__.split("+")[0])' 2>/dev/null || echo 2.4.1)" > "$ROOT/.torch-constraint.txt"
+    "$PY" -m pip install -q --constraint "$ROOT/.torch-constraint.txt" \
+        regex sentencepiece transformers tokenizers einops nltk tiktoken pybind11 || {
+        echo "  WARNING: dependency install failed, training will not start"; }
+    "$PY" -c 'import torch; print("    torch after install:", torch.__version__)'
+
+    # Megatron compiles megatron/core/datasets/helpers_cpp at first run with a Makefile that
+    # shells out to a bare `python3-config`. `python3 -m venv` does not provide one (virtualenv
+    # does), so the compile fails with "make: python3-config: No such file or directory" and then
+    # ModuleNotFoundError. Link the versioned one when it is missing.
+    _pycfg_dir=$(dirname "$PY")
+    if [ ! -e "$_pycfg_dir/python3-config" ]; then
+        _real=$(command -v python3.11-config || command -v python3-config || true)
+        if [ -n "$_real" ]; then
+            ln -sf "$_real" "$_pycfg_dir/python3-config"
+            echo "    linked python3-config -> $_real"
+        else
+            echo "    WARNING: no python3-config found; install python3.11-dev or helpers_cpp will not build"
+        fi
+    fi
+    unset _pycfg_dir _real
+
     echo
     echo "  NOT DONE by this script, on purpose:"
     echo "    requirements.lock.txt is a record of a working environment, not an install target."
