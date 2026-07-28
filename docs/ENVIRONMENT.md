@@ -27,6 +27,47 @@ string, `1.11.0+fc034785`, so the submodule and the pinned wheel agree.
 Analysis and probe scripts that only read checkpoints still need `Megatron-LM` present, because the
 distributed-checkpoint metadata pickle references megatron classes. See `analysis/probes/ckpt_read.py`.
 
+### Getting from a fresh clone to a training step
+
+Validated end to end on a clean checkout. `scripts/setup.sh train` now does the dependency work,
+but the two source builds are still yours to run and they are the slow part.
+
+```bash
+git submodule update --init --recursive        # 200 s, 2.1 GiB
+python3 -m venv --system-site-packages .venv   # reuses the pinned system torch, no 2.5 GB download
+scripts/setup.sh train                         # submodules + runtime deps + python3-config shim
+# TransformerEngine, from source, against the pinned torch:
+CUDA_HOME=/usr/local/cuda NVTE_FRAMEWORK=pytorch MAX_JOBS=$(nproc) \
+  .venv/bin/pip install --no-build-isolation ./TransformerEngine     # 2617 s / 43.6 min
+# apex, with the CUDA extensions Megatron uses:
+CUDA_HOME=/usr/local/cuda MAX_JOBS=32 .venv/bin/pip install --no-build-isolation \
+  --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" \
+  ./apex                                                             # 1094 s / 18.2 min
+```
+
+Measured on one H100 80GB, driver 580.126.09, nvcc 12.4 V12.4.131, torch 2.4.1+cu124. The TE build
+produced `1.11.0+fc034785`, an exact match for `requirements.lock.txt`.
+
+Two things to know:
+
+- **`apex` is not in `requirements.lock.txt`.** It builds and is required, but `pip freeze` records
+  it as version `0.1` and it was omitted. The lockfile is not a complete record of the environment.
+- **`git submodule status` is worth reading after the init.** A leading `+` means a submodule is not
+  at its pinned commit. One observed instance left `lm-evaluation-harness` on `main` instead of its
+  pin; a second `git submodule update` corrected it. Not reproducible in isolation, so check rather
+  than assume.
+
+If training fails at startup, the causes are almost always in this list, all of which
+`scripts/setup.sh train` now handles:
+
+| symptom | cause |
+|---|---|
+| `.../torchrun: No such file or directory` | torch not installed into `$PY`'s prefix; launchers use `"$PY" -m torch.distributed.run` |
+| `No module named 'regex'` | Megatron tokenizer dependency |
+| `pybind11/pybind11.h: No such file or directory` | pybind11 include not on `CPLUS_INCLUDE_PATH`; `env.sh` derives it |
+| `make: python3-config: No such file or directory` | `python3 -m venv` ships no shim, unlike `virtualenv` |
+| `No module named 'megatron.core.datasets.helpers_cpp'` | consequence of the previous two |
+
 ### Reproducing the overlap-architecture runs
 
 The submodule checks out **vanilla** Megatron-LM at `cbaf684`. The overlap-architecture variants were
