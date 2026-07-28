@@ -19,6 +19,9 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
 cd "$ROOT"
 
+# Extra Megatron flags, appended last so argparse sees them after the arrays.
+# EXTRA_MODEL_ARGS is the name the overlap scripts already set; both are honoured.
+EXTRA_ARGS=${EXTRA_ARGS:-${EXTRA_MODEL_ARGS:-}}
 TRAIN_ITERS=${TRAIN_ITERS:-2121}
 # DENSE=1: fully-dense IsoFLOP floor — all 9 layers dense SwiGLU with ffn=1422 so the dense non-embedding
 # params equal the MoE's ACTIVE non-embedding params (12.20M), same 1e18 budget/tokens. No MoE, no temporal.
@@ -90,7 +93,7 @@ if [ "${PROBE:-0}" = "1" ]; then
   export ROUTER_LOG_OUT=$OUT/router_log.pt
   "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} \
     $ROOT/analysis/probes/router_probe.py \
-    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
     --finetune --train-iters 6 --lr-wsd-decay-iters 1 --save-interval 100000 --eval-iters 1 \
     2>&1 | tee "$OUT/probe.log"
 else
