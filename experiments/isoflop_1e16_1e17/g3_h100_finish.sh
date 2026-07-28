@@ -2,8 +2,8 @@
 # H100 tail orchestrator: after the in-flight MoE@1e17 drive finishes (s1 running + s3), run the
 # H100 temporal list (s2/s3@1e17 big shapes + sm1@1e16). A6000 handles the rest (see run plan doc).
 set -uo pipefail
-cd /workspace/FLAME-MoE
-ROOT=$(pwd)
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7600 GRAIN=3 MICRO_BATCH=64
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True EVAL_AT_END=1 HF_TOKEN=

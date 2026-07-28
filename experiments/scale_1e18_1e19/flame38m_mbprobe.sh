@@ -1,6 +1,7 @@
 #!/bin/bash
 set -uo pipefail
-cd /workspace/FLAME-MoE
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 for mb in "$@"; do
   d=results/phase0/runs/flame38m_probe
   rm -rf "$d"

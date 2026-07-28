@@ -1,9 +1,7 @@
 #!/bin/bash
 set -uo pipefail
-cd /workspace/FLAME-MoE
-ROOT=$(pwd); NV=/usr/local/lib/python3.11/dist-packages/nvidia
-export PATH=$ROOT/.venv/bin:$PATH CUDNN_PATH=$NV/cudnn \
-  LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
+. "$(dirname "${BASH_SOURCE[0]}")/../scripts/env.sh"
+cd "$ROOT"
 export PARTS_GLOB="$ROOT/data/dclm_parts/part*.jsonl" OUT_DIR="$ROOT/data/dclm_tokenized" \
   TOKENIZER_MODEL="EleutherAI/pythia-12b" EOD=0 TOKENIZERS_PARALLELISM=false HF_TOKEN=${HF_TOKEN:-}
 echo "=== 50k tokenize start $(date) ==="

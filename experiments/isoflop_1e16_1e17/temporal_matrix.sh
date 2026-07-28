@@ -5,8 +5,8 @@
 # safe to re-launch / resume, and it skips the smoke cell if you ran it first per the handoff).
 #
 # Export the common env first (absolute paths, see docs/EVALUATION_METHODOLOGY.md s8f):
-#   export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k
-#   export DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full
+#   export TOKENIZER_MODEL=$ROOT/data/tok16k
+#   export DATA_DIR=$ROOT/data/tok16k_full
 #   export CE_FUSION=1 BPB_DIVISOR=2.7568
 #
 # RECOMMENDED: run the mechanism smoke alone and verify it BEFORE launching this (handoff Step 1).

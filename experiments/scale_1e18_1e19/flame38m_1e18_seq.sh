@@ -2,7 +2,8 @@
 # 1e18 final sequence (local self-consistent 50k/CE panel). mb=32 all runs (probed to fit).
 # Order: user's 3 (G3-temporal, G3-MoE, G1-MoE) then the dense-floor reference.
 set -uo pipefail
-cd /workspace/FLAME-MoE
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 MB=32
 echo "=== 1e18 SEQ START $(date) ==="
 echo "--- [1/4] G3-temporal ---"

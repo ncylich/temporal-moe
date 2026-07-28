@@ -16,7 +16,6 @@
 # Env: TRAIN_ITERS (default 2121; set small for a smoke), RUN_NAME, TEMPORAL_EVICT, CE_FUSION.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-ROOT=$(pwd)
 
 TRAIN_ITERS=${TRAIN_ITERS:-2121}
 # DENSE=1: fully-dense IsoFLOP floor — all 9 layers dense SwiGLU with ffn=1422 so the dense non-embedding
@@ -24,7 +23,7 @@ TRAIN_ITERS=${TRAIN_ITERS:-2121}
 DENSE=${DENSE:-0}
 if [ "$DENSE" = "1" ]; then FFN=1422; else FFN=1368; fi
 RUN_NAME=${RUN_NAME:-flame38m_$([ "$DENSE" = 1 ] && echo dense || echo temporal_${TEMPORAL_EVICT:-min_logit})}
-WSD_DECAY=$(.venv/bin/python -c "print(max(1,$TRAIN_ITERS//10))")
+WSD_DECAY=$("$PY" -c "print(max(1,$TRAIN_ITERS//10))")
 EVAL_INTERVAL=${EVAL_INTERVAL:-$TRAIN_ITERS}     # default: one eval at the end
 WARMUP_FRAC=0.01
 
@@ -40,10 +39,6 @@ DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
 
 export OMP_NUM_THREADS=16 TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true CUDA_DEVICE_MAX_CONNECTIONS=1 WANDB_MODE=disabled
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True   # 50k-vocab logits are large; reduce fragmentation
-NV=/usr/local/lib/python3.11/dist-packages/nvidia
-export CUDNN_PATH=$NV/cudnn
-export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
-export PATH=$ROOT/.venv/bin:$PATH
 export TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
 
 MOE_ARGS=()

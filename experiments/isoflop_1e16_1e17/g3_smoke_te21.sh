@@ -3,8 +3,8 @@
 # seed 1234. A (MoE no-PF) and B (MoE +PF) must give ~identical loss (PF is numerically equivalent).
 # C (temporal +PF) must descend + scan==reference + no NaN.
 set -uo pipefail
-cd /workspace/FLAME-MoE
-ROOT=$(pwd)
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7600 GRAIN=3 HF_TOKEN= MICRO_BATCH=64
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True EVAL_AT_END=1

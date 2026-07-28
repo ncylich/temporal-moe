@@ -3,8 +3,8 @@
 # expandable_segments reduces allocator fragmentation (numerically safe). Waits for GPU to free
 # between probes so a prior OOM's teardown can't poison the next probe.
 set -uo pipefail
-cd /workspace/FLAME-MoE
-ROOT=$(pwd)
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7600 GRAIN=3 HF_TOKEN=
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
