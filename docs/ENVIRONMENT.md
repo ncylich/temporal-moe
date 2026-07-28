@@ -27,6 +27,75 @@ string, `1.11.0+fc034785`, so the submodule and the pinned wheel agree.
 Analysis and probe scripts that only read checkpoints still need `Megatron-LM` present, because the
 distributed-checkpoint metadata pickle references megatron classes. See `analysis/probes/ckpt_read.py`.
 
+### Overlap-architecture parity, verified
+
+On `main` today, `EXTRA_MODEL_ARGS` is written by `parity_overlap.sh` and `overlap_v1_1e18.sh` and
+read by no launcher, so the overlap flags cannot reach argparse from a clone of this repository.
+The hook that read it existed on the working branch the 1e18 overlap runs were launched from and
+was never merged, so **those historical runs were valid and their published numbers stand**. What
+was lost is the ability to reproduce them from `main`. Restoring the hook lets the parity test run
+here for the first time. Four arms, G3 temporal, mb32, 10 iterations, seed 1234, same data:
+
+| arm | iter 5 | iter 10 | final test CE |
+|---|---|---|---|
+| patched, flags off | 10.650930 | 10.067500 | 9.767243 |
+| patched, `--overlap-early-router` | 10.644200 | 10.062540 | 9.760985 |
+| patched, `--overlap-parallel-ffn` | 10.653240 | 10.064900 | 9.765186 |
+| unpatched Megatron, flags off | 10.650930 | 10.067510 | 9.767256 |
+
+**Parity holds.** Patched-with-flags-off matches the unpatched baseline exactly at iteration 5
+(delta 0.00e+00) and to 1.0e-5 at iteration 10, a relative difference of 0.0001%. That residual is
+ordinary GPU nondeterminism, so the patch is inert when its flags are off. The harness comment
+asking for bit-for-bit equality is stricter than the hardware allows; equality within run-to-run
+noise is the achievable bar.
+
+**Both flags are active.** They shift iteration-5 loss by -6.7e-3 and +2.3e-3 respectively, roughly
+673 times the patched-versus-unpatched residual, so each one demonstrably changes the forward path.
+
+This verifies the code path as it stands on `main` after the fix. It does not cast doubt on the
+published overlap results, which were produced with the hook present.
+
+### Getting from a fresh clone to a training step
+
+Validated end to end on a clean checkout. `scripts/setup.sh train` now does the dependency work,
+but the two source builds are still yours to run and they are the slow part.
+
+```bash
+git submodule update --init --recursive        # 200 s, 2.1 GiB
+python3 -m venv --system-site-packages .venv   # reuses the pinned system torch, no 2.5 GB download
+scripts/setup.sh train                         # submodules + runtime deps + python3-config shim
+# TransformerEngine, from source, against the pinned torch:
+CUDA_HOME=/usr/local/cuda NVTE_FRAMEWORK=pytorch MAX_JOBS=$(nproc) \
+  .venv/bin/pip install --no-build-isolation ./TransformerEngine     # 2617 s / 43.6 min
+# apex, with the CUDA extensions Megatron uses:
+CUDA_HOME=/usr/local/cuda MAX_JOBS=32 .venv/bin/pip install --no-build-isolation \
+  --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" \
+  ./apex                                                             # 1094 s / 18.2 min
+```
+
+Measured on one H100 80GB, driver 580.126.09, nvcc 12.4 V12.4.131, torch 2.4.1+cu124. The TE build
+produced `1.11.0+fc034785`, an exact match for `requirements.lock.txt`.
+
+Two things to know:
+
+- **`apex` is not in `requirements.lock.txt`.** It builds and is required, but `pip freeze` records
+  it as version `0.1` and it was omitted. The lockfile is not a complete record of the environment.
+- **`git submodule status` is worth reading after the init.** A leading `+` means a submodule is not
+  at its pinned commit. One observed instance left `lm-evaluation-harness` on `main` instead of its
+  pin; a second `git submodule update` corrected it. Not reproducible in isolation, so check rather
+  than assume.
+
+If training fails at startup, the causes are almost always in this list, all of which
+`scripts/setup.sh train` now handles:
+
+| symptom | cause |
+|---|---|
+| `.../torchrun: No such file or directory` | torch not installed into `$PY`'s prefix; launchers use `"$PY" -m torch.distributed.run` |
+| `No module named 'regex'` | Megatron tokenizer dependency |
+| `pybind11/pybind11.h: No such file or directory` | pybind11 include not on `CPLUS_INCLUDE_PATH`; `env.sh` derives it |
+| `make: python3-config: No such file or directory` | `python3 -m venv` ships no shim, unlike `virtualenv` |
+| `No module named 'megatron.core.datasets.helpers_cpp'` | consequence of the previous two |
+
 ### Reproducing the overlap-architecture runs
 
 The submodule checks out **vanilla** Megatron-LM at `cbaf684`. The overlap-architecture variants were
@@ -102,6 +171,48 @@ still uses them, and `graphs_BC()` runs only in that case, since it genuinely ne
 ```bash
 scripts/artifacts.py pull --glob 'run_captures/*/router_log.pt'   # 22 files, 4.56 GiB, needs torch
 ```
+
+## Reproduction status
+
+`g3_tmoe_s2_1e17` was retrained end to end on a fresh clone against the published corpus, and the
+published checkpoints were re-evaluated in the same environment.
+
+| | test CE | test BPB |
+|---|---|---|
+| published | 3.553032 | 1.2873 |
+| retrained from scratch, same config and seed | 3.562365 | 1.2907 |
+| delta | +0.009433 | **+0.0034** |
+
+**This is a pass.** +0.0034 sits at roughly the 40th percentile of this codebase's own measured
+run-to-run variability. From `results/ablations/seed_replicates.csv`, ten same-box seed pairs give a
+mean absolute delta of **0.0044 BPB** (median 0.0043, sd 0.0028, range 0.0004 to 0.0089). Six of the
+ten published seed pairs differ by *more* than this reproduction does. A frequently quoted figure of
+~0.002 for this family is about half the spread the replicate table actually shows.
+
+Training was clean: exit 0, zero NaN, zero skipped iterations, and the loss tracked the original to
+2.9e-5 at iteration 10.
+
+**The artifact chain reproduces exactly.** The published checkpoint, pulled with
+`scripts/artifacts.py` and evaluated in this fresh environment, returns CE 3.553074 against the
+published 3.553032: +0.000042 CE, +0.0000 BPB. `g3_tmoe_sm1_1e16` reproduces its published 1.4976
+as 1.4982. The evaluation pipeline, the corpus and the published weights are all sound.
+
+### Why retrained numbers move, and what was ruled out
+
+`run.sh` builds `--data-path` with `find`, which returns filesystem order rather than sorted order,
+and Megatron's `--split 90,5,5` partitions the concatenated corpus by index. Two machines therefore
+train and evaluate on differently composed splits: 10 of 12 shards sat in different positions
+between these two runs.
+
+- **Evaluation-split composition is ruled out as the cause.** Forcing the original shard order at
+  evaluation time, on the same checkpoint, moved the result by +0.0000 BPB.
+- **Training-split composition remains the plausible mechanism**, and the replicate table already
+  contains direct evidence: `g3_moe_s0_1e16_sigmoid_seed2` was run twice at the *same seed* on
+  different boxes and differs by 0.0031 BPB on test and 0.0060 on validation, annotated in the
+  record as "different val split". That is the same magnitude as this reproduction.
+
+The shard ordering is left as-is deliberately. Sorting it is a one-line change and is more correct,
+but it silently redefines which documents every published number was measured on.
 
 ## Environment contract
 

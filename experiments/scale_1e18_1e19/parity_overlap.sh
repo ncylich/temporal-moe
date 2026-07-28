@@ -9,7 +9,19 @@ set -uo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
 cd "$ROOT"
 MEG=$ROOT/Megatron-LM
+# Wait for the previous arm to release the GPU. Without this the arms OOM each other:
+# torch does not free device memory until the process exits, and the next arm starts immediately.
+drain_gpu() {
+  local used
+  for _ in $(seq 120); do
+    used=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null || echo 0)
+    [ "$used" -lt 2000 ] && return 0
+    sleep 5
+  done
+  echo "[parity] WARNING: GPU still holding ${used} MiB, arms may OOM" >&2
+}
 run20() {  # $1=run_name $2=port $3=extra_args
+  drain_gpu
   rm -rf results/phase0/runs/"$1"
   GRAIN=3 MICRO_BATCH=32 TRAIN_ITERS=20 TEMPORAL_EVICT=min_logit \
     RUN_NAME="$1" RDZV_PORT="$2" EXTRA_MODEL_ARGS="$3" \

@@ -15,6 +15,9 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
 cd "$ROOT"
 
+# Extra Megatron flags, appended last so argparse sees them after the arrays.
+# EXTRA_MODEL_ARGS is the name the overlap scripts already set; both are honoured.
+EXTRA_ARGS=${EXTRA_ARGS:-${EXTRA_MODEL_ARGS:-}}
 TRAIN_ITERS=${TRAIN_ITERS:-2121}
 GRAIN=${GRAIN:-1}
 DENSE=${DENSE:-0}
@@ -92,6 +95,6 @@ LOG_ARGS=(
 ENTRY=pretrain_gpt.py
 [ "$MODE" = "temporal" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
 cd Megatron-LM
-"$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
-  "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+"$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+  "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
   2>&1 | tee "$OUT/train.log"
