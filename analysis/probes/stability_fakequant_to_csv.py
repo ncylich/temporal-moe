@@ -6,9 +6,10 @@ writes run,bits,test_ce,test_bpb.  BPB divisor = 2.9780 (50k pythia vocab; NOT t
 bits=16 is the un-quantized baseline (routed-expert weights untouched).
 """
 import os, re, csv
+import sys
 
-ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
-                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from paths import ROOT   # canonical resolver: $TMOE_ROOT, then git, then file location
 RUNS = os.path.join(ROOT, "results/phase0/runs")
 OUT = os.path.join(ROOT, "results/ablations/stability_fakequant.csv")
 DIV = 2.9780

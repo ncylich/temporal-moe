@@ -27,6 +27,31 @@ string, `1.11.0+fc034785`, so the submodule and the pinned wheel agree.
 Analysis and probe scripts that only read checkpoints still need `Megatron-LM` present, because the
 distributed-checkpoint metadata pickle references megatron classes. See `analysis/probes/ckpt_read.py`.
 
+### Reproducing the overlap-architecture runs
+
+The submodule checks out **vanilla** Megatron-LM at `cbaf684`. The overlap-architecture variants were
+produced with four locally modified Megatron files that were never committed upstream, so a fresh
+clone cannot run them as-is. The diff is preserved in this repository:
+
+```bash
+git -C Megatron-LM apply ../overlap_arch/overlap_variants_megatron.patch
+```
+
+It touches `megatron/core/transformer/moe/moe_layer.py`,
+`megatron/core/transformer/transformer_config.py`,
+`megatron/core/transformer/transformer_layer.py` and `megatron/training/arguments.py`, and adds the
+two flags `--overlap-early-router` and `--overlap-parallel-ffn`.
+
+This patch was verified equivalent to the live uncommitted diff on the machine the runs were
+produced on: identical file list, and identical raw patch text (123 lines, 52 `+` lines including
+headers). Applying it to a pristine `cbaf684` gives `4 files changed, 48 insertions(+), 7
+deletions(-)`, and `git apply --check` passes. Without it, a fresh checkout has zero occurrences of
+`overlap-early-router` in `arguments.py`, and any launcher passing those flags fails at argument
+parsing.
+
+Everything else, including both smoke paths in `experiments/run.sh` and
+`experiments/scale_1e18_1e19/`, runs on the unpatched submodule.
+
 ## Environment contract
 
 `scripts/env.sh` is the single source of truth. Source it first from any launcher:

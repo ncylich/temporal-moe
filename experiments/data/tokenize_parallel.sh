@@ -33,3 +33,7 @@ fail=0
 for p in "${pids[@]}"; do wait "$p" || fail=$((fail+1)); done
 echo "ALL DONE elapsed=$(($(date +%s)-S))s failures=$fail"
 ls data/dclm_tokenized/part*_text_document.idx 2>/dev/null | wc -l
+# Exit on the tokenizer result, not on the ls above. Under `set -o pipefail` a no-match ls exits 2
+# and, as the last command, became the script's status, so a run that produced nothing reported
+# failure even when failures=0. Pre-existing, surfaced by launcher validation.
+exit "$fail"
