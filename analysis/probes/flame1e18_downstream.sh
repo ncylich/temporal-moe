@@ -126,7 +126,7 @@ run_one() {
     2>&1 | tee "$OUT/${OUT_TAG}.log"
 
   if [ "${NO_CSV:-0}" != "1" ]; then
-    "$ROOT/.venv/bin/python" "$ROOT/analysis/probes/flame1e18_downstream_csv.py" "$RUN" "$OUT/$OUT_TAG" "$CSV"
+    "$PY" "$ROOT/analysis/probes/flame1e18_downstream_csv.py" "$RUN" "$OUT/$OUT_TAG" "$CSV"
   fi
 }
 
