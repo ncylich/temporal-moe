@@ -2,7 +2,9 @@
 # Tokenize the dclm jsonl into Megatron bin/idx using the pythia-12b tokenizer.
 # Output: data/dclm_tokenized/dclm_text_document.{bin,idx}
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 IN=${1:-$ROOT/data/dclm_jsonl/dclm.jsonl}
 OUTPREFIX=${2:-$ROOT/data/dclm_tokenized/dclm}
 WORKERS=${WORKERS:-32}
