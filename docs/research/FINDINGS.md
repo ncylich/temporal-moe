@@ -12,7 +12,8 @@ committed CSV, not from the transcript, so every number below is reproducible fr
 | OLMoE residency adaptation, Stage 2 LR sweep and the eight-arm bake-off | [`results/ablations/olmoe_adapt_RESULTS.md`](../../results/ablations/olmoe_adapt_RESULTS.md) |
 | De-lexicalization battery at 1e19 | [`mechanism/delexicalization.md`](mechanism/delexicalization.md) |
 | Selection-shaping program: anticipatory loss, bursty loss, Karen, momentum variants | [`ablations/alignment-program.md`](ablations/alignment-program.md) |
-| Offline scheduling (MinFlow / O-series), block-local routing, serving floor | [`ablations/local-global-program.md`](ablations/local-global-program.md), [`background/batch1-offload-feasibility.md`](background/batch1-offload-feasibility.md) |
+| MinFlow / O-series offline scheduling, and the calibration and init-axis screens (Cal-0, Cal-2) | [`olmoe-adaptation-plan.md`](olmoe-adaptation-plan.md) close-out, and the `olmoe_minflow_*` / `olmoe_cal*` rows of [`results/ablations/README.md`](../../results/ablations/README.md) |
+| Block-local routing, serving floor | [`ablations/local-global-program.md`](ablations/local-global-program.md), [`background/batch1-offload-feasibility.md`](background/batch1-offload-feasibility.md) |
 | Per-CSV index for everything | [`results/ablations/README.md`](../../results/ablations/README.md) |
 
 **Metric conventions.** `BPB = CE_nats / (ln2 · bytes_per_token)`, bits per byte, lower is better.
@@ -41,9 +42,9 @@ gap sits near it.
 
 Fine-graining degrades both paradigms, but not equally: G1→G5 costs the temporal cell +0.037 BPB
 and the free-MoE cell +0.045. The temporal advantage therefore widens from −0.005 at G1 to roughly
-−0.014 at G3 and G5. Both K=30 cells still beat the dense floor by about 0.042. The floor here is
-`flame38m_dense_local` (1.3911), the same-corpus local dense run, not the cross-data
-`flame38m_dense` (1.3893).
+−0.014 at G3 and G5. Both K=30 cells still beat the dense floor, the temporal cell by 0.042 and
+the MoE cell by 0.029. The floor here is `flame38m_dense_local` (1.3911), the same-corpus local
+dense run, not the cross-data `flame38m_dense` (1.3893).
 
 The plausible mechanism is that rolling residency damps the routing churn that over-fine-graining
 introduces: with 320 experts and a ≤1-swap budget the served set changes slowly, so the model
@@ -88,8 +89,8 @@ edited-off runs (9.7e-4), while flags-on moved the loss 10–100× that floor.
 | temporal | 1.3798 | 1.3354 | +0.0444 | +0.0036 | 12× |
 | MoE | 1.4964 | 1.3461 | +0.1503 | +0.0004 | 375× |
 
-V1 fails on both legs. The MoE leg lands *below the dense floor* (1.4964 vs 1.3911), meaning
-early-routing erases the entire MoE advantage at this depth. Both runs were clean: monotonic loss
+V1 fails on both legs. The MoE leg lands *worse than the dense floor* (1.4964 vs 1.3911, a higher
+BPB), meaning early-routing erases the entire MoE advantage at this depth. Both runs were clean: monotonic loss
 decay, zero NaN iterations, flags confirmed in the argument dumps.
 
 **The protocol result, which matters more than the architecture result.** The damage is worse on
@@ -109,7 +110,7 @@ would isolate earliness from the choice of norm, was never built.
 
 ---
 
-## 3. OLMoE Stage 3: adaptation recovers about three quarters of the downstream loss
+## 3. OLMoE Stage 3: adaptation recovers three quarters of the downstream loss and reproduces the de-lexicalization signature
 
 The Stage-2 bake-off (documented separately) measured recovery in BPB. Stage 3 asks whether that
 transfers to downstream capability. Three cells, 10 tasks, 0-shot: the base model with free
@@ -117,10 +118,13 @@ routing, the base model with the R=8 residency mask imposed and no training, and
 model (router + RMSNorm gains + LoRA r32, 0.25B tokens) evaluated at R=8.
 Source: [`olmoe_adapt_downstream.csv`](../../results/ablations/olmoe_adapt_downstream.csv).
 
-Mean accuracy over the 10 primary-metric tasks: **base-free 0.715, impose-R8 0.329,
-CE-adapted-R8 0.617**, giving a downstream recovery of **74.7%** of the accuracy the mask destroys.
-The figure is stable across metric selection (74.4–74.7% depending on whether `acc_norm` rows are
-included), so quote it as roughly three quarters rather than to a tenth of a point.
+Mean accuracy over the 10 tasks at each task's primary metric (acc_norm for hellaswag and
+openbookqa, acc for the other eight): **base-free 0.715, impose-R8 0.329, CE-adapted-R8 0.617**,
+giving a downstream recovery of **74.7%** of the accuracy the mask destroys. The recovery fraction
+is stable across metric selection (74.4% acc-only to 74.7% primary-metric), so quote it as roughly
+three quarters rather than to a tenth of a point. The absolute means move by about 0.03 with the
+convention (acc-only gives base 0.682, adapted 0.589), while the recovery fraction does not, which
+is why the fraction is the number to quote.
 
 That is meaningfully below the 93.2% BPB recovery from the same adapted model. Downstream is the
 harder test, and the residual constraint cost concentrates in the hardest tasks: near-full recovery
@@ -131,12 +135,30 @@ lambada_openai goes from 0.706 to **0.000** under the untrained mask before reco
 **The dense-1B bracket.** Against era-matched released dense checkpoints, the CE-adapted model at
 R=8 scores 0.617 mean against OLMo-1B-0724's 0.630, a gap of **−0.012**. It wins on ARC
 (arc_easy +0.061, arc_challenge +0.036) and ties on sciq and openbookqa. So a residency-constrained
-MoE running in roughly a fifth of the VRAM lands within about one point of the unconstrained
-dense-1B peer, and 0.088 below the OLMo-7B anchor.
+MoE serving from roughly a fifth of the parameters (1.3B active of 7B total; serving VRAM itself was
+not benchmarked, since Stage 4 was cancelled) lands within about one point of the unconstrained
+dense-1B peer, and 0.091 below the OLMo-7B anchor.
+
+**Routing forensics: adaptation reproduces the de-lexicalization signature, weakly.** Running the
+Section-4 locus probe on the adapted model asks whether adaptation reshapes routing the way
+training the constraint in from scratch does. It does, in direction: under the untrained R=8 mask
+routing is marginally token-driven (context-minus-token AUC −0.0041), and after CE adaptation the
+sign flips to context-driven (+0.0493), with context AUC rising 0.603→0.673 while token AUC barely
+moves (0.607→0.624). The generalist fraction drops to 0, so experts become more selective, not
+less. Source: [`olmoe_adapt_forensics.csv`](../../results/ablations/olmoe_adapt_forensics.csv).
+
+The effect is real but small and must be sized as such. The underlying AUCs sit at 0.60–0.67
+against a 0.5 chance floor, so the clean signal is the paired context-minus-token difference, not
+the absolute discriminability, and the flip is far milder than the from-scratch 1e19 battery where
+context-dominated experts go from 0% to 88–96%. Demand-prediction AUC is ~0.96 in both cells, a
+non-discriminator here: a ≤1-swap residency schedule is history-forecastable by construction, so
+the mechanism change appears in the locus rather than the forecastability.
 
 **Caveats.** Era-matched, not data-matched (OLMo-1B trained on ~3T Dolma tokens against OLMoE's
 ~5.1T). This compares an adapted-under-constraint model against a free dense model, so it is a
-memory-class comparison and not iso-training. Stderr for every cell is in the CSV.
+memory-class comparison and not iso-training. Stderr for every downstream cell is in the CSV. The
+forensics is a single probe run over layers 2–6, 16 packs, so its magnitudes are indicative rather
+than replicated; the sign of the locus flip is the load-bearing claim.
 
 ---
 
@@ -204,8 +226,10 @@ expert weights only, test CE delta against the 16-bit baseline:
 | temporal_fine_1e19 | +0.0001 | +0.0059 | +0.0340 |
 
 8-bit is lossless everywhere. At both 4-bit and 3-bit the temporal cell degrades less than its
-matched free-MoE pair, in all three pairs. The 1e19 models are 3–5× more quantization-robust than
-the 38M models at 3-bit, and fine-grained cells are more robust than coarse ones.
+matched free-MoE pair, in all three pairs; that within-pair advantage is the clean result. The
+1e19 models are also more quantization-robust than the 38M models at 3-bit, by roughly 2× on
+matched pairs (1.8× fine, 2.3× coarse temporal, 2.4× coarse MoE; up to ~3.2× on the most
+favourable cross-pairing), and fine-grained cells are more robust than coarse ones.
 
 This composes with the memory story: the same constraint that cuts resident memory also produces
 weights that survive low-bit quantization slightly better, so the two savings stack rather than
@@ -213,9 +237,11 @@ trade off.
 
 **Caveats.** `temporal_fine_1e19` has no matched free-MoE pair in this table, so its column is
 descriptive only. The quantization sweep covers routed expert weights, not attention or shared
-experts. Gradient norms were clean on all 38M cells (0 spikes); two 1e19 cells showed early warmup
-transients pre-clip (dense_1e19 max 7.71, 6 spikes; temporal_coarse_1e19 max 12.47, 3 spikes),
-which is warmup behaviour rather than instability.
+experts. Gradient norms were clean on all 38M cells (pre-clip max ≤2.2); two 1e19 cells showed larger
+pre-clip transients that clipping absorbed with no divergence (dense_1e19 max 7.71 at iter 2280 of
+4310; temporal_coarse_1e19 max 12.47 at iter 830). These are mid-run rather than warmup: the dense
+excursion sits near the middle of training, coinciding with the mid-run loss bump rather than the
+opening iterations, and both runs recovered.
 
 ---
 
