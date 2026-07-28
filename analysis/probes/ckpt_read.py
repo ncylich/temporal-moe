@@ -6,9 +6,15 @@ loader in the repo for reading raw weights (router_probe.py hooks a live model i
 small reader is the one piece of new plumbing the stability probes need. Reused by Part A
 (stability_weights) and Part E (stability_fakequant).
 
-The DCP metadata pickle references megatron classes, so `megatron` must be importable (set
-PYTHONPATH to Megatron-LM + repo root, and LD_LIBRARY_PATH to the nvidia cudnn/cublas libs —
-see experiments/scale_1e18_1e19/flame38m_run.sh lines 48-53). Everything here runs on CPU.
+The DCP metadata pickle references megatron classes, so `megatron` must be importable, and
+importing megatron pulls in TransformerEngine, which needs the nvidia cudnn/cublas libs on the
+loader path. Source scripts/env.sh, which derives $NV and sets CUDNN_PATH and LD_LIBRARY_PATH,
+then put Megatron-LM and the repo root on PYTHONPATH:
+
+    . scripts/env.sh
+    PYTHONPATH="$ROOT/Megatron-LM:$ROOT" "$PY" analysis/probes/delex_structural.py
+
+Everything here runs on CPU.
 """
 import os, torch
 import torch.distributed.checkpoint as dcp
