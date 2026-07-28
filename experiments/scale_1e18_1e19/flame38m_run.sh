@@ -92,6 +92,6 @@ LOG_ARGS=(
 ENTRY=pretrain_gpt.py
 [ "$MODE" = "temporal" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
 cd Megatron-LM
-"$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+"$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
   "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
   2>&1 | tee "$OUT/train.log"

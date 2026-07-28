@@ -171,7 +171,7 @@ if [ "${PROBE:-0}" = "1" ]; then
   # Mechanistic router probe: load CKPT, log per-MoE-layer per-token routing on one fixed batch
   # (raw logits + resident mask). --finetune loads weights only; the hook records the first forward.
   export ROUTER_LOG_OUT=$OUT/router_log.pt
-  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $ROOT/analysis/probes/router_probe.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
@@ -183,7 +183,7 @@ elif [ "${ACTPROBE:-0}" = "1" ]; then
   # warmup iters never touch the real checkpoint; only the FIRST forward (uncorrupted weights) is recorded.
   export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
   export ACT_LOG_OUT=$OUT/act_log.pt
-  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $ROOT/analysis/probes/activation_probe.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 \
@@ -197,7 +197,7 @@ elif [ "${QUANTEVAL:-0}" = "1" ]; then
   # quantizes only on the first EVAL-mode forward -> lands AFTER the last optimizer FP32-master->bf16
   # resync (which would undo it) and persists through eval. Save to throwaway; real checkpoint untouched.
   export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
-  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $ROOT/analysis/probes/fakequant_eval.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
@@ -223,7 +223,7 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
     EVAL_ENTRY=$ROOT/temporal/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
     EVAL_FREEZE="--lr 0 --min-lr 0"
   fi
-  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $EVAL_ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
@@ -233,7 +233,7 @@ else
   # then the identical pretrain loop). Same model args; only the expert selection differs.
   ENTRY=pretrain_gpt.py
   [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
-  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
     2>&1 | tee "$OUT/train.log"
 fi

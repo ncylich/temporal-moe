@@ -116,7 +116,7 @@ run_one() {
   export TEMPORAL=$TEMPORAL TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
   export PYTHONPATH=$ROOT/lm-evaluation-harness:$ROOT/Megatron-LM:${PYTHONPATH:-}
 
-  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:$RDZV_PORT \
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:$RDZV_PORT \
     "$ROOT/analysis/probes/run_lmeval.py" \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" \
     --bf16 --seq-length 2048 --micro-batch-size 32 --batch_size "${LM_BATCH:-16}" \
