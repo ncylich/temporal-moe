@@ -5,7 +5,6 @@
 # Launch detached:  nohup bash experiments/isoflop_1e16_1e17/g3_run_all.sh > results/phase0/g3_run_all.log 2>&1 &
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-ROOT=$(pwd)
 
 # ---- common env (absolute paths required: run.sh cd's into Megatron-LM) ----
 export TOKENIZER_MODEL=$ROOT/data/tok16k

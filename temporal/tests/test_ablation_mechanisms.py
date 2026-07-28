@@ -8,7 +8,7 @@ double-momentum A3q / logratio LG1), K2 gate momentum, the decoupled stop-grad n
 coherence BCE loss (the latter absorbed from the former test_coherence_loss.py).
 
 No Megatron, no GPU — CPU torch only.
-Run: .venv/bin/python -m pytest temporal/tests/test_ablation_mechanisms.py
+Run: $PY -m pytest temporal/tests/test_ablation_mechanisms.py
 """
 import os, sys
 import torch

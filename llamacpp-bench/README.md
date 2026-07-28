@@ -80,7 +80,8 @@ build/bin/llama-bench -m qwen3moe-rand-Q4_K_M.gguf -ngl 99 -fa 1 -ub 1 -b 1 -d 1
 The two random-weight benchmark models are regenerated deterministically from the recipe by
 `gen_random_qwen3moe.py` + `build_models.sh` (no local artifacts required):
 ```bash
-bash build_models.sh <llama.cpp-dir> /workspace/models     # -> qwen3moe-rand-{fine,coarse}-Q4_K_M.gguf
+bash build_models.sh <llama.cpp-dir> [out-root]     # -> qwen3moe-rand-{fine,coarse}-Q4_K_M.gguf
+# out-root defaults to llamacpp-bench/models/, or set $MODELS_ROOT
 ```
 Shared backbone (identical across granularities so total params + active FLOPs match): hidden 1024,
 **45 layers**, 8 heads / 4 KV heads (head_dim 128), Qwen3 tokenizer vocab, tied embeddings, Q4_K_M.

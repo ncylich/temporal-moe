@@ -4,9 +4,7 @@
 # Usage: tokenize_parallel.sh [WORKERS_PER_JOB]   (default 2; 32 files x 2 = 64-way)
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-ROOT=$(pwd)
 WPJ=${1:-2}
-NV=/usr/local/lib/python3.11/dist-packages/nvidia
 export PATH=$ROOT/.venv/bin:$PATH CUDNN_PATH=$NV/cudnn \
   LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-} HF_TOKEN=${HF_TOKEN:-}
 # Cap BLAS/OMP threads: 32 jobs x 64 OpenBLAS threads exhausts the cgroup thread limit.

@@ -15,7 +15,7 @@ Experiments (see docs/research/mechanism/probe-replay-e1-e8.md):
   E7 EMA-logit smoothing replay (slow-feature routing preview; beta=1 == baseline identity)
   E8 document-boundary attribution (EOD cold-fill contamination)
 
-Run: .venv/bin/python analysis/probes/probe_replay.py   (regenerates every number + figure)
+Run: $PY analysis/probes/probe_replay.py   (regenerates every number + figure)
 
 Convention (matches analysis/plots/plot_probe.py rolling()/overlap()):
   "hit-rate" / "coverage" = fraction of a token's unconstrained top-k demand that is ALREADY
@@ -31,10 +31,8 @@ import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plots"))  # analysis/plots
 from plot_probe import load, topk_ids, OUT, rolling, overlap, sweep, PAIRS, G3  # reuse helpers/paths
 
-ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
-                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-CACHE = os.path.join(ROOT, "results/phase0/probe_batch_cache")
-FIGDATA = os.path.join(ROOT, "results/phase0/figure_data")   # small CSVs behind every figure
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from paths import CACHE, FIGDATA
 RAM_RATIO = 32.0                              # r_ram / r (SSD->RAM bandwidth ratio) for s_max budget
 
 

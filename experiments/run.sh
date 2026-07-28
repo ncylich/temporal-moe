@@ -3,8 +3,9 @@
 # Adapted from scripts/training/flame-moe.sh: no SLURM, no GCS, local transformer impl.
 # All knobs via env vars (see defaults). Computes train_iters so C = 6*N*D hits TARGET_FLOPS.
 set -euo pipefail
-cd "$(dirname "$0")/.."        # repo root
-ROOT=$(pwd)
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../scripts/env.sh"
+cd "$ROOT"
 
 # ---- run config (env overridable) ----
 SHAPE=${SHAPE:?set SHAPE s1..s6}
@@ -45,7 +46,7 @@ GRAIN=${GRAIN:-1}
 NUM_EXPERTS=$((64 * GRAIN))
 TOPK=${TOPK:-$((6 * GRAIN))}
 if [ "$GRAIN" != "1" ]; then
-  MOE_FFN=$(.venv/bin/python -c "print(2*round(($MOE_FFN/$GRAIN)/2))")
+  MOE_FFN=$("$PY" -c "print(2*round(($MOE_FFN/$GRAIN)/2))")
 fi
 # head_dim must be a multiple of 8 for TE fused attention. Fixed 16 heads gives head_dim
 # 12/20/28 for s1/s3/s5 -> unfused slow path (~3x slower). Use heads=hidden/16 -> head_dim=16
@@ -64,9 +65,9 @@ if [ "${DENSE:-0}" = "1" ]; then
 fi
 
 # ---- compute iters so C = 6*N*D ----
-read N TRAIN_ITERS < <(.venv/bin/python analysis/shapes.py iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
-WARMUP_ITERS=$(.venv/bin/python -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
-MIN_LR=$(.venv/bin/python -c "print($PEAK_LR*0.1)")
+read N TRAIN_ITERS < <("$PY" "$ROOT/analysis/shapes.py" iters "$SHAPE" "$TARGET_FLOPS" "$GLOBAL_BATCH")
+WARMUP_ITERS=$("$PY" -c "print(max(1,round($WARMUP_FRAC*$TRAIN_ITERS)))")
+MIN_LR=$("$PY" -c "print($PEAK_LR*0.1)")
 # LR_DECAY_STYLE=WSD: flame-family schedule (stable then decay over the last ~10% of iters),
 # for t18/t19 curve continuity. Default cosine == shipped behavior.
 LR_DECAY_STYLE=${LR_DECAY_STYLE:-cosine}
@@ -77,18 +78,17 @@ WSD_ARGS=""
 if [ "${EVAL_AT_END:-0}" = "1" ]; then
   EVAL_INTERVAL=$TRAIN_ITERS
 else
-  EVAL_INTERVAL=$(.venv/bin/python -c "print(max(1,round($TRAIN_ITERS/10)))")   # 1e16 point = iters/10
+  EVAL_INTERVAL=$("$PY" -c "print(max(1,round($TRAIN_ITERS/10)))")   # 1e16 point = iters/10
 fi
 SAVE_INTERVAL=$EVAL_INTERVAL
 
-OUT=$ROOT/results/phase0/runs/$RUN_NAME
+OUT=$CKPT_ROOT/$RUN_NAME
 CKPT=$OUT/ckpt
 mkdir -p "$OUT"
 echo "[run] $RUN_NAME N=$N iters=$TRAIN_ITERS warmup=$WARMUP_ITERS min_lr=$MIN_LR eval@$EVAL_INTERVAL" | tee "$OUT/run.meta"
 echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN grain=$GRAIN num_experts=$NUM_EXPERTS shared_int=$SHARED_INT dense=${DENSE:-0} temporal=${TEMPORAL:-0} shared_mult=$SHARED_MULT topk=$TOPK heads=$NHEADS gb=$GLOBAL_BATCH mb=$MICRO_BATCH lr=$PEAK_LR flops=$TARGET_FLOPS" | tee -a "$OUT/run.meta"
 
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
-DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
 DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
   -exec sh -c '[ -f "${1%.bin}.idx" ] && printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
 if [ -z "$DATA_PATH" ]; then echo "ERROR: no tokenized part*_text_document.bin in $DATA_DIR"; exit 1; fi
@@ -98,13 +98,9 @@ export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export WANDB_MODE=disabled
 export HF_TOKEN=${HF_TOKEN:-}
-# TE 1.11 runtime needs cudnn/cublas (pip nvidia-* packages) on the loader path
-NV=/usr/local/lib/python3.11/dist-packages/nvidia
-export CUDNN_PATH=$NV/cudnn
-export LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
-# Megatron compiles datasets/helpers_cpp via `make` calling bare python3/python3-config:
-# put .venv first so pybind11 includes resolve.
-export PATH=$ROOT/.venv/bin:$PATH
+# TE needs cudnn/cublas (pip nvidia-* packages) on the loader path, and Megatron compiles
+# datasets/helpers_cpp via `make` calling bare python3/python3-config. Both the LD_LIBRARY_PATH
+# and the PATH ordering are set by scripts/env.sh from the runtime-derived $NV.
 
 # MoE-specific args (omitted entirely when DENSE=1 -> a plain dense SwiGLU transformer).
 # Router scoring / aux-free paradigm (alignment program Track A):
@@ -175,7 +171,7 @@ if [ "${PROBE:-0}" = "1" ]; then
   # Mechanistic router probe: load CKPT, log per-MoE-layer per-token routing on one fixed batch
   # (raw logits + resident mask). --finetune loads weights only; the hook records the first forward.
   export ROUTER_LOG_OUT=$OUT/router_log.pt
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $ROOT/analysis/probes/router_probe.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 $EXTRA_ARGS \
@@ -187,7 +183,7 @@ elif [ "${ACTPROBE:-0}" = "1" ]; then
   # warmup iters never touch the real checkpoint; only the FIRST forward (uncorrupted weights) is recorded.
   export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
   export ACT_LOG_OUT=$OUT/act_log.pt
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $ROOT/analysis/probes/activation_probe.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 \
@@ -201,7 +197,7 @@ elif [ "${QUANTEVAL:-0}" = "1" ]; then
   # quantizes only on the first EVAL-mode forward -> lands AFTER the last optimizer FP32-master->bf16
   # resync (which would undo it) and persists through eval. Save to throwaway; real checkpoint untouched.
   export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $ROOT/analysis/probes/fakequant_eval.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
@@ -227,7 +223,7 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
     EVAL_ENTRY=$ROOT/temporal/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
     EVAL_FREEZE="--lr 0 --min-lr 0"
   fi
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $EVAL_ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
@@ -237,7 +233,7 @@ else
   # then the identical pretrain loop). Same model args; only the expert selection differs.
   ENTRY=pretrain_gpt.py
   [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
     2>&1 | tee "$OUT/train.log"
 fi

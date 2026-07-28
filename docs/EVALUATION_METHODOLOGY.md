@@ -273,13 +273,14 @@ one the moment it finishes or fails.
 
 ## 10. Concrete commands (what we actually ran)
 
-Copy-pasteable, with the real env regimes. All assume repo root `/workspace/FLAME-MoE` and the 16k
+Copy-pasteable, with the real env regimes. All assume `. scripts/env.sh` has been sourced (which
+exports `$ROOT` and `$PY`) and the 16k
 tokenizer/corpus already built. **Paths are absolute** (see §8f).
 
 ### 10a. Common environment (every run, every sweep)
 ```bash
-export TOKENIZER_MODEL=/workspace/FLAME-MoE/data/tok16k        # 16k BPE (abs path required)
-export DATA_DIR=/workspace/FLAME-MoE/data/tok16k_full          # tokenized dclm shards (abs path)
+export TOKENIZER_MODEL=$ROOT/data/tok16k                       # 16k BPE (abs path required)
+export DATA_DIR=$ROOT/data/tok16k_full                         # tokenized dclm shards (abs path)
 export CE_FUSION=1                                             # fused cross-entropy
 export BPB_DIVISOR=2.7568                                      # 16k bytes/token -> BPB
 ```
@@ -339,11 +340,11 @@ SHAPE=s2 TARGET_FLOPS=1e17 RUN_NAME=v16k_sweep_s2_1e17 EVAL_ONLY=1 \
 ### 10f. Reading results
 ```bash
 # one run -> final/at-1e16 BPB JSON
-BPB_DIVISOR=2.7568 .venv/bin/python analysis/parse_run.py \
+BPB_DIVISOR=2.7568 "$PY" analysis/parse_run.py \
   results/phase0/runs/v16k_sweep_s2_1e17
 
 grep "SUMMARY" results/phase0/log.md          # the measured ledger, one line per run
-.venv/bin/python analysis/plots/plot_g3_curves.py   # regenerate the comparison plot
+"$PY" analysis/plots/plot_g3_curves.py   # regenerate the comparison plot
 ```
 
 ## 11. Monitoring commands (what we actually ran)
@@ -356,7 +357,7 @@ Sleeps in 15 s steps, breaks the instant the run finishes / NaNs / the driver ad
 prints the live `iteration X/total`, loss, and NaN count. `<this>`/`<next>` are run-dir names,
 `<total>` the run's iter count.
 ```bash
-cd /workspace/FLAME-MoE
+. scripts/env.sh && cd "$ROOT"
 d=results/phase0/runs/<this>
 for i in $(seq 1 39); do                                       # ~10-min ceiling
   grep -q "after training is done" $d/train.log 2>/dev/null && { echo DONE; break; }
@@ -373,7 +374,7 @@ grep "consumed samples" $d/train.log | tail -1 \
 ### 11b. Grab a finished run's BPB and confirm the next started
 ```bash
 d=results/phase0/runs/<this>
-BPB_DIVISOR=2.7568 .venv/bin/python analysis/parse_run.py $d 2>/dev/null \
+BPB_DIVISOR=2.7568 "$PY" analysis/parse_run.py $d 2>/dev/null \
   | grep '^{' | python3 -c "import json,sys; o=json.load(sys.stdin); print('BPB', o['final_val_bpb'])"
 echo "next started: $([ -d results/phase0/runs/<next> ] && echo yes || echo no)"
 ```

@@ -5,7 +5,6 @@
 # Usage: drive.sh <configs_file>
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-ROOT=$(pwd)
 CFG=${1:?need configs file}
 export HF_TOKEN=${HF_TOKEN:-}
 PORT=29510
@@ -21,7 +20,7 @@ while read -r NAME SHAPE FLOPS LR WU GB SEED AUX; do
   case "$NAME" in \#*) continue;; esac
   AUX=${AUX:-0.01}
   # total iters for skip-check
-  read _N ITERS < <(.venv/bin/python analysis/shapes.py iters "$SHAPE" "$FLOPS" "$GB")
+  read _N ITERS < <("$PY" analysis/shapes.py iters "$SHAPE" "$FLOPS" "$GB")
   RUNDIR=$ROOT/results/phase0/runs/$NAME
   if is_done "$RUNDIR" "$ITERS"; then
     echo "[drive] SKIP $NAME (complete, iters=$ITERS)"
@@ -32,14 +31,14 @@ while read -r NAME SHAPE FLOPS LR WU GB SEED AUX; do
       AUX_COEFF=$AUX RUN_NAME=$NAME RDZV_PORT=$PORT bash experiments/run.sh
   fi
   # parse + log
-  SUMMARY=$(.venv/bin/python analysis/parse_run.py "$RUNDIR" 2>/dev/null | grep '^SUMMARY')
+  SUMMARY=$("$PY" analysis/parse_run.py "$RUNDIR" 2>/dev/null | grep '^SUMMARY')
   echo "[drive] $SUMMARY"
   {
     echo ""
     echo "### $NAME  ($(date '+%Y-%m-%d %H:%M'))"
     echo "Config: shape=$SHAPE flops=$FLOPS peak_lr=$LR warmup=$WU gb=$GB seed=$SEED aux=$AUX iters=$ITERS"
     echo "$SUMMARY"
-    .venv/bin/python analysis/parse_run.py "$RUNDIR" 2>/dev/null | grep '^{'
+    "$PY" analysis/parse_run.py "$RUNDIR" 2>/dev/null | grep '^{'
   } >> "$ROOT/results/phase0/log.md"
 done < "$CFG"
 echo "[drive] ALL CONFIGS DONE $(date)"

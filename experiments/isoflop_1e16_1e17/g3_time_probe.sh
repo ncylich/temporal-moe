@@ -2,8 +2,8 @@
 # Time candidate configs (40-iter runs) to pick final mb + permute-fusion. Reports steady per-iter
 # (median of last 5) + FIT/OOM. Args: "shape flops mb pf(0/1)" ...
 set -uo pipefail
-cd /workspace/FLAME-MoE
-ROOT=$(pwd)
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7600 GRAIN=3 HF_TOKEN=
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True EVAL_AT_END=1

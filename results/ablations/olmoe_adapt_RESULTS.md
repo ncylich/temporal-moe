@@ -87,7 +87,8 @@ before any training.
 - `results/ablations/olmoe_adapt_corpus_audit.md` — corpus provenance, divisor derivation, throughput root cause.
 - `results/ablations/adapt_ckpts/` — router-only deltas (A/B/C/D, 4MB) tracked; LoRA-bearing deltas
   (E/CE/G, 474MB) and the CE full resumable checkpoint (2.85GB) kept pod-local/gitignored (available on request).
-- All work isolated in the `/workspace/olmoe-adapt` sub-repo (venv/model/data gitignored).
+- All work isolated in a separate `olmoe-adapt` sub-repo, checked out alongside this one
+  (venv/model/data gitignored).
 
 ## Optional-idle ablations (ran on otherwise-idle GPU before Phase-C selection)
 

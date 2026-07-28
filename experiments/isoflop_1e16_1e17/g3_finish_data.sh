@@ -1,12 +1,10 @@
 #!/bin/bash
 set -uo pipefail
-cd /workspace/FLAME-MoE
-ROOT=$(pwd); NV=/usr/local/lib/python3.11/dist-packages/nvidia
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 echo "=== waiting for downloads to finish $(date) ==="
 while pgrep -f download_parts.py >/dev/null; do sleep 10; done
 echo "=== downloads done; parts: $(ls data/dclm_parts/part*.jsonl | wc -l) $(date) ==="
-export PATH=$ROOT/.venv/bin:$PATH CUDNN_PATH=$NV/cudnn \
-  LD_LIBRARY_PATH=$NV/cudnn/lib:$NV/cublas/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
 export PARTS_GLOB="$ROOT/data/dclm_parts/part*.jsonl" OUT_DIR="$ROOT/data/tok16k_full" \
   TOKENIZER_MODEL="$ROOT/data/tok16k" EOD=0 TOKENIZERS_PARALLELISM=false
 echo "=== tokenizing (idempotent) $(date) ==="
