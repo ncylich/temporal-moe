@@ -5,8 +5,8 @@ acc and acc_norm where defined. Prints the headline: dense<<moe~=temporal orderi
 sit >2 stderr above chance (chance = per-task random baseline).
 """
 import os, sys, csv, json, glob
-ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
-                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from paths import ROOT   # canonical resolver: $TMOE_ROOT, then git, then file location
 RUNS = os.path.join(ROOT, "results/phase0/runs")
 OUT = os.path.join(ROOT, "results/ablations/t19_lmeval_extra.csv")
 MODELS = ["dense_1e19", "moe_coarse_1e19", "g1_tmoe_coarse_1e19", "temporal_fine_g3_1e19"]

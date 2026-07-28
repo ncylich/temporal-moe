@@ -16,7 +16,7 @@
 #   OUT_TAG=foo       output subdir tag (default lmeval_1e18_0shot)
 #   NO_CSV=1          do not append to the CSV (validation runs)
 set -euo pipefail
-ROOT="${TEMPORAL_MOE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+ROOT="${TMOE_ROOT:-${TEMPORAL_MOE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}}"
 RUNS=$ROOT/results/phase0/runs
 CSV=$ROOT/results/ablations/flame1e18_downstream.csv
 RDZV_PORT=${RDZV_PORT:-29537}

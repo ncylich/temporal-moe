@@ -7,9 +7,10 @@ Also report per run: max, median, and count of iterations with grad_norm > 5x th
 (trailing window of 100 logged iterations).
 """
 import os, re, csv, statistics as st
+import sys
 
-ROOT = os.environ.get("TEMPORAL_MOE_ROOT",
-                      os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from paths import ROOT   # canonical resolver: $TMOE_ROOT, then git, then file location
 RUNS = os.path.join(ROOT, "results/phase0/runs")
 OUT = os.path.join(ROOT, "results/ablations/stability_gradnorms.csv")
 

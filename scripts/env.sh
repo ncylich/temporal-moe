@@ -28,10 +28,10 @@ export ROOT
 # TMOE_ROOT is the same value, exported under the name analysis/paths.py looks for, so a
 # shell launcher and a python probe always agree on the root.
 export TMOE_ROOT="${TMOE_ROOT:-$ROOT}"
-# TEMPORAL_MOE_ROOT is the equivalent name used by the salvaged probe suite
-# (analysis/probes/stability_*.py, lmeval_*_to_csv.py, flame1e18_downstream.sh). Both branches
-# solved root resolution independently and picked different names. Exporting both here means a
-# caller sets nothing and every probe agrees, rather than one convention silently winning.
+# DEPRECATED alias. TEMPORAL_MOE_ROOT was the name the salvaged probe suite used before those
+# probes were converted to analysis/paths.py. Nothing in this repository reads it any more, except
+# flame1e18_downstream.sh, which prefers TMOE_ROOT and falls back to this. It is still exported so
+# that anything outside the repository which sets or reads it keeps working. Set TMOE_ROOT instead.
 export TEMPORAL_MOE_ROOT="${TEMPORAL_MOE_ROOT:-$ROOT}"
 
 # ---- interpreter ----
