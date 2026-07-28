@@ -29,10 +29,12 @@ distributed-checkpoint metadata pickle references megatron classes. See `analysi
 
 ### Overlap-architecture parity, verified
 
-The overlap variants had never been exercised end to end, because `EXTRA_MODEL_ARGS` was written by
-`parity_overlap.sh` and `overlap_v1_1e18.sh` but read by no launcher, so the flags were silently
-dropped and every "overlap" run was a plain temporal baseline. With the launchers fixed, the parity
-test runs for the first time. Four arms, G3 temporal, mb32, 10 iterations, seed 1234, same data:
+On `main` today, `EXTRA_MODEL_ARGS` is written by `parity_overlap.sh` and `overlap_v1_1e18.sh` and
+read by no launcher, so the overlap flags cannot reach argparse from a clone of this repository.
+The hook that read it existed on the working branch the 1e18 overlap runs were launched from and
+was never merged, so **those historical runs were valid and their published numbers stand**. What
+was lost is the ability to reproduce them from `main`. Restoring the hook lets the parity test run
+here for the first time. Four arms, G3 temporal, mb32, 10 iterations, seed 1234, same data:
 
 | arm | iter 5 | iter 10 | final test CE |
 |---|---|---|---|
@@ -50,8 +52,8 @@ noise is the achievable bar.
 **Both flags are active.** They shift iteration-5 loss by -6.7e-3 and +2.3e-3 respectively, roughly
 673 times the patched-versus-unpatched residual, so each one demonstrably changes the forward path.
 
-Any overlap result recorded before this fix should be treated as a plain temporal baseline, since
-the flags could not reach argparse.
+This verifies the code path as it stands on `main` after the fix. It does not cast doubt on the
+published overlap results, which were produced with the hook present.
 
 ### Getting from a fresh clone to a training step
 

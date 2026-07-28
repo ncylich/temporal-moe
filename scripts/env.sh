@@ -75,8 +75,11 @@ export PATH="$(dirname "$PY"):$PATH"
 if [ -z "${TMOE_NO_PYBIND_INCLUDE:-}" ]; then
     _pb=$("$PY" -c 'import pybind11; print(pybind11.get_include())' 2>/dev/null) || _pb=""
     if [ -n "$_pb" ]; then
-        export CPLUS_INCLUDE_PATH="$_pb:${CPLUS_INCLUDE_PATH:-}"
-        export C_INCLUDE_PATH="$_pb:${C_INCLUDE_PATH:-}"
+        # Append the existing value only when it is non-empty: a trailing colon leaves an empty
+        # element, which gcc reads as the current directory, so a compile could pick up headers
+        # from wherever it happened to be invoked.
+        export CPLUS_INCLUDE_PATH="$_pb${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+        export C_INCLUDE_PATH="$_pb${C_INCLUDE_PATH:+:$C_INCLUDE_PATH}"
     fi
     unset _pb
 fi

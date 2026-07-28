@@ -58,6 +58,33 @@ PY
 
   train)
     echo "=== setup: train (thin wrapper over docs/ENVIRONMENT.md) ==="
+    # This mode installs packages and links a python3-config next to the interpreter, so it must
+    # never run against a system interpreter: pip would land in system site-packages and the
+    # symlink would target /usr/bin. Only root would get away with that, and silently. analysis
+    # mode creates $ROOT/.venv; train needs one too, and needs the pinned torch visible, hence
+    # --system-site-packages rather than a bare venv.
+    case "$PY" in
+      "$ROOT"/*) ;;
+      *)
+        if [ -x "$VENV/bin/python" ]; then
+          echo "  \$PY was outside the repo ($PY); switching to $VENV"
+        else
+          echo "  \$PY is outside the repo ($PY); creating $VENV --system-site-packages"
+          python3 -m venv --system-site-packages "$VENV" || {
+            echo "  ERROR: could not create $VENV"; exit 1; }
+        fi
+        PY="$VENV/bin/python"; export PY
+        export PATH="$(dirname "$PY"):$PATH"
+        ;;
+    esac
+    "$PY" -c 'import torch' >/dev/null 2>&1 || {
+      echo "  ERROR: torch is not importable from $PY"
+      echo "    train mode needs the pinned torch. If torch lives in the system interpreter,"
+      echo "    recreate the venv so it can see it:"
+      echo "      rm -rf \"$VENV\" && python3 -m venv --system-site-packages \"$VENV\""
+      exit 1; }
+    echo "  interpreter: $PY (inside the repo, nothing is written outside it)"
+    echo
     echo "  initialising submodules (this is the mandatory step a fresh clone always needs)"
     git submodule update --init --recursive
     git submodule status | sed 's/^/    /'
@@ -72,10 +99,12 @@ PY
     # helpers_cpp compile), the rest on first use.
     echo
     echo "  installing Megatron's pure-python runtime deps (torch pinned, never upgraded)"
-    printf 'torch==%s\n' "$("$PY" -c 'import torch;print(torch.__version__.split("+")[0])' 2>/dev/null || echo 2.4.1)" > "$ROOT/.torch-constraint.txt"
-    "$PY" -m pip install -q --constraint "$ROOT/.torch-constraint.txt" \
+    _constraint=$(mktemp -t torch-constraint.XXXXXX)
+    printf 'torch==%s\n' "$("$PY" -c 'import torch;print(torch.__version__.split("+")[0])' 2>/dev/null || echo 2.4.1)" > "$_constraint"
+    "$PY" -m pip install -q --constraint "$_constraint" \
         regex sentencepiece transformers tokenizers einops nltk tiktoken pybind11 || {
         echo "  WARNING: dependency install failed, training will not start"; }
+    rm -f "$_constraint"; unset _constraint
     "$PY" -c 'import torch; print("    torch after install:", torch.__version__)'
 
     # Megatron compiles megatron/core/datasets/helpers_cpp at first run with a Makefile that
