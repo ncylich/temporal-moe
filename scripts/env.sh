@@ -28,6 +28,11 @@ export ROOT
 # TMOE_ROOT is the same value, exported under the name analysis/paths.py looks for, so a
 # shell launcher and a python probe always agree on the root.
 export TMOE_ROOT="${TMOE_ROOT:-$ROOT}"
+# TEMPORAL_MOE_ROOT is the equivalent name used by the salvaged probe suite
+# (analysis/probes/stability_*.py, lmeval_*_to_csv.py, flame1e18_downstream.sh). Both branches
+# solved root resolution independently and picked different names. Exporting both here means a
+# caller sets nothing and every probe agrees, rather than one convention silently winning.
+export TEMPORAL_MOE_ROOT="${TEMPORAL_MOE_ROOT:-$ROOT}"
 
 # ---- interpreter ----
 # Prefer the in-tree venv when present, else whatever python3 is on PATH.
