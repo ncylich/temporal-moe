@@ -15,7 +15,9 @@
 #
 # Env: TRAIN_ITERS (default 2121; set small for a smoke), RUN_NAME, TEMPORAL_EVICT, CE_FUSION.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 
 TRAIN_ITERS=${TRAIN_ITERS:-2121}
 # DENSE=1: fully-dense IsoFLOP floor — all 9 layers dense SwiGLU with ffn=1422 so the dense non-embedding
@@ -86,13 +88,13 @@ cd Megatron-LM
 if [ "${PROBE:-0}" = "1" ]; then
   # Mechanistic router probe (see run.sh PROBE): load CKPT, log per-token routing on one fixed batch.
   export ROUTER_LOG_OUT=$OUT/router_log.pt
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} \
     $ROOT/analysis/probes/router_probe.py \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     --finetune --train-iters 6 --lr-wsd-decay-iters 1 --save-interval 100000 --eval-iters 1 \
     2>&1 | tee "$OUT/probe.log"
 else
-  $ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+  "$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
     2>&1 | tee "$OUT/train.log"
 fi

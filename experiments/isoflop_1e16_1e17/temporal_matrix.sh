@@ -11,7 +11,9 @@
 #
 # RECOMMENDED: run the mechanism smoke alone and verify it BEFORE launching this (handoff Step 1).
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 export TEMPORAL=1
 # Every cell is measured directly, so only the final BPB is needed -> EVAL_AT_END=1 (saves ~9 evals/run).
 export EVAL_AT_END=1

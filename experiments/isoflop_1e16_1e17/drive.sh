@@ -4,7 +4,9 @@
 # Skips runs already complete (final-iter checkpoint present). Parses each + appends to log.md.
 # Usage: drive.sh <configs_file>
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 CFG=${1:?need configs file}
 export HF_TOKEN=${HF_TOKEN:-}
 PORT=29510

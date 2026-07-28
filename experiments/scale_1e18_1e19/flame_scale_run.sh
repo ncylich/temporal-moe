@@ -11,7 +11,9 @@
 # Knobs: GRAIN (default 1), MICRO_BATCH (default 8), TRAIN_ITERS (default 2121), TEMPORAL_EVICT
 #        (default min_logit), RUN_NAME, DATA_DIR (default data/dclm_tokenized, the 50k corpus).
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 
 TRAIN_ITERS=${TRAIN_ITERS:-2121}
 GRAIN=${GRAIN:-1}
@@ -90,6 +92,6 @@ LOG_ARGS=(
 ENTRY=pretrain_gpt.py
 [ "$MODE" = "temporal" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
 cd Megatron-LM
-$ROOT/.venv/bin/torchrun --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+"$(dirname "$PY")/torchrun" --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
   "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
   2>&1 | tee "$OUT/train.log"

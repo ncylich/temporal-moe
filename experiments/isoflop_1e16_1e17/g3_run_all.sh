@@ -4,7 +4,9 @@
 # drive.sh is idempotent (skips runs whose final ckpt exists), so this is safe to re-launch.
 # Launch detached:  nohup bash experiments/isoflop_1e16_1e17/g3_run_all.sh > results/phase0/g3_run_all.log 2>&1 &
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+# One environment contract: ROOT, PY, DATA_DIR, TOKENIZER_MODEL, CKPT_ROOT, NV.
+. "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
+cd "$ROOT"
 
 # ---- common env (absolute paths required: run.sh cd's into Megatron-LM) ----
 export TOKENIZER_MODEL=$ROOT/data/tok16k
