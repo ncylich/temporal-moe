@@ -4,8 +4,10 @@
 # Produces: <out-root>/qwen3moe-rand-<fine|coarse>-Q4_K_M.gguf
 set -euo pipefail
 LLAMA_DIR="${1:?usage: build_models.sh <llama.cpp-dir> [out-root]}"
-OUT_ROOT="${2:-/workspace/models}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Default beside this script rather than an absolute path that exists on one machine.
+# Override with argument 2 or $MODELS_ROOT.
+OUT_ROOT="${2:-${MODELS_ROOT:-$HERE/models}}"
 QUANT="$LLAMA_DIR/build/bin/llama-quantize"
 
 python3 "$HERE/gen_random_qwen3moe.py" --variant both --out-root "$OUT_ROOT"

@@ -87,7 +87,10 @@ def build(variant: str, out_dir: str):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--variant", choices=list(VARIANTS) + ["both"], default="both")
-    ap.add_argument("--out-root", default="/workspace/models")
+    # Default beside this script rather than an absolute path that exists on one machine.
+    _default_root = os.environ.get(
+        "MODELS_ROOT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "models"))
+    ap.add_argument("--out-root", default=_default_root)
     args = ap.parse_args()
     variants = list(VARIANTS) if args.variant == "both" else [args.variant]
     for var in variants:
