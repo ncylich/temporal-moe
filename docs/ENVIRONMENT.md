@@ -27,6 +27,32 @@ string, `1.11.0+fc034785`, so the submodule and the pinned wheel agree.
 Analysis and probe scripts that only read checkpoints still need `Megatron-LM` present, because the
 distributed-checkpoint metadata pickle references megatron classes. See `analysis/probes/ckpt_read.py`.
 
+### Overlap-architecture parity, verified
+
+The overlap variants had never been exercised end to end, because `EXTRA_MODEL_ARGS` was written by
+`parity_overlap.sh` and `overlap_v1_1e18.sh` but read by no launcher, so the flags were silently
+dropped and every "overlap" run was a plain temporal baseline. With the launchers fixed, the parity
+test runs for the first time. Four arms, G3 temporal, mb32, 10 iterations, seed 1234, same data:
+
+| arm | iter 5 | iter 10 | final test CE |
+|---|---|---|---|
+| patched, flags off | 10.650930 | 10.067500 | 9.767243 |
+| patched, `--overlap-early-router` | 10.644200 | 10.062540 | 9.760985 |
+| patched, `--overlap-parallel-ffn` | 10.653240 | 10.064900 | 9.765186 |
+| unpatched Megatron, flags off | 10.650930 | 10.067510 | 9.767256 |
+
+**Parity holds.** Patched-with-flags-off matches the unpatched baseline exactly at iteration 5
+(delta 0.00e+00) and to 1.0e-5 at iteration 10, a relative difference of 0.0001%. That residual is
+ordinary GPU nondeterminism, so the patch is inert when its flags are off. The harness comment
+asking for bit-for-bit equality is stricter than the hardware allows; equality within run-to-run
+noise is the achievable bar.
+
+**Both flags are active.** They shift iteration-5 loss by -6.7e-3 and +2.3e-3 respectively, roughly
+673 times the patched-versus-unpatched residual, so each one demonstrably changes the forward path.
+
+Any overlap result recorded before this fix should be treated as a plain temporal baseline, since
+the flags could not reach argparse.
+
 ### Getting from a fresh clone to a training step
 
 Validated end to end on a clean checkout. `scripts/setup.sh train` now does the dependency work,
