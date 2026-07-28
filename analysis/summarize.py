@@ -9,10 +9,12 @@ Usage: summarize.py <run_name_prefix>   e.g. summarize.py v16k_sweep
 """
 import sys, os, re, json, math
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import RUNS
+
 BPB_DIVISOR = float(os.environ.get("BPB_DIVISOR", "2.7568"))
 BAR_1e17 = 1.645   # CE 4.9 @50k -> BPB
 BAR_1e16 = 2.149   # CE 6.4 @50k -> BPB
-RUNS = "/workspace/FLAME-MoE/results/phase0/runs"
 SHAPES = ["s1", "s2", "s3", "s4", "s5", "s6"]
 
 def parse(run_dir):

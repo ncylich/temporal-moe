@@ -7,7 +7,8 @@ import os, sys, csv, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import delex_locus
 
-ROOT = "/workspace/FLAME-MoE"; RUNS = os.path.join(ROOT, "results/phase0/runs")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from paths import ROOT, RUNS
 OUT = os.path.join(ROOT, "results/ablations/mechinterp_locus_1e19.csv")
 CELLS = [("moe_coarse_1e19", "moe_coarse_1e19"),
          ("temporal_coarse_1e19", "g1_tmoe_coarse_1e19"),
