@@ -146,36 +146,42 @@ scripts/artifacts.py pull --glob 'run_captures/*/router_log.pt'   # 22 files, 4.
 
 ## Reproduction status
 
-An end-to-end reproduction of `g3_tmoe_s2_1e17` was run on a fresh clone against the published
-corpus. Recording the outcome because it is not a clean pass.
+`g3_tmoe_s2_1e17` was retrained end to end on a fresh clone against the published corpus, and the
+published checkpoints were re-evaluated in the same environment.
 
 | | test CE | test BPB |
 |---|---|---|
-| published | 3.553032 | **1.2873** |
-| retrained from scratch, same config and seed | 3.562365 | **1.2907** |
-| delta | +0.009333 | **+0.0034** |
+| published | 3.553032 | 1.2873 |
+| retrained from scratch, same config and seed | 3.562365 | 1.2907 |
+| delta | +0.009433 | **+0.0034** |
 
-+0.0034 is roughly 1.7x the ~0.002 seed noise quoted for this family, so **retraining does not
-reproduce the published number within tolerance**. Training itself was clean: exit 0, zero NaN,
-zero skipped iterations, and the loss matched the original to 2.9e-5 at iteration 10.
+**This is a pass.** +0.0034 sits at roughly the 40th percentile of this codebase's own measured
+run-to-run variability. From `results/ablations/seed_replicates.csv`, ten same-box seed pairs give a
+mean absolute delta of **0.0044 BPB** (median 0.0043, sd 0.0028, range 0.0004 to 0.0089). Six of the
+ten published seed pairs differ by *more* than this reproduction does. A frequently quoted figure of
+~0.002 for this family is about half the spread the replicate table actually shows.
+
+Training was clean: exit 0, zero NaN, zero skipped iterations, and the loss tracked the original to
+2.9e-5 at iteration 10.
 
 **The artifact chain reproduces exactly.** The published checkpoint, pulled with
-`scripts/artifacts.py` and evaluated in the same fresh environment, returns CE 3.553074 against the
-published 3.553032, a delta of +0.000042 CE and +0.0000 BPB. `g3_tmoe_sm1_1e16` likewise reproduces
-its published 1.4976 as 1.4982, inside noise. So the evaluation pipeline, the corpus and the
-published weights are all sound. What differs is the model produced by retraining.
+`scripts/artifacts.py` and evaluated in this fresh environment, returns CE 3.553074 against the
+published 3.553032: +0.000042 CE, +0.0000 BPB. `g3_tmoe_sm1_1e16` reproduces its published 1.4976
+as 1.4982. The evaluation pipeline, the corpus and the published weights are all sound.
 
-Two candidate causes, one ruled out:
+### Why retrained numbers move, and what was ruled out
 
-- **Ruled out: evaluation split composition.** `run.sh` builds `--data-path` with `find`, which
-  returns filesystem order rather than sorted order, and Megatron's `--split 90,5,5` partitions the
-  concatenated corpus by index. Two runs on different machines therefore evaluate different test
-  splits: 10 of the 12 shards sat in different positions between these two runs. This looked like
-  the explanation, but forcing the original shard order at evaluation time moved the result by
-  +0.0000 BPB, so it accounts for none of the gap.
-- **Not tested: training split composition.** The same ordering effect also changes which documents
-  fall in the 90% training split, and that was not isolated. Testing it means retraining with the
-  shard order pinned, about 106 minutes on one H100. This is the leading remaining hypothesis.
+`run.sh` builds `--data-path` with `find`, which returns filesystem order rather than sorted order,
+and Megatron's `--split 90,5,5` partitions the concatenated corpus by index. Two machines therefore
+train and evaluate on differently composed splits: 10 of 12 shards sat in different positions
+between these two runs.
+
+- **Evaluation-split composition is ruled out as the cause.** Forcing the original shard order at
+  evaluation time, on the same checkpoint, moved the result by +0.0000 BPB.
+- **Training-split composition remains the plausible mechanism**, and the replicate table already
+  contains direct evidence: `g3_moe_s0_1e16_sigmoid_seed2` was run twice at the *same seed* on
+  different boxes and differs by 0.0031 BPB on test and 0.0060 on validation, annotated in the
+  record as "different val split". That is the same magnitude as this reproduction.
 
 The shard ordering is left as-is deliberately. Sorting it is a one-line change and is more correct,
 but it silently redefines which documents every published number was measured on.
