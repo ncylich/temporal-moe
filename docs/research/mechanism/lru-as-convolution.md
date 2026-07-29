@@ -5,6 +5,11 @@ unit-tested; nothing here is a trained result, so nothing here falsifies anythin
 repo's epistemology (`ablations/decision-time-alignment.md`), free tests may promote ideas and
 never kill them.
 
+**Theory companion:** [`residency-convolution-theory.md`](./residency-convolution-theory.md) — what
+the paging, equivariance, memory and sparse-attention literatures prove about this policy family,
+including a completeness theorem showing the kernel sweep below is exhaustive over the equivariant
+history-only class, and the two untested cells the theory points at.
+
 Prompt: *if the eviction policy is LRU rather than lowest-scoring, rolling residency becomes a
 convolution over experts through time.* That is right, and it is exact rather than metaphorical —
 but the exactness lands on a different object than expected, and it explains the measured result
