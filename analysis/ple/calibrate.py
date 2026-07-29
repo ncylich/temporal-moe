@@ -60,6 +60,12 @@ def main():
                          "router and norm gains have already repaired part of the impose damage, "
                          "so the untrained Delta over-corrects and a null would be uninterpretable.")
     ap.add_argument("--suffix", default="", help="tag appended to the output table filenames")
+    ap.add_argument("--free-same", action="store_true",
+                    help="run the FREE pass on the target surface too, instead of on the base "
+                         "model. Removes the scale mismatch between an offset computed in base "
+                         "scale and a surface whose norms have moved, at the cost of making the "
+                         "target 'this surface with residency off' rather than the true gold "
+                         "standard of base free routing.")
     A = ap.parse_args()
 
     from transformers.models.olmoe.modeling_olmoe import OlmoeSparseMoeBlock
@@ -83,8 +89,9 @@ def main():
         assert len(_tp) == len(_ck["masters"]), (len(_tp), len(_ck["masters"]))
         BASEW = [p.detach().clone() for p in _tp]
         ADAPT = [m.to("cuda").to(p.dtype) for m, p in zip(_ck["masters"], _tp)]
-        print(f"[calib] Delta = free routing on the BASE model  minus  residency on the C surface "
-              f"at {_ck['seen']/1e6:.0f}M tokens ({os.path.basename(A.resume_c)})", flush=True)
+        _fs = "the SAME surface (--free-same)" if A.free_same else "the BASE model"
+        print(f"[calib] Delta = free routing on {_fs}  minus  residency on the surface at "
+              f"{_ck['seen']/1e6:.0f}M tokens ({os.path.basename(A.resume_c)})", flush=True)
 
     def _set(ws):
         if ws is None:
@@ -111,7 +118,8 @@ def main():
         for s in range(0, A.seqs, A.mb):
             ids = corpus[order[s:s + A.mb]].to("cuda").long()
             CAP["on"] = True
-            _set(BASEW if ADAPT is not None else None)      # free side: BASE weights, always
+            # free side: BASE weights by default; the target surface under --free-same
+            _set((ADAPT if A.free_same else BASEW) if ADAPT is not None else None)
             RES.disable_residency()
             CAP["buf"] = {}; model(ids); free = {k: v for k, v in CAP["buf"].items()}
             _set(ADAPT)                                     # residency side: the target surface
@@ -157,6 +165,7 @@ def main():
             "delta": ("MoE_free - MoE_residency on the UNTRAINED base model" if not A.resume_c
                       else f"MoE_free - MoE_residency on the C surface at {A.resume_c}"),
             "reference": A.resume_c or "untrained base",
+            "free_side": ("target surface (--free-same)" if A.free_same else "base model"),
             "shrunk_before_svd": True}
 
     for rk in A.ranks.split(","):

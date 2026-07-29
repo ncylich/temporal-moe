@@ -35,3 +35,5 @@ calstack_norms_plus_ple_r512,calib_table_r512_cal0.pt,csurf_cal0norms.pt,0,100-9
 calstack_norms_plus_ple_r512,calib_table_r512_cal0.pt,csurf_cal0norms.pt,0,1000-9999,113687,3.643706,-42.97,,,3.1089070924799973
 calstack_norms_plus_ple_r512,calib_table_r512_cal0.pt,csurf_cal0norms.pt,0,10000-99999,243363,3.303207,-26.59,,,3.1089070924799973
 calstack_norms_plus_ple_r512,calib_table_r512_cal0.pt,csurf_cal0norms.pt,0,100000+,684920,2.420823,15.87,,,3.1089070924799973
+A_normcal_then_ple_samescale_rfull,calib_table_rfull_same.pt,csurf_cal0norms.pt,0,ALL,1048320,3.236982,-23.4,0.999863,0.995111,3.1089070924799973
+A_normcal_then_ple_samescale_r512,calib_table_r512_same.pt,csurf_cal0norms.pt,0,ALL,1048320,3.087772,-16.22,0.999829,0.994592,3.1089070924799973

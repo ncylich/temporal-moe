@@ -47,12 +47,31 @@ def main():
     ap.add_argument("--clip-lo", type=float, default=0.5)
     ap.add_argument("--clip-hi", type=float, default=2.0)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--ple-table", default=None,
+                    help="install this PLE table BEFORE calibrating norms, reversing the order: "
+                         "norms are then fitted to whatever scale error PLE leaves behind. The "
+                         "free-routing RMS reference is taken with PLE DISABLED, since base free "
+                         "routing is the behaviour being matched and PLE is a correction for "
+                         "damage that does not exist there.")
+    ap.add_argument("--tag", default="cal0")
     A = ap.parse_args()
 
     from transformers.models.olmoe.modeling_olmoe import OlmoeRMSNorm
     D = json.load(open(os.path.join(DATA_DIR, "bpb_slice_meta.json")))["divisor_D"]
     model, _ = RES.load_model()
     model.eval()
+
+    PLE_MOD = None
+    if A.ple_table:
+        import ple as PLE
+        _sd = torch.load(A.ple_table, map_location="cuda")
+        _rank = _sd.pop("rank")
+        PLE_MOD = PLE.install(model, _rank if _rank == "full" else int(_rank), device="cuda")
+        with torch.no_grad():
+            for _k, _v in _sd.items():
+                getattr(PLE_MOD, _k).copy_(_v.to("cuda"))
+        print(f"[cal-stack] PLE installed first from {os.path.basename(A.ple_table)} rank={_rank}",
+              flush=True)
 
     norms = [m for m in model.modules() if isinstance(m, OlmoeRMSNorm)]
     base_g = [n.weight.detach().float().clone() for n in norms]
@@ -79,6 +98,10 @@ def main():
     def rms_pass(residency_on):
         ACC.clear(); CNT.clear(); REC["on"] = True
         RES.enable_residency(R=8) if residency_on else RES.disable_residency()
+        if PLE_MOD is not None:
+            # PLE off for the free reference, on for the constrained state being corrected.
+            import ple as _P
+            _P._STATE["ple"] = PLE_MOD if residency_on else None
         with torch.no_grad():
             for i in range(stat_ids.shape[0]):
                 model(stat_ids[i:i + 1].to("cuda"))
@@ -117,6 +140,9 @@ def main():
                 n += x[:, 1:].numel()
         return (tot / n) / D
 
+    if PLE_MOD is not None:
+        import ple as _P
+        _P._STATE["ple"] = PLE_MOD
     set_norms(base_g)
     b_base = eval_bpb()
     print(f"[cal-stack] base norms   @R8 BPB={b_base:.6f} recovery={rec(b_base)*100:.2f}%", flush=True)
@@ -126,7 +152,7 @@ def main():
 
     # Write the calibrated surface in the trainer's checkpoint layout so the existing tools consume
     # it unchanged: masters = router params (base, uncalibrated) followed by norm params (calibrated).
-    out = A.out or os.path.join(DATA_DIR, "csurf_cal0norms.pt")
+    out = A.out or os.path.join(DATA_DIR, f"csurf_{A.tag}norms.pt")
     masters = [p.detach().float().cpu() for p in RES.router_params(model)] + \
               [g.detach().float().cpu() for g in gprime]
     torch.save({"masters": masters, "opt": {}, "seen": 0, "step": 0, "pos": 0,
@@ -136,9 +162,10 @@ def main():
 
     path = os.path.join(ABLATIONS, "ple_cal_stack.csv")
     import csv as _csv
-    rows = [{"stage": "base norms, base router, R=8", "bpb": round(b_base, 6),
+    _pt = f" + PLE {os.path.basename(A.ple_table)}" if A.ple_table else ""
+    rows = [{"stage": f"base norms, base router, R=8{_pt}", "bpb": round(b_base, 6),
              "recovery_pct": round(rec(b_base) * 100, 2), "trained": "no"},
-            {"stage": f"Cal-0 calibrated norms (clip {A.clip_lo}-{A.clip_hi}), base router, R=8",
+            {"stage": f"calibrated norms (clip {A.clip_lo}-{A.clip_hi}), base router, R=8{_pt}",
              "bpb": round(b_cal, 6), "recovery_pct": round(rec(b_cal) * 100, 2), "trained": "no"}]
     exists = os.path.exists(path)
     with open(path, "a" if exists else "w", newline="") as f:
