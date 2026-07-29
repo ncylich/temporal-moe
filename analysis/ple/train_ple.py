@@ -75,6 +75,10 @@ ap.add_argument("--free-layers", type=int, default=0,
                      "is not comparable to a full-residency number without stating the cost: a freed "
                      "layer must keep all 64 experts resident instead of 8, which is +43.8% resident "
                      "expert memory for one layer and +87.5% for two.")
+ap.add_argument("--free-set", default="",
+                help="explicit comma-separated layer indices to leave UNCONSTRAINED, e.g. 0,1,15. "
+                     "Overrides --free-layers. Same relaxation and the same memory cost: each freed "
+                     "layer keeps all 64 experts resident instead of 8.")
 ap.add_argument("--heldout", action="store_true",
                 help="withhold the token ids in ple_heldout.pt from the PLE lookup, so the "
                      "zero-property check tests rows that were eligible to train")
@@ -92,7 +96,13 @@ D = meta["divisor_D"]                                        # re-read, never in
 model, tok = RES.load_model()
 RES.enable_residency(R=8, free_layers=A.free_layers)
 RES.enable_grad_checkpointing(model)
-if A.free_layers:
+_FREE = [int(x) for x in A.free_set.split(",") if x.strip() != ""]
+if _FREE:
+    RES.set_free_layers(_FREE)
+    _slots = (16 - len(_FREE)) * 8 + len(_FREE) * 64
+    print(f"[resid] layers {_FREE} UNCONSTRAINED, the rest under rolling residency R=8; "
+          f"resident expert slots {_slots} vs 128 (+{_slots/128*100-100:.1f}% memory)", flush=True)
+elif A.free_layers:
     print(f"[resid] first {A.free_layers} MoE layer(s) UNCONSTRAINED; layers {A.free_layers}-15 "
           f"under rolling residency R=8", flush=True)
 RES.freeze_all_but_router(model)
@@ -171,7 +181,10 @@ E_experts = model.config.num_experts
 
 
 def eval_bpb_telem():
-    model.eval(); RES.enable_residency(R=8, free_layers=A.free_layers); RES.reset_telem(); RES._CFG["collect_telem"] = True
+    model.eval(); RES.enable_residency(R=8, free_layers=A.free_layers)
+    if _FREE:
+        RES.set_free_layers(_FREE)
+    RES.reset_telem(); RES._CFG["collect_telem"] = True
     tot = n = 0
     with torch.no_grad():
         for i in range(eval_sub.shape[0]):
@@ -279,7 +292,7 @@ while seen < A.tokens:
 
 fb, fswap, fent = eval_bpb_telem()
 res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
-       "ple_start": A.ple_start, "calib_init": A.calib_init, "free_layers": A.free_layers,
+       "ple_start": A.ple_start, "calib_init": A.calib_init, "free_layers": A.free_layers, "free_set": A.free_set,
        "calib_suffix": A.calib_suffix,
        "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
