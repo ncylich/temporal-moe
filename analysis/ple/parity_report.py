@@ -56,26 +56,52 @@ def main():
          "impl": "analysis/ple/train_ple.py",
          "tokens": a2["train_tokens"], "bpb": f"{f2:.6f}", "swap": f"{a2['final_swap']:.6f}",
          "entropy": f"{a2['final_entropy']:.6f}", "divisor": a2["divisor"]},
-        {"arm": "B", "what": "adaptation program arm C, unmodified",
-         "impl": "olmoe-adapt/scripts/train_bakeoff.py",
+        {"arm": "B1", "what": "adaptation program arm C, unmodified",
+         "impl": "scripts/adaptation/train_bakeoff.py",
          "tokens": b["train_tokens"], "bpb": f"{fb:.6f}", "swap": f"{b['final_swap']:.6f}",
          "entropy": f"{b['final_entropy']:.6f}", "divisor": b["divisor"]},
-        {"arm": "floor", "what": "|A1 - A2| run-to-run non-determinism", "impl": "",
-         "tokens": "", "bpb": f"{floor:.6f}", "swap": "", "entropy": "", "divisor": ""},
-        {"arm": "delta", "what": "|mean(A1,A2) - B| new-code-off vs reference", "impl": "",
-         "tokens": "", "bpb": f"{delta:.6f}", "swap": "", "entropy": "", "divisor": ""},
     ]
+    if b2 is not None:
+        rows.append({"arm": "B2", "what": "adaptation program arm C, second replicate",
+                     "impl": "scripts/adaptation/train_bakeoff.py",
+                     "tokens": b2["train_tokens"], "bpb": f"{fb2:.6f}",
+                     "swap": f"{b2['final_swap']:.6f}", "entropy": f"{b2['final_entropy']:.6f}",
+                     "divisor": b2["divisor"]})
+    rows += [
+        {"arm": "floor_new", "what": "|A1 - A2| new trainer's own run-to-run spread", "impl": "",
+         "tokens": "", "bpb": f"{floor:.6f}", "swap": "", "entropy": "", "divisor": ""},
+    ]
+    if b2 is not None:
+        rows.append({"arm": "floor_ref", "what": "|B1 - B2| reference's own run-to-run spread",
+                     "impl": "", "tokens": "", "bpb": f"{ref_floor:.6f}", "swap": "",
+                     "entropy": "", "divisor": ""})
+    rows.append({"arm": "delta",
+                 "what": ("|mean(A) - mean(B)| new-code-off vs reference" if b2 is not None
+                          else "|mean(A1,A2) - B| new-code-off vs reference"),
+                 "impl": "", "tokens": "", "bpb": f"{delta:.6f}", "swap": "", "entropy": "",
+                 "divisor": ""})
     path = os.path.join(ABLATIONS, "ple_parity.csv")
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader(); w.writerows(rows)
 
-    print(f"A1 (new, flag off)      BPB = {f1:.6f}")
-    print(f"A2 (new, flag off)      BPB = {f2:.6f}")
-    print(f"B  (reference arm C)    BPB = {fb:.6f}")
-    print(f"floor |A1-A2|           = {floor:.6f}")
-    print(f"delta |mean(A)-B|       = {delta:.6f}")
-    print(f"delta / floor           = {delta/floor:.2f}x" if floor else "floor is exactly 0")
+    print(f"A1 (new, flag off)        BPB = {f1:.6f}")
+    print(f"A2 (new, flag off)        BPB = {f2:.6f}")
+    print(f"B1 (reference arm C)      BPB = {fb:.6f}")
+    if b2 is not None:
+        print(f"B2 (reference arm C)      BPB = {fb2:.6f}")
+    print(f"floor_new |A1-A2|         = {floor:.6f}")
+    if b2 is not None:
+        print(f"floor_ref |B1-B2|         = {ref_floor:.6f}   ({ref_floor/floor:.2f}x floor_new)")
+        print(f"delta |mean(A)-mean(B)|   = {delta:.6f}")
+        lo_a, hi_a, lo_b, hi_b = min(f1, f2), max(f1, f2), min(fb, fb2), max(fb, fb2)
+        print(f"A range [{lo_a:.6f}, {hi_a:.6f}]   B range [{lo_b:.6f}, {hi_b:.6f}]"
+              f"   overlap={'yes' if hi_a >= lo_b and hi_b >= lo_a else 'no'}")
+        print("n=2 per arm: perfect separation of 2 vs 2 has p=1/3 under the null, so the ranges "
+              "not overlapping is not evidence of a difference.")
+    else:
+        print(f"delta |mean(A)-B|         = {delta:.6f}")
+    print(f"2-sigma decision bar (PLE_PLAN.md §3) = 0.012000")
     print("wrote", path)
 
 

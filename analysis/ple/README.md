@@ -20,11 +20,16 @@ and the checks. No Phase 1 cell has been launched.
 
 ## Where the artifacts come from
 
-`residency.py` is `olmoe_residency.py` from the adaptation program, which lives outside this repo
-and is **not** in `results/MANIFEST.csv`. It is copied here with two changes only — the two
-hardcoded absolute paths replaced by resolution through `analysis/paths.py` — plus one added
-function, `load_c_adapted`, which applies a saved arm-C delta. The residency scan itself is
-untouched and still calls `temporal/temporal_router.py` verbatim.
+`residency.py` is `olmoe_residency.py` from the adaptation program, copied here with two changes
+only — the two hardcoded absolute paths replaced by resolution through `analysis/paths.py` — plus
+one added function, `load_c_adapted`, which applies a saved arm-C delta. The residency scan itself
+is untouched and still calls `temporal/temporal_router.py` verbatim.
+
+The unmodified original is now archived at `scripts/adaptation/olmoe_residency.py`. The two files
+are deliberately kept separate and are **not** interchangeable: the archived copy is the record of
+what produced the published numbers and must stay byte-identical to what ran, while this one is the
+working module. `diff scripts/adaptation/olmoe_residency.py analysis/ple/residency.py` shows the
+whole delta.
 
 The base checkpoint and the 4.4 GB corpus are resolved by `olmoe_paths.py`, in order:
 `$TMOE_OLMOE_MODEL` / `$TMOE_OLMOE_DATA`, then `$TMOE_OLMOE_HOME`, then `<repo parent>/olmoe-adapt`.
