@@ -15,6 +15,12 @@ It also settles two things:
     and single-layer numbers cannot be summed to predict a subset.
   WHICH TO FREE    freeing a layer costs the same memory wherever it sits (64 experts vs 8), so the
     right layers to free are simply the most damaging ones, at whatever depth.
+
+SUBSET MODE (--sets): instead of constraining one layer at a time, leave a SUBSET unconstrained and
+compare the measured damage against the additive prediction from the single-layer profile. The gap
+is the interaction term. This is what showed that {0,1,2} and {0,1,15} have near-identical additive
+predictions (0.1408 solo damage each for layers 2 and 15) but recover 0.573 and 0.409 respectively:
+layer 15's damage is largely redundant with what freeing layers 0-1 already fixes.
 """
 import argparse, csv, json, os, sys
 import torch
@@ -30,7 +36,6 @@ BASE_REF, IMPOSE_REF = 0.6727, 2.7507
 ap = argparse.ArgumentParser()
 ap.add_argument("--eval-n", type=int, default=256)
 ap.add_argument("--R", type=int, default=8)
-ap.add_argument("--no-plot", action="store_true")
 A = ap.parse_args()
 
 D = json.load(open(os.path.join(DATA_DIR, "bpb_slice_meta.json")))["divisor_D"]
@@ -86,25 +91,5 @@ with open(path, "w", newline="") as f:
     w.writerows(rows)
 print("wrote", path)
 
-if not A.no_plot:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
-    ax.bar(range(L), dmg, color="#145a14", alpha=0.85)
-    ax.axhline(full_d / L, ls="--", color="0.45", lw=1.2,
-               label=f"uniform share of full damage ({full_d/L:.4f})")
-    ax.set_xlabel("MoE layer index")
-    ax.set_ylabel("BPB increase vs free routing")
-    ax.set_title(f"Residency damage per layer (R={A.R}, one layer constrained at a time)")
-    ax.set_xticks(range(L))
-    ax.grid(True, axis="y", ls=":", alpha=0.4)
-    ax.legend()
-    fig.text(0.5, 0.005, f"Base model, no training. Sum of single-layer damage {tot_d:.4f} vs "
-             f"{full_d:.4f} for all 16 constrained (ratio {tot_d/full_d:.2f}).",
-             ha="center", fontsize=8, wrap=True)
-    fig.tight_layout(rect=[0, 0.06, 1, 1])
-    out = os.path.join(os.path.dirname(ABLATIONS), "phase0", "figures", "ple_layer_damage.png")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    fig.savefig(out, dpi=200)
-    print("wrote", out)
+# The figure is drawn by `report.py figure` from the consolidated CSV, because matplotlib is not
+# installed in the venv that runs the model.

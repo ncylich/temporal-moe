@@ -1,4 +1,0 @@
-tag,n_experts_probed,packs,seqlen,window_w,layers,token_AUC_median,context_AUC_median,context_minus_token_median,ref_base_impose_ctx_minus_tok,ref_CE_adapted_ctx_minus_tok
-p4_ce_ple_128,320,16,2048,8,"2,3,4,5,6",0.650022,0.738506,0.094917,-0.0041,0.0493
-p4_seq_ple_512,320,16,2048,8,"2,3,4,5,6",0.650654,0.737467,0.096374,-0.0041,0.0493
-p4_csurf_only,318,16,2048,8,"2,3,4,5,6",0.653762,0.734122,0.093237,-0.0041,0.0493

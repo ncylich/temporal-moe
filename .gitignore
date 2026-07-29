@@ -21,3 +21,18 @@ results/phase0/probe_batch_cache/
 # macOS / editor droppings
 .DS_Store
 .obsidian/
+
+# PLE program: per-measurement intermediates. analysis/ple/consolidate.py folds all of these into
+# the single committed artifact results/ablations/ple_results.csv, so only that file is tracked.
+results/ablations/ple_accounting.csv
+results/ablations/ple_cal_stack.csv
+results/ablations/ple_calib_meta*.json
+results/ablations/ple_coverage.csv
+results/ablations/ple_heldout.csv
+results/ablations/ple_joint_free.csv
+results/ablations/ple_ladder.csv
+results/ablations/ple_layer_damage.csv
+results/ablations/ple_locus.csv
+results/ablations/ple_parity.csv
+results/ablations/ple_row_norms.csv
+results/ablations/ple_trainfree_and_buckets.csv

@@ -1,5 +1,0 @@
-rank,total_params,params_M,flash_fetch_bytes_per_token,resident_basis_bytes,expert_swap_bytes,fetch_vs_expert_swap,train_param_plus_grad_GiB,train_adam8bit_GiB,train_adam_fp32_GiB,train_total_adam8bit_GiB,note
-32,2658304,2.658,64,2097152,12582912,5e-06,0.02,0.005,0.02,0.025,"U[50304,32] + V[32,16,2048]"
-128,10633216,10.633,256,8388608,12582912,2e-05,0.079,0.02,0.079,0.099,"U[50304,128] + V[128,16,2048]"
-512,42532864,42.533,1024,33554432,12582912,8.1e-05,0.317,0.079,0.317,0.396,"U[50304,512] + V[512,16,2048]"
-full,1648361472,1648.361,65536,0,12582912,0.005208,12.281,3.07,12.281,15.352,"unfactored table [vocab, layers, hidden]"

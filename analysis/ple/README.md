@@ -1,125 +1,104 @@
-# Per-Layer Embeddings (PLE) for OLMoE residency adaptation
+# Per-Layer Embeddings (PLE) and per-layer residency relaxation
 
-Implementation of `PLE_PLAN.md`. Phase 0 only: the module, the parity control, the accounting,
-and the checks. No Phase 1 cell has been launched.
+Implementation for [`PLE_PLAN.md`](../../PLE_PLAN.md). **Results and findings live in
+[`results/ablations/ple_RESULTS.md`](../../results/ablations/ple_RESULTS.md); every number is in
+`results/ablations/ple_results.csv`.** This file documents only the code.
 
 ## Files
 
 | file | what it is |
 |---|---|
-| `ple.py` | the factored PLE table and the post-MoE install/uninstall |
-| `train_ple.py` | training cell; `--rank off` is the recipe-C parity control |
-| `residency.py` | the rolling-residency mask, copied from the adaptation program (see below) |
-| `olmoe_paths.py` | path contract for the base checkpoint and corpus, plus manifest verification |
-| `accounting.py` | parameter / bandwidth table and corpus coverage |
-| `parity_report.py` | collects the parity runs into `results/ablations/ple_parity.csv` |
-| `placement_check.py` | proves the post-MoE placement leaves same-layer routing untouched |
-| `grad_check.py` | proves the table receives gradient *through* gradient checkpointing |
-| `zero_check.py` | the zero-property check, at init and after a cell trains |
-| `row_norms.py` | per-cell diagnostic: mean row norm bucketed by occurrence count (no GPU) |
+| `residency.py` | the rolling-residency constraint, plus `set_free_layers()` for per-layer relaxation |
+| `ple.py` | the factored PLE table and the post-MoE install |
+| `train_ple.py` | every training cell: PLE ranks, LoRA surface, free-layer sets, calibrated init, resume |
+| `olmoe_paths.py` | path contract for the base checkpoint and corpus, with manifest verification |
+| `calibrate.py` | closed-form Δ capture, shrinkage at an estimated λ\*, precision-weighted SVD |
+| `cal_stack.py` | Cal-0 norm calibration, and the norm↔PLE stack in either order |
+| `layer_ablation.py` | per-layer damage, and joint free-set damage vs the additive prediction |
+| `eval_table.py` | score a table with NO training (§9), and bucket recovery by frequency (§8.3) |
+| `locus.py` | §8.1 token-vs-context locus probe |
+| `row_norms.py` | §2 diagnostic: row norm bucketed by occurrence count |
+| `accounting.py` | parameters, flash fetch, training memory, corpus coverage |
+| `memory_probe.py` | measured memory decomposition per rank and micro-batch |
+| `heldout.py` | builds the held-out token set the zero-property check uses |
+| `checks.py` | all correctness checks: `init`, `placement`, `grad`, `zero`, `bitwise` |
+| `report.py` | §5 ladder gates, and the layer-damage figure |
+| `consolidate.py` | folds every intermediate into the one committed CSV |
 
-## Where the artifacts come from
+## Artifacts and paths
 
-`residency.py` is `olmoe_residency.py` from the adaptation program, copied here with two changes
-only — the two hardcoded absolute paths replaced by resolution through `analysis/paths.py` — plus
-one added function, `load_c_adapted`, which applies a saved arm-C delta. The residency scan itself
-is untouched and still calls `temporal/temporal_router.py` verbatim.
+`residency.py` is the adaptation program's `olmoe_residency.py` with two hardcoded paths replaced by
+resolution through `analysis/paths.py`, plus `load_c_adapted()` and `set_free_layers()`. The
+unmodified original is archived at [`scripts/adaptation/`](../../scripts/adaptation/README.md) and
+the two are **not** interchangeable: the archive is the record of what produced the published
+numbers.
 
-The unmodified original is now archived at `scripts/adaptation/olmoe_residency.py`. The two files
-are deliberately kept separate and are **not** interchangeable: the archived copy is the record of
-what produced the published numbers and must stay byte-identical to what ran, while this one is the
-working module. `diff scripts/adaptation/olmoe_residency.py analysis/ple/residency.py` shows the
-whole delta.
+The base checkpoint (27 GB) and corpus (4.4 GB) resolve via `$TMOE_OLMOE_MODEL` / `$TMOE_OLMOE_DATA`,
+then `$TMOE_OLMOE_HOME`, then `<repo parent>/olmoe-adapt`. The corpus files are in
+`results/MANIFEST.csv` with sha256; `olmoe_paths.py --full` verifies a local copy, which is what
+licenses using local disk instead of re-downloading.
 
-The base checkpoint and the 4.4 GB corpus are resolved by `olmoe_paths.py`, in order:
-`$TMOE_OLMOE_MODEL` / `$TMOE_OLMOE_DATA`, then `$TMOE_OLMOE_HOME`, then `<repo parent>/olmoe-adapt`.
-The corpus files are listed in `results/MANIFEST.csv` with sha256; `olmoe_paths.py --full` checks a
-local copy against it, which is what licenses using local disk instead of re-downloading.
+Each script writes a small intermediate CSV into `results/ablations/`. Those are **gitignored**;
+`consolidate.py` folds them into the single tracked `ple_results.csv`. Re-run any script, then
+`consolidate.py`, and the committed artifact is rebuilt.
 
 ## Design decisions that differ from the plan's literal text
 
-**Gate initialization.** `PLE_PLAN.md` §2 asks for both a zero-initialized table and a gate
-"initialized so the branch starts inert". Both at once is a permanent fixed point: with the table
-at zero the contribution is already exactly zero, and a zero gate additionally zeroes the gradient
-reaching the table, so `dL/dU = dL/dV = dL/dg = 0` and nothing ever moves. Measured directly:
+**Gate initialisation.** §2 asks for both a zero-init table and a gate "initialised so the branch
+starts inert". Both at once is a permanent fixed point — `dL/dU = dL/dV = dL/dg = 0`, so the branch
+can never leave zero and a cell would train nothing while logging a healthy loss curve. Verified by
+`checks.py init`. The gate starts at 1.0; the zero table alone provides inertness, bit-identical
+parity, and the rare-row zero property.
 
-```
-gate=0.0: contribution_zero=True  dU_nonzero=False dV_nonzero=False dg_nonzero=False
-gate=1.0: contribution_zero=True  dU_nonzero=True  dV_nonzero=False dg_nonzero=False
-```
+**Weight decay is 0 on every rung**, making rank the only regulariser so a null at low rank is
+attributable. §9's λ\* is *not* a source for it — λ is count-space pseudo-observations, decay is a
+loss coefficient, and the functional forms differ. The cost is acknowledged: with Adam and no decay a
+row seen once takes nearly the step of a row seen ten thousand times, so full rank is exposed to
+memorising noise in rare rows. `row_norms.py` is the diagnostic; measured norms rise monotonically
+with frequency, so the risk did not materialise.
 
-The gate is therefore initialized to 1.0. Inertness at step 0 comes from the zero table, which is
-what actually gives bit-identical parity and the rare-row zero property; the gate is kept only
-because §2 specifies a learned per-layer scale. `dV` and `dg` start at zero and become nonzero once
-the table leaves zero, which is the intended order.
+**Gradient clipping is per-surface.** Clipping the C parameters and the PLE tensors jointly would
+make the C-surface updates depend on the PLE gradient norm, confounding PLE's contribution with a
+changed C trajectory.
 
-**Weight decay coefficient: 0 on every rung, decided.** §2 originally said to inherit the
-coefficient "the C recipe already uses", which is an explicit `weight_decay=0.0` in all four
-adaptation trainers (`train_bakeoff.py:51`, `train_router.py:31`, `train_fprime.py:85`,
-`train_cal2.py:86`, now archived verbatim under `scripts/adaptation/`), so inheriting it literally
-would disable the mechanism §2 argues for. That conflict was raised and resolved in favour of 0:
-
-* the ladder exists to measure whether constraining **rank** denoises underdetermined rare-token
-  rows. Regularizing by rank and by decay at once makes a null at low rank unattributable between
-  the two. At 0 the ladder is single-axis and flag-off parity is exact by construction.
-* §9's `λ*` is **not** a source for this coefficient. λ is pseudo-observations added to `n_t`, in
-  count space, giving the `n_t/(n_t+λ)` shrinkage curve; decoupled weight decay is a loss
-  coefficient, and against Adam's second-moment-normalized step a row's equilibrium norm goes
-  roughly as frequency/wd — linear in frequency. The functional forms differ, so transferring `λ*`
-  into the optimizer would manufacture rigour that is not there. λ stays in §9, which trains nothing.
-
-The cost is acknowledged rather than hidden: with Adam and no decay, a row seen once takes a step
-nearly the size of a row seen ten thousand times, because after one observation `v ≈ g²` and the
-update is `≈ lr·sign(g)`. Full rank is therefore exposed to memorizing noise in rare rows. That is
-the **pre-registered** reason full rank might lose, and losing that way is a result.
-
-`--table-wd` stays a settable parameter group, at 0. `row_norms.py` is the diagnostic any non-zero
-value should be set against; see its docstring for the stop-and-report trigger.
-
-**Gradient clipping is per-surface.** The C parameters are clipped to norm 1.0 among themselves, as
-in the reference trainer, and the PLE tensors are clipped separately. Clipping them jointly would
-make the C-surface updates depend on the PLE gradient norm, so a rank-ladder cell would differ from
-the flag-off control in the router and norm gains as well as in the table, confounding PLE's
-contribution with a changed C trajectory.
+**Free layers relax the constraint.** A cell using `--free-set` or `--free-layers` is not comparable
+to a full-residency number without stating the cost: a freed layer keeps all 64 experts resident
+instead of 8. FLOPs are unchanged — both regimes activate exactly top-8 of 64, and residency only
+restricts which eight are eligible.
 
 ## Placement
 
-Post-MoE only, added to the layer output:
+Post-MoE only, added to the layer output: `out = h + MoE(LN2(h)) + g_l * PLE[tok, l]`. There is no
+pre-MoE flag and no code path that could produce one (§13). `checks.py placement` verifies the
+guarantee that follows: layer 0's router logits are bitwise identical with and without an active
+table. Deeper layers' routing does move, which is inherent to writing into the residual stream.
 
-```
-out = h + MoE(LN2(h)) + g_l * PLE[tok, l]
-```
-
-There is no pre-MoE flag and no code path that could produce one (§13). `placement_check.py`
-verifies the guarantee that follows: layer 0's router logits are bitwise identical with and without
-an active table, because PLE is added after that layer's MoE. Deeper layers' routing does move,
-which is inherent to writing into the residual stream and is not the pre-MoE failure mode.
-
-## Reproducing Phase 0
+## Reproducing
 
 ```bash
 export TMOE_ROOT=$(git rev-parse --show-toplevel)
-PY=<the adaptation venv python>          # torch 2.4.1+cu124, transformers 5.12.1, bitsandbytes
+PY=<adaptation venv python>        # torch 2.4.1+cu124, transformers 5.12.1, bitsandbytes
 
-$PY analysis/ple/olmoe_paths.py --full           # verify the corpus against MANIFEST.csv
-$PY analysis/ple/accounting.py --accounting      # -> results/ablations/ple_accounting.csv   (CPU)
-$PY analysis/ple/accounting.py --coverage --model-for-loss C
-                                                 # -> results/ablations/ple_coverage.csv     (GPU)
-$PY analysis/ple/zero_check.py --init            # init-time zero property                   (CPU)
-$PY analysis/ple/placement_check.py              # post-MoE placement guarantee              (GPU)
-$PY analysis/ple/grad_check.py                   # gradient survives checkpointing           (GPU)
-# parity: two flag-off runs plus the unmodified reference, then
-$PY analysis/ple/parity_report.py                # -> results/ablations/ple_parity.csv
+$PY analysis/ple/olmoe_paths.py --full          # verify the corpus against MANIFEST.csv
+$PY analysis/ple/accounting.py --accounting     # params / bandwidth / training memory   (CPU)
+$PY analysis/ple/accounting.py --coverage --model-for-loss C                            # (GPU)
+$PY analysis/ple/checks.py init                 # zero-init property, gradient reachability (CPU)
+$PY analysis/ple/checks.py placement            # post-MoE guarantee                     (GPU)
+$PY analysis/ple/checks.py grad                 # gradient survives checkpointing        (GPU)
+$PY analysis/ple/heldout.py                     # build the zero-property held-out set   (GPU)
+$PY analysis/ple/layer_ablation.py              # per-layer damage                       (GPU)
+
+# a training cell, e.g. the rank ladder and the best free-set configuration
+$PY analysis/ple/train_ple.py --tag ladder_r512 --rank 512 --tokens 50000000 \
+      --mb 16 --eval-every 10000000 --table-wd 0.0 --adam8bit --heldout
+$PY analysis/ple/train_ple.py --tag ce_free_0_1_15 --rank off --tokens 50000000 \
+      --mb 16 --eval-every 10000000 --lora 32 --free-set 0,1,15
+
+# after any cell
+$PY analysis/ple/checks.py zero --trained <ple_table_TAG.pt> --train-tokens 50000000
+$PY analysis/ple/consolidate.py                 # rebuild the committed CSV
 ```
 
-After the first Phase-1 cell, as §4 item 5 specifies:
-
-```bash
-$PY analysis/ple/zero_check.py --trained <ple_table_TAG.pt> --train-tokens 50000000
-$PY analysis/ple/row_norms.py  --table   <ple_table_TAG.pt> --train-tokens 50000000
-```
-
-Both define "covered" from the prefix of the shuffled order the cell actually consumed, not from
-the whole 1B corpus — a row can only have moved if the cell saw its token. Measured uncovered-row
-counts, which is what the zero property is tested on: 3,023 rows at 10M tokens, 1,113 at 50M, 801
-at 100M.
+`checks.py bitwise` needs `CUBLAS_WORKSPACE_CONFIG=:4096:8` and, for exact gradient comparison,
+`--no-flash`. Flash attention is **on** for every training cell per §10; flash-off is only for
+correctness checks. `report.py figure` needs matplotlib, absent from the adaptation venv.
