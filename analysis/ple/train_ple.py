@@ -44,6 +44,10 @@ ap.add_argument("--accum", type=int, default=1,
                      "because activations, not the table, dominate memory.")
 ap.add_argument("--seed", type=int, default=1234, help="PLE basis init only; data order is seeded 0")
 ap.add_argument("--adam8bit", action="store_true", help="8-bit Adam for the PLE table (§2)")
+ap.add_argument("--lora", type=int, default=0,
+                help="add per-expert LoRA of this rank to the trained surface, making the base CE "
+                     "(router + norms + LoRA r32) instead of C. Default 0 = bare C surface, which "
+                     "is what the rank ladder runs on so that rank is isolated.")
 ap.add_argument("--heldout", action="store_true",
                 help="withhold the token ids in ple_heldout.pt from the PLE lookup, so the "
                      "zero-property check tests rows that were eligible to train")
@@ -67,6 +71,14 @@ norm_ps = RES.norm_params(model)                             # arm C surface: + 
 extra = norm_ps
 for p in extra:
     p.requires_grad = True
+
+if A.lora:
+    # CE surface. Mechanisms ADD here: C and E tie as alternatives (91.44% each) but stacked reach
+    # 93.16%, so the bare C surface the ladder runs on is deliberately weakened and cannot reach
+    # §1's claim. add_lora starts as an exact no-op (B factors zero-init).
+    extra = extra + RES.add_lora(model, r=A.lora, alpha=2 * A.lora)
+    for p in extra:
+        p.requires_grad = True
 
 train_params = rp + extra
 masters = [p.detach().float().clone().requires_grad_(True) for p in train_params]
@@ -97,7 +109,7 @@ n_ple = ple_mod.n_params() if ple_mod else 0
 print(f"[ple] tag={A.tag} rank={RANK} lr={A.lr} "
       f"table_wd={'n/a (flag off)' if RANK == 'off' else A.table_wd} adam8bit={A.adam8bit} "
       f"trainable_C={sum(p.numel() for p in train_params)} "
-      f"(router={sum(p.numel() for p in rp)} norms={sum(p.numel() for p in extra)}) "
+      f"(router={sum(p.numel() for p in rp)} extra={sum(p.numel() for p in extra)} lora_r={A.lora}) "
       f"ple={n_ple} tokens={A.tokens} D={D:.7f}", flush=True)
 
 corpus = torch.load(f"{DATA_DIR}/finetune_ids.pt")
@@ -188,7 +200,7 @@ while seen < A.tokens:
             print(f"[ABORT] BPB {b:.4f} > impose {IMPOSE_BPB}", flush=True); sys.exit(4)
 
 fb, fswap, fent = eval_bpb_telem()
-res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd,
+res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
        "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
        "final_bpb": fb, "final_swap": fswap, "final_entropy": fent,

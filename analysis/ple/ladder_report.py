@@ -30,9 +30,18 @@ from olmoe_paths import DATA_DIR            # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS                 # noqa: E402
 
-C_50M, CE_50M, FPRIME = 0.8791, 0.8269, 0.8106
+C_50M, C_250M, CE_50M, FPRIME = 0.8791, 0.8505, 0.8269, 0.8106
 BASE, IMPOSE = 0.6727, 2.7507
 TWO_SIGMA = 0.012
+
+# TOKEN EFFICIENCY, which is the framing this program already uses for its headline adaptation
+# claim and which the first draft of this report buried. C@250M = 0.8505 is what the C recipe
+# reaches after 250M tokens. A cell that ties it at 50M has reached the same quality on a fifth of
+# the budget, and "ties" is the correct word whenever |delta| < 2 sigma.
+#
+# RECOVERY IS REPORTED AT MATCHED BUDGET. Quoting a 50M cell's recovery against C@250M's 91.44%
+# makes an improvement read as a regression -- the same matched-budget defect that was fixed in the
+# gate, resurfacing in prose. The comparison for a 50M cell is C@50M = 90.07%.
 
 
 def recovery(bpb):
@@ -64,10 +73,16 @@ def main():
             "flash_attention": "on",
             "ple_params": r["ple_params"],
             "final_bpb": round(b, 6),
-            "recovery": round(recovery(b), 4),
+            "recovery_pct": round(recovery(b) * 100, 2),
+            "recovery_pct_of_C_at_matched_budget": round(recovery(C_50M) * 100, 2),
+            "recovery_gain_vs_C50M_points": round((recovery(b) - recovery(C_50M)) * 100, 2),
             "delta_vs_C50M": round(b - C_50M, 6),
+            "delta_vs_C250M": round(b - C_250M, 6),
             "delta_vs_CE50M": round(b - CE_50M, 6),
             "beats_C50M_by_2sigma": (C_50M - b) > TWO_SIGMA,
+            "ties_or_beats_C250M": (b - C_250M) < TWO_SIGMA,
+            "token_efficiency_vs_C250M": ("5x (ties C@250M at 50M)" if abs(b - C_250M) < TWO_SIGMA
+                                          else (">5x" if b < C_250M else "<5x")),
             "beats_CE50M_by_2sigma": (CE_50M - b) > TWO_SIGMA,
             "verdict": verdict(b),
             "final_swap": round(r["final_swap"], 6),
@@ -77,16 +92,15 @@ def main():
         })
     if not rows:
         print("no ple_ladder_*.json yet"); return
-    for ref, name in ((C_50M, "C@50M router+norms"), (CE_50M, "CE@50M router+norms+LoRA"),
-                      (FPRIME, "F' full finetune 6.92B (fair only at 250M)")):
-        rows.append({"tag": "REFERENCE", "rank": name, "train_tokens": "",
-                     "mb": "", "accum": "", "lr": "", "table_wd": "", "adam8bit": "",
-                     "flash_attention": "", "ple_params": "",
-                     "final_bpb": ref, "recovery": round(recovery(ref), 4),
-                     "delta_vs_C50M": "", "delta_vs_CE50M": "",
-                     "beats_C50M_by_2sigma": "", "beats_CE50M_by_2sigma": "",
-                     "verdict": "", "final_swap": "", "final_entropy": "",
-                     "divisor": 3.1089070924799973, "curve_bpb": ""})
+    for ref, name, tokens in ((C_50M, "C@50M router+norms", 50_000_000),
+                              (C_250M, "C@250M router+norms", 250_000_000),
+                              (CE_50M, "CE@50M router+norms+LoRA r32", 50_000_000),
+                              (FPRIME, "F' full finetune 6.92B", 250_000_000)):
+        blank = {k: "" for k in rows[0]}
+        blank.update({"tag": "REFERENCE", "rank": name, "train_tokens": tokens,
+                      "final_bpb": ref, "recovery_pct": round(recovery(ref) * 100, 2),
+                      "divisor": 3.1089070924799973})
+        rows.append(blank)
     path = os.path.join(ABLATIONS, "ple_ladder.csv")
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
