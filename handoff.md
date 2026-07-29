@@ -44,9 +44,12 @@ is `results/ablations/README.md`.
 
 ## Where the artifacts are
 
-**The pod's disk no longer matters.** Every checkpoint, log, and captured tensor lives in four
-public Hugging Face repos, indexed by `results/MANIFEST.csv` (local path, HF repo, HF path, size,
-sha256):
+**Data artifacts are mirrored; code is not, and that is a live gap.** Every checkpoint, log, and
+captured tensor lives in four public Hugging Face repos, indexed by `results/MANIFEST.csv` (local
+path, HF repo, HF path, size, sha256). **Training scripts were never in that scope.** The
+adaptation trainers that produced the whole results table above sat only on the previous pod's disk;
+if they are still reachable, archiving them in `scripts/adaptation/` takes priority over new GPU
+work, and if they are not, say so immediately rather than reimplementing from the write-ups.
 
 - `ncylich/temporal-moe-ckpts`: model checkpoints and run logs
 - `ncylich/temporal-moe-extras`: probe captures and router logs
