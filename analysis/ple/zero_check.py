@@ -82,6 +82,16 @@ def check_trained(path, train_tokens=None, mb=16, model=None, device="cuda"):
         raise SystemExit("--train-tokens is required: the covered set is defined by what the cell saw")
     covered, n_seq = consumed_covered(train_tokens, mb=mb, vocab=tab.shape[0])
 
+    # The deliberately held-out rows are the ones that actually test something: they were eligible
+    # to train (2 to 1018 occurrences in a 50M-token cell) and were withheld anyway. The naturally
+    # uncovered rows are unused vocab padding and are checked too, but prove far less.
+    ho_path = os.path.join(DATA_DIR, "ple_heldout.pt")
+    heldout = None
+    if os.path.exists(ho_path):
+        ho = torch.load(ho_path)
+        heldout = torch.zeros(tab.shape[0], dtype=torch.bool)
+        heldout[ho["ids"].long()] = True
+
     uncovered_nonzero = int((row_nonzero & ~covered).sum())
     out = {
         "rank": rank,
@@ -94,6 +104,12 @@ def check_trained(path, train_tokens=None, mb=16, model=None, device="cuda"):
         "uncovered_rows_violating": uncovered_nonzero,
         "covered_rows_that_moved": int((row_nonzero & covered).sum()),
     }
+    if heldout is not None:
+        out["n_heldout"] = int(heldout.sum())
+        out["heldout_rows_bit_zero"] = int((row_nonzero & heldout).sum()) == 0
+        out["heldout_rows_violating"] = int((row_nonzero & heldout).sum())
+        # the strong statement: these rows were seen in training and still did not move
+        out["heldout_rows_that_were_covered"] = int((heldout & covered).sum())
 
     # claim 4: bitwise-equal logits on an uncovered token
     if model is not None:

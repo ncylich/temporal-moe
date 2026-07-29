@@ -76,6 +76,19 @@ class FactoredPLE(nn.Module):
             v = torch.empty(rank, layers, hidden, dtype=torch.float32).normal_(0.0, rank ** -0.5, generator=gen)
             self.V = nn.Parameter(v.to(device))
         self.g = nn.Parameter(torch.ones(layers, dtype=torch.float32, device=device))
+        # Deliberately held-out token ids for the zero-property check (§4 item 5). Coverage is
+        # ~100%, so the naturally-uncovered rows are unused vocab padding slots -- testing only
+        # those would prove almost nothing, because they are rows the model had no chance to touch
+        # for trivial reasons. A held-out set is rows that WERE eligible and still must be zero.
+        # Zeroing the contribution in the forward (rather than masking the gradient afterwards) is
+        # what makes it airtight: an unread row cannot receive gradient at all, so the row stays
+        # bit-zero by the same mechanism as a genuinely absent token.
+        self.register_buffer("heldout", torch.zeros(vocab, dtype=torch.bool, device=device))
+
+    def set_heldout(self, ids):
+        self.heldout.zero_()
+        if ids is not None and len(ids):
+            self.heldout[torch.as_tensor(ids, dtype=torch.long, device=self.heldout.device)] = True
 
     def table_params(self):
         """The token-indexed table: the tensors weight decay must reach (§2)."""
@@ -91,6 +104,8 @@ class FactoredPLE(nn.Module):
             d = self.P[token_ids, layer_idx]                     # [B,S,H]
         else:
             d = self.U[token_ids] @ self.V[:, layer_idx, :]      # [B,S,r] @ [r,H]
+        if bool(self.heldout.any()):
+            d = d * (~self.heldout[token_ids]).unsqueeze(-1)
         return (self.g[layer_idx] * d).to(dtype)
 
     def n_params(self):

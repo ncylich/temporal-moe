@@ -40,6 +40,9 @@ ap.add_argument("--table-wd", type=float, default=0.0,
 ap.add_argument("--mb", type=int, default=16)
 ap.add_argument("--seed", type=int, default=1234, help="PLE basis init only; data order is seeded 0")
 ap.add_argument("--adam8bit", action="store_true", help="8-bit Adam for the PLE table (§2)")
+ap.add_argument("--heldout", action="store_true",
+                help="withhold the token ids in ple_heldout.pt from the PLE lookup, so the "
+                     "zero-property check tests rows that were eligible to train")
 ap.add_argument("--out", default=None, help="defaults to $OLMOE data dir")
 A = ap.parse_args()
 
@@ -70,6 +73,12 @@ ple_mod = None
 opt_ple = None
 if RANK != "off":
     ple_mod = PLE.install(model, RANK, device="cuda", seed=A.seed)
+    ho_path = os.path.join(DATA_DIR, "ple_heldout.pt")
+    if A.heldout and os.path.exists(ho_path):
+        ho = torch.load(ho_path)
+        ple_mod.set_heldout(ho["ids"])
+        print(f"[ple] held out {ho['ids'].numel()} token ids "
+              f"({ho['loss_share']*100:.4f}% of eval loss) for the zero-property check", flush=True)
     groups = [
         {"params": ple_mod.table_params(), "weight_decay": A.table_wd},   # the table: decay wired here
         {"params": ple_mod.basis_params(), "weight_decay": 0.0},          # basis + gates: no decay
