@@ -1,0 +1,6 @@
+arm,what,impl,tokens,bpb,swap,entropy,divisor
+A1,"new trainer, PLE flag off",analysis/ple/train_ple.py,10027008,0.981639,0.999672,0.995378,3.1089070924799973
+A2,"new trainer, PLE flag off, identical to A1",analysis/ple/train_ple.py,10027008,0.980822,0.999666,0.995213,3.1089070924799973
+B,"adaptation program arm C, unmodified",olmoe-adapt/scripts/train_bakeoff.py,10027008,0.983215,0.999660,0.994807,3.1089070924799973
+floor,|A1 - A2| run-to-run non-determinism,,,0.000817,,,
+delta,"|mean(A1,A2) - B| new-code-off vs reference",,,0.001984,,,
