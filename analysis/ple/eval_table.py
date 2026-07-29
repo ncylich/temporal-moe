@@ -51,10 +51,18 @@ def main():
     D = json.load(open(os.path.join(DATA_DIR, "bpb_slice_meta.json")))["divisor_D"]
     model, _ = RES.load_model()
     if A.lora:
-        RES.add_lora(model, r=A.lora, alpha=2 * A.lora)
+        LORA_PS = RES.add_lora(model, r=A.lora, alpha=2 * A.lora)
     if A.csurf:
         ck = torch.load(A.csurf, map_location="cuda")
-        tp = RES.router_params(model) + RES.norm_params(model)
+        # The trainer's parameter list is router + norms + LoRA, in that order, so the
+        # checkpoint's masters must be zipped against the SAME list. Zipping against only
+        # router+norms truncates silently -- zip stops at the shorter sequence -- discarding every
+        # trained LoRA tensor and leaving LoRA at its zero-init no-op. That reconstructed
+        # ce_ple_128 at 1.1652 BPB when the cell had trained to 0.8327. The assert makes the
+        # mismatch loud instead of silent.
+        tp = RES.router_params(model) + RES.norm_params(model) + (LORA_PS if A.lora else [])
+        assert len(tp) == len(ck["masters"]), \
+            f"param/checkpoint mismatch: {len(tp)} params vs {len(ck['masters'])} masters"
         with torch.no_grad():
             for p, m in zip(tp, ck["masters"]):
                 p.data.copy_(m.to("cuda").to(p.dtype))
