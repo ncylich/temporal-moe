@@ -52,9 +52,11 @@ def main():
     else:
         if not c:
             print(""); return
+        # §5 carries "the top two ranks" when they tie, not every rank inside 2σ of the best. With
+        # three ranks clustered under the bar the unbounded reading would spawn a third CE cell and
+        # overrun the night for a rank already known to be no better than the two ahead of it.
         best = min(c.values())
-        win = sorted([k for k, v in c.items() if (v - best) < TWO_SIGMA],
-                     key=lambda k: c[k])
+        win = sorted([k for k, v in c.items() if (v - best) < TWO_SIGMA], key=lambda k: c[k])[:2]
         print(" ".join(win))
 
 
