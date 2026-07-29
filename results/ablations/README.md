@@ -101,3 +101,65 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `olmoe_cal2.csv` | Cal-2 calibrated-init training screen: NULL, undone-to-single-basin (final 0.9262 vs C@50M 0.8791; cos-to-init 1.0->0.17, cos-to-C -0.03->0.44; init axis closed). | h100@9f0ca8ae |
 | `olmoe_adapt_RESULTS.md` | Full adaptation-study writeup (11-arm table, four-part mechanism story, recommendations). | h100@0101 closeout |
 | `adapt_ckpts/*.safetensors` | Router-only checkpoints (~4MB each): LR-sweep arms, bake-off router arms (B/C/D), Cal-2. LoRA-bearing ckpts (474MB) remain pod-local by policy. | h100 arm commits |
+
+---
+
+## Mechinterp re-run: schema conventions and file semantics
+
+Applies to every file written by `analysis/probes/delex_*.py` and `probe_replay.py` after the audit
+in [`MECHINTERP_RERUN_PLAN.md`](../../docs/research/mechanism/MECHINTERP_RERUN_PLAN.md). Recorded
+here because a CSV has no room for a header comment without breaking `csv.DictReader`.
+
+1. **Every per-expert row carries `layer`.** Pooling is a reporting decision made in the plot script,
+   never at write time. Files that previously pooled experts across layers
+   (`mechinterp_structural*`, `mechinterp_demand*`) now write the layer key they always had.
+2. **No silent layer skipping.** Layer lists come from the artifact, not from a constant. Anything a
+   script cannot cover is warned about and recorded — see `mechinterp_locus_coverage.csv`.
+   The predecessor of this rule, `LAYERS = [2,3,4,5,6]` plus `if L not in d["layers"]: continue`,
+   silently dropped 8 of the 13 MoE layers the 1e19 captures contain.
+3. **Every row carries `run` and `budget`**, not only a display label. Labels like `s0_TEMPORAL` and
+   `8.1M active, coarse (6 of 64 experts)` needed the source to decode and could not be joined
+   against `MANIFEST.csv`.
+4. **Window and variant semantics.** `variant` is `kwin` = w=k/2, `kfull` = w=k, `base` = w=32, and a
+   `window` column now states w outright. The old `mechinterp_locus_1e19.csv` wrote w=k under the
+   name `base`, which collides with `base` = w=32 in `mechinterp_locus.csv`; anything joining the two
+   files on `variant` alone was comparing different windows. Select on `window`.
+5. **Model lists come from `analysis/probes/registry.py`**, built from `MANIFEST.csv` + each run's
+   `run.meta`. Run `python3 analysis/probes/registry.py` for the inventory.
+
+### `split`: which fit/score split a probe row came from
+
+`sequence` holds out whole documents; `position` is the published split, `cut = int(0.7*S*B)`. Because
+the stream is flattened with the batch dimension innermost, that cut lands at a sequence *position*,
+so every document appears in both the fit and score halves. `sequence` is the default for all new
+rows; both are kept so the difference is measurable rather than asserted.
+
+### Why per-layer replay reporting uses `p95_burst_len`, not `mean_swap_rate`
+
+Swap rate is 0.994–1.000 on every model and every layer, so it carries no depth signal and is not a
+finding. At R = k a swap fires iff at least one demanded expert is missing, which makes the statistic
+"fraction of tokens with ≥ 1 miss" — structurally near-saturated. Both columns are still written;
+depth claims must use `p95_burst_len` (from e1) or `hit_rate` (from e6). Do not re-adopt swap rate as
+a depth metric.
+
+### The circular-shift null is not a valid floor for the context probe
+
+`mechinterp_floors*.csv` carries two nulls. The **iid permutation** holds at 0.500 ± 0.002 for every
+model, layer, feature and window, and is the floor the gate in `delex_locus_driver.py` enforces. The
+**circular shift** is inflated — up to +0.017, growing monotonically with the context window width and
+with depth — and is retained as a diagnostic only. `analysis/probes/delex_null_check.py` isolates the
+cause with a six-arm battery (`mechinterp_null_battery.csv`): the shift is applied to the flattened
+`[S*B]` stream whose adjacent entries are adjacent *batch elements*, so it never shifted along the
+token axis, and what it leaves intact is a document-level association between a label series and the
+feature. Neither generic label autocorrelation nor position-within-sequence explains it; both were
+tested and rejected.
+
+### New files
+
+| CSV | What it is |
+|---|---|
+| `mechinterp_locus_coverage.csv` | Experts probed vs omitted per (run, layer, variant, split), with the reason. The audit trail for convention 2. |
+| `mechinterp_floors_1e19.csv` | Null floors per (run, layer, variant, split, feature, null_type), over every probed expert rather than an 8-per-layer subsample. |
+| `mechinterp_null_battery.csv` | Six nulls per feature, each preserving or destroying one structure, establishing which null actually floors the probe. |
+| `mechinterp_locus_slopes.csv` | Per-arm depth slope of the median context-minus-token, in both units (per unit `l/L` and per layer index), with bootstrap intervals. |
+| `mechinterp_oracle.csv` | C7 nonparametric token-identity oracle: best achievable AUC from token id alone, and `I(expert; token id)/H(expert)`, per (layer, expert). The ceiling the linear token probe is measured against. |

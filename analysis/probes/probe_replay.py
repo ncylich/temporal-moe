@@ -44,25 +44,56 @@ def _csv(name, header, rows):
         w = csv.writer(f); w.writerow(header); w.writerows(rows)
     print("wrote", f"{ABLATIONS}/{name}")
 
-# ---- run registry (active non-embedding params in millions; matched full-MoE pair; grain) ----
-META = {
-    "tmoe_minlogit_sh1_s0_1e16": dict(N=1.36,  moe="v16k_d_s0_1e16",     grain=1, batch="16k"),
-    "tmoe_minlogit_sh1_s2_1e17": dict(N=8.12,  moe="v16k_sweep_s2_1e17", grain=1, batch="16k"),
-    "tmoe_minlogit_sh1_s3_1e17": dict(N=14.77, moe="v16k_sweep_s3_1e17", grain=1, batch="16k"),
-    "g3_tmoe_s1_1e17":           dict(N=3.91,  moe=None,                 grain=3, batch="16k"),
-    "flame38m_temporal_minlogit":dict(N=38.0,  moe=None,                 grain=1, batch="50k"),
-}
-ALL_TEMPORAL = ["tmoe_minlogit_sh1_s0_1e16", "tmoe_minlogit_sh1_s2_1e17",
-                "tmoe_minlogit_sh1_s3_1e17", "g3_tmoe_s1_1e17", "flame38m_temporal_minlogit"]
-HEADLINERS   = ["tmoe_minlogit_sh1_s2_1e17", "g3_tmoe_s1_1e17", "flame38m_temporal_minlogit"]
+# ---- run registry: from MANIFEST.csv + run.meta, never a hardcoded list ----
+# The lists this replaces named five runs (tmoe_minlogit_sh1_*, g3_tmoe_s1_1e17,
+# flame38m_temporal_minlogit), and NONE of them is in MANIFEST.csv: the router logs behind the
+# published e1-e8 numbers were not preserved. The 22 logs that were preserved are a different
+# population, so this sweep does not reproduce those numbers, it replaces them. See
+# results/ablations/README.md.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import registry                                                    # noqa: E402
+
+_RUNS = registry.runs(router_log=True, on_disk=True)
+_BY_NAME = {r.name: r for r in _RUNS}
+ALL_RUNS = [r.name for r in _RUNS]
+ALL_TEMPORAL = [r.name for r in _RUNS if r.temporal]
+# B10 / C4: unconstrained runs. Replaying the residency policy over an unconstrained model's demand
+# is the baseline arm every replay metric was missing; the engine already supports it, the old run
+# list simply had no non-temporal entry.
+BASELINES = [r.name for r in _RUNS if not r.temporal]
+
+
+def _headliners(runs):
+    """One run per (budget, granularity) cell: the deepest log available, tie-broken toward the
+    plainest recipe name so a trigger-shaping variant never stands in for its cell."""
+    best = {}
+    for r in runs:
+        key = (r.budget, r.grain, r.regime)
+        cur = best.get(key)
+        if cur is None or (len(r.name), r.name) < (len(cur.name), cur.name):
+            best[key] = r
+    return [r.name for r in sorted(best.values(), key=lambda r: (r.budget, r.grain_label))]
+
+
+HEADLINERS = _headliners(_RUNS)
 
 
 def label(run, withN=True):
-    """De-jargoned figure label: active-param count + expert-grain description."""
-    m = META[run]; N = m["N"]
-    Ns = f"{N:.1f}M active" if N < 100 else f"{N:.0f}M active"
-    grain = "fine-grained (18 of 192 experts)" if m["grain"] == 3 else "coarse (6 of 64 experts)"
-    return f"{Ns}, {grain}" if withN else grain
+    """Self-describing figure label. The published labels led with an active-parameter count, which
+    run.meta does not record; regime + granularity + budget identifies the cell without a decoder
+    ring, and every CSV additionally carries the raw run name and budget (schema convention 3)."""
+    r = _BY_NAME.get(run) or registry.get(run)
+    grain = ("fine-grained (18 of 192 experts)" if r.grain == 3
+             else "coarse (6 of 64 experts)" if r.grain == 1 else "unknown granularity")
+    if not withN:
+        return grain
+    return f"{r.regime} @{r.budget}, {grain}"
+
+
+def meta_cols(run):
+    """The (run, budget, regime, grain) prefix every per-run CSV row carries."""
+    r = _BY_NAME.get(run) or registry.get(run)
+    return [run, r.budget, r.regime, r.grain_label]
 
 
 # =====================================================================================
@@ -82,7 +113,7 @@ def _prep(lg, k):
 
 
 def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swaps=False,
-           eval_lg=None):
+           eval_lg=None, record_resident=False):
     """Roll the shipped K=k, cap-1 residency policy over logged logits [S,B,E].
 
     evict: 'min_logit' (shipped) | 'lru' | 'belady' (offline-optimal: evict farthest next demand) |
@@ -94,7 +125,8 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
               while the trigger runs on `lg` — use for shaped triggers (EMA/momentum) so coverage
               measures service of the RAW demand, not the shaped stream's own (self-referential).
     Returns dict: setcov[S,B], masscov[S,B] (both PRE-swap), swaprate[S,B] (bool);
-    if record_swaps also nominee[S,B], evicted[S,B] expert indices (-1 == no swap).
+    if record_swaps also nominee[S,B], evicted[S,B] expert indices (-1 == no swap);
+    if record_resident also resident[S,B,E] bool, the entering resident set at each token.
     """
     S, B, E = lg.shape
     order, dm, w = _prep(lg, k)
@@ -124,12 +156,16 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
     setcov = np.empty((S, B), np.float32); masscov = np.empty((S, B), np.float32)
     swaps = np.zeros((S, B), bool)
     setcov[0] = 1.0; masscov[0] = 1.0
-    nom_rec = evc_rec = None
+    nom_rec = evc_rec = res_rec = None
     if record_swaps:
         nom_rec = -np.ones((S, B), np.int32); evc_rec = -np.ones((S, B), np.int32)
+    if record_resident:
+        res_rec = np.zeros((S, B, E), bool); res_rec[0] = res
 
     for t in range(1, S):
         lt = lg[t]
+        if record_resident:
+            res_rec[t] = res                     # entering resident set, before this token's swap
         # coverage measured on ENTRY (pre-swap): demand[t] vs current resident
         setcov[t] = (dm_e[t] & res).sum(1) / k
         masscov[t] = (w_e[t] * res).sum(1)
@@ -164,6 +200,8 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
     out = dict(setcov=setcov, masscov=masscov, swaps=swaps)
     if record_swaps:
         out["nominee"] = nom_rec; out["evicted"] = evc_rec
+    if record_resident:
+        out["resident"] = res_rec
     return out
 
 
@@ -175,6 +213,20 @@ def replay_run(run, **kw):
         k = rec["k"]; E = rec["logits"].shape[-1]
         per[ln] = replay(rec["logits"], k, **kw)
     return per, k, E
+
+
+def per_layer(per, skip0=True):
+    """{layer: (setcov, masscov)} plus an 'all' key holding the layer-pooled pair.
+
+    B6/B8 ask for these metrics per layer; the pooled value is kept under 'all' so the figures and
+    the Belady sanity check keep reading one number without re-deriving it.
+    """
+    sl = slice(1, None) if skip0 else slice(None)
+    out = {ln: (float(p["setcov"][sl].mean()), float(p["masscov"][sl].mean()))
+           for ln, p in per.items()}
+    out["all"] = (float(np.mean([v[0] for v in out.values()])),
+                  float(np.mean([v[1] for v in out.values()])))
+    return out
 
 
 def agg(per, key, skip0=True):
@@ -195,7 +247,7 @@ def e1():
     print("\n=== E1  swap-rate telemetry ===")
     rows = []            # (run, layer, swaprate, p95burst)
     victim = {}          # run -> (sizes, hitrates)
-    for run in ALL_TEMPORAL:
+    for run in ALL_RUNS:
         per, k, E = replay_run(run, record_swaps=True)
         budget = s_max(k)
         # per-layer swap rate + burst run-lengths
@@ -274,12 +326,20 @@ def e2():
     print("\n=== E2  streamed-diversity attribution ===")
     summary = {}          # run -> dict
     resid_dists = {}      # run -> per-expert residency fractions (deepest layer) for the plot
-    for run in ALL_TEMPORAL:
+    for run in ALL_RUNS:
         r = load(run)
         unions, effN, pinned, maxres = [], [], [], []
         deepest = max(r["layers"]); pinned_ids = []
+        counterfactual = not _BY_NAME[run].temporal
         for ln, rec in r["layers"].items():
-            m = rec["mask"]; S, B, E = m.shape          # logged resident set actually used
+            m = rec["mask"]
+            if m is None:
+                # B10: an unconstrained run logs no resident set because it never had one. Replaying
+                # the residency policy over its own demand yields the set it *would* have held --
+                # the baseline arm every residency metric was missing.
+                m = replay(rec["logits"], rec["k"], evict="min_logit",
+                           record_resident=True)["resident"]
+            S, B, E = m.shape
             # union size per sequence (distinct experts resident at any t)
             u = m.any(0).sum(1)                          # [B]
             unions.append(u.astype(float))
@@ -292,19 +352,22 @@ def e2():
                 resid_dists[run] = np.sort(m.mean(0).mean(0))[::-1]  # sorted residency, deepest layer
                 pinned_ids = np.where(resid > 0.8)[0]
         uni = np.concatenate(unions)
-        summary[run] = dict(E=E, union_mean=float(uni.mean()), union_std=float(uni.std()),
+        summary[run] = dict(E=E, counterfactual=counterfactual,
+                            union_mean=float(uni.mean()), union_std=float(uni.std()),
                             union_frac=float(uni.mean() / E), effN=float(np.mean(effN)),
                             pinned=float(np.mean(pinned)), maxres=float(np.max(maxres)),
                             pinned_deep=pinned_ids.tolist())
         s = summary[run]
-        print(f"  {label(run):40s} E={E:3d}  union={s['union_mean']:5.1f} "
+        print(f"  {label(run):46s} E={E:3d}  union={s['union_mean']:5.1f} "
               f"({s['union_frac']*100:4.1f}% of E)  eff-experts={s['effN']:5.1f}  "
-              f"max-residency={s['maxres']*100:4.1f}%  >0.8-resident/layer={s['pinned']:.1f}")
+              f"max-residency={s['maxres']*100:4.1f}%  >0.8-resident/layer={s['pinned']:.1f}"
+              f"{'   [counterfactual replay: no logged mask]' if counterfactual else ''}")
 
     # token-service concentration: temporal (resident==served since K=k) vs matched full MoE (top-k)
     conc = {}
-    for run in ["tmoe_minlogit_sh1_s2_1e17"]:
-        moe = META[run]["moe"]
+    pair = {(r.budget, r.grain): r.name for r in _RUNS if not r.temporal}
+    for run in [r.name for r in _RUNS if r.temporal and (r.budget, r.grain) in pair]:
+        moe = pair[(_BY_NAME[run].budget, _BY_NAME[run].grain)]
         t_serv = _service_counts(run, use_mask=True)
         m_serv = _service_counts(moe, use_mask=False)
         conc[run] = (t_serv, m_serv, moe)
@@ -337,12 +400,16 @@ def _gini(x):
 def e3():
     print("\n=== E3  mass-weighted consistency & coverage ===")
     rows = []
-    for run in ALL_TEMPORAL:
+    pair = {(r.budget, r.grain): r.name for r in _RUNS if not r.temporal}
+    for run in ALL_RUNS:
         per, k, E = replay_run(run, evict="min_logit")
         set_hit = agg(per, "setcov"); mass_hit = agg(per, "masscov")
         # A3 (vs previous active set) == our pre-swap coverage under the shipped policy.
         rows.append((run, "temporal", set_hit, mass_hit))
-        moe = META[run]["moe"]
+        rr = _BY_NAME[run]
+        moe = pair.get((rr.budget, rr.grain)) if rr.temporal else None
+        if moe == run:
+            moe = None
         if moe:
             sm, mm = _moe_mass_a3(moe)
             rows.append((run, "full MoE", sm, mm))
@@ -373,7 +440,7 @@ def e4():
     print("\n=== E4  trigger-margin (tau) replay ===")
     taus = [0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
     curves = {}; taustar = {}
-    for run in HEADLINERS:
+    for run in ALL_RUNS:
         sr, rm = [], []
         for tau in taus:
             per, k, E = replay_run(run, evict="min_logit", tau=tau)
@@ -400,31 +467,29 @@ def e4():
 #  E5 — Belady / discounted-oracle / LRU eviction bound
 # =====================================================================================
 def e5(taustar):
-    print("\n=== E5  eviction-policy headroom (Belady bound) ===")
+    print("\n=== E5  eviction-policy headroom (Belady bound), per layer ===")
     table = {}
-    for run in HEADLINERS:
+    for run in ALL_RUNS:
         res = {}
-        base = replay_run(run, evict="min_logit")[0]
-        res["min_logit"] = (agg(base, "setcov"), agg(base, "masscov"))
-        lru = replay_run(run, evict="lru")[0]
-        res["LRU"] = (agg(lru, "setcov"), agg(lru, "masscov"))
+        res["min_logit"] = per_layer(replay_run(run, evict="min_logit")[0])
+        res["LRU"] = per_layer(replay_run(run, evict="lru")[0])
         ts = taustar[run]["tau_budget"]
-        tau = replay_run(run, evict="min_logit", tau=ts)[0]
-        res[f"min_logit+tau*({ts})"] = (agg(tau, "setcov"), agg(tau, "masscov"))
+        res[f"min_logit+tau*({ts})"] = per_layer(replay_run(run, evict="min_logit", tau=ts)[0])
         for g in (0.5, 0.9, 0.95):
-            d = replay_run(run, evict="discounted", gamma=g)[0]
-            res[f"discounted-oracle(g={g})"] = (agg(d, "setcov"), agg(d, "masscov"))
-        bel = replay_run(run, evict="belady")[0]
-        res["Belady"] = (agg(bel, "setcov"), agg(bel, "masscov"))
+            res[f"discounted-oracle(g={g})"] = per_layer(
+                replay_run(run, evict="discounted", gamma=g)[0])
+        res["Belady"] = per_layer(replay_run(run, evict="belady")[0])
         for h in (1, 4, 16):
-            bp = replay_run(run, evict="belady", prefetch=h)[0]
-            res[f"Belady+prefetch(h={h})"] = (agg(bp, "setcov"), agg(bp, "masscov"))
+            res[f"Belady+prefetch(h={h})"] = per_layer(
+                replay_run(run, evict="belady", prefetch=h)[0])
         table[run] = res
-        ml = res["min_logit"][0]; be = res["Belady"][0]
+        ml = res["min_logit"]["all"][0]; be = res["Belady"]["all"][0]
         assert be >= ml - 1e-6, f"Belady {be} < min_logit {ml} (offline-optimal cannot be worse)"
         print(f"  {label(run)}")
-        for name, (sc, mc) in res.items():
-            print(f"      {name:28s} set={sc*100:5.1f}%  mass={mc*100:5.1f}%")
+        for name, per in res.items():
+            sc, mc = per["all"]
+            lay = " ".join(f"L{ln}:{per[ln][0]*100:.0f}" for ln in sorted(k for k in per if k != "all"))
+            print(f"      {name:28s} set={sc*100:5.1f}%  mass={mc*100:5.1f}%   {lay}")
     _fig_e5(table)
     return table
 
@@ -435,7 +500,7 @@ def e5(taustar):
 def e6():
     print("\n=== E6  per-layer ranking ===")
     perlayer = {}
-    for run in HEADLINERS:
+    for run in ALL_RUNS:
         per, k, E = replay_run(run, evict="min_logit", record_swaps=False)
         lifes = _lifetimes(run)
         d = {}
@@ -474,27 +539,31 @@ def _ema(lg, beta):
 
 
 def e7():
-    print("\n=== E7  EMA-logit smoothing replay ===")
+    print("\n=== E7  EMA-logit smoothing replay, per layer ===")
     betas = [1.0, 0.5, 0.25, 0.1]
-    curves = {}
+    curves = {}          # run -> {beta: {layer|'all': (swaprate, setcov, masscov)}}
     identity_ok = True
-    for run in HEADLINERS:
+    for run in ALL_RUNS:
         r = load(run)
-        sr, sc, mc = [], [], []
-        # baseline (no smoothing) for identity check
         base = replay_run(run, evict="min_logit")[0]
         base_sr, base_sc = agg(base, "swaps"), agg(base, "setcov")
+        byb = {}
         for beta in betas:
             per = {}
             for ln, rec in r["layers"].items():
                 k = rec["k"]; lg = _ema(rec["logits"], beta)
                 per[ln] = replay(lg, k, evict="min_logit")
-            sr.append(agg(per, "swaps")); sc.append(agg(per, "setcov")); mc.append(agg(per, "masscov"))
-        curves[run] = (np.array(betas), np.array(sr), np.array(sc), np.array(mc))
-        ok = abs(sr[0] - base_sr) < 1e-9 and abs(sc[0] - base_sc) < 1e-9
+            byl = {ln: (float(p["swaps"][1:].mean()), float(p["setcov"][1:].mean()),
+                        float(p["masscov"][1:].mean())) for ln, p in per.items()}
+            byl["all"] = (agg(per, "swaps"), agg(per, "setcov"), agg(per, "masscov"))
+            byb[beta] = byl
+        curves[run] = byb
+        s1, c1, _ = byb[1.0]["all"]
+        ok = abs(s1 - base_sr) < 1e-9 and abs(c1 - base_sc) < 1e-9
         identity_ok &= ok
-        print(f"  {label(run):40s} beta=1 swap={sr[0]:.3f} set={sc[0]*100:4.1f}%  "
-              f"beta=0.1 swap={sr[-1]:.3f} set={sc[-1]*100:4.1f}%  identity(b=1)={'OK' if ok else 'FAIL'}")
+        s2, c2, _ = byb[0.1]["all"]
+        print(f"  {label(run):46s} beta=1 swap={s1:.3f} set={c1*100:4.1f}%  "
+              f"beta=0.1 swap={s2:.3f} set={c2*100:4.1f}%  identity(b=1)={'OK' if ok else 'FAIL'}")
     _fig_e7(curves)
     return curves, identity_ok
 
@@ -505,8 +574,8 @@ def e7():
 def e8():
     print("\n=== E8  document-boundary attribution ===")
     out = {}
-    for run in HEADLINERS:
-        batch = META[run]["batch"]
+    for run in ALL_RUNS:
+        batch = "50k" if "pythia" in (_BY_NAME[run].meta.get("tok") or "") else "16k"
         eodfile = f"{CACHE}/eod_{batch}.npy"
         if not os.path.exists(eodfile):
             print(f"  [skip] {run}: EOD cache {eodfile} missing"); continue
@@ -687,7 +756,7 @@ def _save(fig, name):
 
 def _fig_e1_swaprate(rows):
     fig, ax = plt.subplots(figsize=(9.5, 5.6))
-    runs = ALL_TEMPORAL
+    runs = HEADLINERS
     xs = np.arange(len(runs))
     for i, run in enumerate(runs):
         srs = [sr for r_, l_, sr, _ in rows if r_ == run]
@@ -715,7 +784,7 @@ def _fig_e1_swaprate(rows):
 
 def _fig_e1_victim(victim):
     fig, ax = plt.subplots(figsize=(8.5, 5.4))
-    for run in ALL_TEMPORAL:
+    for run in HEADLINERS:
         sizes, hr = victim[run]
         ax.plot(sizes, hr * 100, "o-", label=label(run))
     ax.set_xlabel("victim-cache size  (number of recently-evicted experts kept in RAM)")
@@ -731,7 +800,7 @@ def _fig_e1_victim(victim):
 
 def _fig_e2_union(summary):
     fig, ax = plt.subplots(figsize=(9, 5.4))
-    runs = ALL_TEMPORAL; xs = np.arange(len(runs))
+    runs = HEADLINERS; xs = np.arange(len(runs))
     um = [summary[r]["union_mean"] for r in runs]; us = [summary[r]["union_std"] for r in runs]
     Es = [summary[r]["E"] for r in runs]; en = [summary[r]["effN"] for r in runs]
     ax.bar(xs - 0.2, um, 0.4, yerr=us, color="C2", label="distinct experts used over the sequence (union)")
@@ -751,7 +820,7 @@ def _fig_e2_union(summary):
 
 def _fig_e2_residency(resid_dists):
     fig, ax = plt.subplots(figsize=(9, 5.4))
-    for run in ALL_TEMPORAL:
+    for run in HEADLINERS:
         d = resid_dists[run]
         ax.plot(np.arange(len(d)) / (len(d) - 1), d, label=label(run))
     ax.axhline(0.8, ls="--", c="gray", lw=1, label="pinned threshold (resident >80% of tokens)")
@@ -787,7 +856,7 @@ def _fig_e3(rows):
 
 def _fig_e4(curves):
     fig, ax = plt.subplots(figsize=(9, 5.8))
-    for run, c in zip(HEADLINERS, ["C2", "C3", "C4"]):
+    for run, c in zip(HEADLINERS, [f"C{i}" for i in range(len(HEADLINERS))]):
         taus, sr, rm = curves[run]
         ax.plot(sr, rm * 100, "o-", color=c, label=label(run))
         for tv, x, y in zip(taus, sr, rm):
@@ -810,8 +879,8 @@ def _fig_e5(table):
     fig, axes = plt.subplots(1, len(HEADLINERS), figsize=(14, 5.2), sharey=True)
     for ax, run in zip(axes, HEADLINERS):
         res = table[run]
-        names = list(res.keys()); vals = [res[n][0] * 100 for n in names]
-        ml = res["min_logit"][0] * 100; be = res["Belady"][0] * 100
+        names = list(res.keys()); vals = [res[n]["all"][0] * 100 for n in names]
+        ml = res["min_logit"]["all"][0] * 100; be = res["Belady"]["all"][0] * 100
         colors = ["C1" if "Belady" in n else "gray" if n == "LRU" else
                   "C3" if "discounted" in n else "C0" if "tau" in n else "C2" for n in names]
         ax.barh(np.arange(len(names)), vals, color=colors)
@@ -833,7 +902,7 @@ def _fig_e5(table):
 
 def _fig_e6(perlayer):
     fig, ax = plt.subplots(figsize=(9, 5.6))
-    for run, c in zip(HEADLINERS, ["C2", "C3", "C4"]):
+    for run, c in zip(HEADLINERS, [f"C{i}" for i in range(len(HEADLINERS))]):
         d = perlayer[run]; lns = sorted(d)
         ax.plot(lns, [d[l]["hit"] * 100 for l in lns], "o-", color=c, label=label(run))
     ax.set_xlabel("Mixture-of-Experts layer number (shallow -> deep)")
@@ -849,8 +918,11 @@ def _fig_e6(perlayer):
 
 def _fig_e7(curves):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.4))
-    for run, c in zip(HEADLINERS, ["C2", "C3", "C4"]):
-        betas, sr, sc, mc = curves[run]
+    for run, c in zip(HEADLINERS, [f"C{i}" for i in range(len(HEADLINERS))]):
+        byb = curves[run]
+        betas = np.array(sorted(byb))
+        sr = np.array([byb[b]["all"][0] for b in betas])
+        sc = np.array([byb[b]["all"][1] for b in betas])
         ax1.plot(betas, sr, "o-", color=c, label=label(run))
         ax2.plot(sr, sc * 100, "o-", color=c, label=label(run))
         for b, x, y in zip(betas, sr, sc):
@@ -904,53 +976,76 @@ def _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
                         e5_table, e6_perlayer, e7_curves, e8_out):
     """Write the small, tidy CSV behind every figure to results/ablations/.
     These are the concise, committed stand-in for the (large) raw router_log.pt tensors."""
-    _csv("e1_swap_rate_by_layer.csv", ["model", "layer", "mean_swap_rate", "p95_burst_len"],
-         [[label(r), ln, f"{sr:.5f}", f"{p95:.2f}"] for (r, ln, sr, p95) in e1_rows])
-    _csv("e1_victim_cache_hitrate.csv", ["model", "cache_size_experts", "reload_hitrate"],
-         [[label(r), int(c), f"{h:.5f}"] for r, (sizes, hit) in e1_victim.items()
+    M = meta_cols
+    # Schema convention 3: every row carries the raw run name and its budget/regime/granularity, not
+    # only a display label. Convention 1: the layer key is written, never pooled away.
+    _csv("e1_swap_rate_by_layer.csv",
+         ["run", "budget", "regime", "grain", "layer", "mean_swap_rate", "p95_burst_len"],
+         [M(r) + [ln, f"{sr:.5f}", f"{p95:.2f}"] for (r, ln, sr, p95) in e1_rows])
+    _csv("e1_victim_cache_hitrate.csv",
+         ["run", "budget", "regime", "grain", "cache_size_experts", "reload_hitrate"],
+         [M(r) + [int(c), f"{h:.5f}"] for r, (sizes, hit) in e1_victim.items()
           for c, h in zip(sizes, hit)])
     _csv("e2_streamed_diversity.csv",
-         ["model", "num_experts", "union_mean", "union_std", "union_frac_of_E",
-          "effective_experts", "mean_experts_over_0.8_resident_per_layer", "max_residency_frac"],
-         [[label(r), s["E"], f"{s['union_mean']:.2f}", f"{s['union_std']:.2f}",
-           f"{s['union_frac']:.4f}", f"{s['effN']:.2f}", f"{s['pinned']:.2f}", f"{s['maxres']:.4f}"]
-          for r, s in e2_summary.items()])
-    _csv("e3_mass_vs_set_consistency.csv", ["model", "routing", "set_consistency", "mass_consistency"],
-         [[label(r), kind, f"{sh:.5f}", f"{mh:.5f}"] for (r, kind, sh, mh) in e3_rows])
-    _csv("e4_swap_vs_retained_mass.csv", ["model", "tau", "swap_rate", "retained_mass"],
-         [[label(r), f"{tt:g}", f"{ss:.5f}", f"{mm:.5f}"]
+         ["run", "budget", "regime", "grain", "num_experts", "counterfactual_replay",
+          "union_mean", "union_std",
+          "union_frac_of_E", "effective_experts", "mean_experts_over_0.8_resident_per_layer",
+          "max_residency_frac"],
+         [M(r) + [s["E"], "yes" if s["counterfactual"] else "no", f"{s['union_mean']:.2f}", f"{s['union_std']:.2f}",
+                  f"{s['union_frac']:.4f}", f"{s['effN']:.2f}", f"{s['pinned']:.2f}",
+                  f"{s['maxres']:.4f}"] for r, s in e2_summary.items()])
+    _csv("e3_mass_vs_set_consistency.csv",
+         ["run", "budget", "regime", "grain", "routing", "set_consistency", "mass_consistency"],
+         [M(r) + [kind, f"{sh:.5f}", f"{mh:.5f}"] for (r, kind, sh, mh) in e3_rows])
+    _csv("e4_swap_vs_retained_mass.csv",
+         ["run", "budget", "regime", "grain", "tau", "swap_rate", "retained_mass"],
+         [M(r) + [f"{tt:g}", f"{ss:.5f}", f"{mm:.5f}"]
           for r, (taus, sr, rm) in e4_curves.items() for tt, ss, mm in zip(taus, sr, rm)])
-    _csv("e5_eviction_policy_headroom.csv", ["model", "policy", "set_coverage", "mass_coverage"],
-         [[label(r), pol, f"{sc:.5f}", f"{mc:.5f}"]
-          for r, res in e5_table.items() for pol, (sc, mc) in res.items()])
-    _csv("e6_per_layer_ranking.csv", ["model", "layer", "hit_rate", "swap_rate", "lifetime_tokens"],
-         [[label(r), ln, f"{d[ln]['hit']:.5f}", f"{d[ln]['swap']:.5f}", f"{d[ln]['life']:.3f}"]
+    _csv("e5_eviction_policy_headroom.csv",
+         ["run", "budget", "regime", "grain", "policy", "layer", "set_coverage", "mass_coverage"],
+         [M(r) + [pol, ln, f"{sc:.5f}", f"{mc:.5f}"]
+          for r, res in e5_table.items() for pol, per in res.items()
+          for ln, (sc, mc) in per.items()])
+    _csv("e6_per_layer_ranking.csv",
+         ["run", "budget", "regime", "grain", "layer", "hit_rate", "swap_rate", "lifetime_tokens"],
+         [M(r) + [ln, f"{d[ln]['hit']:.5f}", f"{d[ln]['swap']:.5f}", f"{d[ln]['life']:.3f}"]
           for r, d in e6_perlayer.items() for ln in sorted(d)])
-    _csv("e7_demand_smoothing.csv", ["model", "ema_beta", "swap_rate", "set_coverage", "mass_coverage"],
-         [[label(r), f"{bb:g}", f"{ss:.5f}", f"{cc:.5f}", f"{mm:.5f}"]
-          for r, (betas, sr, sc, mc) in e7_curves.items() for bb, ss, cc, mm in zip(betas, sr, sc, mc)])
+    _csv("e7_demand_smoothing.csv",
+         ["run", "budget", "regime", "grain", "ema_beta", "layer", "swap_rate", "set_coverage",
+          "mass_coverage"],
+         [M(r) + [f"{bb:g}", ln, f"{ss:.5f}", f"{cc:.5f}", f"{mm:.5f}"]
+          for r, per in e7_curves.items() for bb, byl in per.items()
+          for ln, (ss, cc, mm) in byl.items()])
     _csv("e8_document_boundary.csv",
-         ["model", "batch", "window_tokens", "hit_after_eod", "hit_within_doc",
-          "frac_tokens_after", "deficit"],
-         [[label(r), o["batch"], w, f"{dd['hit_after']:.5f}", f"{dd['hit_within']:.5f}",
-           f"{dd['frac_tokens_after']:.5f}", f"{dd['deficit']:.5f}"]
+         ["run", "budget", "regime", "grain", "batch", "window_tokens", "hit_after_eod",
+          "hit_within_doc", "frac_tokens_after", "deficit"],
+         [M(r) + [o["batch"], w, f"{dd['hit_after']:.5f}", f"{dd['hit_within']:.5f}",
+                  f"{dd['frac_tokens_after']:.5f}", f"{dd['deficit']:.5f}"]
           for r, o in e8_out.items() for w, dd in o["windows"].items()])
-    # plot_probe.py headline figures (learned-locality-vs-scale + rolling coverage/lifetime vs K)
+    # plot_probe.py headline figures (learned-locality-vs-scale + rolling coverage/lifetime vs K).
+    # PAIRS/G3 in plot_probe.py name runs whose router logs were never preserved, so the pairing is
+    # rebuilt from the registry: each temporal run against the unconstrained run in its own
+    # (budget, granularity) cell, blank where no such baseline was preserved.
+    pair = {(r.budget, r.grain): r.name for r in _RUNS if not r.temporal}
     rows = []
-    for tag, N, tr, mr in list(PAIRS) + [G3]:
-        rec = next(iter(load(tr)["layers"].values())); k, E = rec["k"], rec["logits"].shape[-1]
-        rows.append([label(tr), f"{N:g}", f"{overlap(tr)*100:.2f}",
-                     (f"{overlap(mr)*100:.2f}" if mr else ""), f"{100.0*k/E:.2f}"])
+    for run in HEADLINERS:
+        r = _BY_NAME[run]
+        rec = next(iter(load(run)["layers"].values())); k, E = rec["k"], rec["logits"].shape[-1]
+        mr = pair.get((r.budget, r.grain))
+        rows.append(meta_cols(run) + [f"{overlap(run)*100:.2f}",
+                                      (f"{overlap(mr)*100:.2f}" if mr and mr != run else ""),
+                                      mr or "", f"{100.0*k/E:.2f}"])
     _csv("learned_locality_vs_scale.csv",
-         ["model", "active_params_M", "temporal_overlap_pct", "full_moe_overlap_pct", "random_pct"], rows)
+         ["run", "budget", "regime", "grain", "temporal_overlap_pct", "full_moe_overlap_pct",
+          "full_moe_run", "random_pct"], rows)
     rows = []
-    for r in ALL_TEMPORAL + ["v16k_sweep_s2_1e17"]:
-        Ks, cov, life, k = sweep(r)
+    for run in ALL_RUNS:
+        Ks, cov, life, k = sweep(run)
         for K, c, l in zip(Ks, cov, life):
-            rows.append([label(r) if r in META else "full MoE, 8.1M active",
-                         f"{K/k:.3f}", f"{c:.5f}", f"{l:.3f}"])
+            rows.append(meta_cols(run) + [f"{K/k:.3f}", f"{c:.5f}", f"{l:.3f}"])
     _csv("rolling_coverage_lifetime_vs_K.csv",
-         ["model", "resident_cache_K_over_k", "hit_rate", "mean_lifetime_tokens"], rows)
+         ["run", "budget", "regime", "grain", "resident_cache_K_over_k", "hit_rate",
+          "mean_lifetime_tokens"], rows)
 
 
 def main():

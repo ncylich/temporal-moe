@@ -1,60 +1,93 @@
 #!/usr/bin/env python3
-"""Locus-by-depth figure: does routing get more contextual as you go deeper?
+"""C1 -- locus of routing specialization against NORMALIZED depth, with bootstrap intervals.
 
-y = median over experts of (context AUC - token AUC) for one MoE layer. Above 0 = that layer's
-routing is better predicted by the excluded-context mean than by the current token; below 0 =
-lexical. x = MoE layer index (layer 1 is dense in every config -- moe-layer-freq [0]*1+[1]*(L-1) --
-so there is no layer-1 point to plot).
+y = median over that layer's experts of (context AUC - token AUC). Above 0 = routing at that layer is
+better predicted by the excluded-context mean than by the current token; below 0 = lexical.
 
-Colors follow the isoFLOP standard used by plot_mechinterp.py: hue = method (MoE blue, temporal
-green), shade = granularity (fine 18/192 dark, coarse 6/64 normal). Marker = compute budget.
+x = l/L, the layer's index over the model's transformer depth. This is the change that makes the
+figure readable: the previous version plotted the raw MoE layer index, which is not comparable across
+models of different depth -- the 1e16 model's layer 4 is its last, while the 1e19 model's layer 4 is
+under a third of the way through a 14-layer stack. Every H1 claim is a claim about depth, so the axis
+has to be depth.
 
-Sources, and the window each row was measured at (w = context half-width):
-  results/ablations/mechinterp_locus.csv       variant kfull = w=k, kwin = w=k/2, base = w=32
-  results/ablations/mechinterp_locus_1e19.csv  variant base  = w=k (delex_locus.py default)
-We plot w=k everywhere it exists. s0_SOFTMAX_BASELINE was only ever run at w=32, so it is drawn
-dashed; its sigmoid-router sibling (s0_FULL, same budget/granularity) does have w=k and is drawn
-solid, which brackets what the missing measurement would show.
+Bands are 95% bootstrap intervals on the per-layer median, 2000 resamples of that layer's experts. A
+slope without an interval is not testable, and the slope table this writes
+(`mechinterp_locus_slopes.csv`) is what report item 2 -- do the temporal and baseline depth slopes
+differ? -- is answered from.
 
-Broken y-axis: the two regimes are ~0.3 AUC apart, so a single scale hides the per-layer slopes
-that are the point of the figure.
+Sources:
+  mechinterp_locus.csv       1e16/1e17 cells, MoE layers 2-6, variant kfull = w=k, position split.
+                             These runs are absent from MANIFEST.csv, so no capture or checkpoint
+                             survives and they cannot be extended past layer 6 or re-split.
+  mechinterp_locus_1e19.csv  1e19 cells, MoE layers 2-14, all three windows, both splits.
+
+Both files carry a `window` column now; w=k is selected everywhere via `kfull`, which also fixes the
+collision whereby the old 1e19 file wrote w=k under the name `base` while `base` means w=32 in the
+1e16/1e17 file.
+
+The 1e19 rows are read at split=sequence (documents held out). The published split cuts the flattened
+[S*B] stream at 70%, which is a sequence *position*, so every document appears in both the fit and
+score halves; `--split position` reproduces it and the slope CSV carries both.
+
+  python3 analysis/plots/plot_locus_by_layer.py [--no-caption] [--split sequence|position]
 
 Output: results/phase0/figures/locus_by_layer[_nocaption].png
+        results/ablations/mechinterp_locus_slopes.csv
 """
-import csv, math, os, statistics as st, sys
+import csv
+import math
+import os
+import statistics as st
+import sys
 from collections import defaultdict
+
 import matplotlib
+import numpy as np
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 PAPER = "--no-caption" in sys.argv
+SPLIT = "position" if "--split" in sys.argv and sys.argv[sys.argv.index("--split") + 1] == "position" \
+    else "sequence"
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DATA = os.path.join(REPO, "results", "ablations")
 OUT = os.path.join(REPO, "results", "phase0", "figures")
+sys.path.insert(0, os.path.join(REPO, "analysis", "probes"))
+import registry                                                    # noqa: E402  (needs REPO first)
+
+BOOT = 2000
+RNG = np.random.default_rng(0)
 
 MOE_FINE, MOE_COARSE = "#0d3b66", "#5aa0dd"
 TMP_FINE, TMP_COARSE = "#145a14", "#5cc85c"
 BUDGET_MARKER = {"1e16": "o", "1e17": "s", "1e19": "^"}
 
-# (file, label, variant, color, budget, legend, linestyle)
+# (file, label, variant, colour, budget, legend, linestyle). variant kfull = w=k everywhere.
 SERIES = [
-    ("mechinterp_locus.csv",      "s0_TEMPORAL",         "kfull", TMP_FINE,   "1e16", "temporal 18/192", "-"),
-    ("mechinterp_locus_1e19.csv", "temporal_fine_1e19",  "base",  TMP_FINE,   "1e19", "temporal 18/192", "-"),
-    ("mechinterp_locus.csv",      "s2_TEMPORAL",         "kfull", TMP_COARSE, "1e17", "temporal 6/64",   "-"),
-    ("mechinterp_locus_1e19.csv", "temporal_coarse_1e19", "base", TMP_COARSE, "1e19", "temporal 6/64",   "-"),
-    ("mechinterp_locus.csv",      "s0_FULL",             "kfull", MOE_FINE,   "1e16", "full MoE 18/192 (sigmoid)", "-"),
-    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE", "base",  MOE_FINE,   "1e16", "full MoE 18/192 (w=32 only)", "--"),
-    ("mechinterp_locus.csv",      "s2_FULL",             "kfull", MOE_COARSE, "1e17", "full MoE 6/64",   "-"),
-    ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",     "base",  MOE_COARSE, "1e19", "full MoE 6/64",   "-"),
+    ("mechinterp_locus.csv",      "s0_TEMPORAL",          "kfull", TMP_FINE,   "1e16", "temporal 18/192", "-"),
+    ("mechinterp_locus_1e19.csv", "temporal_fine_1e19",   "kfull", TMP_FINE,   "1e19", "temporal 18/192", "-"),
+    ("mechinterp_locus.csv",      "s2_TEMPORAL",          "kfull", TMP_COARSE, "1e17", "temporal 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "temporal_coarse_1e19", "kfull", TMP_COARSE, "1e19", "temporal 6/64",   "-"),
+    ("mechinterp_locus.csv",      "s0_FULL",              "kfull", MOE_FINE,   "1e16", "full MoE 18/192 (sigmoid)", "-"),
+    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "full MoE 18/192 (w=32 only)", "--"),
+    ("mechinterp_locus.csv",      "s2_FULL",              "kfull", MOE_COARSE, "1e17", "full MoE 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",      "kfull", MOE_COARSE, "1e19", "full MoE 6/64",   "-"),
 ]
 
 
-def per_layer(fname, label, variant):
-    """-> {layer: median over experts of (context_AUC - token_AUC)}, dropping non-finite probes."""
+def per_layer(fname, label, variant, split):
+    """-> {layer: [context_minus_token per expert]}, run name. Drops non-finite probes."""
     g = defaultdict(list)
-    with open(os.path.join(DATA, fname)) as f:
-        for r in csv.DictReader(f):
+    run = None
+    path = os.path.join(DATA, fname)
+    with open(path) as f:
+        rdr = csv.DictReader(f)
+        has_split = "split" in (rdr.fieldnames or [])
+        for r in rdr:
             if r["label"] != label or r["variant"] != variant:
+                continue
+            if has_split and r["split"] != split:
                 continue
             try:
                 d = float(r["context_minus_token"])
@@ -62,40 +95,87 @@ def per_layer(fname, label, variant):
                 continue
             if not math.isnan(d):
                 g[int(r["layer"])].append(d)
-    return {ln: st.median(v) for ln, v in g.items()}, {ln: len(v) for ln, v in g.items()}
+                run = r["run"]
+    return g, run
+
+
+def boot_median_ci(vals, n=BOOT):
+    """95% bootstrap interval on the median of one layer's experts."""
+    a = np.asarray(vals, float)
+    if a.size < 3:
+        return float(np.median(a)), float(np.median(a)), float(np.median(a))
+    draws = np.median(RNG.choice(a, size=(n, a.size), replace=True), axis=1)
+    return float(np.median(a)), float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
+
+
+def boot_slope(g, xs_by_layer, n=BOOT):
+    """OLS slope of per-layer median vs x, with a bootstrap interval.
+
+    Experts are resampled within each layer independently, mirroring how the medians were formed, so
+    the interval reflects per-expert sampling noise rather than treating the medians as exact.
+    """
+    layers = sorted(g)
+    if len(layers) < 2:
+        return (float("nan"),) * 3
+    x = np.array([xs_by_layer[l] for l in layers], float)
+    arrs = [np.asarray(g[l], float) for l in layers]
+    fit = lambda y: np.polyfit(x, y, 1)[0]
+    point = fit(np.array([np.median(a) for a in arrs]))
+    draws = np.empty(n)
+    for i in range(n):
+        draws[i] = fit(np.array([np.median(RNG.choice(a, size=a.size, replace=True)) for a in arrs]))
+    return point, float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 
 
 if PAPER:
     plt.rcParams.update({"font.size": 14, "axes.labelsize": 14, "legend.fontsize": 9,
                          "xtick.labelsize": 12, "ytick.labelsize": 12})
 
-fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(6.4, 6.2) if PAPER else (8.0, 7.2),
+fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(6.4, 6.2) if PAPER else (8.0, 7.4),
                              gridspec_kw={"height_ratios": [1, 1], "hspace": 0.08})
 
-counts = []
+slope_rows, counts, missing = [], [], []
 for fname, label, variant, color, budget, legend, ls in SERIES:
-    med, n = per_layer(fname, label, variant)
-    if not med:
-        print(f"[warn] no rows for {label}/{variant}", file=sys.stderr)
+    g, run = per_layer(fname, label, variant, SPLIT)
+    if not g:
+        print(f"[warn] no rows for {label}/{variant} at split={SPLIT}", file=sys.stderr)
+        missing.append(f"{label}/{variant}")
         continue
-    xs = sorted(med)
-    ys = [med[x] for x in xs]
-    ax = hi if ys[0] > 0 else lo
-    ax.plot(xs, ys, ls, color=color, marker=BUDGET_MARKER[budget], markersize=7,
+    depth = registry.depth_of(run) if run else None
+    if not depth:
+        print(f"[warn] unknown depth for run {run}; cannot place {label} on a normalized axis",
+              file=sys.stderr)
+        missing.append(f"{label} (depth unknown)")
+        continue
+    layers = sorted(g)
+    xs = {l: l / depth for l in layers}
+    med, ylo, yhi = zip(*(boot_median_ci(g[l]) for l in layers))
+    x = [xs[l] for l in layers]
+    ax = hi if med[0] > 0 else lo
+    ax.fill_between(x, ylo, yhi, color=color, alpha=0.18, linewidth=0)
+    ax.plot(x, med, ls, color=color, marker=BUDGET_MARKER[budget], markersize=7,
             linewidth=1.8, markeredgecolor="white", markeredgewidth=0.8,
             label=f"{legend} @ {budget}")
-    counts.append(f"{label}: n={min(n.values())}-{max(n.values())}/layer")
+    # slopes in both units: per unit normalized depth (comparable across models) and per layer
+    # index (comparable with the published table)
+    s_nd = boot_slope(g, xs)
+    s_ix = boot_slope(g, {l: float(l) for l in layers})
+    slope_rows.append([label, run, budget, "temporal" if med[0] > 0 else "full", variant,
+                       int(variant == "base" and 32 or 0) or "", SPLIT, depth,
+                       layers[0], layers[-1], len(layers),
+                       round(s_nd[0], 4), round(s_nd[1], 4), round(s_nd[2], 4),
+                       round(s_ix[0], 5), round(s_ix[1], 5), round(s_ix[2], 5),
+                       round(med[0], 4), round(med[-1], 4)])
+    counts.append(f"{label}: n={min(len(v) for v in g.values())}-{max(len(v) for v in g.values())}"
+                  f"/layer, layers {layers[0]}-{layers[-1]} of {depth}")
 
 hi.axhline(0, color="#888", linewidth=1.0, linestyle=":")
-hi.set_ylim(-0.02, 0.21)
-lo.set_ylim(-0.36, -0.15)
-lo.set_yticks([-0.35, -0.30, -0.25, -0.20, -0.15])
-hi.set_yticks([0.00, 0.05, 0.10, 0.15, 0.20])
+hi.set_ylim(-0.02, 0.24)
+lo.set_ylim(-0.38, -0.13)
 hi.spines["bottom"].set_visible(False)
 lo.spines["top"].set_visible(False)
 hi.tick_params(labeltop=False, bottom=False)
 
-# diagonal break marks
 kw = dict(marker=[(-1, -0.6), (1, 0.6)], markersize=9, linestyle="none",
           color="k", mec="k", mew=1, clip_on=False)
 hi.plot([0, 1], [0, 0], transform=hi.transAxes, **kw)
@@ -103,8 +183,8 @@ lo.plot([0, 1], [1, 1], transform=lo.transAxes, **kw)
 
 for ax in (hi, lo):
     ax.grid(alpha=0.25, linewidth=0.6)
-    ax.set_xticks([2, 3, 4, 5, 6])
-lo.set_xlabel("MoE layer index  (layer 1 is dense in every config)")
+    ax.set_xlim(0.0, 1.05)
+lo.set_xlabel("normalized depth  $l/L$   (layer 1 is a dense FFN in every config)")
 fig.supylabel("median over experts:  context AUC $-$ token AUC", x=0.035, fontsize=13)
 hi.text(0.012, 0.90, "context-dominated (temporal)", transform=hi.transAxes,
         fontsize=10, color="#145a14", weight="bold")
@@ -120,18 +200,46 @@ if PAPER:
     out = os.path.join(OUT, "locus_by_layer_nocaption.png")
 else:
     lo.text(-0.14, -0.72,
-             "Locus of routing specialization by depth. Per (layer, expert) logistic probes predict\n"
-             "whether expert e serves token t, from either the current token embedding E[x_t] or the\n"
-             "excluded-context mean over +-w neighbours; AUC is held-out (fit 70%, score 30%), chance\n"
-             "floor 0.500+-0.002. Points are medians over that layer's experts. Colour = setup (blue =\n"
-             "unconstrained MoE, green = temporal; dark = fine 18/192, light = coarse 6/64), marker =\n"
-             "compute budget (circle 1e16, square 1e17, triangle 1e19). Note the broken y-axis. Only\n"
-             "MoE layers 2-6 were probed: the 1e18/1e19 models have 9 layers, so layers 7-9 are missing.",
-             transform=lo.transAxes, fontsize=8.6, va="top", ha="left",
-             family="monospace", color="#333")
+            "Locus of routing specialization by normalized depth. Per (layer, expert) ridge probes\n"
+            "predict whether expert e serves token t, from either the current token embedding E[x_t]\n"
+            "or the excluded-context mean over +-w=k neighbours; AUC is held out on unseen documents,\n"
+            "measured chance floor 0.500+-0.002 under iid permutation. Points are medians over that\n"
+            "layer's experts, bands are 95% bootstrap intervals (2000 resamples). Colour = setup\n"
+            "(blue = unconstrained MoE, green = temporal; dark = fine 18/192, light = coarse 6/64),\n"
+            "marker = compute budget. Note the broken y-axis: the regime gap (~0.3) dwarfs every\n"
+            "depth effect (~0.05). The 1e19 models are 14 layers deep and are probed at every MoE\n"
+            "layer, 2-14; the 1e16/1e17 cells stop at 6 because their captures were not preserved.",
+            transform=lo.transAxes, fontsize=8.6, va="top", ha="left",
+            family="monospace", color="#333")
     out = os.path.join(OUT, "locus_by_layer.png")
 
 os.makedirs(OUT, exist_ok=True)
 fig.savefig(out, dpi=190, bbox_inches="tight")
 print("wrote", out)
-print("  " + "; ".join(counts))
+for c in counts:
+    print("  " + c)
+if missing:
+    print("  [omitted] " + "; ".join(missing))
+
+HEADER = ["label", "run", "budget", "regime", "variant", "window", "split", "depth_L",
+          "first_layer", "last_layer", "n_layers",
+          "slope_per_normdepth", "slope_nd_lo95", "slope_nd_hi95",
+          "slope_per_layer", "slope_ix_lo95", "slope_ix_hi95",
+          "median_at_first_layer", "median_at_last_layer"]
+sp = os.path.join(DATA, "mechinterp_locus_slopes.csv")
+existing = []
+if os.path.exists(sp):
+    with open(sp) as f:
+        existing = [r for r in csv.DictReader(f) if r.get("split") != SPLIT]
+with open(sp, "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(HEADER)
+    w.writerows([[e[h] for h in HEADER] for e in existing])
+    w.writerows(slope_rows)
+print(f"wrote {sp}: {len(slope_rows)} rows at split={SPLIT}"
+      f"{f' (kept {len(existing)} from other splits)' if existing else ''}")
+print(f"\n{'label':22} {'layers':8} {'slope/l-L':>22} {'slope/layer':>22}")
+for r in slope_rows:
+    print(f"{r[0]:22} {str(r[8])+'-'+str(r[9]):8} "
+          f"{r[11]:+.4f} [{r[12]:+.4f},{r[13]:+.4f}] "
+          f"{r[14]:+.5f} [{r[15]:+.5f},{r[16]:+.5f}]")

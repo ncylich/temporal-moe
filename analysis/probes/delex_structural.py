@@ -1,106 +1,153 @@
 #!/usr/bin/env python3
-"""delex-1e19 Part 1 (a): structural stats per model -> mechinterp_structural_1e19.csv.
+"""A6-A9 -- structural routing statistics, per MoE layer.
 
-Per model (experts pooled over all MoE layers of the capture):
-  PR_median        median expert selectivity = normalized inverse Simpson of renormalized gate mass
-                   q_e(t)=g_e(t)/sum_t g_e(t);  PR_e = 1/(N sum_t q_e(t)^2) in (0,1]
-  generalist_frac  |{e: PR_e>0.5}|/E
-  router_entropy   mean_t[-sum_e g_e(t) ln g_e(t)] / ln E   (per-token routing flatness in [0,1])
-  dist2centroid_mean  mean_e (1 - cos(w_e, wbar)) of flattened FFN weights vs centroid
-  pairwise_cos_med / _p99  median / p99 of pairwise cos(w_e, w_e')
-  eff_rank         participation ratio of the eigenvalues of the expert gate-mass correlation matrix
-  strong_corr_pairs  # expert pairs with Pearson corr of per-token gate series > 0.5
-Schema mirrors mechinterp_structural.csv + a `budget` column (1e19).
+Per (run, layer):
+  PR_median          median expert selectivity: normalized inverse Simpson of renormalized gate mass
+                     q_e(t)=g_e(t)/sum_t g_e(t);  PR_e = 1/(N sum_t q_e(t)^2) in (0,1]. 1 = the
+                     expert draws uniformly from the stream, ~m/N = it lives on m positions.
+  generalist_frac    |{e: PR_e>0.5}|/E
+  router_entropy     mean_t[-sum_e g_e(t) ln g_e(t)] / ln E, per-token routing flatness in [0,1]
+  eff_rank           participation ratio of the eigenvalues of the expert gate-mass covariance
+  strong_corr_pairs  expert pairs whose per-token gate series correlate above 0.5
+  dist2centroid_mean mean_e (1 - cos(w_e, wbar)) of flattened FFN weights against their centroid
+  pairwise_cos_med   median / p99 of pairwise cos(w_e, w_e')
+
+**The change is the `layer` key.** The published version pooled every expert of every MoE layer into
+one row per model, discarding a layer key it already had, so selectivity, generalist fraction and
+router entropy became depth curves for free (A6, A7, A9). Weight geometry (A8) is expected to be flat
+with depth; it is computed per layer anyway so that "expected flat" is a measurement.
+
+Gate statistics need only the capture. Weight geometry additionally needs the run's checkpoint, and
+reading a Megatron distributed checkpoint needs `megatron` importable (see ckpt_read.py). When the
+checkpoint is absent the gate columns are still written and the geometry columns are left blank with
+the reason recorded, rather than failing the whole run.
+
+    . scripts/env.sh
+    PYTHONPATH="$ROOT/Megatron-LM:$ROOT" "$PY" analysis/probes/delex_structural.py
 """
-import os, sys, csv, numpy as np, torch
+import csv
+import os
+import sys
+
+import numpy as np
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import ckpt_read
+import registry
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from paths import ROOT, RUNS
-OUT = os.path.join(ROOT, "results/ablations/mechinterp_structural_1e19.csv")
-CELLS = [("moe_coarse_1e19", "moe_coarse_1e19", "full"),
-         ("temporal_coarse_1e19", "g1_tmoe_coarse_1e19", "temporal"),
-         ("temporal_fine_1e19", "temporal_fine_g3_1e19", "temporal")]
+from paths import ABLATIONS
+
+OUT = os.path.join(ABLATIONS, "mechinterp_structural_1e19.csv")
+HEADER = ["label", "run", "budget", "regime", "grain", "layer", "E", "k",
+          "PR_median", "generalist_frac", "router_entropy", "eff_rank", "strong_corr_pairs",
+          "dist2centroid_mean", "pairwise_cos_med", "pairwise_cos_p99", "geometry_note"]
 
 
-def gate_stats(cap):
-    """Pool per-token gates over all MoE layers -> per-expert PR, router entropy, gate-series corr."""
-    d = torch.load(cap, map_location="cpu", weights_only=False)
-    PR, Hs, corr_counts, eff_ranks, k = [], [], 0, [], None
-    for L in sorted(d["layers"]):
-        Ld = d["layers"][L]; lg = Ld["logits"].float(); k = Ld["k"]; E = lg.shape[-1]
-        N = lg.shape[0] * lg.shape[1]
-        g = torch.softmax(lg, dim=-1).reshape(N, E).double()          # [N,E]
-        # router flatness (per token)
-        H = (-(g * (g.clamp(min=1e-12)).log()).sum(-1)).mean() / np.log(E)
-        Hs.append(float(H))
-        # selectivity per expert
-        mass = g.sum(0)                                                # [E]
-        q = g / mass.clamp(min=1e-12)                                  # renormalized over tokens
-        pr = 1.0 / (N * (q * q).sum(0)).clamp(min=1e-12)
-        PR.extend(pr.tolist())
-        # gate-series correlation across experts
-        gc = g - g.mean(0)
-        cov = (gc.T @ gc) / N
-        sd = cov.diag().clamp(min=1e-12).sqrt()
-        cc = cov / (sd[:, None] * sd[None, :])
-        iu = torch.triu_indices(E, E, 1)
-        corr_counts += int((cc[iu[0], iu[1]].abs() > 0.5).sum())
-        ev = torch.linalg.eigvalsh(cov).clamp(min=0)
-        eff_ranks.append(float((ev.sum() ** 2) / (ev * ev).sum().clamp(min=1e-12)))
-    return np.array(PR), float(np.mean(Hs)), corr_counts, float(np.mean(eff_ranks)), k, E
+def gate_stats(d, L):
+    """Per-layer gate statistics from one capture's layer record."""
+    import torch
+    Ld = d["layers"][L]
+    lg = Ld["logits"].float()
+    k = int(Ld["k"])
+    E = lg.shape[-1]
+    N = lg.shape[0] * lg.shape[1]
+    g = torch.softmax(lg, dim=-1).reshape(N, E).double()
+    H = float((-(g * g.clamp(min=1e-12).log()).sum(-1)).mean() / np.log(E))
+    mass = g.sum(0)
+    q = g / mass.clamp(min=1e-12)
+    pr = (1.0 / (N * (q * q).sum(0)).clamp(min=1e-12)).numpy()
+    gc = g - g.mean(0)
+    cov = (gc.T @ gc) / N
+    sd = cov.diag().clamp(min=1e-12).sqrt()
+    cc = cov / (sd[:, None] * sd[None, :])
+    iu = torch.triu_indices(E, E, 1)
+    strong = int((cc[iu[0], iu[1]].abs() > 0.5).sum())
+    ev = torch.linalg.eigvalsh(cov).clamp(min=0)
+    eff = float((ev.sum() ** 2) / (ev * ev).sum().clamp(min=1e-12))
+    return dict(E=E, k=k, PR_median=float(np.median(pr)), generalist=float((pr > 0.5).mean()),
+                entropy=H, eff_rank=eff, strong=strong)
 
 
-def weight_identity(run):
-    """Flatten each routed expert's (fc1|fc2) weights over MoE layers -> per-expert vector; centroid."""
-    ip = ckpt_read.iter_dir(os.path.join(RUNS, run, "ckpt"))
-    meta = ckpt_read.weight_keys(ckpt_read.FileSystemReader(ip))
+def weight_geometry(run):
+    """{layer: (dist2centroid_mean, pairwise_cos_med, pairwise_cos_p99)} from the checkpoint.
+
+    Returns ({}, reason) when the checkpoint or the megatron import is unavailable.
+    """
     import re
-    keys = sorted([kk for kk in meta if re.search(r"experts\.experts\.linear_fc[12]\.weight$", kk)])
+    import torch
+    ck = os.path.join(registry.RUNS, run, "ckpt")
+    if not os.path.isdir(ck):
+        return {}, "no checkpoint on disk (scripts/artifacts.py pull --run %s)" % run
+    try:
+        import ckpt_read
+        ip = ckpt_read.iter_dir(ck)
+        meta = ckpt_read.weight_keys(ckpt_read.FileSystemReader(ip))
+    except Exception as exc:                                   # megatron/TE import or DCP metadata
+        return {}, f"checkpoint unreadable: {type(exc).__name__}: {exc}"[:160]
+    keys = sorted(k for k in meta if re.search(r"experts\.experts\.linear_fc[12]\.weight$", k))
+    if not keys:
+        return {}, "checkpoint has no routed-expert weights"
     sd = ckpt_read.load(ip, keys)
-    # group by layer -> concat fc1,fc2 per expert; then average identity across layers
-    vecs_by_layer = {}
+    by_layer = {}
     for kk in keys:
         L = int(re.search(r"layers\.(\d+)\.", kk).group(1))
-        t = sd[kk].float()                                            # [E,out,in]
-        E = t.shape[0]
-        v = t.reshape(E, -1)
-        vecs_by_layer.setdefault(L, []).append(v)
-    d2c, pcos = [], []
-    for L, parts in vecs_by_layer.items():
-        W = torch.cat(parts, dim=1)                                   # [E, feat]
+        t = sd[kk].float()
+        by_layer.setdefault(L, []).append(t.reshape(t.shape[0], -1))
+    out = {}
+    for L, parts in by_layer.items():
+        W = torch.cat(parts, dim=1)
         Wn = W / W.norm(dim=1, keepdim=True).clamp(min=1e-12)
-        cbar = Wn.mean(0); cbar = cbar / cbar.norm().clamp(min=1e-12)
-        d2c.extend((1 - (Wn @ cbar)).tolist())
+        cbar = Wn.mean(0)
+        cbar = cbar / cbar.norm().clamp(min=1e-12)
         C = Wn @ Wn.T
         iu = torch.triu_indices(W.shape[0], W.shape[0], 1)
-        pcos.extend(C[iu[0], iu[1]].tolist())
-    return float(np.mean(d2c)), float(np.median(pcos)), float(np.percentile(pcos, 99))
+        pc = C[iu[0], iu[1]]
+        out[L] = (float((1 - (Wn @ cbar)).mean()), float(pc.median()),
+                  float(np.percentile(pc.numpy(), 99)))
+    return out, ""
 
 
 def main():
+    import torch
+    only = [a for a in sys.argv[1:] if not a.startswith("--")]
+    cells = [r for r in registry.runs(capture=True)
+             if (not only or r.name in only) and os.path.exists(r.path("delex_capture.pt"))]
+    if not cells:
+        sys.exit("no captures on disk")
     rows = []
-    for label, run, kind in CELLS:
-        cap = os.path.join(RUNS, run, "delex_capture.pt")
-        if not os.path.exists(cap):
-            print(f"[skip] {label}: no capture"); continue
-        PR, Hbar, corrpairs, effrank, k, E = gate_stats(cap)
-        d2c, pcos_med, pcos_p99 = weight_identity(run)
-        row = [label, run, kind, E, k, round(float(np.median(PR)), 4),
-               round(float((PR > 0.5).mean()), 4), round(Hbar, 4), round(effrank, 2),
-               corrpairs, round(d2c, 4), round(pcos_med, 4), round(pcos_p99, 4), "1e19"]
-        rows.append(row)
-        print(f"[ok] {label}: PR_med={row[5]} generalist={row[6]} Hbar={row[7]} "
-              f"d2c={row[10]} pcos_med={row[11]}")
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    for r in cells:
+        d = torch.load(r.path("delex_capture.pt"), map_location="cpu", weights_only=False)
+        layers = registry.moe_layers(d)
+        geom, note = weight_geometry(r.name)
+        if note:
+            print(f"[warn] {r.name}: weight geometry (A8) unavailable — {note}")
+        print(f"[run] {r.name} ({r.regime}, {r.grain_label}, {r.budget}) "
+              f"layers {layers[0]}-{layers[-1]}", flush=True)
+        for L in layers:
+            s = gate_stats(d, L)
+            g = geom.get(L)
+            missing = "" if g else (note or f"layer {L} absent from checkpoint expert weights")
+            rows.append([r.name, r.name, r.budget, r.regime, r.grain_label, L, s["E"], s["k"],
+                         round(s["PR_median"], 4), round(s["generalist"], 4), round(s["entropy"], 4),
+                         round(s["eff_rank"], 2), s["strong"],
+                         round(g[0], 4) if g else "", round(g[1], 4) if g else "",
+                         round(g[2], 4) if g else "", missing])
+            print(f"    L{L:<3} PR_med={s['PR_median']:.3f} generalist={s['generalist']*100:4.0f}% "
+                  f"Hbar={s['entropy']:.3f} eff_rank={s['eff_rank']:6.2f} "
+                  f"strong_pairs={s['strong']:5d}"
+                  + (f"  d2c={g[0]:.3f} cos_med={g[1]:.4f}" if g else "  [geometry: n/a]"),
+                  flush=True)
+
+    os.makedirs(ABLATIONS, exist_ok=True)
     with open(OUT, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["label", "run", "kind", "E", "k", "PR_median", "generalist_frac", "router_entropy",
-                    "eff_rank", "strong_corr_pairs", "dist2centroid_mean", "pairwise_cos_med",
-                    "pairwise_cos_p99", "budget"])
+        w.writerow(HEADER)
         w.writerows(rows)
-    print(f"[write] {OUT}: {len(rows)} rows")
+    print(f"\n[write] {OUT}: {len(rows)} rows")
+    nogeom = sum(1 for x in rows if x[-1])
+    if nogeom:
+        print(f"note: {nogeom}/{len(rows)} rows have no weight-geometry (A8) columns; the reason is "
+              f"in the geometry_note column of each")
 
 
 if __name__ == "__main__":

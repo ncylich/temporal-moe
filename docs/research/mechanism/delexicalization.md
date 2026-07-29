@@ -75,12 +75,32 @@ chance floor: the same classifiers refit on null labels (iid permutations and ci
 at least 1000 tokens, the latter preserving the labels' residency-induced autocorrelation) give
 $0.500 \pm 0.002$ everywhere, so every entry is real signal.
 
+Every number in this table is a median over the experts of **MoE layers 2–6**, pooled: 4 layers for
+the 192E model (of its 4, so complete) and 5 for the 64E model (of its 6, layer 7 onward absent
+because layer 1 is dense). Depth is not resolved here at all; that is
+[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md)'s subject.
+
 | model | median $A_{\mathrm{tok}}$ | median $A_{\mathrm{ctx}}$ | chance floor (tok / ctx) | context dominated |
 |---|---|---|---|---|
-| baseline (192E, $w{=}18$) | 0.93 | 0.64 | 0.501 / 0.499 | 1% |
+| baseline (192E, $w{=}32$) | 0.93 | 0.64 | 0.501 / 0.499 | 1% |
 | temporal (192E, $w{=}18$) | 0.62 | 0.77 | 0.500 / 0.498 | 91% |
 | baseline (64E, $w{=}6$) | 0.84 | 0.59 | 0.499 / 0.502 | 1% |
 | temporal (64E, $w{=}6$) | 0.60 | 0.68 | 0.501 / 0.501 | 85% |
+
+The softmax-aux 192E baseline row is $w{=}32$, not $w{=}18$: only the $w{=}32$ variant was ever run
+for that cell, and this table previously mislabelled it. Its sigmoid-router sibling does have
+$w{=}18$ and sits about 0.02 lower, which brackets what the missing measurement would show.
+
+Two caveats on the floors, both established after this section was written and neither of which
+changes its conclusions. First, the floors above are the **iid-permutation** nulls; the
+circular-shift null quoted alongside them is inflated — measured at full depth it runs to +0.017,
+scaling with the context window width — because it is applied to the flattened $[S{\cdot}B]$ stream
+whose adjacent entries are adjacent *batch elements*, so it never shifted along the token axis. See
+`analysis/probes/delex_null_check.py`. Second, the 70/30 split is a split on sequence *position*, so
+the same documents appear in the fit and score halves; holding out whole documents instead moves
+these AUCs, and the re-measured values are in
+[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) §1. The regime gap of 0.3 AUC is an order of magnitude
+larger than either correction.
 
 The baseline router implements a near deterministic token-to-expert lookup: the current token
 predicts expert firing at AUC 0.84 to 0.93 (+0.34 to +0.43 above floor) and context never
