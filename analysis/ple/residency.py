@@ -22,7 +22,7 @@ from temporal.temporal_router import compute_resident_mask, compute_resident_mas
 from transformers.models.olmoe.modeling_olmoe import OlmoeTopKRouter, OlmoeSparseMoeBlock
 
 _CFG = {"on": False, "R": 8, "evict": "min_logit", "accel": True, "collect_aux": False,
-        "collect_telem": False, "free_layers": 0}
+        "collect_telem": False, "free_layers": 0, "free_set": None}
 # free_layers: leave the first N MoE layers UNCONSTRAINED (ordinary free routing) while the rest run
 # under rolling residency. This relaxes the constraint rather than adapting to it, so a cell using it
 # is NOT comparable to a full-residency number without stating the cost: every expert of a freed
@@ -91,8 +91,13 @@ def _router_forward(self, hidden_states):
     if not _CFG["on"]:
         return _orig_router_forward(self, hidden_states)
     _li = getattr(self, "_layer_idx", None)
-    if _li is not None and _li < _CFG.get("free_layers", 0):
-        return _orig_router_forward(self, hidden_states)      # this layer is deliberately free
+    if _li is not None:
+        _fs = _CFG.get("free_set")
+        if _fs is not None:
+            if _li in _fs:
+                return _orig_router_forward(self, hidden_states)   # explicitly free
+        elif _li < _CFG.get("free_layers", 0):
+            return _orig_router_forward(self, hidden_states)       # first-N free
     hidden_states = hidden_states.reshape(-1, self.hidden_dim)
     router_logits = F.linear(hidden_states, self.weight)                 # [N, E]
     N, E = router_logits.shape
@@ -127,6 +132,15 @@ def tag_layers(model):
         m._layer_idx = i
 
 
+def set_free_layers(indices):
+    """Explicit set of layer indices to leave UNCONSTRAINED; None restores the free_layers rule.
+
+    Generalises free_layers so any subset can be freed, which is what the per-layer damage ablation
+    needs: constrain exactly one layer by freeing the other fifteen.
+    """
+    _CFG["free_set"] = set(indices) if indices is not None else None
+
+
 def set_forced(masks):
     """masks: list of [S,B,E] bool per layer (or None to disable). Router serves exactly the True experts."""
     _CFG["forced"] = masks
@@ -149,9 +163,10 @@ def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
     post-forward so it is gradient-checkpointing safe. Each rl: [B*S, E]."""
     aux_t = z_t = None; n = 0
     _free = _CFG.get("free_layers", 0)
+    _fset = _CFG.get("free_set")
     for _li, rl in enumerate(router_logits_tuple):
         N, E = rl.shape
-        if _li < _free:
+        if (_li in _fset) if _fset is not None else (_li < _free):
             # unconstrained layer: ordinary Switch aux/z on the UNMASKED distribution
             probs = torch.softmax(rl.float(), dim=-1)
             P = probs.mean(0)
