@@ -22,7 +22,11 @@ from temporal.temporal_router import compute_resident_mask, compute_resident_mas
 from transformers.models.olmoe.modeling_olmoe import OlmoeTopKRouter, OlmoeSparseMoeBlock
 
 _CFG = {"on": False, "R": 8, "evict": "min_logit", "accel": True, "collect_aux": False,
-        "collect_telem": False}
+        "collect_telem": False, "free_layers": 0}
+# free_layers: leave the first N MoE layers UNCONSTRAINED (ordinary free routing) while the rest run
+# under rolling residency. This relaxes the constraint rather than adapting to it, so a cell using it
+# is NOT comparable to a full-residency number without stating the cost: every expert of a freed
+# layer must stay resident, which is 64 instead of 8 per layer.
 # per-forward accumulators for masked-distribution aux + z-loss (router-only finetune)
 AUX = {"aux": None, "z": None, "n": 0}
 # telemetry accumulators (eval-time, R=8): swap-rate/layer + expert-usage entropy
@@ -86,6 +90,9 @@ def _block_forward(self, hidden_states):
 def _router_forward(self, hidden_states):
     if not _CFG["on"]:
         return _orig_router_forward(self, hidden_states)
+    _li = getattr(self, "_layer_idx", None)
+    if _li is not None and _li < _CFG.get("free_layers", 0):
+        return _orig_router_forward(self, hidden_states)      # this layer is deliberately free
     hidden_states = hidden_states.reshape(-1, self.hidden_dim)
     router_logits = F.linear(hidden_states, self.weight)                 # [N, E]
     N, E = router_logits.shape
@@ -130,8 +137,10 @@ def install_patch():
     OlmoeTopKRouter.forward = _router_forward
 
 
-def enable_residency(R=8, evict="min_logit"):
+def enable_residency(R=8, evict="min_logit", free_layers=None):
     _CFG.update(on=True, R=R, evict=evict)
+    if free_layers is not None:
+        _CFG["free_layers"] = free_layers
 
 
 def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
@@ -139,8 +148,18 @@ def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
     router_logits (output_router_logits=True). Differentiable in the router weights; computed once
     post-forward so it is gradient-checkpointing safe. Each rl: [B*S, E]."""
     aux_t = z_t = None; n = 0
-    for rl in router_logits_tuple:
+    _free = _CFG.get("free_layers", 0)
+    for _li, rl in enumerate(router_logits_tuple):
         N, E = rl.shape
+        if _li < _free:
+            # unconstrained layer: ordinary Switch aux/z on the UNMASKED distribution
+            probs = torch.softmax(rl.float(), dim=-1)
+            P = probs.mean(0)
+            aux = E * (P * P).sum()          # importance loss; uniform P minimises it
+            z = (torch.logsumexp(rl.float(), dim=-1) ** 2).mean()
+            aux_t = aux if aux_t is None else aux_t + aux
+            z_t = z if z_t is None else z_t + z; n += 1
+            continue
         lg = rl.view(B, S, E).transpose(0, 1).contiguous()          # [S,B,E]
         with torch.no_grad():
             scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
@@ -265,6 +284,7 @@ def load_model(path=None, device="cuda"):
     model = AutoModelForCausalLM.from_pretrained(
         path, dtype=torch.bfloat16, attn_implementation="sdpa").to(device).eval()
     install_patch()
+    tag_layers(model)          # _layer_idx is required by the free_layers check
     return model, tok
 
 

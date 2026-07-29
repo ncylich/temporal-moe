@@ -69,6 +69,12 @@ ap.add_argument("--calib-init", action="store_true",
                      "Cal-2 null: norm gains receive gradient every step so any init washes out, "
                      "whereas a PLE row is updated only when its token appears, so a calibrated "
                      "init persists exactly for the rare rows that are underdetermined.")
+ap.add_argument("--free-layers", type=int, default=0,
+                help="leave the first N MoE layers unconstrained (ordinary free routing) while the "
+                     "rest run under rolling residency. This RELAXES the constraint, so such a cell "
+                     "is not comparable to a full-residency number without stating the cost: a freed "
+                     "layer must keep all 64 experts resident instead of 8, which is +43.8% resident "
+                     "expert memory for one layer and +87.5% for two.")
 ap.add_argument("--heldout", action="store_true",
                 help="withhold the token ids in ple_heldout.pt from the PLE lookup, so the "
                      "zero-property check tests rows that were eligible to train")
@@ -84,8 +90,11 @@ meta = json.load(open(f"{DATA_DIR}/bpb_slice_meta.json"))
 D = meta["divisor_D"]                                        # re-read, never inherited
 
 model, tok = RES.load_model()
-RES.enable_residency(R=8)
+RES.enable_residency(R=8, free_layers=A.free_layers)
 RES.enable_grad_checkpointing(model)
+if A.free_layers:
+    print(f"[resid] first {A.free_layers} MoE layer(s) UNCONSTRAINED; layers {A.free_layers}-15 "
+          f"under rolling residency R=8", flush=True)
 RES.freeze_all_but_router(model)
 rp = RES.router_params(model)
 norm_ps = RES.norm_params(model)                             # arm C surface: + learnable RMSNorm gains
@@ -162,7 +171,7 @@ E_experts = model.config.num_experts
 
 
 def eval_bpb_telem():
-    model.eval(); RES.enable_residency(R=8); RES.reset_telem(); RES._CFG["collect_telem"] = True
+    model.eval(); RES.enable_residency(R=8, free_layers=A.free_layers); RES.reset_telem(); RES._CFG["collect_telem"] = True
     tot = n = 0
     with torch.no_grad():
         for i in range(eval_sub.shape[0]):
@@ -185,7 +194,13 @@ if A.resume_c:
             _m.data.copy_(_s.to("cuda"))
         for _m, _p in zip(masters, train_params):
             _p.data.copy_(_m.data.to(_p.dtype))
-    opt.load_state_dict(_ck["opt"])
+    # A synthetic surface (one written by cal_stack.py from closed-form calibration rather than by
+    # training) carries no optimizer state. Resuming those means starting Adam fresh, which is
+    # correct: there is no moment history to continue.
+    if _ck.get("opt"):
+        opt.load_state_dict(_ck["opt"])
+    else:
+        print("[resume] checkpoint carries no optimizer state; starting Adam fresh", flush=True)
     seen, step, pos = _ck["seen"], _ck["step"], _ck["pos"]
     hist = list(_ck["hist"])
     print(f"[resume] C surface from {os.path.basename(A.resume_c)}: seen={seen/1e6:.0f}M "
@@ -264,7 +279,7 @@ while seen < A.tokens:
 
 fb, fswap, fent = eval_bpb_telem()
 res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
-       "ple_start": A.ple_start, "calib_init": A.calib_init,
+       "ple_start": A.ple_start, "calib_init": A.calib_init, "free_layers": A.free_layers,
        "calib_suffix": A.calib_suffix,
        "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
