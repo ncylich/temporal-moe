@@ -8,7 +8,7 @@ uniform output schema.
 
 This is deliberately *not* hypothesis-driven work — it is making the existing measurements complete
 and reproducible. The hypothesis-driven analysis that motivated the audit lives in
-[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) and depends on Steps 1–3 below.
+[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) and depends on Section 5 Steps 1–3 below.
 
 ## 1. Current coverage
 
@@ -51,7 +51,61 @@ From [`results/MANIFEST.csv`](../../../results/MANIFEST.csv):
 **The capture pass is the only real cost in this plan.** Everything downstream of a capture is
 CPU-bound analysis measured in minutes.
 
-## 3. Schema conventions to adopt
+## 3. The analyses to re-run
+
+Every mechanistic analysis in the repo, with what changes about it. "Per-layer" means the output
+gains a `layer` column and covers every MoE layer; "all models" means the selection set of
+Section 5 Step 3 rather than the current hardcoded list.
+
+### A. Locus / de-lexicalization family — driver [`delex_probe.py`](../../../analysis/probes/delex_probe.py) capture
+
+| # | analysis | script -> output | change |
+|---|---|---|---|
+| A1 | Locus probes: token AUC vs excluded-context AUC per expert | `delex_locus.py` -> `mechinterp_locus*.csv` | layers 2–9 instead of 2–6; all models; warn instead of silently skipping |
+| A2 | Null-control floors (iid permutation + circular shift) | `delex_locus.py` -> `mechinterp_floors.csv` | per layer, not pooled; gate every new model |
+| A3 | Context-window sweep (w = k/2, k, 32) | `delex_locus.py` variants | run all three for **every** cell — currently the softmax-aux fine baseline has only w=32 |
+| A4 | Output logit lens: data-weighted effective vocabulary per expert | `delex_lens.py` -> `mechinterp_lens*.csv` | layers 2–9 instead of 2–4; all models |
+| A5 | Static (no-data) lens reference | `delex_lens.py` variant `static` | same extension; it is the no-signal control for A4 |
+| A6 | Selectivity PR + generalist fraction | `delex_structural.py` -> `mechinterp_structural*.csv` | **add `layer` grouping — currently pooled across all MoE layers** |
+| A7 | Router entropy (per-token routing flatness) | same | per layer |
+| A8 | Weight geometry: distance-to-centroid, pairwise cosine | same | per layer; expected flat, confirm once |
+| A9 | Gate-mass correlation: effective rank, strong-corr pairs | same | per layer |
+| A10 | Demand forecastability (causal, history-only probe) | `delex_demand.py` -> `mechinterp_demand*.csv` | **fit per layer — currently one probe pooled over layers 2–6** |
+| A11 | Free-rider: distinct experts per sequence, tokens per expert | -> `mechinterp_freerider.csv` | all models; per-layer breakout is not meaningful (architecturally fixed) — record once and note why |
+
+### B. Replay / residency-dynamics family — [`probe_replay.py`](../../../analysis/probes/probe_replay.py), captures = `router_log.pt`
+
+| # | analysis | output | change |
+|---|---|---|---|
+| B1 | Swap rate and p95 burst length by layer | `e1_swap_rate_by_layer.csv` | all 22 captured runs; **stop reporting swap rate as a depth signal** (saturated), keep burst length |
+| B2 | Victim-cache hit rate vs cache size | `e1_victim_cache_hitrate.csv` | all runs |
+| B3 | Streamed diversity: expert union, effective experts, pinned set | `e2_streamed_diversity.csv` | all runs |
+| B4 | Mass-weighted vs set-based routing consistency | `e3_mass_vs_set_consistency.csv` | all runs |
+| B5 | Swap rate vs retained mass (hysteresis tau sweep) | `e4_swap_vs_retained_mass.csv` | all runs |
+| B6 | Eviction-policy headroom (min_logit / LRU / Belady bound) | `e5_eviction_policy_headroom.csv` | all runs; **per layer** — policy headroom may itself be depth-dependent |
+| B7 | Per-layer ranking: hit rate, swap rate, lifetime | `e6_per_layer_ranking.csv` | **3 runs -> all 22**; this is the metric with the depth signal |
+| B8 | EMA demand smoothing (beta sweep) | `e7_demand_smoothing.csv` | all runs; per layer |
+| B9 | Document-boundary churn | `e8_document_boundary.csv` | all runs |
+| B10 | **Counterfactual baseline replay** — impose rolling residency on an unconstrained run's router log | new | does not exist; every replay metric currently lacks a baseline arm |
+
+### X. Cross-regime constraint swap
+
+| # | analysis | change |
+|---|---|---|
+| X1 | Global swap: evaluate each trained model under the other regime (§5 of [`delexicalization.md`](delexicalization.md)) | **has no committed driver** — it was run ad hoc through `run.sh` with `EVAL_ONLY=1` and the temporal env flags. Commit one, since the per-layer version is on the layer-lexicality critical path |
+| X2 | Per-layer swap sweep | new; the C3 test of [`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) |
+| X3 | Residency dose curve (uniform R) | re-run the R endpoints at 1e17 and 1e18, not only 1e16 |
+
+### Z. Explicitly out of scope
+
+`expert_coactivation.py` and `router_saturation.py` under
+[`scripts/empirical_analysis/`](../../../scripts/empirical_analysis) are upstream FLAME-MoE
+analyses that do not run in this repo. `stability_*.py`, `fakequant_eval.py` and `run_lmeval.py`
+are stability, quantization and downstream-eval probes, not mechanistic interpretability.
+`expert_load.py` and `activation_probe.py` produce aggregate stability statistics; pull them in
+only if a specific question needs them.
+
+## 4. Schema conventions to adopt
 
 Applied uniformly as each script is touched, so this audit does not have to be repeated:
 
@@ -66,7 +120,7 @@ Applied uniformly as each script is touched, so this audit does not have to be r
    cross-referencing prose in another document (`kwin` = w=k/2, `kfull` = w=k, `base` = w=32).
 5. **Model lists come from a single shared registry**, not per-function constants.
 
-## 4. Steps
+## 5. Steps
 
 Ordered so that anything usable without a GPU lands first.
 
@@ -109,13 +163,6 @@ Ordered so that anything usable without a GPU lands first.
 12. Regenerate every figure from the completed CSVs.
 13. Reconcile the numbers quoted in [`delexicalization.md`](delexicalization.md) against the
     re-run outputs, and record any that move.
-
-## 5. Out of scope
-
-The stability, fake-quant and lm-eval probes (`stability_*.py`, `fakequant_eval.py`,
-`run_lmeval.py`) are not mechanistic interpretability and are not part of this re-run.
-`expert_load.py` and `activation_probe.py` produce aggregate stability statistics rather than
-routing-locus measurements; include them only if a specific question needs them.
 
 ## 6. Acceptance criteria
 

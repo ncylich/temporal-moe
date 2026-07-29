@@ -226,10 +226,12 @@ constraint and reframes H2.
 Off-diagonal collapse would show routing is a qualitatively different function with depth rather
 than the same function weakening.
 
-## 5. Training tests
+## 5. Optional training tests
 
-Three, in order. The design is driven by a power calculation, because the first testbed we
-considered cannot detect the effect.
+**All three are optional and none is a prerequisite for anything in Section 4.** H1 is settled
+entirely by the cheap tests; only H2 needs training runs, and C3 is a deterministic pre-screen for
+whether they are worth starting. They are listed in order, and the design is driven by a power
+calculation, because the first testbed we considered cannot detect the effect.
 
 **Noise floor.** From [`seed_replicates.csv`](../../../results/ablations/seed_replicates.csv) and
 [`flame38m_overnight_seeds.csv`](../../../results/ablations/flame38m_overnight_seeds.csv), test-set
@@ -253,13 +255,14 @@ BPB across seeds of the same config:
 **s2/1e17 — the testbed originally proposed — is the worst of the three and is underpowered at
 n=1.** Revised plan:
 
-**T1 — single-layer sweep at s0/1e16. 3 runs, cheapest available, first real H2 evidence.**
+**T1 (optional) — single-layer sweep at s0/1e16. 3 runs, cheapest available, first real H2
+evidence.**
 Constrain exactly one MoE layer at a time (R = k there, R = E elsewhere); the two reference
 endpoints (all-constrained 1.4750, none-constrained 1.4519) already exist. Only 3 MoE layers, so
 the depth resolution is coarse — but at SNR ~7 per layer it cleanly answers *"is the per-layer cost
 curve flat or sloped?"*, which is the binary H2 turns on.
 
-**T2 — shallow-half versus deep-half contrast at 1e18. 2 arms x 3 seeds = 6 runs.** Constrain
+**T2 (optional) — shallow-half versus deep-half contrast at 1e18. 2 arms x 3 seeds = 6 runs.** Constrain
 layers 2–5 with 6–9 free, versus 2–5 free with 6–9 constrained: matched layer count, matched
 resident-slot budget, so the arms differ *only* in where the constraint sits. The contrast
 aggregates four layers of the depth gradient instead of one, which is what makes 1e18 viable
@@ -267,8 +270,8 @@ despite a per-layer SNR of ~1.9; with 3 seeds per arm the contrast standard erro
 This is the definitive H2 test, at the budget where the constraint actually wins and across 8 MoE
 layers.
 
-**T3 — full per-layer resolution at 1e18, and the schedule-versus-uniform control. 8 + 2 runs, only
-if T1 and T2 both point the same way.** Per-layer resolution gives the cutoff *d*; the control
+**T3 (optional) — full per-layer resolution at 1e18, and the schedule-versus-uniform control.
+8 + 2 runs, only if T1 and T2 both point the same way.** Per-layer resolution gives the cutoff *d*; the control
 compares the resulting prefix schedule against uniform R at **equal total resident-slot count**.
 That control is not optional: the schedule saves memory against the full MoE baseline but *costs*
 memory against shipped temporal (1e18 model: 512 slots baseline, 48 uniform R=k), so the only
