@@ -1,15 +1,18 @@
 # Layer-wise Lexicality of MoE Routing
 
-**Status: hypothesis + partial baseline measurements + work plan.** Sections 1–3 record what is
-already measured. Section 4 states the two hypotheses this line of work exists to prove or
-disprove; Sections 5–7 are the plan to test them. No result here is final.
+**Status: two hypotheses, partial baseline measurements, and the tests to settle them.** Sections
+1–2 record what is already measured. Section 3 states what this work exists to prove or disprove.
+Sections 4–5 are the tests, split by whether they need training runs. No result here is final.
+
+Battery-wide housekeeping — re-running every mechinterp script across every model and layer — is
+tracked separately in [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md). Steps 1–3 of that
+plan are prerequisites for several tests below.
 
 ## 0. Why
 
 [`delexicalization.md`](delexicalization.md) establishes that unconstrained MoE routers bind
-experts to token identity and that rolling residency breaks that binding, and it reports one
-number per model — a median pooled over layers. It never asks whether the effect varies with
-depth, and it never states which layers it pooled over.
+experts to token identity and that rolling residency breaks that binding, and it reports one number
+per model — a median pooled over layers. It never asks whether the effect varies with depth.
 
 If the locus of specialization moves toward context as depth increases, then the residency
 constraint — which forces routing onto exactly the feature that context provides — should be
@@ -66,49 +69,37 @@ from 2000 bootstrap resamples of experts within each layer.
 **Readings.**
 
 1. **The regimes never overlap at any depth.** Every temporal series is above 0 at every layer,
-   every unconstrained series is below −0.20 at every layer. The regime gap (~0.3 AUC) dwarfs
-   every depth effect (~0.05).
-2. **The depth trend is positive in 3 of 4 arms, and is present in both regimes at
-   indistinguishable rates.** On current evidence it is a property of network depth — more
-   attention mixing before deeper routers see the stream — not of the residency constraint. This
-   is consistent with the mechanism behind H1 below, but it means any regime-specific claim needs
-   matched baseline arms to be testable at all.
-3. **The coarse 1e17 pair is flat in both regimes**, CI straddling zero. A real exception, not
-   noise-in-our-favour.
-4. **Granularity sets the level more than compute does.** The fine arms bracket the coarse ones.
+   every unconstrained series is below −0.20. The regime gap (~0.3 AUC) dwarfs every depth effect
+   (~0.05).
+2. **The depth trend is positive in 3 of 4 arms, and appears in both regimes at indistinguishable
+   rates.** On current evidence it is a property of network depth — more attention mixing before
+   deeper routers see the stream — not of the constraint. This is consistent with the mechanism
+   behind H1, but it means any regime-specific claim needs matched baseline arms to be testable.
+3. **The coarse 1e17 pair is flat in both regimes**, CI straddling zero. A real exception.
+4. **Granularity sets the level more than compute does.**
 
-**Caveats that limit these readings.**
+**Caveats.**
 
-- **Layers 7–9 are missing for every 9-layer model.** `LAYERS = [2,3,4,5,6]` is hardcoded in
-  [`analysis/probes/delex_locus.py`](../../../analysis/probes/delex_locus.py), with the note "paper
-  convention". For the 4- and 6-layer models this happens to be full coverage; for the 1e18/1e19
-  models it is 5 of 8 MoE layers, silently skipped by the `if L not in d["layers"]: continue`
-  guard. The captures contain the missing layers.
+- **Layers 7–9 are missing for every 9-layer model** — `LAYERS = [2,3,4,5,6]` hardcoded at
+  [`delex_locus.py:18`](../../../analysis/probes/delex_locus.py), silently skipping the rest. The
+  captures contain them.
 - **The x-axis mixes models of different total depth.** The fine@1e16 model's L4 is its last layer;
-  the 1e19 model's L4 is 3/8 of the way through. Any depth claim has to be stated against
-  normalized depth `l/L`.
-- **The softmax-aux fine baseline was only ever measured at w=32**, not at w=k. In
-  [`mechinterp_locus.csv`](../../../results/ablations/mechinterp_locus.csv) the variants decode as
-  `kwin` = w=k/2, `kfull` = w=k, `base` = w=32; `s0_SOFTMAX_BASELINE` has only `base`. §3 of
-  [`delexicalization.md`](delexicalization.md) labels that table row "w=18", which is wrong. Its
-  sigmoid sibling at the same budget and granularity does have w=k and sits ~0.02 lower, which
-  brackets the missing measurement. **The doc needs correcting either way.**
-- Layer 1 is a dense FFN in every config (`--moe-layer-freq "[0]*1+[1]*(L-1)"`), so there is no
-  layer-1 router to probe.
-- The probe is **linear on the input embedding**. `A_tok = 1` is not the ceiling: routing is a
-  function of the post-attention hidden state, so the same token id genuinely routes differently in
-  different contexts.
+  the 1e19 model's L4 is 3/8 of the way through. Depth claims must be stated against `l/L`.
+- **The softmax-aux fine baseline was only ever measured at w=32**, not w=k, and §3 of
+  [`delexicalization.md`](delexicalization.md) mislabels that row as w=18. Its sigmoid sibling has
+  w=k and sits ~0.02 lower, bracketing the missing measurement.
+- Layer 1 is a dense FFN in every config, so there is no layer-1 router to probe.
+- The probe is **linear on the input embedding**; `A_tok = 1` is not the ceiling, since routing is
+  a function of the post-attention hidden state.
 
 ## 2. Cache hit rate by depth
 
-**Metric.** Hit rate = of the k experts a token's router actually wanted (its *unconstrained*
-top-k), the fraction already resident when the token arrived, measured **pre-swap**. Range 0–1,
-higher = the resident set matches demand better. A random resident set scores
-**k/E = 6/64 = 18/192 = 0.094** — identical for both granularities, so the two are directly
-comparable on this axis.
+**Metric.** Of the k experts a token's router actually wanted (its *unconstrained* top-k), the
+fraction already resident when the token arrived, measured **pre-swap**. Range 0–1, higher =
+resident set matches demand better. A random resident set scores **k/E = 6/64 = 18/192 = 0.094**,
+identical for both granularities, so the two are directly comparable.
 
-Source: [`e6_per_layer_ranking.csv`](../../../results/ablations/e6_per_layer_ranking.csv), produced
-by [`analysis/probes/probe_replay.py`](../../../analysis/probes/probe_replay.py).
+Source: [`e6_per_layer_ranking.csv`](../../../results/ablations/e6_per_layer_ranking.csv).
 
 | MoE layer | 3.9M active, fine 18/192 @1e17 | 8.1M active, coarse 6/64 @1e17 | 38M active, coarse 6/64 @1e18 |
 |---|---|---|---|
@@ -121,166 +112,173 @@ by [`analysis/probes/probe_replay.py`](../../../analysis/probes/probe_replay.py)
 | 8 | — | — | 0.339 |
 | 9 | — | — | 0.338 |
 
-**Depth coverage here is complete** for all three models (s1 has 5 layers, s2 has 6, the 38M has 9;
-layer 1 is dense in each). This is the one metric that already sees the full stack, which makes its
-shape important: hit rate climbs steeply from the first MoE layer through the middle (+82% relative
-for the fine model, +64% for the 8.1M coarse) and then **plateaus at 0.33–0.34 through L9 rather
-than continuing to rise**. If the locus curve does the same, H1's shape is
-*increases-then-saturates*, not monotone increase — a materially different prediction for where a
-per-layer schedule should put its cutoff.
+**Depth coverage here is complete** for all three models, which makes its shape important: hit rate
+climbs steeply from the first MoE layer through the middle (+82% relative for the fine model, +64%
+for the 8.1M coarse) and then **plateaus at 0.33–0.34 through L9 rather than continuing to rise.**
+If the locus curve does the same, H1's shape is *increases-then-saturates*, not monotone increase —
+a materially different prediction for where a per-layer schedule puts its cutoff.
 
-**Do not use swap rate for this.** Swap rate is 0.994–1.000 in every cell of every model, and that
-is structural, not a finding: at R = k a swap fires **iff at least one demanded expert is missing**,
-so swap rate is just "fraction of tokens with >= 1 miss" and saturates. Hit rate is the graded
-statistic. The `lifetime_tokens` column is likewise pinned at k (5.99 coarse, 17.85 fine). Of e1's
-columns only `p95_burst_len` is independently informative.
+All three models are temporal; there is no unconstrained baseline hit rate at all (test C4).
+Swap rate is unusable for depth work: it is 0.994–1.000 everywhere because at R = k a swap fires
+iff at least one demanded expert is missing, so it saturates as "fraction of tokens with >= 1 miss".
 
-**Coverage gaps.** All three models are **temporal**; there is no unconstrained baseline hit rate
-at all. Budgets are 1e17 x2 and 1e18 x1. Granularity is coarse x2, fine x1, and the single fine
-model is also the shallowest. The cause is a hardcoded run list: `e6()` loops over `HEADLINERS`
-(3 runs) while `e1()` loops over `ALL_TEMPORAL` (5), at
-[`probe_replay.py:55-57`](../../../analysis/probes/probe_replay.py).
-
-## 3. Coverage audit
-
-| metric | file | per-layer? | layers covered | models |
-|---|---|---|---|---|
-| locus probes (A_tok, A_ctx) | `mechinterp_locus{,_1e19}.csv` | yes | 2–6 (of up to 9) | 8 |
-| output logit lens (effective vocab) | `mechinterp_lens{,_1e19}.csv` | yes | **2–4 only** | 6 |
-| logit lens (older) | `mechinterp_logitlens.csv` | yes | 1–3 | 2 |
-| cache hit rate | `e6_per_layer_ranking.csv` | yes | **all** | 3 |
-| swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | all | 5 |
-| selectivity PR, generalist %, router entropy, weight geometry | `mechinterp_structural{,_1e19}.csv` | **no — pooled** | n/a | 11 |
-| demand forecastability | `mechinterp_demand_1e19.csv` | **no — pooled over 2–6** | n/a | 3 |
-
-Against this: **69 runs have preserved checkpoints** in
-[`results/MANIFEST.csv`](../../../results/MANIFEST.csv), spanning 1e16 through 1e19, both regimes,
-granularities g1/g3/g5, and several seeds. **22 runs have preserved `router_log.pt`** (enough for
-all replay/cache metrics with no forward pass). Only **3 runs have a preserved `delex_capture.pt`**,
-all at 1e19 — every other locus/lens number needs a fresh capture pass from its checkpoint.
-
-The gap is not data. Every analysis script hardcoded a 3-to-8 model list and a 3-to-5 layer range.
-
-## 4. The two hypotheses
-
-Stated in advance, with what would falsify each. Everything in Sections 5–7 exists to test these;
-anything else this analysis turns up is exploratory and labelled as such.
+## 3. The two hypotheses
 
 ### H1 — routing specialization shifts from lexical to contextual as depth increases
 
 **Prediction.** `A_ctx - A_tok` increases with normalized depth `l/L`, and cache hit rate increases
-with `l/L`, in both regimes, across budgets and granularities.
+with `l/L`, across budgets and granularities.
 
 **Falsified by:** a flat or negative depth slope in the majority of arms once measured over the
-full stack on a normalized axis with matched baselines; or a slope that vanishes when arms are
-pooled with per-arm uncertainty.
+full stack on a normalized axis with matched baselines.
 
-**Refined by:** the shape. Monotone increase and increase-then-saturate imply different cutoffs for
-H2's schedule, and the one full-depth signal we have (Section 2) currently favours saturation.
+**Refined by:** the shape — monotone versus saturating implies a different cutoff for H2's
+schedule, and the one full-depth signal we have currently favours saturation.
 
 **Status:** positive slope in 3 of 4 arms over layers 2–6, CIs excluding zero in 3 of 4; one flat
 exception; not yet measured on a normalized axis, over the full stack, or at 1e18.
 
 ### H2 — the quality cost of imposing rolling residency decreases with depth
 
-**Prediction.** dBPB from constraining a single layer (R = k at that layer, R = E elsewhere) is
-largest at the first MoE layer and falls with depth. If H1's shape is saturating, dBPB should
-flatten at the same depth H1 flattens.
+**Prediction.** dBPB from constraining a single layer (R = k there, R = E elsewhere) is largest at
+the first MoE layer and falls with depth; if H1 saturates, dBPB flattens at the same depth.
 
-**Falsified by:** a flat or U-shaped per-layer cost curve; or a cost curve uncorrelated with the
+**Falsified by:** a flat or U-shaped per-layer cost curve, or a cost curve uncorrelated with the
 per-layer contextual share from H1.
 
 **Why it does not follow from H1.** "This layer routes on context" and "this layer can afford to
 lose routing freedom" are different quantities. §5 of
-[`delexicalization.md`](delexicalization.md) already showed the model co-adapts to the constraint
-during training, so per-layer cost has to be measured on separately trained models, not by masking
-a trained checkpoint.
+[`delexicalization.md`](delexicalization.md) showed the model co-adapts to the constraint during
+training, so per-layer cost must be measured on separately trained models — not by masking a
+trained checkpoint (which is test C3's limitation).
 
-**Status:** no evidence either way. Nothing in the repo isolates the cost of constraining one
-layer; the existing dose curve varies R uniformly across all layers.
+**Status:** no evidence either way. The existing dose curve varies R uniformly across all layers.
 
-**Payoff if H1 and H2 both hold.** A prefix schedule: leave layers shallower than depth *d*
-unconstrained, constrain everything from *d* on. One tunable parameter, and the per-layer cost
-curve gives *d* directly instead of assuming where the lexical layers are.
+**Payoff if both hold.** A prefix schedule: leave layers shallower than depth *d* unconstrained,
+constrain everything from *d* on. One tunable parameter, with the per-layer curve giving *d*.
 
-## 5. Plan
+## 4. Cheap tests (no training)
 
-Ordered so that every step either sharpens H1 or is a prerequisite for H2. Each lands its own
-commit.
+Ordered by what they buy. C1–C4 are the critical path.
 
-### Step 1 — make H1 measurable on what we already have (no GPU)
+| id | test | serves | needs |
+|---|---|---|---|
+| C1 | Replot on normalized depth `l/L`, with bootstrap CI bands | H1 | nothing |
+| C2 | Locus at layers 2–9 on the three preserved captures | H1 | existing captures |
+| C3 | Per-layer inference-time constraint swap | H2 pre-screen | existing checkpoints |
+| C4 | Baseline hit rate by counterfactual replay | H1 control | existing router logs |
+| C5 | Per-layer output lens (effective vocabulary) | H1, third view | captures; >L4 needs re-run |
+| C6 | Per-layer demand forecastability | H2 mechanism | existing captures |
+| C7 | Nonparametric token-id oracle | H1 ceiling | existing captures |
+| C8 | Causal token / context substitution | H1, causal | forward passes |
+| C9 | Frequency-stratified `A_tok` | H1 refinement | captures + token ids |
+| C10 | Cross-layer probe transfer | H1 refinement | existing captures |
 
-1. **Replot on normalized depth `l/L`.** Absolute layer index is not comparable across 4-, 6- and
-   9-layer models, and every H1 statement is about depth.
-2. **Carry per-arm bootstrap CIs into the figure and the table**, as in Section 1. A depth slope
-   without an interval is not testable.
-3. **Correct §3 of [`delexicalization.md`](delexicalization.md)**: state the layer range, fix the
-   `s0_SOFTMAX_BASELINE` window label from w=18 to w=32.
+**C1 — normalized depth and confidence intervals.** Every H1 statement is about depth, and the
+current axis is not comparable across 4-, 6- and 9-layer models. A slope without an interval is not
+testable. Minutes.
 
-### Step 2 — full stack, on existing captures
+**C2 — the full stack.** This decides whether H1 is monotone or saturating, which sets what H2
+should predict. `LAYERS = range(2, 10)` and a warning in place of the silent skip.
 
-4. **Locus at all layers.** `LAYERS = range(2, 10)` in `delex_locus.py`; replace the silent
-   `continue` with a warning. Re-run on the 3 preserved captures. **This is the step that decides
-   whether H1 is monotone or saturating**, which in turn sets what H2 should predict.
-5. **Cache metrics on all captured runs.** Point `e6()` at `ALL_TEMPORAL`, then extend to all 22
-   runs with a `router_log.pt`, including the 1e19 models no cache metric currently covers.
-6. **Baseline hit rate by counterfactual replay.** Replay rolling residency over the unconstrained
-   runs' router logs. Without this, H1's cache-side evidence has no matched control and cannot
-   distinguish a tMoE effect from an MoE effect.
+**C3 — per-layer inference-time constraint swap. The cheap pre-screen for H2, and the highest-value
+item here.** §5 of [`delexicalization.md`](delexicalization.md) already measures the *global*
+cross-regime swap (unmask a trained temporal model, or impose residency on a trained baseline). Do
+it **one layer at a time**: impose residency on layer *l* only of a trained unconstrained model,
+and separately unmask layer *l* only of a trained temporal model, sweeping *l*. This yields a
+per-layer cost profile for the price of `2L` evaluation passes and **no training at all**. It is
+deterministic — same checkpoint, same fixed batch, no seed noise — so even small differences are
+readable.
 
-### Step 3 — enough arms to test H1 properly
+Its limitation is exactly the one §5 identified: no co-adaptation, so it measures the cost of
+*removing* freedom from a model that was trained expecting it, not the cost of never having had it.
+That makes it an upper bound whose *shape* is still informative. If the shape is flat, H2's
+training sweep is unlikely to be worth running; if it slopes, we know where to spend.
 
-7. **Capture and probe a 1e18 pair, both regimes, both granularities**, plus one seed replicate of
-   an existing arm. 1e18 is the budget where the temporal model wins and where the current figure
-   has nothing at all. Seed replication gives the between-run variability that the within-run
-   bootstrap in Section 1 does not.
-8. Regenerate the figure from the full set; the colour/marker encoding already scales.
+**C4 — baseline hit rate.** Replay rolling residency over an unconstrained run's router log. Without
+it, H1's cache-side evidence has no matched control and cannot separate a tMoE effect from a
+generic MoE effect — the same problem the Section 1 slopes exposed on the probe side.
 
-### Step 4 — H2
+**C5 — per-layer output lens.** An output-side view (what an expert writes) rather than an
+input-side view (what makes it fire), from data already on disk for layers 2–4. Independent
+evidence for H1 if it agrees; more interesting if it does not.
 
-9. **Per-layer marginal cost sweep.** Constrain exactly one layer at a time, one run per layer, at
-   s2/1e17 (5 MoE layers, cheap runs). Produces dBPB against depth: the direct test of H2 and the
-   thing that yields *d*.
-10. **Schedule vs uniform at matched memory.** Take the prefix schedule implied by (9) and compare
-    against uniform R with the same total resident-slot count. This is the control that decides
-    whether a per-layer schedule is worth anything: the proposal saves memory against the full MoE
-    baseline but *costs* memory against shipped temporal (1e18 model: 512 slots baseline, 48 for
-    uniform R=k), so the only meaningful comparison is against the uniform-R dose curve at equal
-    spend.
-11. **Confirm at 1e18**, where there are 6 genuinely middle layers and the quality benefit exists.
+**C6 — per-layer demand forecastability.** `delex_demand.py` currently pools layers 2–6 into one
+probe. Per layer, it tests whether deep-layer demand is more predictable from history — the
+mechanism H2 leans on, and directly comparable to the hit-rate curve.
 
-Implementation note for 9–11: the R knob exists but is global —
+**C7 — nonparametric token-id oracle.** Best achievable AUC from token identity alone via empirical
+`P(y_e | token id)`, equivalently `I(expert ; token id) / H(expert)`. Gives the ceiling the linear
+probe has been measured against, so a falling `A_tok` can be attributed to genuine
+context-dependence rather than probe capacity.
+
+**C8 — causal substitution.** Hold context fixed and substitute the current token; measure how far
+the selected expert set moves, per layer. Then the complement: hold the token fixed, shuffle the
+context. The ratio is a causal per-layer lexical-versus-contextual measure that does not depend on
+a probe being able to express the mapping. Forward passes only, no training. This is the strongest
+non-training evidence available for H1.
+
+**C9 — frequency stratification.** Split `A_tok` by token-frequency decile within each layer. If
+the lexical shortcut lives entirely on rare tokens, that changes which layers deserve the
+constraint and reframes H2.
+
+**C10 — cross-layer probe transfer.** Fit the token probe at layer *l*, evaluate at *l'*.
+Off-diagonal collapse would show routing is a qualitatively different function with depth rather
+than the same function weakening.
+
+## 5. Training tests
+
+Three, in order. The design is driven by a power calculation, because the first testbed we
+considered cannot detect the effect.
+
+**Noise floor.** From [`seed_replicates.csv`](../../../results/ablations/seed_replicates.csv) and
+[`flame38m_overnight_seeds.csv`](../../../results/ablations/flame38m_overnight_seeds.csv), test-set
+BPB across seeds of the same config:
+
+| cell | seeds | spread | sd |
+|---|---|---|---|
+| g3_s0_1e16 temporal fine | 1234 / 2 / 3 | 1.4754 / 1.4758 / 1.4737 | 0.0011 |
+| g1_s2_1e17 temporal coarse | 1234 / 2 | 1.2821 / 1.2844 | ~0.002 |
+| flame38m_g3 1e18 temporal | 2 / 3 | 1.3339 / 1.3323 | ~0.001 |
+| flame38m_g3 1e18 full MoE | 2 / 3 | 1.3489 / 1.3483 | ~0.001 |
+
+**Effect sizes available**, from the uniform-R endpoints:
+
+| testbed | MoE layers | total constraint effect | per-layer if uniform | sd | per-layer SNR |
+|---|---|---|---|---|---|
+| s0 @1e16 | 3 | 0.0231 (cost) | 0.0077 | 0.0011 | **~7** |
+| s2 @1e17 | 5 | 0.0131 (cost) | 0.0026 | 0.002 | ~1.3 |
+| flame38m @1e18 | 8 | 0.0150 (benefit) | 0.0019 | 0.001 | ~1.9 |
+
+**s2/1e17 — the testbed originally proposed — is the worst of the three and is underpowered at
+n=1.** Revised plan:
+
+**T1 — single-layer sweep at s0/1e16. 3 runs, cheapest available, first real H2 evidence.**
+Constrain exactly one MoE layer at a time (R = k there, R = E elsewhere); the two reference
+endpoints (all-constrained 1.4750, none-constrained 1.4519) already exist. Only 3 MoE layers, so
+the depth resolution is coarse — but at SNR ~7 per layer it cleanly answers *"is the per-layer cost
+curve flat or sloped?"*, which is the binary H2 turns on.
+
+**T2 — shallow-half versus deep-half contrast at 1e18. 2 arms x 3 seeds = 6 runs.** Constrain
+layers 2–5 with 6–9 free, versus 2–5 free with 6–9 constrained: matched layer count, matched
+resident-slot budget, so the arms differ *only* in where the constraint sits. The contrast
+aggregates four layers of the depth gradient instead of one, which is what makes 1e18 viable
+despite a per-layer SNR of ~1.9; with 3 seeds per arm the contrast standard error is ~0.0008.
+This is the definitive H2 test, at the budget where the constraint actually wins and across 8 MoE
+layers.
+
+**T3 — full per-layer resolution at 1e18, and the schedule-versus-uniform control. 8 + 2 runs, only
+if T1 and T2 both point the same way.** Per-layer resolution gives the cutoff *d*; the control
+compares the resulting prefix schedule against uniform R at **equal total resident-slot count**.
+That control is not optional: the schedule saves memory against the full MoE baseline but *costs*
+memory against shipped temporal (1e18 model: 512 slots baseline, 48 uniform R=k), so the only
+meaningful comparison is against the existing uniform-R dose curve at equal spend.
+
+**Run C3 before T1.** If the inference-time per-layer profile is flat, T1's prior drops sharply and
+the training budget is better spent elsewhere.
+
+**Implementation.** The R knob exists but is global —
 [`temporal_router.py:359`](../../../temporal/temporal_router.py) reads `TEMPORAL_RESIDENCY_R` once
 and applies it at every layer. `self.layer_number` is already in scope a few lines below, so a
-per-layer schedule is a small change. FLOPs are unchanged at any R.
-
-## 6. Additional metrics, only where they serve H1 or H2
-
-The locus probe is correlational and linear. Two additions would materially strengthen H1; the rest
-are noted so they are not re-invented, but are not on the critical path.
-
-1. **Causal token substitution** (strengthens H1). Hold context fixed, substitute the current
-   token, measure how far the selected expert set moves, per layer; then the complement — hold the
-   token fixed, shuffle the context. The ratio is a causal per-layer lexical-vs-contextual measure
-   that does not depend on a probe being able to express the lookup. Needs forward passes, no
-   training.
-2. **Nonparametric token-id oracle** (bounds H1). Best achievable AUC from token identity alone via
-   empirical `P(y_e | token id)`, equivalently `I(expert ; token id) / H(expert)`. Gives the
-   ceiling our linear probe has been measuring against, so a falling `A_tok` can be attributed to
-   real context-dependence rather than probe capacity. Free on existing captures.
-3. Not on the critical path: per-layer output lens (free but limited to layers 2–4 until re-run),
-   frequency-stratified `A_tok`, cross-layer probe transfer, expert-set autocorrelation length,
-   `I(expert ; document id)` to separate topical from local context.
-
-## 7. On recomputing the rest of the mechinterp battery per layer
-
-Cheap, and worth doing once, but not a prerequisite for either hypothesis.
-
-Every per-expert metric — locus, lens, selectivity PR, generalist fraction, router entropy, weight
-geometry — is already computed per (layer, expert) and then pooled. Layer is a grouping key that
-was discarded at write time, not a measurement we lack. Free-rider / tokens-per-expert is
-architecturally fixed and not meaningful per layer.
-
-The one discipline point: a per-layer breakout of the full battery multiplies the available
-comparisons by roughly the depth of the network. H1 and H2 above are the claims; anything else the
-breakout surfaces is exploratory and should be reported as such.
+per-layer schedule (an env-var list, or `R=E` sentinel per layer) is a small change. FLOPs are
+unchanged at any R, so every arm above is compute-matched to the baseline.
