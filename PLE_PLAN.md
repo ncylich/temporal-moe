@@ -69,25 +69,40 @@ that rank the factorization stores both `U` and `V` and is larger than the table
 and never-updated rare-token rows stay exact no-ops rather than noise. `g_ℓ` is a learned per-layer
 gate, initialized so the branch starts inert.
 
-**Regularization.** Weight decay applies **to the PLE table**, stated explicitly because the usual
-default excludes embeddings and here we want the opposite. It gives frequency-dependent shrinkage for
-free: every row decays each step while only frequent rows receive enough gradient to sustain
-themselves, so rare rows relax toward zero, which is exactly the desired prior. Load-bearing at full
-rank (32,768 free parameters per token row) and close to cosmetic at r=32.
+**Regularization: rank is the only regularizer. Weight decay on the table is 0 for every rung.**
 
-**The coefficient is fixed, not swept.** Inherit the value the C recipe already uses and record it.
-Phase 1 stays strictly one-dimensional in rank: sweeping decay as well would turn 3–4 training cells
-into 9–12 for a second-order knob. Revisit only if a cell looks pathological.
+Wire the table as its own parameter group so the coefficient is settable, then set it to 0 and leave
+it there. Do not inherit a value from the C recipe: C trains the router and the RMSNorm gains, and
+decaying a norm gain toward zero shrinks activations toward zero, so C has no coefficient that means
+anything for a lookup table. An earlier draft of this section said to inherit one; that instruction
+was ill-posed and is void.
 
-**This is the same mechanism as the side measurement's λ, not an alternative to it.** The closed-form
-estimator `sum_t/(n_t + λ)` in §9 is the ridge solution to
-`min_p Σ_i ‖Δ_i − p‖² + λ‖p‖²`, so λ-shrinkage is an L2 penalty, and weight decay is an L2 penalty
-applied by the optimizer. §9 can divide because it holds sufficient statistics and the solution is
-closed-form; training has no solution to divide, so the penalty must be applied per step instead.
-The frequency-dependence then falls out for free, since a row receives loss-gradient only when its
-token appears but receives the decay pull every step. An explicit per-token `λ/n_t` penalty during
-training would match the closed-form estimator more exactly, but uniform decay already gives the
-frequency-dependence, so it is not worth the machinery.
+The reason to hold decay at 0 is that the ladder exists to measure whether constraining rank denoises
+underdetermined rare-token rows. Regularize by two mechanisms at once and a null at low rank becomes
+unattributable: either rank does not matter, or decay already did that job. At 0 the ladder is
+single-axis and measures what it claims, and flag-off parity stays exact by construction.
+
+The cost is real and is the hypothesis, not a bug to pre-empt. With Adam and no decay a row seen once
+takes a step nearly the size of a row seen ten thousand times, because after one observation
+`v ≈ g²` and the update is ≈ `lr·sign(g)`. Full rank is therefore exposed to fitting noise into rare
+rows. That is the stated reason full rank might lose, and losing that way is a result.
+
+**Decay is a contingency with a trigger, not a swept knob.** Report, for each trained cell, mean row
+norm bucketed by training-corpus occurrence count. It is a histogram over the trained table and costs
+no GPU time. If full rank shows rare-row norms growing to match or exceed frequent-row norms while
+eval BPB diverges from train, that is the trigger: stop, report, and we pick a coefficient against
+that diagnostic rather than guessing one now. Note also that the targeted fix for the failure above
+is on the update rather than the penalty, since it is Adam's normalization that destroys the
+frequency signal; do not build that under this plan.
+
+**§9's λ does not supply this coefficient, and cannot.** The two are the same idea — the closed-form
+estimator `sum_t/(n_t + λ)` is the ridge solution to `min_p Σ_i ‖Δ_i − p‖² + λ‖p‖²`, so λ-shrinkage
+is an L2 penalty, and weight decay is an L2 penalty applied by the optimizer. They are not the same
+number and do not convert. λ lives in count space: it is pseudo-observations added to `n_t`. Decay is
+a loss coefficient. And because AdamW decouples the decay while Adam normalizes gradients by their own
+second moment, a row's equilibrium norm under decay goes roughly as `frequency/wd`, linear in
+frequency, not as the `n_t/(n_t + λ)` curve. Do not transfer λ\* into the optimizer; it would
+manufacture rigor that is not there. λ stays in §9, which trains nothing.
 
 **Optimizer.** 8-bit Adam for the table; full-rank fp32 moments would be ~20 GB. Embedding gradients
 are sparse, so only rows appearing in the batch update.
@@ -121,8 +136,8 @@ with adapter capacity.
 1. Read `config.json` for exact vocab size, expert intermediate width, tied/untied embeddings.
    **Report before building**: the parameter and bandwidth figures in §2 assume 16 × 2048 and a ~50k
    vocab and must be confirmed.
-2. Implement the factored PLE behind a flag, post-MoE only, zero-init, weight decay wired to the
-   table.
+2. Implement the factored PLE behind a flag, post-MoE only, zero-init, with the table as its own
+   optimizer parameter group so its weight decay is settable. Set it to 0 (§2) and leave it.
 3. **Parity test before any cell trains.** Flag off must reproduce the C recipe within the
    run-to-run non-determinism floor. Measure that floor from two identical flag-off runs and report
    both numbers, as the overlap program did (edited-off vs original-off 1.2e-4 against a 9.7e-4
