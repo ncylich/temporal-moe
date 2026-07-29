@@ -1,0 +1,3 @@
+stage,bpb,recovery_pct,trained
+"base norms, base router, R=8",2.750704,-0.0,no
+"Cal-0 calibrated norms (clip 0.5-2.0), base router, R=8",2.096512,31.48,no
