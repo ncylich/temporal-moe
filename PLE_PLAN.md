@@ -127,9 +127,21 @@ changes. Lower is better.
 Eval noise σ ≈ 0.006 BPB. **Pre-registered: differences below 2σ = 0.012 BPB are noise.** This
 program has retracted single-seed wins before; do not report an effect inside the bar as an effect.
 
-PLE cells train the **C surface (router + norm gains)**, not CE. C and E tie at 91.4%, so LoRA adds
-cost without discriminating, and omitting it isolates PLE's contribution rather than confounding it
-with adapter capacity.
+**Ladder cells train the C surface (router + norm gains); the headline cell does not.** Running the
+rank ladder on the bare C surface isolates PLE's contribution instead of confounding it with adapter
+capacity, and rank is what the ladder is for. That is the only reason to omit LoRA there.
+
+An earlier draft justified omitting LoRA everywhere with "C and E tie at 91.4%, so LoRA adds cost
+without discriminating." **That was wrong.** C and E tie *as alternatives*; stacked, CE reaches 93.16%
+against 91.44% for either alone, so norms and LoRA are additive by +1.8 points — the bake-off CSV says
+so explicitly. LoRA is not redundant with norm gains, and the C surface is therefore a deliberately
+weakened base.
+
+That matters for what §1 claims. §1 asks whether new parameters can break the F′ = 0.8106 constraint
+price. Projecting the C surface forward, C gained 0.0286 BPB between 50M and 250M, so PLE-on-C at
+250M lands near 0.830 — short of CE@50M (0.8269), let alone F′. **The claim is reachable from the CE
+surface, not from C.** So the headline cell is PLE at the winning rank added to the CE surface,
+compared against CE@50M = 0.8269 at matched budget; see §6.
 
 ## 4. Phase 0 — specification, no GPU time
 
@@ -201,19 +213,31 @@ the same surface base, so it is like-for-like against router + norms + PLE. §1 
 lexical capacity LoRA cannot, and this is that claim's direct test. Landing between 0.8791 and 0.8269
 means PLE helps but is the worse third mechanism.
 
-## 6. Phase 2 — depth to the headline comparator
+## 6. Phase 2 — surface before depth
 
-Best configuration from Phase 1 extended to **250M** tokens in a **single run with evals every 50M**,
-which is how arm C's own curve was produced. One run then yields matched-budget comparison against C
-at 50 / 100 / 150 / 200 / 250M *and* the F′ = 0.8106 claim at the end.
+**Run the winning rank on the CE surface at 50M before spending anything on depth.** Cell is
+PLE(winning rank) + router + norm gains + LoRA r32, 50M tokens, compared against CE@50M = 0.8269 at
+matched budget. One ~50-minute run.
 
-250M rather than the 100M an earlier draft specified: 100M cannot reach the comparator the program is
-actually aiming at, so it would have produced a curve with no headline. Depth is now the eval trace of
-this run rather than a separate cell, which is why this costs one run and not two.
+This is the cell that tests §1, for the reason given in §3: PLE-on-C cannot plausibly reach F′, and
+norms and LoRA are additive rather than redundant, so the question is whether PLE adds a *third* time.
+Three outcomes, all informative:
 
-**If the top two ranks tie within 2σ at 50M, take both to 250M.** Rank selection can shift with
-budget, since more tokens support more parameters, so a 50M winner may under-select rank for 250M. A
-tie at 50M is an unresolved gate, not a coin flip.
+| outcome | reading |
+|---|---|
+| beats CE@50M by >2σ | PLE adds on top of both existing mechanisms; go to 250M for the F′ claim |
+| ties CE@50M | PLE and LoRA are substitutes, not complements; report that and stop |
+| worse than CE@50M | PLE interferes with adapter capacity; report the negative, do not spend depth |
+
+**Depth is conditional on that result, not automatic.** If the CE cell clears its bar, extend it to
+**250M** in a single run with evals every 50M, which is how arm C's own curve was produced, and which
+yields matched-budget comparison at 50 / 100 / 150 / 200 / 250M plus the F′ = 0.8106 claim at the end.
+An earlier draft ran depth unconditionally at 100M on the C surface: 100M cannot reach the comparator,
+and the C surface cannot either.
+
+**If the top two ranks tie within 2σ at 50M, carry both into the CE cell.** Rank selection can shift
+with budget and with surface, since more tokens and more co-adapting capacity both support more
+parameters. A tie at 50M is an unresolved gate, not a coin flip.
 
 ## 7. Phase 3 — sequential versus joint
 
