@@ -84,8 +84,12 @@ def destination(root, repo, hf_path):
     if base is None:
         return os.path.join(root, "artifacts", s, hf_path)
     # tokenizer/ and tokenizer_tok16k/ collapse onto their own dirs; strip the segment so the
-    # files land directly inside, not one level deeper.
-    if (s, first) in {("corpus", "tokenizer"), ("extras", "tokenizer_tok16k")}:
+    # files land directly inside, not one level deeper. run_captures/ is the same case and matters
+    # more: every probe script reads results/phase0/runs/<run>/router_log.pt, which is also what
+    # this row's local_path says, so leaving the segment in place delivered the file one level
+    # below where anything looks for it.
+    if (s, first) in {("corpus", "tokenizer"), ("extras", "tokenizer_tok16k"),
+                      ("extras", "run_captures")}:
         hf_path = "/".join(hf_path.split("/")[1:])
     return os.path.join(root, base, hf_path)
 
