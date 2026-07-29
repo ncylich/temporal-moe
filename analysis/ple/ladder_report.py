@@ -48,7 +48,17 @@ def recovery(bpb):
     return 1.0 - (bpb - BASE) / (IMPOSE - BASE)
 
 
-def verdict(bpb):
+def verdict(bpb, ple_params=1, free_layers=0):
+    # The §1-premise wording only makes sense for a cell that actually HAS a PLE table. A cell with
+    # early layers unconstrained beat the comparator by RELAXING the residency constraint, which is
+    # a different claim entirely and costs resident memory (64 experts per freed layer, not 8).
+    if free_layers:
+        note = (f"first {free_layers} MoE layer(s) UNCONSTRAINED: relaxes the constraint, "
+                f"costs +{((16-free_layers)*8 + free_layers*64)/(16*8)*100-100:.1f}% resident "
+                f"expert memory; not comparable to a full-residency number")
+        return note
+    if not ple_params:
+        return "no PLE table in this cell"
     if bpb > C_50M - TWO_SIGMA:
         return "does not beat C@50M by 2 sigma"
     if bpb > CE_50M + TWO_SIGMA:
@@ -70,7 +80,11 @@ def main():
             r = json.load(open(path))
         except Exception:
             continue
-        if "final_bpb" not in r or not r.get("ple_params"):
+        # Include any trained cell, not only PLE-bearing ones. Filtering on ple_params excluded
+        # ce_free2 -- the CE recipe with early layers unconstrained and no PLE at all -- which is a
+        # headline cell. This is the second time a filter here silently dropped a result; the rule
+        # is now "has a final BPB", which is the only thing the table actually requires.
+        if "final_bpb" not in r:
             continue
         b = r["final_bpb"]
         rows.append({
@@ -85,6 +99,7 @@ def main():
             "ple_start": r.get("ple_start", 0),
             "calib_init": r.get("calib_init", False),
             "calib_ref": r.get("calib_suffix", "") or ("untrained" if r.get("calib_init") else ""),
+            "free_layers": r.get("free_layers", 0),
             "ple_params": r["ple_params"],
             "final_bpb": round(b, 6),
             "recovery_pct": round(recovery(b) * 100, 2),
@@ -98,7 +113,7 @@ def main():
             "token_efficiency_vs_C250M": ("5x (ties C@250M at 50M)" if abs(b - C_250M) < TWO_SIGMA
                                           else (">5x" if b < C_250M else "<5x")),
             "beats_CE50M_by_2sigma": (CE_50M - b) > TWO_SIGMA,
-            "verdict": verdict(b),
+            "verdict": verdict(b, r.get("ple_params", 0), r.get("free_layers", 0)),
             "final_swap": round(r["final_swap"], 6),
             "final_entropy": round(r["final_entropy"], 6),
             "divisor": r["divisor"],
