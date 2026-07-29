@@ -65,15 +65,33 @@ def main():
     from transformers.models.olmoe.modeling_olmoe import OlmoeSparseMoeBlock
     model, _ = RES.load_model()
     model.eval()
+    # Delta = MoE_free - MoE_residency. The FREE side is always the BASE model with free routing,
+    # because that is the behaviour PLE is trying to restore -- it is the gold standard the whole
+    # program measures against (0.6727 BPB). The RESIDENCY side is whatever surface the table will
+    # sit on.
+    #
+    # An earlier version ran BOTH passes on the adapted weights when --resume-c was given, making
+    # the target "the adapted model with residency switched off". That model's router was trained
+    # under masking, so running it unmasked is not the gold standard and is not even good: the
+    # resulting table, evaluated training-free on the 50M surface, scored 2.2142 BPB against 0.8779
+    # for the surface alone. A correction toward the right target cannot make the model three times
+    # worse; that number is what exposed the bug.
+    ADAPT = None
     if A.resume_c:
         _ck = torch.load(A.resume_c, map_location="cuda")
         _tp = RES.router_params(model) + RES.norm_params(model)
         assert len(_tp) == len(_ck["masters"]), (len(_tp), len(_ck["masters"]))
+        BASEW = [p.detach().clone() for p in _tp]
+        ADAPT = [m.to("cuda").to(p.dtype) for m, p in zip(_ck["masters"], _tp)]
+        print(f"[calib] Delta = free routing on the BASE model  minus  residency on the C surface "
+              f"at {_ck['seen']/1e6:.0f}M tokens ({os.path.basename(A.resume_c)})", flush=True)
+
+    def _set(ws):
+        if ws is None:
+            return
         with torch.no_grad():
-            for _p, _m in zip(_tp, _ck["masters"]):
-                _p.data.copy_(_m.to("cuda").to(_p.dtype))
-        print(f"[calib] Delta captured against the C surface at {_ck['seen']/1e6:.0f}M tokens "
-              f"({os.path.basename(A.resume_c)}), not the untrained base", flush=True)
+            for _p, _w in zip(RES.router_params(model) + RES.norm_params(model), ws):
+                _p.data.copy_(_w)
     blocks = [m for m in model.modules() if isinstance(m, OlmoeSparseMoeBlock)]
     for i, b in enumerate(blocks):
         b.register_forward_hook(_hook(i))
@@ -93,8 +111,10 @@ def main():
         for s in range(0, A.seqs, A.mb):
             ids = corpus[order[s:s + A.mb]].to("cuda").long()
             CAP["on"] = True
+            _set(BASEW if ADAPT is not None else None)      # free side: BASE weights, always
             RES.disable_residency()
             CAP["buf"] = {}; model(ids); free = {k: v for k, v in CAP["buf"].items()}
+            _set(ADAPT)                                     # residency side: the target surface
             RES.enable_residency(R=8)
             CAP["buf"] = {}; model(ids); res = {k: v for k, v in CAP["buf"].items()}
             CAP["on"] = False
