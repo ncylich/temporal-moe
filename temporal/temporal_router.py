@@ -357,6 +357,24 @@ def temporal_forward(self, input: torch.Tensor):
     # router selects top-k AMONG residents. R=k (default) == shipped maximal constraint; R=E ==
     # unconstrained full MoE (mask all-True, masked_fill a no-op). Zero FLOP change at any R.
     resid_R = int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) or k
+    # Per-layer schedule, for the cross-regime swap sweep (X2 / test C3) and any prefix schedule.
+    # TEMPORAL_R_SCHEDULE is a comma-separated list of <layer>:<R> overriding the global R at those
+    # layers only; R may be the literal 'E' for unconstrained. Layers are Megatron's layer_number,
+    # matching the `layer` column of every mechinterp CSV. Examples:
+    #   TEMPORAL_R_SCHEDULE=4:E                  free layer 4, constrain the rest  (unmask one layer)
+    #   TEMPORAL_RESIDENCY_R=0 with R=E default and 4:6   constrain layer 4 only   (impose one layer)
+    # FLOPs are unchanged at any R, at any layer, so every arm stays compute-matched.
+    sched = os.environ.get("TEMPORAL_R_SCHEDULE", "").strip()
+    if sched:
+        E = logits.shape[-1]
+        ln = int(getattr(self, "layer_number", -1))
+        for item in sched.split(","):
+            if not item.strip():
+                continue
+            lay, _, val = item.partition(":")
+            if int(lay) == ln:
+                resid_R = E if val.strip().upper() == "E" else int(val)
+                break
     mask = compute_resident_mask_accel(
         trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
         tau=float(os.environ.get("TEMPORAL_RHO", "0")),
