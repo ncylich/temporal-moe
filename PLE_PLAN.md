@@ -181,12 +181,39 @@ better quality *and* a smaller, lower-bandwidth artifact.
 | monotone degradation as rank drops | rank binds; ship the highest rank that clears the bar |
 | a middle rank beats full by >2σ | interior optimum from denoising; probe its neighbours |
 | all rungs tie | rank is not the binding constraint; ship the smallest and say so |
-| nothing beats C (0.8505) by >2σ | PLE does not recover the residual; report the negative |
+| nothing beats C@50M (0.8791) by >2σ | PLE does not recover the residual; report the negative |
 
-## 6. Phase 2 — depth
+**Comparators are matched-budget, and 0.8505 is not one of them.** C's own curve is
+0.8791 / 0.8627 / 0.8560 / 0.8526 / 0.8505 at 50 / 100 / 150 / 200 / 250M
+(`olmoe_adapt_bakeoff.csv`, arm C). An earlier draft gated 50M cells against C@250M = 0.8505, which
+demanded that PLE alone overcome the entire 50M→250M trajectory *and* beat C; that gate returned the
+negative almost regardless of whether PLE works. The gap is 0.0286, about 2.4× the 2σ bar. Gate at
+matched budget:
 
-Best configuration from Phase 1 extended to **100M** tokens, with checkpoints and evals at 50M and
-100M so it compares directly against the Phase-1 cells.
+| comparator | value | what beating it means |
+|---|---|---|
+| C@50M | 0.8791 | PLE recovers residual at all |
+| CE@50M | 0.8269 | PLE beats LoRA as the *third* mechanism on the same surface — the premise in §1 |
+| F′ | 0.8106 | the constraint price; only a fair claim at 250M |
+
+CE@50M is the sharpest of the three and is free: it is router + norms + LoRA at the same budget on
+the same surface base, so it is like-for-like against router + norms + PLE. §1 claims PLE supplies
+lexical capacity LoRA cannot, and this is that claim's direct test. Landing between 0.8791 and 0.8269
+means PLE helps but is the worse third mechanism.
+
+## 6. Phase 2 — depth to the headline comparator
+
+Best configuration from Phase 1 extended to **250M** tokens in a **single run with evals every 50M**,
+which is how arm C's own curve was produced. One run then yields matched-budget comparison against C
+at 50 / 100 / 150 / 200 / 250M *and* the F′ = 0.8106 claim at the end.
+
+250M rather than the 100M an earlier draft specified: 100M cannot reach the comparator the program is
+actually aiming at, so it would have produced a curve with no headline. Depth is now the eval trace of
+this run rather than a separate cell, which is why this costs one run and not two.
+
+**If the top two ranks tie within 2σ at 50M, take both to 250M.** Rank selection can shift with
+budget, since more tokens support more parameters, so a 50M winner may under-select rank for 250M. A
+tie at 50M is an unresolved gate, not a coin flip.
 
 ## 7. Phase 3 — sequential versus joint
 
@@ -297,14 +324,16 @@ co-adaptation redistributes the work.
 |---|---|---|---|
 | 0 | spec, parity, accounting | none | $0 |
 | 1 | rank ladder: full, 512, 128 always; 32 conditionally | 3–4 × 45 min | $6–8 |
-| 2 | depth to 100M | 85 min | $4 |
+| 2 | depth to 250M, one run, evals every 50M | ~3.5 h | $10 |
 | 3 | sequential versus joint | 85 min | $4 |
 | 4 | verification battery | ~1 h | $3 |
 | side | training-free table, λ and rank sweeps | 30 min | $1.5 |
 
-**Total ≈ 6–7.5 h GPU, ~$19–21**, depending on where the ladder terminates. Throughput assumption
+**Total ≈ 8–9.5 h GPU, ~$25–29**, depending on where the ladder terminates and on whether a 50M tie
+sends two ranks to 250M rather than one. Revised up from an earlier 6–7.5 h / $19–21: that estimate
+had Phase 2 stopping at 100M, which cannot reach the F′ comparator (§6). Throughput assumption
 ~19.7k tok/s, bound by the per-expert dispatch loop in the HF implementation rather than by the
-residency scan.
+residency scan; the full-rank rung runs at micro-batch 4 and is slower.
 
 ## 13. Not in scope
 
