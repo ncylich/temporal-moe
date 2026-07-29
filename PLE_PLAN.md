@@ -268,6 +268,12 @@ co-adaptation redistributes the work.
 - **Screen at the deployment configuration.** Depth, surface, and geometry must match, or say
   explicitly that they do not and treat the screen as untransferable.
 - **2σ or it is noise.** 0.012 BPB on this slice.
+- **Flash attention on, in every training cell, recorded in every CSV.** Its backward is
+  non-deterministic and injects roughly 1e-3 relative gradient noise per step, which is understood
+  and is not a blocker: it is far below seed-to-seed variance, and seed consistency has been good
+  across this program. Do not trade throughput for determinism. If a rank comparison lands inside the
+  2σ bar, that is when to add a seed replicate at the rungs in question. Keep flash off only for
+  bitwise correctness checks, which are not training cells.
 - **Report each deliverable separately**, CSV committed *and pushed*, and verify the file reached the
   branch rather than assuming the commit succeeded.
 - **Failures go in error messages**, not only status lines. Never quote an ETA without re-reading the
