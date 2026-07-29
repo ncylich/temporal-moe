@@ -1,0 +1,3 @@
+tag,table,csurf,lora,bucket,n_eval_tokens,bpb,recovery_pct,swap_rate,usage_entropy,divisor
+trainfree_r512_init,calib_table_r512.pt,none,0,ALL,1048320,2.088235,31.88,0.999809,0.992347,3.1089070924799973
+trainfree_full_init,calib_table_rfull.pt,none,0,ALL,1048320,1.973545,37.4,0.999812,0.992527,3.1089070924799973
