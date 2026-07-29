@@ -1,0 +1,115 @@
+model,nomination_protocol,eviction_kernel,set_coverage,ci_lo,ci_hi,swap_rate,eff_experts,union,max_residency
+"8M active, coarse (6 of 64 experts)",trace,"min_logit (shipped, logged)",0.4498,0.4300,0.4977,1.0000,23.86,44,0.1537
+"8M active, coarse (6 of 64 experts)",trace,lru = FIFO (box on admissions),0.2626,0.2367,0.2960,0.8219,31.17,44,0.5845
+"8M active, coarse (6 of 64 experts)",trace,LRD (refresh on demand),0.4178,0.3935,0.4680,0.8676,26.06,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=1",0.2945,0.2603,0.3432,0.8219,31.24,44,0.5890
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=2",0.4186,0.3995,0.4711,0.8858,27.25,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=4",0.4224,0.3995,0.4756,0.8858,26.12,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=8",0.4300,0.4079,0.4680,0.8630,24.28,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=16",0.3189,0.2823,0.3653,0.7808,22.57,44,0.6484
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=32",0.3196,0.2770,0.3653,0.7443,19.27,44,0.7991
+"8M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=64",0.3044,0.2747,0.3402,0.7489,18.21,44,0.8858
+"8M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.5 (tau~2 tok)",0.4231,0.4018,0.4779,0.8950,25.69,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.25 (tau~4 tok)",0.4414,0.4178,0.4871,0.8995,23.86,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.125 (tau~8 tok)",0.4505,0.4285,0.4962,0.8539,21.62,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.0625 (tau~16 tok)",0.3250,0.2892,0.3706,0.7900,20.10,44,0.7078
+"8M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.03125 (tau~32 tok)",0.3097,0.2725,0.3508,0.7626,18.61,44,0.8721
+"8M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 0.5*slow 0.03125",0.4376,0.4155,0.4818,0.8767,23.17,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 1*slow 0.03125",0.4429,0.4201,0.4848,0.8950,22.26,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 2*slow 0.03125",0.4460,0.4216,0.4932,0.8813,21.05,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 4*slow 0.03125",0.4528,0.4307,0.4985,0.8767,19.35,44,0.9224
+"8M active, coarse (6 of 64 experts)",trace,Belady (oracle eviction),0.5228,0.5068,0.5647,0.7397,23.02,43,0.9224
+"8M active, coarse (6 of 64 experts)",selfnom,lru = FIFO (box on admissions),0.3858,0.3592,0.4445,1.0000,24.32,38,0.7808
+"8M active, coarse (6 of 64 experts)",selfnom,LRD (refresh on demand),0.4346,0.4125,0.4901,1.0000,22.52,40,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=1",0.4353,0.4109,0.4947,1.0000,22.98,39,0.8995
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=2",0.4338,0.4110,0.4909,1.0000,22.52,40,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=4",0.4353,0.4117,0.4985,1.0000,22.19,39,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=8",0.4292,0.4033,0.4863,1.0000,22.04,41,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=16",0.4315,0.4094,0.4795,1.0000,18.78,42,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=32",0.4277,0.3965,0.4833,1.0000,16.50,39,0.9041
+"8M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=64",0.4346,0.4140,0.4848,1.0000,15.33,40,0.9041
+"8M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.5 (tau~2 tok)",0.4399,0.4170,0.4992,1.0000,21.90,40,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.25 (tau~4 tok)",0.4422,0.4216,0.5023,1.0000,21.61,40,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.125 (tau~8 tok)",0.4346,0.4117,0.4932,1.0000,19.56,42,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.0625 (tau~16 tok)",0.4323,0.4072,0.4863,1.0000,17.28,41,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.03125 (tau~32 tok)",0.4315,0.4033,0.4863,1.0000,16.22,40,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 0.5*slow 0.03125",0.4399,0.4155,0.4947,1.0000,20.66,41,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 1*slow 0.03125",0.4429,0.4216,0.4985,1.0000,19.82,41,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 2*slow 0.03125",0.4368,0.4170,0.4916,1.0000,18.82,41,0.9087
+"8M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 4*slow 0.03125",0.4285,0.4018,0.4901,1.0000,17.38,40,0.9087
+"15M active, coarse (6 of 64 experts)",trace,"min_logit (shipped, logged)",0.4528,0.4262,0.4878,1.0000,27.06,44,0.1522
+"15M active, coarse (6 of 64 experts)",trace,lru = FIFO (box on admissions),0.2405,0.2108,0.2626,0.9178,34.15,44,0.4612
+"15M active, coarse (6 of 64 experts)",trace,LRD (refresh on demand),0.4163,0.3927,0.4391,0.9361,28.92,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=1",0.2839,0.2314,0.3326,0.9224,35.13,44,0.4201
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=2",0.4011,0.3813,0.4285,0.9452,29.69,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=4",0.4056,0.3805,0.4307,0.9452,29.08,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=8",0.4155,0.3973,0.4353,0.8950,26.13,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=16",0.3219,0.2755,0.3546,0.8493,26.17,44,0.7169
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=32",0.2907,0.2481,0.3090,0.8311,21.65,44,0.8037
+"15M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=64",0.2755,0.2390,0.2922,0.8219,17.54,44,0.9178
+"15M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.5 (tau~2 tok)",0.4247,0.4003,0.4490,0.9406,28.33,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.25 (tau~4 tok)",0.4300,0.4079,0.4559,0.9132,26.02,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.125 (tau~8 tok)",0.4368,0.4178,0.4536,0.8950,23.60,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.0625 (tau~16 tok)",0.4460,0.4110,0.4802,0.8676,19.24,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.03125 (tau~32 tok)",0.4201,0.3935,0.4399,0.8493,17.92,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 0.5*slow 0.03125",0.4300,0.4056,0.4521,0.9224,25.54,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 1*slow 0.03125",0.4201,0.3965,0.4452,0.9178,24.81,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 2*slow 0.03125",0.4330,0.4041,0.4604,0.8904,23.01,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 4*slow 0.03125",0.4300,0.4079,0.4498,0.8858,20.77,44,0.9132
+"15M active, coarse (6 of 64 experts)",trace,Belady (oracle eviction),0.5053,0.4893,0.5259,0.8311,26.71,44,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,lru = FIFO (box on admissions),0.3820,0.3615,0.4110,1.0000,27.98,41,0.7854
+"15M active, coarse (6 of 64 experts)",selfnom,LRD (refresh on demand),0.4338,0.4117,0.4635,1.0000,26.07,42,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=1",0.4155,0.3927,0.4452,1.0000,27.02,42,0.9087
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=2",0.4224,0.4003,0.4536,1.0000,26.33,41,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=4",0.4277,0.4049,0.4619,1.0000,25.10,43,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=8",0.4399,0.4163,0.4711,1.0000,23.52,43,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=16",0.4444,0.4049,0.4863,1.0000,21.79,45,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=32",0.4422,0.4072,0.4787,1.0000,19.38,46,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=64",0.4300,0.3973,0.4658,1.0000,16.89,44,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.5 (tau~2 tok)",0.4406,0.4163,0.4749,1.0000,24.72,42,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.25 (tau~4 tok)",0.4437,0.4170,0.4764,1.0000,24.02,43,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.125 (tau~8 tok)",0.4513,0.4216,0.4855,1.0000,22.11,44,0.9178
+"15M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.0625 (tau~16 tok)",0.4475,0.4170,0.4817,1.0000,20.04,46,0.9178
+"15M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.03125 (tau~32 tok)",0.4475,0.4148,0.4840,1.0000,18.53,46,0.9178
+"15M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 0.5*slow 0.03125",0.4482,0.4285,0.4756,1.0000,23.81,43,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 1*slow 0.03125",0.4475,0.4262,0.4764,1.0000,23.05,43,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 2*slow 0.03125",0.4505,0.4254,0.4802,1.0000,21.64,44,0.9132
+"15M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 4*slow 0.03125",0.4414,0.4140,0.4757,1.0000,20.36,43,0.9132
+"38M active, coarse (6 of 64 experts)",trace,"min_logit (shipped, logged)",0.4307,0.3501,0.4924,1.0000,26.18,42,0.1187
+"38M active, coarse (6 of 64 experts)",trace,lru = FIFO (box on admissions),0.2314,0.1667,0.2671,0.8813,32.51,42,0.3516
+"38M active, coarse (6 of 64 experts)",trace,LRD (refresh on demand),0.3478,0.2625,0.4049,0.8995,30.54,42,0.4338
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=1",0.2846,0.1925,0.3440,0.8858,33.23,42,0.3653
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=2",0.3234,0.2351,0.3927,0.8904,32.29,42,0.3836
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=4",0.3303,0.2405,0.3912,0.8950,31.11,42,0.4064
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=8",0.3919,0.3204,0.4406,0.8721,26.66,42,0.7078
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=16",0.4170,0.3424,0.4688,0.8813,23.29,42,0.6621
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=32",0.2846,0.1918,0.3447,0.7945,22.07,42,0.6073
+"38M active, coarse (6 of 64 experts)",trace,"box-W demand count, W=64",0.2823,0.1796,0.3402,0.8174,20.44,42,0.6484
+"38M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.5 (tau~2 tok)",0.3600,0.2702,0.4254,0.8995,30.00,42,0.4521
+"38M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.25 (tau~4 tok)",0.3896,0.3067,0.4460,0.9178,26.71,42,0.7626
+"38M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.125 (tau~8 tok)",0.4277,0.3394,0.4878,0.8813,23.41,42,0.6895
+"38M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.0625 (tau~16 tok)",0.3790,0.3052,0.4330,0.8265,20.23,42,0.7763
+"38M active, coarse (6 of 64 experts)",trace,"EMA demand, gamma=0.03125 (tau~32 tok)",0.2892,0.1925,0.3493,0.8037,20.05,42,0.6484
+"38M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 0.5*slow 0.03125",0.3988,0.3212,0.4498,0.9041,25.48,42,0.7580
+"38M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 1*slow 0.03125",0.4102,0.3204,0.4779,0.9087,22.54,42,0.8402
+"38M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 2*slow 0.03125",0.4155,0.3379,0.4749,0.8904,20.56,42,0.8584
+"38M active, coarse (6 of 64 experts)",trace,"two-scale EMA, fast 0.5 + 4*slow 0.03125",0.4186,0.3356,0.4825,0.8721,19.55,42,0.8539
+"38M active, coarse (6 of 64 experts)",trace,Belady (oracle eviction),0.4886,0.4155,0.5388,0.8082,23.66,42,0.7306
+"38M active, coarse (6 of 64 experts)",selfnom,lru = FIFO (box on admissions),0.3714,0.3052,0.4224,1.0000,25.93,36,0.6027
+"38M active, coarse (6 of 64 experts)",selfnom,LRD (refresh on demand),0.4193,0.3356,0.4795,0.9909,25.16,40,0.6849
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=1",0.4018,0.3272,0.4574,0.9909,26.96,40,0.6347
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=2",0.4163,0.3478,0.4711,0.9863,25.28,39,0.6667
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=4",0.4254,0.3500,0.4863,0.9863,24.83,39,0.7123
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=8",0.4262,0.3455,0.4848,0.9817,23.23,39,0.7169
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=16",0.4414,0.3706,0.4992,0.9863,21.11,39,0.7352
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=32",0.4224,0.3455,0.4795,0.9817,19.58,37,0.7215
+"38M active, coarse (6 of 64 experts)",selfnom,"box-W demand count, W=64",0.4033,0.3067,0.4756,0.9817,16.84,33,0.8219
+"38M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.5 (tau~2 tok)",0.4231,0.3364,0.4848,0.9909,24.75,40,0.7032
+"38M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.25 (tau~4 tok)",0.4254,0.3402,0.4871,0.9863,23.09,39,0.7260
+"38M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.125 (tau~8 tok)",0.4444,0.3645,0.5038,0.9863,21.54,39,0.7397
+"38M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.0625 (tau~16 tok)",0.4346,0.3600,0.4901,0.9817,19.34,38,0.7626
+"38M active, coarse (6 of 64 experts)",selfnom,"EMA demand, gamma=0.03125 (tau~32 tok)",0.4216,0.3379,0.4878,0.9817,16.91,38,0.8402
+"38M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 0.5*slow 0.03125",0.4285,0.3493,0.4871,0.9863,22.72,40,0.7397
+"38M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 1*slow 0.03125",0.4307,0.3500,0.4932,0.9863,21.82,41,0.7397
+"38M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 2*slow 0.03125",0.4429,0.3760,0.4985,0.9817,20.61,39,0.7443
+"38M active, coarse (6 of 64 experts)",selfnom,"two-scale EMA, fast 0.5 + 4*slow 0.03125",0.4368,0.3539,0.4954,0.9772,18.67,37,0.8447

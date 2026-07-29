@@ -32,6 +32,11 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `flame38m_1e18_cells.csv` | 1e18 38M-middle 5-cell panel finals (dense/MoE/temporal × coarse/fine); coarse per-seed curves in t18_1e18_curves.csv. | temporal-moe-impl@66f786b7, h100@60b0e351/e53596d6 |
 | `flame512_1e18_rightflank.csv` | 1e18 isoFLOP RIGHT-flank (hidden-512/98M) 5-cell final CE panel. | h100@d4827a1e |
 | `flame512_1e18_rightflank_curves.csv` | Per-iteration training curves for the 1e18 right-flank cells. | h100@d4827a1e |
+| `k1_effective_kernel.csv` | Age-at-eviction (in admission events) of the shipped min_logit residency — the effective residency kernel, against FIFO's box of width k. | `analysis/probes/kernel_replay.py` |
+| `k1_kernel_survival.csv` | Survival curve of that kernel (P(still resident after a further admissions)) vs the FIFO box. | `analysis/probes/kernel_replay.py` |
+| `k2_demand_renewal.csv` | Inter-demand-interval CDF of the unconstrained top-k demand — the box-kernel coverage law cov=F(W). | `analysis/probes/kernel_replay.py` |
+| `k3_eviction_kernel_replay.csv` | Coverage / swap rate / diversity per eviction kernel (FIFO, refresh-on-demand LRU, box-W, EMA, two-scale, Belady) under two nomination protocols. | `analysis/probes/kernel_replay.py` |
+| `k4_signal_bandwidth.csv` | Integrated autocorrelation time of demand vs realized residency, per model. | `analysis/probes/kernel_replay.py` |
 | `karen_center_replay.csv` | 'Karen' (aux-free momentum) center-of-mass replay — A3/eff/union/swap per seed. | a6000@91855c19 |
 | `karen_promotion_s2_1e17.csv` | Karen s2@1e17 promotion checkpoint — val/test BPB + residency stats. | h100@ee5b26db |
 | `learned_locality_vs_scale.csv` | Temporal vs full-MoE routing overlap ('learned locality') vs model scale. | a6000@cd588fd6, h100@cd588fd6 |

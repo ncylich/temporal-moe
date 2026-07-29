@@ -82,11 +82,16 @@ def _prep(lg, k):
 
 
 def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swaps=False,
-           eval_lg=None):
+           eval_lg=None, evict_gamma=0.125):
     """Roll the shipped K=k, cap-1 residency policy over logged logits [S,B,E].
 
     evict: 'min_logit' (shipped) | 'lru' | 'belady' (offline-optimal: evict farthest next demand) |
-           'discounted' (score = discounted future selection mass y_t(e), gamma set).
+           'discounted' (score = discounted future selection mass y_t(e), gamma set) |
+           'lrd' (least recently DEMANDED — 'lru' but refreshed on every top-k appearance, not only
+           on admission: textbook LRU) | 'ema' (evict the smallest causal EMA of the demand
+           indicator, rate `evict_gamma`; ties on 'lru' order). The last two are the derived
+           kernels from docs/research/mechanism/lru-as-convolution.md; they mirror
+           temporal_router.compute_resident_mask, keep the two in sync.
     tau:      hysteresis margin (logit space): swap iff best_nonresident > worst_resident + tau.
     prefetch: h>0 -> nominate for demand h tokens in the FUTURE (prescient prefetch bound).
     gamma:    discount for evict='discounted'.
@@ -119,6 +124,11 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
     refresh = np.full((B, E), NEG, np.float32)
     rank = np.arange(k - 1, -1, -1, dtype=np.float32)[None].repeat(B, 0)
     np.put_along_axis(refresh, top0, rank, 1)
+    if evict == "lrd":                      # cold fill must sit below t=1 on the token clock
+        refresh = np.full((B, E), NEG, np.float32)
+        np.put_along_axis(refresh, top0, rank - k, 1)
+    demand_ema = (evict_gamma * dm[0].astype(np.float32)) if evict == "ema" else None
+    tie = np.float32(1e-9 / (k + S + 1))    # sub-ULP 'lru'-order tiebreak for the 'ema' key
 
     bidx = np.arange(B)
     setcov = np.empty((S, B), np.float32); masscov = np.empty((S, B), np.float32)
@@ -142,12 +152,18 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
             evict_i = worst_i
         else:
             src = lg[min(t + prefetch, S - 1)] if prefetch else lt
+            if evict == "lrd":            # refresh every resident this token still demands
+                refresh = np.where(dm[t], np.float32(t), refresh)
+            elif evict == "ema":
+                demand_ema = (1 - evict_gamma) * demand_ema + evict_gamma * dm[t].astype(np.float32)
             nom_i = np.where(res, NEG, src).argmax(1)
             nom_val = src[bidx, nom_i]
             worst_val = np.where(res, src, POS).min(1)
             do_swap = nom_val > worst_val + tau
-            if evict == "lru":
+            if evict in ("lru", "lrd"):
                 ekey = refresh
+            elif evict == "ema":
+                ekey = demand_ema + tie * refresh
             elif evict == "belady":
                 ekey = -fut[t]            # evict farthest next demand -> smallest -fut
             else:
@@ -158,7 +174,9 @@ def replay(lg, k, evict="min_logit", tau=0.0, prefetch=0, gamma=None, record_swa
         if len(sb):
             res[sb, evict_i[do_swap]] = False
             res[sb, nom_i[do_swap]] = True
-            refresh[sb, nom_i[do_swap]] = t
+            # k + t (not t) so an admission always outranks the cold fill's 0..k-1 ranks — matches
+            # temporal_router.compute_resident_mask, which the cross-framework tests pin.
+            refresh[sb, nom_i[do_swap]] = t + 0.5 if evict == "lrd" else k + t
             if record_swaps:
                 nom_rec[t, sb] = nom_i[do_swap]; evc_rec[t, sb] = evict_i[do_swap]
     out = dict(setcov=setcov, masscov=masscov, swaps=swaps)

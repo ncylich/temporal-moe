@@ -1,0 +1,4 @@
+model,tau_demand_tokens,tau_residency_tokens,ratio,corr_demand_residency
+"8M active, coarse (6 of 64 experts)",2.5387,6.1332,2.4159,0.4584
+"15M active, coarse (6 of 64 experts)",2.9584,7.8527,2.6543,0.4637
+"38M active, coarse (6 of 64 experts)",3.1322,10.1451,3.2390,0.4655

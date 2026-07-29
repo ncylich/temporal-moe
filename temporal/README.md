@@ -9,7 +9,7 @@ swaps/token) so the resident weights can be streamed from SSD/RAM rather than he
 
 | File | What it is |
 | --- | --- |
-| `temporal_router.py` | **Core, shipped mechanism.** `compute_resident_mask` (pure), the Triton/CUDA-graph accelerated scan (`compute_resident_mask_accel`), `temporal_forward`, and `install()` (patches Megatron's `TopKRouter.forward`). Eviction: `min_logit` (shipped) or `lru`. |
+| `temporal_router.py` | **Core, shipped mechanism.** `compute_resident_mask` (pure), the Triton/CUDA-graph accelerated scan (`compute_resident_mask_accel`), `temporal_forward`, and `install()` (patches Megatron's `TopKRouter.forward`). Eviction: `min_logit` (shipped) or `lru`; plus the reference-only `lrd` / `ema` kernels derived in `docs/research/mechanism/lru-as-convolution.md` (eager scan only — the Triton/CUDA-graph paths implement the shipped pair, and `compute_resident_mask_accel` hard-gates the rest). |
 | `ablation_mechanisms.py` | **Default-off, negative-result knobs**, kept only for reproducibility of `results/ablations/*.csv` — demand momentum, aux-free trigger, coherence/anticipatory/bursty losses, nomination head. Not on any shipped path. |
 | `pretrain_temporal.py` | Training entrypoint: `install()` then Megatron's normal GPT pretrain loop. Invoked by `experiments/run.sh` with `TEMPORAL=1`. |
 | `__init__.py` | Re-exports the combined public surface of the two modules. |

@@ -268,7 +268,12 @@ measured ceiling).
 ## 7. Do not run (measured, or twice-reasoned)
 
 - **Eviction-policy learning** (Belady imitation): measured ceiling +6–10 pt (E5). **LRU**:
-  measured 7 pt worse than shipped min_logit.
+  measured 7 pt worse than shipped min_logit. *(Scope note: the `lru` policy refreshes on admission
+  only, so what was measured — and trained, at s0@1e16 — is FIFO. Refresh-on-demand LRU is a
+  distinct, never-trained policy that recovers 73–80% of the deficit in replay;
+  [`../mechanism/lru-as-convolution.md`](../mechanism/lru-as-convolution.md) §4.1. Both derived
+  kernels there are demand-referential, not cache-referential, so they sit inside the header's
+  scope guard — but neither is a verdict, and neither is scheduled.)*
 - **Pinned resident slots**: measured — no expert exceeds 20–39% residency (E2); permanence is a
   degeneracy (a routed slot acting as a shared expert), not a feature.
 - **Coherence BCE in any form**: measured negative on this branch; no new information, and the

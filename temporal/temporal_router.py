@@ -35,19 +35,42 @@ try:
 except Exception:                                           # triton missing -> eager/graph fallback
     _HAS_TRITON = False
 
+# Eviction policies. The first two are the shipped/published pair and are the only ones the Triton
+# and CUDA-graph scans implement; the rest are reference-only (eager) and are hard-gated in
+# compute_resident_mask_accel so a fast path can never silently run the wrong policy.
+EVICT_POLICIES = ("lru", "min_logit", "lrd", "ema")
+_ACCEL_EVICT = ("lru", "min_logit")
+
 
 def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
-                          tau: float = 0.0, ema_beta: float = 1.0) -> torch.Tensor:
+                          tau: float = 0.0, ema_beta: float = 1.0,
+                          evict_gamma: float = 0.125) -> torch.Tensor:
     """Rolling-residency expert selection.
 
     Args:
         logits: [seq, batch, num_experts] router logits (seq-first, as Megatron's router sees them).
         k: resident-set size (= top-k; K = k for this PoC).
-        evict: which resident to remove when a swap happens (experiment knob, same swap *trigger*):
-            "lru"       — oldest last-refresh time (cache-style; protects just-loaded experts from
-                          immediate re-eviction → less thrash; score-neutral w.r.t. the aux loss).
+        evict: which resident to remove when a swap happens (experiment knob, same swap *trigger*).
+            Read as a temporal filter on each expert's own history — see
+            docs/research/mechanism/lru-as-convolution.md; the shape and width of that filter is
+            what distinguishes them:
+            "lru"       — oldest last-refresh time, where "refresh" happens ONLY on admission.
+                          That makes it a FIFO queue over the admission stream, i.e. a box kernel
+                          of width k: every expert is evicted at age exactly k admissions,
+                          regardless of demand. Kept under this name because it is the policy the
+                          published eviction ablation measured.
             "min_logit" — lowest current logit, i.e. the same "worst resident" the swap trigger
                           compares against (most consistent; quality-greedy; simpler).
+            "lrd"       — least recently DEMANDED: same recency rule as "lru", but the refresh
+                          time also updates whenever a resident is in the token's unconstrained
+                          top-k. Textbook LRU (refresh on use); recovers most of "lru"'s deficit
+                          in offline replay (analysis/probes/kernel_replay.py, K3).
+            "ema"       — smallest causal EMA of the per-expert demand indicator, rate
+                          `evict_gamma` (time constant ~1/evict_gamma tokens), ties broken by
+                          "lru" order. The width-tunable member of the family: "min_logit" is
+                          roughly its width-1 limit and "lru" its demand-blind limit.
+        evict_gamma: EMA rate for evict="ema" (weight on the current token; 0.125 == ~8 tokens,
+            the offline-replay optimum). Unused by the other policies.
         tau: hysteresis margin (logit units): swap fires only if the best non-resident beats the
             worst resident by MORE than tau. tau=0 == shipped behavior.
         ema_beta: causal EMA smoothing of the TRIGGER stream (weight on the current token;
@@ -70,9 +93,10 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
         mask[t] = R_t                               # the post-swap set the token actually uses
     Refresh times (for "lru"): cold-fill experts rank by ascending logit (lowest = oldest); each
     nomination is the newest. All resident refresh times stay distinct, so eviction is deterministic.
+    "lrd" additionally refreshes on demand, so its refresh times can tie; ties break on expert index
+    (torch's argmin), which is the same tie rule the rest of the scan uses.
     """
-    assert evict in ("lru", "min_logit"), f"unknown evict policy {evict!r}"
-    use_lru = evict == "lru"
+    assert evict in EVICT_POLICIES, f"unknown evict policy {evict!r}"
     S, B, E = logits.shape
     dev = logits.device
     NEG, POS = float("-inf"), float("inf")
@@ -85,6 +109,7 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
             trig[_t] = (1.0 - ema_beta) * trig[_t - 1] + ema_beta * logits[_t]
 
     refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert ("lru" only)
+    demand_ema = torch.zeros(B, E, device=dev)              # demand filter state ("ema" only)
     out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
 
     # --- t=0 cold fill: R_0 = top-k(trig[0]) (== top-k(logits[0]): EMA is identity at t=0) ---
@@ -94,19 +119,45 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
     # highest logit -> newest (largest refresh); lowest of the k -> oldest (0).
     rank_refresh = torch.arange(k - 1, -1, -1, device=dev).float().expand(B, k)
     refresh.scatter_(1, top_i, rank_refresh)
+    if evict == "lrd":
+        # "lrd" refreshes on demand too, on a plain token clock, so its cold fill must sit BELOW
+        # t=1: shift the same ranks into [-k, -1]. Admissions then land at t+0.5, so an expert
+        # loaded at t outranks one merely demanded at t. "lru" keeps its original scale untouched.
+        refresh = torch.full((B, E), NEG, device=dev)
+        refresh.scatter_(1, top_i, rank_refresh - float(k))
     out[0] = resident
+    if evict == "ema":
+        dm0 = torch.zeros(B, E, device=dev).scatter_(1, top_i, 1.0)
+        demand_ema = evict_gamma * dm0
+    tie = 1e-9 / float(k + S + 1)                           # refresh -> a sub-ULP FIFO tiebreak
 
     for t in range(1, S):
         lt = trig[t]                                        # token t pulls in one expert and uses it
+        if evict in ("lrd", "ema"):
+            # The token's UNCONSTRAINED top-k — the demand signal these two kernels filter. Free
+            # in principle (the trigger already ranks every expert); a separate topk here keeps the
+            # reference implementation obvious.
+            demanded = torch.zeros(B, E, dtype=torch.bool, device=dev)
+            demanded.scatter_(1, lt.topk(k, dim=-1).indices, True)
+            if evict == "lrd":
+                refresh = torch.where(demanded, torch.full_like(refresh, float(t)), refresh)
+            else:
+                demand_ema = (1.0 - evict_gamma) * demand_ema + evict_gamma * demanded.float()
         nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)      # best non-resident [B]
         worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)       # worst resident   [B]
         do_swap = (nom_val > worst_val + tau).unsqueeze(-1)             # [B,1]; tau=0 == shipped
-        evict_key = refresh if use_lru else lt
+        if evict == "min_logit":
+            evict_key = lt
+        elif evict == "ema":
+            evict_key = demand_ema + tie * refresh          # demand first, FIFO order on ties
+        else:                                               # "lru" / "lrd": recency of refresh
+            evict_key = refresh
         evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
         evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
         nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
         resident = (resident & ~evicted) | nominee
-        refresh = refresh.masked_fill(nominee, float(k + t))           # newest (read only when "lru")
+        newest = float(t) + 0.5 if evict == "lrd" else float(k + t)
+        refresh = refresh.masked_fill(nominee, newest)      # newest (read by every policy but min_logit)
         out[t] = resident
 
     return out
@@ -256,7 +307,8 @@ def _triton_scan(logits, k, use_lru):
     return out.to(torch.bool)
 
 
-def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
+def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0,
+                                evict_gamma=0.125):
     """Resident mask via a GPU fast path; identical result to compute_resident_mask.
 
     On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects the
@@ -267,6 +319,15 @@ def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
     """
     global _scan_path
     mode = os.environ.get("TEMPORAL_SCAN", "triton")
+    if evict not in _ACCEL_EVICT:                           # reference-only eviction kernel
+        # The fast paths take a single `use_lru` boolean, so any policy outside the shipped pair
+        # would be silently demoted to min_logit there. Run the reference instead.
+        if _scan_path != f"eager-{evict}":
+            _scan_path = f"eager-{evict}"
+            print(f"[temporal] scan path: eager (evict={evict}, gamma={evict_gamma})")
+        with torch.no_grad():
+            return compute_resident_mask(logits, k, evict, tau=tau, ema_beta=ema_beta,
+                                         evict_gamma=evict_gamma)
     if tau != 0.0 or ema_beta < 1.0:                        # shaped trigger: reference only
         # The Triton/CUDA-graph kernels implement the shipped (tau=0, ema_beta=1) semantics;
         # running them here would silently ignore the knobs. Eval-only workloads tolerate eager.
@@ -360,7 +421,8 @@ def temporal_forward(self, input: torch.Tensor):
     mask = compute_resident_mask_accel(
         trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
         tau=float(os.environ.get("TEMPORAL_RHO", "0")),
-        ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
+        ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")),
+        evict_gamma=float(os.environ.get("TEMPORAL_EVICT_GAMMA", "0.125")))
     lam = float(os.environ.get("TEMPORAL_COHERENCE_LAMBDA", "0"))
     if lam > 0 and self.training:
         from megatron.core.transformer.moe.moe_utils import (
@@ -431,6 +493,8 @@ def banner_knobs() -> str:
     knobs = f", tau={tau}, ema_beta={beta}" if (float(tau) != 0.0 or float(beta) < 1.0) else ""
     if int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) > 0:
         knobs += f", residency_R={os.environ.get('TEMPORAL_RESIDENCY_R')}"
+    if os.environ.get("TEMPORAL_EVICT", "lru") == "ema":
+        knobs += f", evict_gamma={os.environ.get('TEMPORAL_EVICT_GAMMA', '0.125')}"
     if os.environ.get("AUXFREE", "0") == "1":
         knobs += ", auxfree-trigger=sigmoid+bias"
     if float(os.environ.get("TEMPORAL_MOM_BETA", "0")) > 0:

@@ -1,0 +1,4 @@
+model,evictions,mean_age_admissions,ci_lo,ci_hi,median_age,p90_age,max_age,frac_age_lt_2,frac_age_eq_k,mean_age_tokens,median_age_tokens,max_age_tokens,frac_slots_older_than_k_admissions
+"8M active, coarse (6 of 64 experts)",219,4.7260,4.4292,5.1598,3.0,10.0,28,0.1963,0.0594,4.7260,3.0,28,0.4186
+"15M active, coarse (6 of 64 experts)",219,4.9680,4.6484,5.3242,3.0,12.0,41,0.1963,0.0731,4.9680,3.0,41,0.4041
+"38M active, coarse (6 of 64 experts)",217,5.8018,4.3318,7.8018,3.0,10.4,143,0.2442,0.0415,5.8571,3.0,143,0.4490

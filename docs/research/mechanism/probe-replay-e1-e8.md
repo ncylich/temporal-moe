@@ -164,7 +164,11 @@ head). **Belady+prefetch(h)** = let the swap fire h tokens early. Set hit-rate (
 | Belady + prefetch(h=4) | 52.8 | 44.7 | 47.0 |
 
 Two clean findings: **(a)** LRU is *worse* than the shipped min_logit (−7 pt) — cache-recency is the
-wrong instinct here, quality-greedy eviction already beats it. **(b)** Better *eviction alone* has
+wrong instinct here, quality-greedy eviction already beats it. *(Naming caveat, added later: the
+`lru` policy refreshes only on ADMISSION, so the row above measures insertion-order (FIFO) eviction,
+which is provably a box kernel of width k over the admission stream. Textbook LRU — refresh on
+demand — recovers 73–80% of this deficit in replay; see
+[`lru-as-convolution.md`](./lru-as-convolution.md).)* **(b)** Better *eviction alone* has
 **limited headroom**: offline-optimal Belady beats shipped by only **+8.6 pt (G1), +6.0 pt (G3), +10.0
 pt (38 M)**. But **anticipation** — nominating experts by *future* demand (discounted-oracle /
 prefetch) — buys **+20 to +30 pt** (G1: 38 → 66 %).
