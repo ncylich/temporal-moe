@@ -38,6 +38,10 @@ ap.add_argument("--table-wd", type=float, default=0.0,
                      "between rank and decay. Settable, but see row_norms.py for the diagnostic any "
                      "non-zero value should be set against.")
 ap.add_argument("--mb", type=int, default=16)
+ap.add_argument("--accum", type=int, default=1,
+                help="gradient accumulation steps. The effective batch is --mb * --accum and must "
+                     "be held at 16 to match the C recipe: the full-rank rung needs --mb 4 --accum 4 "
+                     "because activations, not the table, dominate memory.")
 ap.add_argument("--seed", type=int, default=1234, help="PLE basis init only; data order is seeded 0")
 ap.add_argument("--adam8bit", action="store_true", help="8-bit Adam for the PLE table (§2)")
 ap.add_argument("--heldout", action="store_true",
@@ -120,22 +124,36 @@ def eval_bpb_telem():
 
 seen = step = pos = 0
 hist = []
+# Detached scalars only, meaned at eval time. Kept as tensors so no per-step device sync is added:
+# the training math is untouched, this is bookkeeping. The train/eval gap at each eval point is the
+# generalization measure, and inferring it from the printed step lines afterwards is lossier.
+lm_acc = []
 model.train()
 t0 = time.time()
 while seen < A.tokens:
-    if pos + A.mb > corpus.shape[0]:
-        pos = 0
     RES._CFG["R"] = 8
-    batch = corpus[order[pos:pos + A.mb]].to("cuda").long(); pos += A.mb
-    labels = batch[:, 1:].reshape(-1)
-    out = model(batch, output_router_logits=True)
-    logits = out.logits
-    lm = torch.nn.functional.cross_entropy(logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels)
-    aux, z = RES.aux_z_from_router_logits(out.router_logits, batch.shape[0], batch.shape[1], RES._CFG["R"])
-    loss = lm + AUX_C * aux + Z_C * z
-    if not torch.isfinite(loss):
-        print(f"[ABORT] non-finite loss step {step}", flush=True); sys.exit(3)
-    loss.backward()
+    # One optimizer step over --accum micro-batches. Gradients accumulate in p.grad across the
+    # inner loop; the master copy, clipping and step happen once, so the effective batch is
+    # --mb * --accum regardless of how it is split.
+    lm_last = None
+    for _micro in range(A.accum):
+        if pos + A.mb > corpus.shape[0]:
+            pos = 0
+        batch = corpus[order[pos:pos + A.mb]].to("cuda").long(); pos += A.mb
+        labels = batch[:, 1:].reshape(-1)
+        out = model(batch, output_router_logits=True)
+        logits = out.logits
+        lm = torch.nn.functional.cross_entropy(logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels)
+        aux, z = RES.aux_z_from_router_logits(out.router_logits, batch.shape[0], batch.shape[1],
+                                              RES._CFG["R"])
+        loss = (lm + AUX_C * aux + Z_C * z) / A.accum
+        if not torch.isfinite(loss):
+            print(f"[ABORT] non-finite loss step {step} micro {_micro}", flush=True); sys.exit(3)
+        loss.backward()
+        seen += batch.numel(); lm_last = lm
+        lm_acc.append(lm.detach())
+        del out, logits, loss
+    lm = lm_last
     for m, p in zip(masters, train_params):
         m.grad = p.grad.float() if p.grad is not None else None
     torch.nn.utils.clip_grad_norm_(masters, 1.0)
@@ -147,15 +165,25 @@ while seen < A.tokens:
         torch.nn.utils.clip_grad_norm_(list(ple_mod.parameters()), 1.0)
         opt_ple.step()
         opt_ple.zero_grad(set_to_none=True)
-    seen += batch.numel(); step += 1
+    step += 1
     if step % 20 == 0:
         print(f"[step {step}] tok={seen/1e6:.1f}M lm={lm.item():.4f} "
               f"{seen/(time.time()-t0)/1e3:.1f}k tok/s", flush=True)
     if seen // A.eval_every > len(hist):
         b, swap, ent = eval_bpb_telem()
-        hist.append({"tok": seen, "bpb": b, "swap_rate": swap, "usage_entropy": ent})
-        print(f"[eval] {A.tag} rank={RANK} tok={seen/1e6:.0f}M BPB={b:.6f} swap={swap:.4f} ent={ent:.4f}",
-              flush=True)
+        train_lm = float(torch.stack(lm_acc).mean()) if lm_acc else float("nan")
+        lm_acc = []
+        hist.append({"tok": seen, "bpb": b, "swap_rate": swap, "usage_entropy": ent,
+                     "train_lm": train_lm, "train_bpb": train_lm / D})
+        print(f"[eval] {A.tag} rank={RANK} tok={seen/1e6:.0f}M BPB={b:.6f} "
+              f"train_lm={train_lm:.6f} train_bpb={train_lm/D:.6f} gap={train_lm/D - b:+.6f} "
+              f"swap={swap:.4f} ent={ent:.4f}", flush=True)
+        # Table snapshot at every eval, so rare-row growth is a trajectory rather than one
+        # post-hoc point. Pure I/O; nothing here feeds back into training.
+        if ple_mod is not None:
+            torch.save({"rank": str(RANK),
+                        **{k: v.detach().cpu() for k, v in ple_mod.state_dict().items()}},
+                       f"{OUT}/ple_table_{A.tag}_at{seen // 10**6}M.pt")
         if b > IMPOSE_BPB:
             print(f"[ABORT] BPB {b:.4f} > impose {IMPOSE_BPB}", flush=True); sys.exit(4)
 

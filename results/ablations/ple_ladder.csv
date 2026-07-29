@@ -1,0 +1,5 @@
+tag,rank,train_tokens,mb,accum,lr,table_wd,adam8bit,flash_attention,ple_params,final_bpb,recovery,delta_vs_C50M,delta_vs_CE50M,beats_C50M_by_2sigma,beats_CE50M_by_2sigma,verdict,final_swap,final_entropy,divisor,curve_bpb
+ladder_full,full,50003968,4,4,0.0003,0.0,True,on,1648361488,0.858867,0.9104,-0.020233,0.031967,True,False,"beats C@50M, worse than LoRA (CE@50M) -- PLE is the weaker third mechanism",0.999728,0.998432,3.1089070924799973,10M:0.914016|20M:0.884746|30M:0.872327|40M:0.865310|50M:0.858867
+REFERENCE,C@50M router+norms,,,,,,,,,0.8791,0.9007,,,,,,,,3.1089070924799973,
+REFERENCE,CE@50M router+norms+LoRA,,,,,,,,,0.8269,0.9258,,,,,,,,3.1089070924799973,
+REFERENCE,F' full finetune 6.92B (fair only at 250M),,,,,,,,,0.8106,0.9336,,,,,,,,3.1089070924799973,
