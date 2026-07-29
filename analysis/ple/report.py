@@ -3,7 +3,8 @@
 
     report.py gate r32       -> RUN / SKIP / AMBIGUOUS, per PLE_PLAN.md §5's r=32 rule
     report.py gate winners   -> the top two tying ranks, for the CE stage
-    report.py figure         -> results/phase0/figures/ple_layer_damage.png from the results CSV
+    report.py figure         -> results/phase0/figures/layer_freeing_damage.png
+                                from layer_freeing_results.csv
 
 Cell results are NOT assembled here; consolidate.py writes the single results CSV from the per-cell
 JSONs the trainer emits. This file holds only the decision rules and the plot, so there is one
@@ -56,13 +57,18 @@ def figure():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    # layer damage lives in the layer-freeing table, not the PLE one: it is a property of the
+    # constraint, measured by removing it, and has nothing to do with per-layer embeddings.
     dmg, full = {}, None
-    for r in csv.DictReader(open(os.path.join(ABLATIONS, "ple_results.csv"))):
+    src = os.path.join(ABLATIONS, "layer_freeing_results.csv")
+    for r in csv.DictReader(open(src)):
         if r["group"] == "layer_damage" and r["metric"] == "damage_bpb":
             if r["name"].isdigit():
                 dmg[int(r["name"])] = float(r["value"])
             elif r["name"] == "all constrained":
                 full = float(r["value"])
+    if full is None or not dmg:
+        raise SystemExit(f"no layer_damage rows in {src}; run layer_ablation.py then consolidate.py")
     xs = sorted(dmg); ys = [dmg[i] for i in xs]; u = full / len(xs); s = sum(ys)
     fig, ax = plt.subplots(figsize=(7.6, 4.6))
     ax.bar(xs, ys, color=["#0d3b66" if v >= u else "#5aa0dd" for v in ys], alpha=0.9)
@@ -76,7 +82,7 @@ def figure():
              f"constraint is mildly SUPER-additive across the network.",
              ha="center", fontsize=8, wrap=True)
     fig.tight_layout(rect=[0, 0.07, 1, 1])
-    out = os.path.join(os.path.dirname(ABLATIONS), "phase0", "figures", "ple_layer_damage.png")
+    out = os.path.join(os.path.dirname(ABLATIONS), "phase0", "figures", "layer_freeing_damage.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     fig.savefig(out, dpi=200)
     print("wrote", out)

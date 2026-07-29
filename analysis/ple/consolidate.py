@@ -156,8 +156,8 @@ take("ple_accounting.csv", "accounting", "rank",
      ["total_params", "flash_fetch_bytes_per_token", "resident_basis_bytes", "expert_swap_bytes",
       "fetch_vs_expert_swap", "train_param_plus_grad_GiB", "train_adam8bit_GiB",
       "train_total_adam8bit_GiB"], "note")
-take("ple_layer_damage.csv", "layer_damage", "layer", ["bpb", "damage_bpb"])
-take("ple_joint_free.csv", "free_set", "free_set",
+take("layer_damage.csv", "layer_damage", "layer", ["bpb", "damage_bpb"])
+take("joint_free.csv", "free_set", "free_set",
      ["bpb", "damage_bpb", "additive_prediction", "interaction", "resident_slots",
       "memory_vs_full_residency_pct"])
 take("ple_locus.csv", "locus", "tag",

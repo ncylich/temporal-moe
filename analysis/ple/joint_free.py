@@ -22,7 +22,7 @@ from paths import ABLATIONS
 
 D = json.load(open(os.path.join(DATA_DIR, "bpb_slice_meta.json")))["divisor_D"]
 solo = {}
-for r in csv.DictReader(open(os.path.join(ABLATIONS, "ple_layer_damage.csv"))):
+for r in csv.DictReader(open(os.path.join(ABLATIONS, "layer_damage.csv"))):
     if r["layer"].isdigit():
         solo[int(r["layer"])] = float(r["damage_bpb"])
     elif r["layer"] == "all constrained":
@@ -70,7 +70,7 @@ for S, name in SETS:
           flush=True)
 RES.set_free_layers(None)
 
-path = os.path.join(ABLATIONS, "ple_joint_free.csv")
+path = os.path.join(ABLATIONS, "joint_free.csv")
 with open(path, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
     w.writeheader(); w.writerows(rows)

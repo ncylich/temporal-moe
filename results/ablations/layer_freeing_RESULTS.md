@@ -66,7 +66,7 @@ share of 0.1299, the middle third (7–13) at 0.54–0.64× it. Layer **1 is the
 |---|---|---|---|---|---|---|---|---|
 | damage | 0.0810 | 0.0822 | 0.0837 | 0.0698 | 0.0729 | 0.0748 | 0.1225 | 0.1408 |
 
-Figure: [`results/phase0/figures/ple_layer_damage.png`](../phase0/figures/ple_layer_damage.png).
+Figure: [`results/phase0/figures/layer_freeing_damage.png`](../phase0/figures/layer_freeing_damage.png).
 
 The shape is cleaner than "early layers matter": the constraint hurts most where routing is closest
 to the token — at the input, and again at the output where the next-token decision is formed.

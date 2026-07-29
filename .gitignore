@@ -29,9 +29,9 @@ results/ablations/ple_cal_stack.csv
 results/ablations/ple_calib_meta*.json
 results/ablations/ple_coverage.csv
 results/ablations/ple_heldout.csv
-results/ablations/ple_joint_free.csv
+results/ablations/joint_free.csv
 results/ablations/ple_ladder.csv
-results/ablations/ple_layer_damage.csv
+results/ablations/layer_damage.csv
 results/ablations/ple_locus.csv
 results/ablations/ple_parity.csv
 results/ablations/ple_row_norms.csv

@@ -84,7 +84,7 @@ print(f"\n[abl] sum {tot_d:.6f} vs full-residency {full_d:.6f}  ratio {tot_d/ful
 order = sorted(range(L), key=lambda i: -dmg[i])
 print(f"[abl] most damaging: {order[:4]}   least: {order[-4:]}", flush=True)
 
-path = os.path.join(ABLATIONS, "ple_layer_damage.csv")
+path = os.path.join(ABLATIONS, "layer_damage.csv")
 with open(path, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=["layer", "bpb", "damage_bpb"])
     w.writeheader()
