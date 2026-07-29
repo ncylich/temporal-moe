@@ -1,8 +1,14 @@
-# Per-Layer Embeddings and per-layer residency relaxation — results
+# Per-Layer Embeddings (PLE) — results
 
 Program of record: [`PLE_PLAN.md`](../../PLE_PLAN.md). All numbers below are in
-`ple_results.csv` (one tidy file, sliceable by its `group` column); code is in
+`ple_results.csv` (tidy, sliceable by its `group` column); code is in
 [`analysis/ple/`](../../analysis/ple/README.md).
+
+**Scope.** This covers per-layer embeddings only: PLE *adds* a token-indexed lookup while leaving
+the rolling-residency constraint intact. The separate experiment that *relaxes* the constraint on
+chosen layers is written up in [`layer_freeing_RESULTS.md`](layer_freeing_RESULTS.md) with its own
+table, and is not mixed in here — the two share only a base model, an eval slice and a set of
+published references.
 
 **Metric.** BPB = cross-entropy nats ÷ 3.10891 on the Stage-1 audited held-out slice (dolmino
 dclm), the divisor byte-derived as `ln2 × bytes_per_token`. **Lower is better.**
@@ -13,20 +19,13 @@ untrained, 100% is the base model with free routing. **2σ = 0.012 BPB; anything
 
 ## 1. Headline
 
-Two results survive, and they are about different things.
-
 **PLE is a token-efficiency win over the C recipe, not a new mechanism.** A rank-512 per-layer
 embedding table co-trained with router and norm gains reaches **0.848854 at 50M tokens**, which ties
 C@250M = 0.8505 (Δ 0.14σ). Same quality for a fifth of the tokens, at 42.5M parameters and 1 KB of
 flash traffic per token — and r=128 does it at 10.6M parameters and 256 B/token.
 
-**Relaxing residency on three well-chosen layers beats the full finetune.** The CE recipe with MoE
-layers 0, 1 and 15 left unconstrained reaches **0.797810 (93.98%)**, beating F′ = 0.8106 — a
-finetune of all 6.92B parameters — by 1.07σ. The cost is **+131% resident expert memory** and
-nothing else: FLOPs are unchanged, because both regimes activate exactly top-8 of 64 per token and
-residency only restricts *which* eight are eligible.
-
-Neither reaches 95% recovery (BPB 0.7766), which would require beating F′ by a further 0.034.
+PLE does not, however, reach the constraint price: the best PLE cell on the CE surface
+(0.832730) ties LoRA alone and remains 2.2 points of recovery short of F′ = 0.8106.
 
 ## 2. What failed, and how conclusively
 
@@ -51,8 +50,6 @@ would have manufactured a spurious "PLE moved the locus from 0.049 to 0.095".
 
 | cell | BPB | recovery | config |
 |---|---|---|---|
-| **ce_free_0_1_15** | **0.797810** | **93.98%** | CE, layers 0/1/15 free, +131% mem |
-| ce_free2 | 0.814440 | 93.18% | CE, layers 0/1 free, +87.5% mem |
 | ce_ple_128 | 0.832730 | 92.30% | CE + PLE r128 |
 | ce_ple_512 | 0.833799 | 92.25% | CE + PLE r512 |
 | seq_ple_512 | 0.843163 | 91.80% | PLE introduced at 50M of 100M |
@@ -70,48 +67,8 @@ F′ 0.8106.
 
 ## 4. Per-layer residency damage
 
-Constraining exactly one MoE layer at a time, base model, no training. Both anchors reproduce
-published values to six decimals (all-free 0.672736 vs 0.6727; all-constrained 2.750704 vs 2.7507).
-
-Damage is **U-shaped**, not decaying: layers 0–2 and 14–15 at or above the uniform share of 0.1299,
-the middle third (7–13) at 0.54–0.64× it. Layer **1 is the single most damaging** at 1.99× uniform,
-nearly double layer 15.
-
-| layer | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|---|---|---|---|---|---|---|---|---|
-| damage | 0.2178 | **0.2588** | 0.1408 | 0.1153 | 0.1168 | 0.0986 | 0.1064 | 0.0792 |
-
-| layer | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
-|---|---|---|---|---|---|---|---|---|
-| damage | 0.0810 | 0.0822 | 0.0837 | 0.0698 | 0.0729 | 0.0748 | 0.1225 | 0.1408 |
-
-Figure: [`results/phase0/figures/ple_layer_damage.png`](../phase0/figures/ple_layer_damage.png).
-
-**Solo damage does not predict joint value.** Layers 2 and 15 have near-identical solo damage
-(0.14084, 0.14076) and therefore near-identical additive predictions, but freeing them alongside
-{0,1} recovers 0.573 vs 0.409 — the third layer is worth **0.198 if it is layer 2 and 0.034 if it is
-layer 15**, a factor of 5.8 at identical memory. Layer 15's damage largely *overlaps* what freeing
-0–1 already fixes. No single-layer profile can show this.
-
-| free set | damage | additive pred. | interaction | memory | recovered |
-|---|---|---|---|---|---|
-| {0} | 1.931151 | 1.860135 | +0.071 | +43.8% | 0.147 |
-| {1} | 1.913915 | 1.819152 | +0.095 | +43.8% | 0.164 |
-| {0,1} | 1.702781 | 1.601319 | +0.101 | +87.5% | 0.375 |
-| **{0,1,2}** | **1.504779** | 1.460475 | +0.044 | +131.2% | **0.573** |
-| {0,1,15} | 1.669080 | 1.460562 | +0.209 | +131.2% | 0.409 |
-| {0,1,14,15} | 1.582700 | 1.338077 | +0.245 | +175.0% | 0.495 |
-
-{0,1,2} dominates {0,1,14,15} outright — more recovery for less memory. A contiguous early block
-beats splitting across both ends. Across the whole network the constraint is mildly
-**super-additive** (singles sum 1.861 vs full 2.078, ratio 0.896), but within any freed subset every
-interaction term is **positive**, i.e. freeing a set always recovers *less* than the profile
-predicts.
-
-**Unresolved.** Training-free ordering did not survive adaptation in the one case tested: layer 15
-was predicted to add 0.034 and, trained, added 0.0166 BPB — more than layers 0–1 contributed
-together (0.0125). The controlled `{0,1,2}` cell that would settle whether damage profiles are a
-useful design tool was cancelled before completing.
+Moved: see [`layer_freeing_RESULTS.md`](layer_freeing_RESULTS.md). It is a property of the
+constraint, not of PLE, and belongs with the relaxation experiments.
 
 ## 5. Training-free adaptation, and why order matters
 
@@ -183,11 +140,8 @@ Write PLE up as an **efficiency and serving-cost** result versus recipe C — 5�
 256 B/token — and drop the lexical-restoration framing, which the locus probe does not support. PLE
 is not an additional mechanism on top of adapter capacity.
 
-The layer-freeing result is a genuine quality/memory frontier point and the strongest quality in the
-adaptation line, but it concedes the paper's central claim that serving memory tracks active
-parameters. If a 95% target is real, **R is the likelier lever than layer count**: the residency-dose
-curve is smooth in R, whereas free-vs-constrained is an all-or-nothing jump to R=64 on a layer — the
-most expensive point on that curve.
+For the constraint-relaxation frontier and the 95% question, see
+[`layer_freeing_RESULTS.md`](layer_freeing_RESULTS.md).
 
 §13's follow-on (DeepSeek Engram, richer lookups) is now less attractive: the axis produced a real
 efficiency win but no evidence for the mechanism that motivated it, and it does not compose with

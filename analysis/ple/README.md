@@ -14,7 +14,7 @@ Implementation for [`PLE_PLAN.md`](../../PLE_PLAN.md). **Results and findings li
 | `olmoe_paths.py` | path contract for the base checkpoint and corpus, with manifest verification |
 | `calibrate.py` | closed-form Δ capture, shrinkage at an estimated λ\*, precision-weighted SVD |
 | `cal_stack.py` | Cal-0 norm calibration, and the norm↔PLE stack in either order |
-| `layer_ablation.py` | per-layer damage, and joint free-set damage vs the additive prediction |
+
 | `eval_table.py` | score a table with NO training (§9), and bucket recovery by frequency (§8.3) |
 | `locus.py` | §8.1 token-vs-context locus probe |
 | `row_norms.py` | §2 diagnostic: row norm bucketed by occurrence count |
@@ -23,7 +23,20 @@ Implementation for [`PLE_PLAN.md`](../../PLE_PLAN.md). **Results and findings li
 | `heldout.py` | builds the held-out token set the zero-property check uses |
 | `checks.py` | all correctness checks: `init`, `placement`, `grad`, `zero`, `bitwise` |
 | `report.py` | §5 ladder gates, and the layer-damage figure |
-| `consolidate.py` | folds every intermediate into the one committed CSV |
+| `consolidate.py` | folds every intermediate into the two committed CSVs |
+
+Per-layer residency **relaxation** is a separate line of inquiry sharing this code:
+
+| file | what it is |
+|---|---|
+| `layer_ablation.py` | per-layer damage: constrain one MoE layer at a time |
+| `joint_free.py` | joint free-set damage vs the additive prediction from the solo profile |
+| `train_ple.py --free-set` | training cells with chosen layers unconstrained |
+
+Its results are in `results/ablations/layer_freeing_results.csv` and
+[`layer_freeing_RESULTS.md`](../../results/ablations/layer_freeing_RESULTS.md), kept apart from the
+PLE tables on purpose: PLE adds a lookup and leaves the constraint intact, layer freeing removes the
+constraint and adds nothing.
 
 ## Artifacts and paths
 
@@ -39,8 +52,9 @@ then `$TMOE_OLMOE_HOME`, then `<repo parent>/olmoe-adapt`. The corpus files are 
 licenses using local disk instead of re-downloading.
 
 Each script writes a small intermediate CSV into `results/ablations/`. Those are **gitignored**;
-`consolidate.py` folds them into the single tracked `ple_results.csv`. Re-run any script, then
-`consolidate.py`, and the committed artifact is rebuilt.
+`consolidate.py` folds them into the two tracked files, `ple_results.csv` and
+`layer_freeing_results.csv`. Re-run any script, then `consolidate.py`, and the committed artifacts
+are rebuilt.
 
 ## Design decisions that differ from the plan's literal text
 

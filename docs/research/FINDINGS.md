@@ -268,24 +268,39 @@ repo (2.7568, 2.7600, 2.9780) and they correspond to genuinely different corpora
 error. One early CSV was written with the 16k divisor for 50k-vocab runs. The convention is to
 re-derive `ln2 · bytes_per_token` from the exact evaluation and record it in the CSV header.
 
-## Per-layer embeddings and per-layer residency relaxation (PLE program)
+## Per-layer embeddings (PLE)
 
-Two results, about different things. A rank-512 per-layer embedding table co-trained with router and
-norm gains reaches 0.848854 BPB at 50M tokens, tying the C recipe at 250M — 5x token efficiency at
-42.5M parameters and 1 KB flash traffic per token, holding down to 10.6M and 256 B at r=128. And
-relaxing residency on MoE layers 0, 1 and 15 reaches 0.797810 (93.98%), beating F' (the 6.92B full
-finetune) by 1.07 sigma, at +131% resident expert memory and unchanged FLOPs.
+A rank-512 per-layer embedding table co-trained with router and norm gains reaches 0.848854 BPB at
+50M tokens, tying the C recipe at 250M — 5x token efficiency at 42.5M parameters and 1 KB flash
+traffic per token, holding down to 10.6M and 256 B at r=128. That is the result that survives.
 
-What failed matters more. PLE's *mechanism* is refuted: section 8.1's locus probe, run with a no-PLE
-control on the same code and data, shows adding PLE moves context-minus-token by 0.003 in the wrong
-direction (0.0932 -> 0.0964). By the plan's own clause the gain is generic capacity, not lexical
-restoration. PLE also adds nothing on top of LoRA (0.49 sigma, wrong side, both ranks), calibrated
-initialisation is worthless in three arms and actively harmful from the strongest starting point, and
-sequential-vs-joint is null.
+The mechanism does not. Section 8.1's locus probe, run with a no-PLE control on the same code and
+data, shows adding PLE moves context-minus-token by 0.003 in the WRONG direction (0.0932 -> 0.0964).
+By the plan's own clause the gain is generic capacity, not lexical restoration. PLE also adds nothing
+on top of LoRA (0.49 sigma, wrong side, both ranks), calibrated initialisation is worthless in three
+arms and actively harmful from the strongest starting point (1.23 sigma worse than zero-init), and
+sequential-versus-joint is null. Rank does not bind above 128.
 
-Per-layer damage is U-shaped, not decaying, and layer 1 is the most damaging single layer at 1.99x
-the uniform share. Solo damage does not predict joint value: layers 2 and 15 have identical solo
-damage but the third freed layer is worth 0.198 if it is layer 2 and 0.034 if it is layer 15.
+A fully training-free stack of calibrated norms plus a calibrated PLE table reaches 53.13% recovery
+with zero gradient steps, but only in the PLE-then-norms order: reversed, it scores -4.54%. A
+rescaling can be fitted last; an additive offset cannot.
 
-Full write-up and single results table: `results/ablations/ple_RESULTS.md`,
-`results/ablations/ple_results.csv`.
+Write-up `results/ablations/ple_RESULTS.md`, numbers `results/ablations/ple_results.csv`.
+
+## Per-layer residency relaxation
+
+A separate experiment: instead of adapting to the constraint, remove it from chosen layers. The CE
+recipe with MoE layers 0, 1 and 15 unconstrained reaches 0.797810 (93.98%), beating F' (the 6.92B
+full finetune) by 1.07 sigma. Cost is +131% resident expert memory and nothing else — FLOPs are
+unchanged, since both regimes activate exactly top-8 of 64 and residency only restricts which eight
+are eligible. This is the strongest quality in the adaptation line and it concedes the thesis that
+serving memory tracks active parameters.
+
+Per-layer damage is U-shaped rather than decaying, and layer 1 is the most damaging single layer at
+1.99x the uniform share. Solo damage does not predict joint value: layers 2 and 15 have identical
+solo damage, but the third freed layer is worth 0.198 if it is layer 2 and 0.034 if it is layer 15.
+The training-free ordering also failed to survive adaptation in the one case tested, so damage
+profiles should not be used to pick configurations without a trained check.
+
+Write-up `results/ablations/layer_freeing_RESULTS.md`, numbers
+`results/ablations/layer_freeing_results.csv`.

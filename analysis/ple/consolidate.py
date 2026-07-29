@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Fold every PLE / layer-freeing result into ONE tidy CSV: results/ablations/ple_results.csv.
+"""Fold results into two tidy CSVs, one per line of inquiry.
+
+    results/ablations/ple_results.csv            per-layer embeddings
+    results/ablations/layer_freeing_results.csv  per-layer residency relaxation
+
+These are separate experiments and are kept apart deliberately. PLE ADDS a token-indexed lookup
+while leaving the residency constraint intact; layer freeing REMOVES the constraint from chosen
+layers and adds nothing. They share a base model, an eval slice and a set of published references,
+and nothing else -- so mixing them in one table invites comparisons that are not like-for-like.
+
+The shared references (base, impose, C, CE, F-prime, the 2 sigma bar, the divisor) are written into
+BOTH files so each is self-contained and readable without the other.
 
 The program produced eleven CSVs and six JSONs across seven kinds of measurement. That is hard to
 read and harder to query. This emits a single long-format table instead:
@@ -39,12 +50,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS                 # noqa: E402
 
 BASE, IMPOSE, TWO_SIGMA = 0.6727, 2.7507, 0.012
-OUT = os.path.join(ABLATIONS, "ple_results.csv")
-rows = []
+OUT_PLE = os.path.join(ABLATIONS, "ple_results.csv")
+OUT_LF = os.path.join(ABLATIONS, "layer_freeing_results.csv")
+rows, lf_rows = [], []
+
+# Cells with no PLE table at all, whose whole content is which layers were left unconstrained.
+LF_CELLS = {"ce_free2", "ce_free_0_1_15", "ce_free_0_1_2"}
+LF_GROUPS = {"layer_damage", "free_set"}
 
 
 def add(group, name, metric, value, note=""):
-    rows.append({"group": group, "name": name, "metric": metric, "value": value, "note": note})
+    r = {"group": group, "name": name, "metric": metric, "value": value, "note": note}
+    (lf_rows if (group in LF_GROUPS or name in LF_CELLS) else rows).append(r)
 
 
 def rec(b):
@@ -64,9 +81,9 @@ CELL_NOTE = {
     "calstack_full": "init from the PLE-then-norms training-free stack (53.13%)",
     "ce_ple_512":  "CE surface: PLE + router + norms + LoRA r32",
     "ce_ple_128":  "CE surface: PLE + router + norms + LoRA r32",
-    "ce_free2":    "CE surface, no PLE, MoE layers 0-1 unconstrained",
-    "ce_free_0_1_15": "CE surface, no PLE, MoE layers 0/1/15 unconstrained",
-    "ce_free_0_1_2":  "CE surface, no PLE, MoE layers 0/1/2 unconstrained",
+    "ce_free2":    "CE surface, NO PLE, MoE layers 0-1 unconstrained, +87.5% resident memory",
+    "ce_free_0_1_15": "CE surface, NO PLE, MoE layers 0/1/15 unconstrained, +131.2% resident memory",
+    "ce_free_0_1_2":  "CE surface, NO PLE, MoE layers 0/1/2 unconstrained, +131.2% resident memory",
 }
 for p in sorted(glob.glob(os.path.join(DATA_DIR, "ple_*.json"))):
     base = os.path.basename(p)
@@ -108,10 +125,15 @@ for nm, b, what in (("base_free_routing", 0.6727, "unconstrained ceiling"),
                     ("C_router_norms_250M", 0.8505, "5x token-efficiency comparator"),
                     ("CE_router_norms_lora_50M", 0.8269, "LoRA as the third mechanism"),
                     ("Fprime_full_finetune_6.92B", 0.8106, "the constraint price")):
-    add("reference", nm, "bpb", b, what)
-    add("reference", nm, "recovery_pct", rec(b), what)
-add("reference", "two_sigma_bar", "bpb", TWO_SIGMA, "differences below this are noise (PLE_PLAN.md §3)")
-add("reference", "divisor_D", "value", 3.1089070924799973, "ln2 x bytes_per_token, audited slice")
+    for dest in (rows, lf_rows):
+        dest.append({"group": "reference", "name": nm, "metric": "bpb", "value": b, "note": what})
+        dest.append({"group": "reference", "name": nm, "metric": "recovery_pct",
+                     "value": rec(b), "note": what})
+for dest in (rows, lf_rows):
+    dest.append({"group": "reference", "name": "two_sigma_bar", "metric": "bpb", "value": TWO_SIGMA,
+                 "note": "differences below this are noise (PLE_PLAN.md §3)"})
+    dest.append({"group": "reference", "name": "divisor_D", "metric": "value",
+                 "value": 3.1089070924799973, "note": "ln2 x bytes_per_token, audited slice"})
 
 # ---------------------------------------------------------------- simple CSV passthroughs
 def take(fname, group, key, metrics, notecol=None):
@@ -186,13 +208,13 @@ if os.path.exists(hp):
     add("heldout", "zero_property_set", "corpus_count_max",
         max(int(x["corpus_count_in_cell"]) for x in hr))
 
-with open(OUT, "w", newline="") as f:
-    w = csv.DictWriter(f, fieldnames=["group", "name", "metric", "value", "note"])
-    w.writeheader()
-    w.writerows(rows)
-
 from collections import Counter
-c = Counter(r["group"] for r in rows)
-print(f"wrote {OUT}  ({len(rows)} rows, {os.path.getsize(OUT)} bytes)")
-for g, n in sorted(c.items(), key=lambda kv: -kv[1]):
-    print(f"  {g:14s} {n:4d} rows")
+for path, rr, label in ((OUT_PLE, rows, "per-layer embeddings"),
+                        (OUT_LF, lf_rows, "per-layer residency relaxation")):
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["group", "name", "metric", "value", "note"])
+        w.writeheader()
+        w.writerows(rr)
+    print(f"wrote {os.path.basename(path)}  ({len(rr)} rows, {os.path.getsize(path)} bytes)  {label}")
+    for g, n in sorted(Counter(x["group"] for x in rr).items(), key=lambda kv: -kv[1]):
+        print(f"    {g:14s} {n:4d}")
