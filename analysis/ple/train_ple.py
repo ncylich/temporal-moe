@@ -54,6 +54,21 @@ ap.add_argument("--ple-start", type=int, default=0,
                      "norms+PLE. No checkpoint/resume machinery is needed: the table is zero-init, "
                      "so while its optimizer is not stepped its contribution is exactly 0.0 and "
                      "the first leg is bit-identical to a flag-off run.")
+ap.add_argument("--resume-c", default=None,
+                help="resume the C surface (router + norm gains + their AdamW state) and the data "
+                     "cursor from a csurf_*.pt written by an earlier cell. Lets the second leg of a "
+                     "sequential run re-use a shared first leg instead of recomputing it, so two "
+                     "second-leg variants differ ONLY in what is being compared.")
+ap.add_argument("--calib-suffix", default="",
+                help="which calibration table to load: '' = captured on the untrained base, "
+                     "'_at50M' = captured against the C surface at 50M. Must match where the table "
+                     "is installed, or the correction is measured against the wrong damage.")
+ap.add_argument("--calib-init", action="store_true",
+                help="initialize the PLE table from calib_table_r<rank>.pt instead of zeros. The "
+                     "with/without comparison this enables is NOT covered by the prior program's "
+                     "Cal-2 null: norm gains receive gradient every step so any init washes out, "
+                     "whereas a PLE row is updated only when its token appears, so a calibrated "
+                     "init persists exactly for the rare rows that are underdetermined.")
 ap.add_argument("--heldout", action="store_true",
                 help="withhold the token ids in ple_heldout.pt from the PLE lookup, so the "
                      "zero-property check tests rows that were eligible to train")
@@ -95,10 +110,31 @@ ple_mod = None
 opt_ple = None
 if RANK != "off":
     ple_mod = PLE.install(model, RANK, device="cuda", seed=A.seed)
+    if A.calib_init:
+        cpath = os.path.join(DATA_DIR, f"calib_table_r{RANK}{A.calib_suffix}.pt")
+        cs = torch.load(cpath, map_location="cuda")
+        with torch.no_grad():
+            if RANK == "full":
+                ple_mod.P.copy_(cs["P"].to("cuda"))
+            else:
+                ple_mod.U.copy_(cs["U"].to("cuda")); ple_mod.V.copy_(cs["V"].to("cuda"))
+        tp = ple_mod.table_params()[0]
+        print(f"[ple] calibrated init from {os.path.basename(cpath)}: "
+              f"||table||={float(tp.norm()):.4f}, "
+              f"{int((tp.reshape(tp.shape[0],-1)!=0).any(-1).sum())} rows nonzero", flush=True)
     ho_path = os.path.join(DATA_DIR, "ple_heldout.pt")
     if A.heldout and os.path.exists(ho_path):
         ho = torch.load(ho_path)
         ple_mod.set_heldout(ho["ids"])
+        if A.calib_init:
+            # A calibrated init would seed the held-out rows too, and the zero-property check
+            # requires them bit-zero. They are masked out of the forward regardless, so zeroing
+            # them changes nothing the model can see and keeps the invariant testable.
+            with torch.no_grad():
+                for t in ple_mod.table_params():
+                    t[ho["ids"].long()] = 0.0
+            print("[ple] zeroed held-out rows after calibrated init (masked in forward anyway)",
+                  flush=True)
         print(f"[ple] held out {ho['ids'].numel()} token ids "
               f"({ho['loss_share']*100:.4f}% of eval loss) for the zero-property check", flush=True)
     groups = [
@@ -142,6 +178,18 @@ def eval_bpb_telem():
 
 seen = step = pos = 0
 hist = []
+if A.resume_c:
+    _ck = torch.load(A.resume_c, map_location="cuda")
+    with torch.no_grad():
+        for _m, _s in zip(masters, _ck["masters"]):
+            _m.data.copy_(_s.to("cuda"))
+        for _m, _p in zip(masters, train_params):
+            _p.data.copy_(_m.data.to(_p.dtype))
+    opt.load_state_dict(_ck["opt"])
+    seen, step, pos = _ck["seen"], _ck["step"], _ck["pos"]
+    hist = list(_ck["hist"])
+    print(f"[resume] C surface from {os.path.basename(A.resume_c)}: seen={seen/1e6:.0f}M "
+          f"step={step} pos={pos} evals={len(hist)}; data cursor continues, no repeat", flush=True)
 # Detached scalars only, meaned at eval time. Kept as tensors so no per-step device sync is added:
 # the training math is untouched, this is bookkeeping. The train/eval gap at each eval point is the
 # generalization measure, and inferring it from the printed step lines afterwards is lossier.
@@ -204,6 +252,9 @@ while seen < A.tokens:
               f"swap={swap:.4f} ent={ent:.4f}", flush=True)
         # Table snapshot at every eval, so rare-row growth is a trajectory rather than one
         # post-hoc point. Pure I/O; nothing here feeds back into training.
+        torch.save({"masters": [m.detach().cpu() for m in masters], "opt": opt.state_dict(),
+                    "seen": seen, "step": step, "pos": pos, "hist": hist, "lora": A.lora},
+                   f"{OUT}/csurf_{A.tag}_at{seen // 10**6}M.pt")
         if ple_mod is not None:
             torch.save({"rank": str(RANK),
                         **{k: v.detach().cpu() for k, v in ple_mod.state_dict().items()}},
@@ -213,7 +264,8 @@ while seen < A.tokens:
 
 fb, fswap, fent = eval_bpb_telem()
 res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
-       "ple_start": A.ple_start,
+       "ple_start": A.ple_start, "calib_init": A.calib_init,
+       "calib_suffix": A.calib_suffix,
        "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
        "final_bpb": fb, "final_swap": fswap, "final_entropy": fent,
