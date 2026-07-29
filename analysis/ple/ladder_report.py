@@ -60,8 +60,18 @@ def verdict(bpb):
 
 def main():
     rows = []
-    for path in sorted(glob.glob(os.path.join(DATA_DIR, "ple_ladder_*.json"))):
-        r = json.load(open(path))
+    # Every PLE-bearing cell, not just the rank ladder: the sequential, calibration, CE and depth
+    # cells all belong in this table. An earlier version globbed ple_ladder_*.json only, which
+    # silently dropped Phase 3 and would have dropped everything after it.
+    paths = [p for p in glob.glob(os.path.join(DATA_DIR, "ple_*.json"))
+             if not os.path.basename(p).startswith(("ple_parity", "ple_heldout"))]
+    for path in sorted(paths):
+        try:
+            r = json.load(open(path))
+        except Exception:
+            continue
+        if "final_bpb" not in r or not r.get("ple_params"):
+            continue
         b = r["final_bpb"]
         rows.append({
             "tag": r["tag"], "rank": r["rank"], "train_tokens": r["train_tokens"],
@@ -71,6 +81,10 @@ def main():
             "mb": r["mb"], "accum": 16 // r["mb"], "lr": r["lr"],
             "table_wd": r["table_wd"], "adam8bit": r["adam8bit"],
             "flash_attention": "on",
+            "lora": r.get("lora", 0),
+            "ple_start": r.get("ple_start", 0),
+            "calib_init": r.get("calib_init", False),
+            "calib_ref": r.get("calib_suffix", "") or ("untrained" if r.get("calib_init") else ""),
             "ple_params": r["ple_params"],
             "final_bpb": round(b, 6),
             "recovery_pct": round(recovery(b) * 100, 2),
