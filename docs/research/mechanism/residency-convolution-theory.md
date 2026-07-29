@@ -1,7 +1,10 @@
 # Rolling residency as convolution: the theory, and what the CNN literature already proves
 
 Companion to [`lru-as-convolution.md`](./lru-as-convolution.md), which established the
-correspondence and measured it. This note is the theoretical half: what is *provable* about the
+correspondence and measured it, and to
+[`residency-as-recurrence.md`](./residency-as-recurrence.md), which takes the same policy as a
+recurrent state machine and covers predicted-demand keys, the learning-augmented guarantees, and the
+submodular-objective result. This note is the theoretical half: what is *provable* about the
 policy family, which results from the convolution literature transfer, and — the point — which
 of them prove something we have not tested.
 

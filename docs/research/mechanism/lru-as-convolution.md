@@ -9,6 +9,9 @@ never kill them.
 the paging, equivariance, memory and sparse-attention literatures prove about this policy family,
 including a completeness theorem showing the kernel sweep below is exhaustive over the equivariant
 history-only class, and the two untested cells the theory points at.
+[`residency-as-recurrence.md`](./residency-as-recurrence.md) continues it: predicted-demand keys, the
+Johnson-graph latency theorem, and why the cap-1 interchange is the right algorithm for a submodular
+objective we are not using.
 
 Prompt: *if the eviction policy is LRU rather than lowest-scoring, rolling residency becomes a
 convolution over experts through time.* That is right, and it is exact rather than metaphorical —
