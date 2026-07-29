@@ -48,6 +48,12 @@ ap.add_argument("--lora", type=int, default=0,
                 help="add per-expert LoRA of this rank to the trained surface, making the base CE "
                      "(router + norms + LoRA r32) instead of C. Default 0 = bare C surface, which "
                      "is what the rank ladder runs on so that rank is isolated.")
+ap.add_argument("--ple-start", type=int, default=0,
+                help="PHASE 3 (§7, sequential vs joint): withhold PLE updates until this many "
+                     "tokens have been seen, so the run is router+norms alone and then router+"
+                     "norms+PLE. No checkpoint/resume machinery is needed: the table is zero-init, "
+                     "so while its optimizer is not stepped its contribution is exactly 0.0 and "
+                     "the first leg is bit-identical to a flag-off run.")
 ap.add_argument("--heldout", action="store_true",
                 help="withhold the token ids in ple_heldout.pt from the PLE lookup, so the "
                      "zero-property check tests rows that were eligible to train")
@@ -140,6 +146,7 @@ hist = []
 # the training math is untouched, this is bookkeeping. The train/eval gap at each eval point is the
 # generalization measure, and inferring it from the printed step lines afterwards is lossier.
 lm_acc = []
+_ple_live = [False]
 model.train()
 t0 = time.time()
 while seen < A.tokens:
@@ -174,8 +181,13 @@ while seen < A.tokens:
         p.data.copy_(m.data.to(p.dtype)); p.grad = None
     opt.zero_grad(set_to_none=True)
     if opt_ple is not None:
-        torch.nn.utils.clip_grad_norm_(list(ple_mod.parameters()), 1.0)
-        opt_ple.step()
+        if seen >= A.ple_start:
+            torch.nn.utils.clip_grad_norm_(list(ple_mod.parameters()), 1.0)
+            opt_ple.step()
+            if A.ple_start and not _ple_live[0]:
+                print(f"[ple] table began updating at {seen/1e6:.1f}M tokens (--ple-start "
+                      f"{A.ple_start/1e6:.0f}M)", flush=True)
+                _ple_live[0] = True
         opt_ple.zero_grad(set_to_none=True)
     step += 1
     if step % 20 == 0:
@@ -201,6 +213,7 @@ while seen < A.tokens:
 
 fb, fswap, fent = eval_bpb_telem()
 res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
+       "ple_start": A.ple_start,
        "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
        "final_bpb": fb, "final_swap": fswap, "final_entropy": fent,
