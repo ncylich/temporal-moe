@@ -189,6 +189,35 @@ elif [ "${ACTPROBE:-0}" = "1" ]; then
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 \
     --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
     2>&1 | tee "$OUT/actprobe.log"
+elif [ "${DELEXPROBE:-0}" = "1" ]; then
+  # De-lexicalization capture: one pass over a fixed batch, recording token input embeddings, every
+  # MoE layer's router logits and resident mask, and per-expert output sums. This is the input to the
+  # whole locus/lens/structural family (analysis/probes/delex_*.py).
+  #
+  # The three captures in MANIFEST.csv were produced ad hoc and this branch was never committed, so
+  # the family had no reproducible driver. Modelled on PROBE=1 above; --nproc_per_node=1 is correct
+  # for a single-GPU pod.
+  #
+  # N_MB is the number of micro-batches accumulated. Every published locus/lens number is on the same
+  # fixed batch of 64 sequences x 2048 tokens = 131k tokens, and micro-batch differs by shape (8 at
+  # s19opt, 64 at s0), so N_MB defaults to whatever reaches 64 sequences rather than to a constant.
+  # Override it only to deliberately change the batch, and note that doing so makes the capture
+  # non-comparable with every other cell.
+  export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  export DELEX_OUT=$OUT/delex_capture.pt
+  export N_MB=${N_MB:-$(( (64 + MICRO_BATCH - 1) / MICRO_BATCH ))}
+  # Weights frozen (--lr 0 --min-lr 0): with --finetune the iteration counter resets, so the warmup
+  # iters would otherwise run at ~PEAK LR and perturb the model before it is captured. delex_probe.py
+  # records the first N_MB micro-batches, which all fall inside the first iteration whenever
+  # N_MB <= GLOBAL_BATCH/MICRO_BATCH, but freezing makes that independent of the arithmetic.
+  # Throwaway --save, so the real checkpoint is never written to.
+  echo "[delexprobe] N_MB=$N_MB x mb=$MICRO_BATCH = $((N_MB * MICRO_BATCH)) sequences, TEMPORAL=$TEMPORAL"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/delex_probe.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/delexprobe.log"
 elif [ "${QUANTEVAL:-0}" = "1" ]; then
   # Stability Part E: RTN fake-quant routed-expert weights (QUANT_BITS, group QUANT_GROUP) then
   # test-set eval. --finetune resets consumed_samples to 0 (end-of-training checkpoints have

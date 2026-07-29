@@ -42,6 +42,7 @@ class Run:
         self.E = self.meta.get("num_experts")
         self.k = self.meta.get("topk")
         self.temporal = self.meta.get("temporal")
+        self.dense = self.meta.get("dense")     # dense-FFN control: no experts, no router at all
         self.budget = self.meta.get("flops") or budget_of(name)
         self.depth = self.meta.get("L")         # transformer depth, or None for the 1e18 form
 
@@ -63,7 +64,13 @@ class Run:
 
     @property
     def regime(self):
-        """'temporal' (rolling residency) or 'full' (unconstrained MoE)."""
+        """'temporal' (rolling residency), 'full' (unconstrained MoE), or 'dense' (no experts).
+
+        The dense control has no router, so every routing metric here is undefined for it; it is the
+        isoFLOP quality floor, not a third routing regime.
+        """
+        if self.dense:
+            return "dense"
         return "temporal" if self.temporal else "full"
 
     @property
@@ -109,8 +116,9 @@ def budget_of(name):
     m = re.search(r"(1e1[6-9])", name)
     if m:
         return m.group(1)
-    if "flame38m" in name:
-        return "1e18"            # the 38M-active fleet is the 1e18 budget throughout
+    # The 1e18 isoFLOP panel: flame38m is the middle, flame192/flame512 the left/right flanks.
+    if name.startswith(("flame38m", "flame192", "flame512")):
+        return "1e18"
     return "unknown"
 
 
@@ -134,6 +142,10 @@ def _parse_meta(name):
         out["temporal"] = out["temporal"] == "1"
     elif "mode" in out:
         out["temporal"] = out["mode"] == "temporal"     # the flame38m single-line form
+    if "dense" in out:
+        out["dense"] = out["dense"] == "1"
+    elif "mode" in out:
+        out["dense"] = out["mode"] == "dense"
     return out
 
 
@@ -151,11 +163,13 @@ def _manifest_runs():
     return out
 
 
-def runs(router_log=False, capture=False, ckpt=False, temporal=None, budget=None, on_disk=False):
+def runs(router_log=False, capture=False, ckpt=False, temporal=None, budget=None, on_disk=False,
+         dense=None):
     """Every run matching the filters, in name order. All filters default to off.
 
     router_log/capture/ckpt: require that artifact be preserved (per MANIFEST.csv).
     temporal: True for residency-constrained runs, False for unconstrained baselines.
+    dense:    True for the dense-FFN isoFLOP floor, False to exclude it (it has no router).
     budget:   '1e16'..'1e19', or a collection of them.
     on_disk:  additionally require the artifact be present locally, not merely preserved.
     """
@@ -169,6 +183,8 @@ def runs(router_log=False, capture=False, ckpt=False, temporal=None, budget=None
         if ckpt and not r.has_ckpt:
             continue
         if temporal is not None and r.temporal is not temporal:
+            continue
+        if dense is not None and bool(r.dense) is not dense:
             continue
         if budget is not None:
             want = {budget} if isinstance(budget, str) else set(budget)
@@ -196,7 +212,56 @@ def moe_layers(artifact):
     return sorted(int(x) for x in artifact["layers"].keys())
 
 
+def selection(budget_order=("1e18", "1e19", "1e17", "1e16")):
+    """The capture-sweep selection set (re-run plan Step 3 item 10).
+
+    One run per cell, plus the dense control at each budget as the isoFLOP floor. Ordered by
+    `budget_order`, which puts 1e18 first because no mechanistic measurement of any kind exists at
+    that budget and it is where the temporal model wins.
+
+    A cell is (budget, regime, granularity, ffn). `ffn` is in the key because the 1e18 panel has three
+    shapes -- flame192 on the left flank, flame38m in the middle, flame512 on the right -- and
+    granularity alone would collapse them into one cell and silently drop two thirds of the panel.
+
+    Within a cell, prefer a run whose artifacts were already preserved (a capture or a router log
+    marks the run the published analyses actually used), then the plainest recipe name, so a
+    trigger-shaping or overlap variant never stands in for its cell.
+
+    Excluded: runs with no preserved checkpoint (nothing to capture from) and runs whose budget cannot
+    be determined -- those are parity and smoke-test runs, not science cells.
+    """
+    best = {}
+    for r in runs(ckpt=True):
+        if r.budget == "unknown":
+            continue
+        key = (r.budget, r.regime, r.grain_label, r.meta.get("ffn"))
+        # sort key: preserved artifacts first, then the shortest/plainest name
+        rankr = (not (r.has_capture or r.has_router_log), len(r.name), r.name)
+        cur = best.get(key)
+        if cur is None or rankr < (not (cur.has_capture or cur.has_router_log),
+                                   len(cur.name), cur.name):
+            best[key] = r
+    rank = {b: i for i, b in enumerate(budget_order)}
+    return sorted(best.values(),
+                  key=lambda r: (rank.get(r.budget, len(rank)), r.regime, r.grain_label, r.name))
+
+
 if __name__ == "__main__":
+    if "--selection" in sys.argv:
+        sel = selection()
+        if "--names-only" in sys.argv:
+            print("\n".join(r.name for r in sel))
+            sys.exit(0)
+        print(f"capture-sweep selection set: {len(sel)} runs "
+              f"(one per budget/regime/granularity cell, plus the dense floor)\n")
+        print(f"{'run':34} {'budget':7} {'regime':9} {'grain':13} {'depth':5} capture?")
+        for r in sel:
+            print(f"{r.name:34} {r.budget:7} {r.regime:9} {r.grain_label:13} "
+                  f"{str(depth_of(r.name) or '?'):5} {'already have' if r.has_capture else 'NEEDED'}")
+        need = [r for r in sel if not r.has_capture]
+        print(f"\n{len(need)} of {len(sel)} need a capture pass")
+        sys.exit(0)
+
     rl = runs(router_log=True)
     cp = runs(capture=True)
     print(f"{len(_manifest_runs())} runs in MANIFEST.csv; "
