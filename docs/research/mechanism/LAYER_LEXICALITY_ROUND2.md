@@ -90,99 +90,171 @@ the most expensive). Falsified if the spike tracks depth-relative position rathe
 first/last-layer adjacency — i.e. if in a 14-layer model it moves to ~⅔ depth instead of staying at
 the first and last MoE layers.
 
-## 4. The next round, in order
+## 4. The next round, in priority order
 
-### N1 — C3 at 1e19, both directions. Eval-only. The decision experiment.
+Every run here is **eval-only or a single forward pass — no training**. Training is deferred to §5
+and should be started only when these are done and there is spare capacity.
+
+Timing estimates are derived from the FLOP budgets, anchored on the one wall-clock fact the repo
+records — the 1e18 seed replicates ran overnight on an A6000
+([`seed_replicates.csv`](../../../results/ablations/seed_replicates.csv), `box` column) — scaled to a
+single H100 at roughly 3–4x effective throughput. Individual evals are startup-dominated (Megatron
+init plus checkpoint load) rather than compute-dominated, so arm counts matter more than model size.
+Treat every estimate as ±2x.
+
+| # | run | cost | answers |
+|---|---|---|---|
+| **N1** | Sham-perturbation control at 1e18 | ~18 evals, 1.5 h | Is the endpoint spike positional? Directly, rather than by inference |
+| **N2** | Multi-layer schedule and additivity check | ~6 evals, 40 min | Do single-layer costs predict a schedule at all? |
+| **N3** | C3 on a second seed at 1e18 | ~18 evals, 1.5 h | Is the U a property of the regime or of one trained model? |
+| **N4** | C3 on the fine granularity at 1e18 | ~18 evals, 1.5 h | Does the endpoint spike replicate across granularity? |
+| **N5** | C3 at 1e19, both directions, layers 2–14 | ~30 evals, 3–5 h | H2a: does cost track contextual share or depth? The dissociation |
+| **N6** | C8 — causal token and context substitution | 2–4 h | H1, causally rather than by probe. Still never run |
+| **N7** | Per-layer cost versus per-layer hit rate | free, CPU | Rules out (or in) cacheability as a third explanation |
+| **N8** | Captures: re-take 3 x 1e19, add 1e16/1e17 arms | ~7 passes, 2 h | Makes the 1e19 output lens valid; unfreezes the low-budget end |
+| **N9** | Document corrections | no compute | Two claims still stand next to their own refutations |
+
+**Do N1–N4 first.** They fit in one pod day, they are all cheap, and N1 can answer H2b outright — in
+which case N5 narrows to the H2a dissociation question only.
+
+### N1 — sham-perturbation control. The cheapest decisive test for H2b.
+
+H2b currently rests on an *inference*: the first and last MoE layers are expensive to constrain, the
+last layer is the least lexical layer in the stack, therefore the spike is architectural. Test it
+instead.
+
+Sweep the same layers with a perturbation of matched magnitude that carries **no lexical
+information**: keep k experts active but choose the resident set uniformly at random, or add noise to
+the router logits calibrated to produce a comparable mean CE penalty. Then compare profiles.
+
+- Sham reproduces the same U -> **H2b confirmed outright.** The endpoints are positional sensitivity
+  and have nothing to do with routing; report C3 as an interior trend plus two structural outliers.
+- Sham is flat while the constraint's profile is U-shaped -> the endpoints are specific to residency,
+  and H2b needs the depth-scaling test in N5.
+
+This is more decisive for H2b than N5 and costs a third as much.
+
+### N2 — multi-layer schedule and additivity. De-risks six training runs for six evals.
+
+Every C3 number is a **single**-layer perturbation. The thing we would ship is a **multi**-layer
+schedule, and nothing has checked that the two relate. Run:
+
+- impose on {3..8} together, on the unconstrained checkpoint;
+- impose on {2,9} together;
+- unmask {2,9} together, on the temporal checkpoint;
+- compare each against the sum of the corresponding single-layer costs.
+
+If the effects are not additive, single-layer C3 does not predict schedule performance and T2's
+design rests on an unchecked assumption. This also produces the first direct eval-time estimate of
+the proposed "free the endpoints" schedule, which is the thing §5 would spend six training runs on.
+
+### N3 — C3 on a second seed at 1e18.
+
+`flame38m_g3_temporal_s2`, `flame38m_g3_temporal_s3` and `flame38m_g1_temporal_s3` all have preserved
+checkpoints. The entire U-shape currently rests on one trained model per direction. C3 is
+deterministic given a checkpoint, so this is not a noise estimate — it tests whether the shape is a
+property of the regime or of that particular run.
+
+### N4 — C3 on the fine granularity at 1e18.
+
+C3 has only ever run on the coarse arm. `flame38m_g3_temporal` / `flame38m_g3_moe` test whether the
+endpoint spike survives a change of granularity.
+
+### N5 — C3 at 1e19, both directions, layers 2–14. The H2a dissociation.
 
 Run [`scripts/phase0/constraint_swap_sweep.sh`](../../../scripts/phase0/constraint_swap_sweep.sh)
-over `g1_tmoe_coarse_1e19` (unmask) and `moe_coarse_1e19` (impose), layers 2–14. Two
-pre-registered readings:
+over `g1_tmoe_coarse_1e19` (unmask) and `moe_coarse_1e19` (impose). Two pre-registered readings:
 
-**Test A — endpoint position (works in both directions, strong signal).** Where do the spikes land
-in a 14-layer model?
+**Test A — endpoint position (both directions, strong signal).** Where do the spikes land in a
+14-layer model? At layers 2 and 14 -> adjacency to the dense block and the unembedding, H2b
+confirmed. At ~⅔ depth (layers 9–10) -> intrinsic, and Round 1's vertex reading was right.
 
-- Spikes at layers 2 and 14 -> **H2b confirmed**, the effect is adjacency to the embedding and the
-  unembedding, and the "U" should be reported as two outliers plus a trend, not a curve.
-- Spikes at ~⅔ depth (layers 9–10) -> H2b rejected; the shape is intrinsic and Round 1's vertex
-  reading was right.
+**Test B — dissociation (unmask arm only).** Between layers 8 and 14 the temporal contextual share
+*falls* while depth rises. Does interior cost rise again after layer 8, tracking the contextual share
+(**H2a is a lexical effect**), or keep falling with depth (**H2a is a depth effect and the mechanism
+is not about lexicality**)?
 
-**Test B — dissociation (unmask arm only; this is the only arm where the two explanations come
-apart).** Between layers 8 and 14 the temporal contextual share *falls* while depth rises. Does
-interior cost:
+Two limitations, stated rather than discovered: the unmask arm carries the weaker signal (interior
+spread ~0.016 CE at 1e18 against ~0.09 for impose), and the impose arm cannot run Test B because the
+unconstrained model's contextual share stays monotone through layer 14. This model also gives 11
+interior points against 1e18's 6, which is the real power gain for H2a — the current
+ρ = −0.886 rests on six.
 
-- rise again after layer 8, tracking the contextual share -> **H2a confirmed as a lexical effect**;
-- keep falling with depth -> H2a is a depth effect, and H2's mechanism is not about lexicality at
-  all.
+### N6 — C8, causal token and context substitution.
 
-Note the limitation up front: the unmask arm carries the weaker signal (interior spread ~0.016 CE at
-1e18 versus ~0.09 for impose), and the impose arm cannot run Test B because the *unconstrained*
-model's contextual share stays monotone through layer 14. If Test B is inconclusive, say so rather
-than leaning on Test A.
+Hold the context fixed and substitute the current token, measuring how far the selected expert set
+moves; then hold the token fixed and shuffle the context. Forward passes only. Still the strongest
+untried evidence for H1, and more valuable now: if the endpoints are positional, C8's per-layer
+sensitivity ratio is the clean way to show the routing story is an interior-layers story.
 
-### N1b — C3 on the fine granularity at 1e18. Eval-only, cheap.
+### N7 — per-layer cost versus per-layer hit rate. Free.
 
-C3 has only ever run on the coarse arm. Running `flame38m_g3_temporal` / `flame38m_g3_moe` tests
-whether the endpoint spike replicates across granularity before any of it is built on.
+Cacheability is a third candidate explanation for the interior gradient and nobody has ruled it out.
+Per-layer hit rate now exists for 22 runs (`e6_per_layer_ranking.csv`). At 1e18 it is collinear with
+both depth and contextual share over the interior, so it needs the same dissociation treatment as
+H2a — fold it into N5's analysis rather than running anything.
 
-### N2 — re-frame C3 in [`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md).
+### N8 — the capture gaps.
 
-§3's H2 status and the two-line summary currently report the U without the decomposition, and state
-that both directions agree on the same vertex. Replace with H2a/H2b above, and record that the
-interior correlation and the depth correlation are collinear within one model.
+Re-take the three 1e19 captures with the fixed layer keying, so C5 (output lens) is valid there and
+not only at 1e18. Then capture 1e16/1e17 sibling arms: the low-budget end is frozen at layers 2–4 and
+2–6 because the runs behind the published rows are absent from `MANIFEST.csv`, but same-shape,
+same-budget checkpoints do exist, so *new* low-budget arms are reachable even though those exact
+cells never will be.
 
-### N3 — C8, causal token and context substitution.
+### N9 — document corrections. No compute.
 
-Still the strongest untried non-training evidence for H1, and more valuable now: if the endpoint
-spikes are positional, C8's per-layer sensitivity ratio is the clean way to show the routing story
-is an interior-layers story. Hold the context fixed and substitute the current token, measure how
-far the selected expert set moves; then hold the token fixed and shuffle the context. Forward passes
-only.
+1. §4 of [`delexicalization.md`](delexicalization.md) now places its correction *above* the original
+   claim, so the retracted paragraph — ending "input side, output side, and structure now agree" —
+   still sits at the bottom of the section as though it stands. Delete it or mark it explicitly.
+2. The same section says the fine pair "shows the same crossover from layer 5 on". It does not
+   cleanly: at layers 5 and 8 the unconstrained arm is the sharper one. "Does not replicate" is the
+   defensible claim.
+3. §3's H2 status in [`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) reports the U without the
+   endpoint/interior decomposition, and states that both directions agree on the same vertex — they
+   agree on the endpoint spike and disagree on the interior. Replace with H2a/H2b from §3 above.
 
-### N4 — correct §4 of [`delexicalization.md`](delexicalization.md).
+## 5. Deferred: training runs, for when there is spare capacity
 
-The published output-lens claim — temporal experts barely distinguishable from no signal, baseline
-markedly narrower — rests on rows that the layer-keying bug attributed one layer too shallow, and it
-does not replicate at 1e18. Median effective vocabulary (data-weighted, 50k vocabulary; **lower =
-narrower, more lexical**):
+**Nothing here should start before §4 is done.** N1 and N5 determine which schedule is worth
+training, and N2 determines whether single-layer costs predict a schedule at all. Running T2 against
+the wrong exemption set would burn six 1e18 runs on a spurious null, which is exactly what Round 1's
+original T2 design would have done.
 
-| MoE layer | coarse full MoE | coarse temporal | fine full MoE | fine temporal |
+| # | run | count | per run | total |
 |---|---|---|---|---|
-| 2 | 8,824 | 9,624 | 11,937 | 18,231 |
-| 3 | 8,690 | 9,065 | 13,233 | 13,633 |
-| 4 | 8,896 | 14,821 | 13,450 | 12,953 |
-| 5 | 10,414 | 12,356 | 9,724 | 12,226 |
-| 6 | 10,364 | 7,501 | 12,499 | 10,599 |
-| 7 | 7,640 | **720** | 12,163 | 8,625 |
-| 8 | 9,640 | 2,477 | 13,549 | 15,759 |
-| 9 | 18,068 | 14,810 | 20,158 | 19,584 |
+| T1 | Single-layer constraint sweep at s0/1e16 | 3 | ~10 min | under 1 h |
+| T2 | Matched-memory schedule contrast at 1e18 | 6 | 5–6 h | ~1.5 days |
+| T3 | Full per-layer resolution plus schedule-versus-uniform at 1e18 | ~10 | 5–6 h | ~2.5 days |
+| T4 | Dense-final-block variant at 1e18 | 1–2 | 5–6 h | ~10 h |
 
-The coarse pair shows a crossover — temporal broader through layer 5, sharper from layer 6 — and the
-fine pair shows no consistent direction at all (temporal broader at layers 2, 3, 5, 8; sharper at 4,
-6, 7, 9). Round 1 summarised this as "temporal experts write *sharper* vocabularies", quoting layer
-7 of the coarse arm, which is the single most extreme cell in the table. **The defensible statement
-is that the output-lens regime difference does not replicate at 1e18**, not that it reverses. §4
-needs restating or retracting, and its concluding sentence — that input side, output side and
-structure agree — cannot stand as written.
+**T1 is nearly free and worth running regardless** — three runs at ten minutes each is cheaper than
+arguing about whether inference-time C3 generalises to a co-adapted model, which is the one thing C3
+structurally cannot tell us.
 
-### N5 — training. Held, and the design changes if N1 Test A confirms H2b.
-
-Round 1 proposed redesigning T2 to contrast {2,3,8,9} against {4,5,6,7}, which is right for a
-symmetric U. If the spikes are positional, the schedule worth testing is narrower and much cheaper:
-**free only the first and last MoE layer, constrain the rest.** Resident expert-slot counts at 1e18
-coarse (8 MoE layers, E = 64, k = 6):
+**T2's exemption set depends on N1 and N5.** Resident expert-slot counts at 1e18 coarse (8 MoE
+layers, E = 64, k = 6):
 
 | schedule | slots | vs baseline |
 |---|---|---|
-| unconstrained baseline | 512 | 1.00× |
-| free {2,3,8,9}, constrain {4,5,6,7} | 280 | 0.55× |
-| **free {2,9}, constrain {3..8}** | **164** | **0.32×** |
-| uniform R = k | 48 | 0.09× |
+| unconstrained baseline | 512 | 1.00x |
+| free {2,3,8,9}, constrain {4,5,6,7} | 280 | 0.55x |
+| **free {2,9}, constrain {3..8}** | **164** | **0.32x** |
+| uniform R = k | 48 | 0.09x |
 
-The matched-memory control for the 164-slot schedule is uniform R = 20 (160 slots), which is where
-the existing uniform-R dose curve already provides the reference. Do not start any of this before
-N1.
+If the endpoints are positional, the two-layer exemption is the right schedule and the four-layer one
+wastes 116 slots. The matched-memory control for the 164-slot schedule is uniform R = 20 (160 slots),
+where the existing uniform-R dose curve already provides the reference.
 
-## 5. What the advisor's prior does and does not survive
+**T4 is the last resort for H2b**, and only if N1, N3, N4 and N5 leave it ambiguous. If the endpoint
+spike is adjacency to the unembedding, then training a model whose final block is dense should move
+the spike to the new last MoE layer. Every existing config uses `--moe-layer-freq "[0]*1+[1]*(L-1)"`,
+so this needs new training rather than a new analysis.
+
+For the full T1–T3 rationale and the power calculation that set their testbeds, see §5 of
+[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md).
+
+## 6. What the advisor's prior does and does not survive
 
 The original suggestion was to keep the first and last layers fully resident and constrain the
 middle, on the grounds that first and last layer experts are bound to token identity.
@@ -195,9 +267,9 @@ schedule we proposed.
 and the most expensive to constrain. Whatever makes the end layers expensive, it is not that they
 route on token identity. Worth communicating both halves, since the reason determines whether the
 exemption should be two layers or four, and whether it generalises to deeper models — which is
-exactly what N1 measures.
+what N1 and N5 measure.
 
-## 6. Reproduction
+## 7. Reproduction
 
 ```bash
 python3 analysis/probes/swap_shape.py                    # -> results/ablations/swap_shape.csv

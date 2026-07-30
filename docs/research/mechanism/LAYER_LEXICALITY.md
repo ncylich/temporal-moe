@@ -462,6 +462,14 @@ closed. Note also that H1's re-measurement reversed the expected *sign* of the p
 confirmation. They are listed in order, and the design is driven by a power
 calculation, because the first testbed we considered cannot detect the effect.
 
+> **Now deprioritised below every eval-only run**, and C3 having run does not open the gate on its
+> own. See §4–§5 of [`LAYER_LEXICALITY_ROUND2.md`](LAYER_LEXICALITY_ROUND2.md): nine no-training runs
+> come first, four of them inside a single pod day. Two decide this section's design rather than
+> merely informing it — a sham-perturbation control that can settle the endpoint question outright,
+> and a six-eval additivity check on whether single-layer costs predict a multi-layer schedule at all.
+> T1 is the exception worth running early (3 runs, ~10 min each). Start T2 onward only when the
+> eval-only queue is clear, and note that Round 2 adds a T4.
+
 **Noise floor.** From [`seed_replicates.csv`](../../../results/ablations/seed_replicates.csv) and
 [`flame38m_overnight_seeds.csv`](../../../results/ablations/flame38m_overnight_seeds.csv), test-set
 BPB across seeds of the same config:
