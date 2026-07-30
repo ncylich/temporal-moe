@@ -94,3 +94,4 @@ flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,7,192,18,4.006176,
 flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,8,192,18,4.007508,1.9414,swap_unmask_L8.log
 flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,9,192,18,4.047778,1.9610,swap_unmask_L9.log
 flame38m_g3_moe,1e18,full,fine18/192,real,native,-,192,192,4.009125,1.9422,swap_native.log
+flame38m_g3_moe,1e18,full,fine18/192,real,impose_one,2,18,192,4.864124,2.3564,swap_impose_L2.log
