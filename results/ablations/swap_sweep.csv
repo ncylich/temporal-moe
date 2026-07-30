@@ -70,3 +70,4 @@ moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,14,6,64,3.353621,1.6247,swa
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,dose_R24,-,24,24,4.102362,1.9874,swap_dose_R24.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,dose_R48,-,48,48,4.316586,2.0912,swap_dose_R48.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,dose_R64,-,64,64,4.388952,2.1262,swap_dose_R64.log
+g3_tmoe_s2_1e17,1e17,temporal,fine18/192,real,dose_R18,-,18,18,4.722725,2.2879,swap_dose_R18.log
