@@ -55,9 +55,22 @@ run_one() {   # run, arm, layer(or "-"), R_at_layer, R_elsewhere, schedule, logn
   shape=${SHAPE:-$(meta_get "$meta" shape)}
   grain=$(meta_get "$meta" grain); topk=$(meta_get "$meta" topk)
   mb=$(meta_get "$meta" mb); gb=$(meta_get "$meta" gb)
-  flops=${TARGET_FLOPS:-$(meta_get "$meta" flops)}; smult=$(meta_get "$meta" shared_mult)
+  flops=$(meta_get "$meta" flops); smult=$(meta_get "$meta" shared_mult)
+  # The 1e18 launchers wrote no shape= or flops=; recover both the way the capture sweep does.
+  [ -z "$shape" ] && shape=$("$PY" -c "
+import sys, os
+sys.path.insert(0, os.path.join('$ROOT', 'analysis', 'probes'))
+import registry
+print(registry.shape_of('$run') or '')")
+  [ -z "$flops" ] && flops=$("$PY" -c "
+import sys, os
+sys.path.insert(0, os.path.join('$ROOT', 'analysis', 'probes'))
+import registry
+b = registry.get('$run').budget
+print('' if b == 'unknown' else b)")
+  shape=${SHAPE:-$shape}; flops=${TARGET_FLOPS:-$flops}
   if [ -z "$shape" ] || [ -z "$flops" ]; then
-    echo "[skip] $run: run.meta has no shape=/flops=; pass SHAPE= and TARGET_FLOPS=" >&2
+    echo "[skip] $run: no shape/budget determinable; pass SHAPE= and TARGET_FLOPS=" >&2
     return 0
   fi
   cp "$meta" "$meta.presweep"

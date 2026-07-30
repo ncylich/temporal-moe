@@ -240,13 +240,17 @@ def selection(budget_order=("1e18", "1e19", "1e17", "1e16")):
     marks the run the published analyses actually used), then the plainest recipe name, so a
     trigger-shaping or overlap variant never stands in for its cell.
 
-    Excluded: runs with no preserved checkpoint (nothing to capture from) and runs whose budget cannot
-    be determined -- those are parity and smoke-test runs, not science cells.
+    Excluded: runs with no preserved checkpoint (nothing to capture from), runs whose budget cannot be
+    determined (parity and smoke-test runs, not science cells), and the dense controls -- a dense model
+    has no experts and no router, so a routing capture records nothing. The dense floor belongs in the
+    isoFLOP quality comparison instead.
     """
     best = {}
     for r in runs(ckpt=True):
         if r.budget == "unknown":
             continue
+        if r.dense:
+            continue        # no router: nothing for a routing capture to record
         key = (r.budget, r.regime, r.grain_label, r.meta.get("ffn"))
         # sort key: preserved artifacts first, then the shortest/plainest name
         rankr = (not (r.has_capture or r.has_router_log), len(r.name), r.name)

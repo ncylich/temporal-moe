@@ -59,6 +59,12 @@ for run in "${SELECTION[@]}"; do
   if [ -f "$RUNS_DIR/$run/delex_capture.pt" ] && [ "${FORCE:-0}" != "1" ]; then
     echo "[skip] $run: capture already present (FORCE=1 to recapture)"; skipped=$((skipped+1)); continue
   fi
+  # The dense control has no experts and no router, so there is nothing for delex_probe.py to record:
+  # it would run a clean forward pass, collect nothing, and write no file. It belongs in the isoFLOP
+  # quality comparison, not in a routing capture.
+  if grep -qE "(^|[[:space:]])(dense=1|mode=dense)([[:space:]]|$)" "$meta"; then
+    echo "[skip] $run: dense control, no router to capture"; skipped=$((skipped+1)); continue
+  fi
 
   # Reconstruct the configuration from run.meta. `shape=` and `flops=` are present only in the
   # two-line form written by run.sh; the 1e18 launchers wrote neither, and both are recovered below.

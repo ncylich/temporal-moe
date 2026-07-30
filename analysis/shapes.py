@@ -19,6 +19,14 @@ SHAPES = {
     # 1e19 compute-optimal point (t19 panel): N_active ~184.1M, between the paper-alpha (~159M)
     # and strict-empirical (~288M) extrapolations; flame aspect (L=h/64+2, ffn~5.34h, moe~0.6875h).
     "s19opt": dict(h=800, L=14, ffn=4272, moe_ffn=550),
+    # The 1e18 panel. These were trained by their own launchers in experiments/scale_1e18_1e19/ with
+    # geometry hardcoded, so neither run.sh nor this table could address them and every probe branch
+    # was unreachable for the whole budget. Each mirrors the matching case in run.sh, verified against
+    # every field of the runs' committed run.meta. s192f/s512f duplicate s1/s6 geometry and exist as
+    # separate names only so a 1e18 flank run is never confused with its 1e16/1e17 namesake.
+    "s38m":  dict(h=256, L=9,  ffn=1368, moe_ffn=176),   # flame38m_*, the 1e18 middle (38M active)
+    "s192f": dict(h=192, L=5,  ffn=1026, moe_ffn=132),   # flame192_*, 1e18 left flank
+    "s512f": dict(h=512, L=10, ffn=2736, moe_ffn=352),   # flame512_*, 1e18 right flank
 }
 import os
 # GRAIN>1: fine-grain the ROUTED experts (see run.sh). num_experts and top-k scale by GRAIN; each

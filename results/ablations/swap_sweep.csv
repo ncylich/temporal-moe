@@ -1,0 +1,3 @@
+run,budget,regime,grain,arm,layer,R_at_layer,R_elsewhere,test_CE,test_BPB,log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,native,-,6,6,3.909461,1.8939,swap_native.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,unmask_all,-,64,64,4.388937,2.1262,swap_unmask_all.log
