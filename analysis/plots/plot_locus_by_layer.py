@@ -61,7 +61,7 @@ RNG = np.random.default_rng(0)
 
 MOE_FINE, MOE_COARSE = "#0d3b66", "#5aa0dd"
 TMP_FINE, TMP_COARSE = "#145a14", "#5cc85c"
-BUDGET_MARKER = {"1e16": "o", "1e17": "s", "1e19": "^"}
+BUDGET_MARKER = {"1e16": "o", "1e17": "s", "1e18": "D", "1e19": "^"}
 
 # (file, label, variant, colour, budget, legend, linestyle). variant kfull = w=k everywhere.
 SERIES = [
@@ -73,6 +73,12 @@ SERIES = [
     ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "full MoE 18/192 (w=32 only)", "--"),
     ("mechinterp_locus.csv",      "s2_FULL",              "kfull", MOE_COARSE, "1e17", "full MoE 6/64",   "-"),
     ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",      "kfull", MOE_COARSE, "1e19", "full MoE 6/64",   "-"),
+    # 1e18, the budget at which the temporal model wins and where no capture-based measurement existed
+    # before the Step 3 sweep. Matched temporal/unconstrained pairs at both granularities.
+    ("mechinterp_locus_1e19.csv", "flame38m_g3_temporal", "kfull", TMP_FINE,   "1e18", "temporal 18/192", "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g1_temporal", "kfull", TMP_COARSE, "1e18", "temporal 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g3_moe",      "kfull", MOE_FINE,   "1e18", "full MoE 18/192", "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g1_moe",      "kfull", MOE_COARSE, "1e18", "full MoE 6/64",   "-"),
 ]
 
 

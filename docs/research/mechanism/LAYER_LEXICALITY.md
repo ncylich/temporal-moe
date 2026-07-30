@@ -112,8 +112,39 @@ the unconstrained arm is still climbing at its last layer, its vertex interval r
 network. The full-range slope reads "baseline steeper" only because the temporal arm's own decline is
 folded into its average.
 
-Shape cannot be resolved for the 1e16/1e17 arms: 3–5 layers give curvature intervals that straddle zero.
-All shape statistics are in `mechinterp_locus_slopes.csv`.
+**1e18 makes the same point more sharply, and it is the budget where the temporal model wins.** No
+capture-based measurement existed here at all before the Step 3 sweep; there are now matched pairs at
+both granularities, 8 MoE layers each:
+
+| coarse 6/64 @1e18 | R² lin / quad | full-range slope | rising slope | curvature | vertex |
+|---|---|---|---|---|---|
+| temporal | **0.01** / 0.40 | +0.0067 [−0.015, +0.031] | **+0.1282 [+0.063, +0.173]** | −0.1529 [−0.234, −0.037] | **5.7 [5.0, 7.5]** |
+| unconstrained | **0.94** / 0.94 | +0.1384 [+0.112, +0.169] | +0.1384 [+0.112, +0.169] | −0.0378 [−0.174, +0.079] | 22.0 (outside) |
+
+A line fits the unconstrained arm well (R² 0.94, curvature interval containing zero: it is simply
+rising) and fits the temporal arm not at all (R² **0.01**). Reporting only the full-range slope would
+have said the 1e18 temporal model has *no depth trend whatsoever* — +0.0067 with an interval straddling
+zero — when its rising-region slope is +0.128 and statistically indistinguishable from the baseline's
++0.138.
+
+So at 1e18 the two regimes climb at the **same rate**; the entire difference is that the constrained one
+stops and reverses. And the turning point is reproducible across budgets in normalized depth: layer 5.7
+of 9 (0.63) at 1e18, layer 9.5 of 14 (0.68) at 1e19 — about two thirds of the way down in both. The fine
+arms turn later and less identifiably (12.4 of 14, 7.6 of 9, both intervals wide).
+
+Shape cannot be resolved for the 1e16/1e17 arms, nor for fine 18/192 at 1e18: 3–8 layers give curvature
+intervals that straddle zero. All shape statistics, with `linear_r2` and `quadratic_r2`, are in
+`mechinterp_locus_slopes.csv`.
+
+**De-lexicalization itself replicates at 1e18 with matched pairs**, which it had never been tested with
+at the winning budget (medians over layers 2–9, w=k, documents held out):
+
+| 1e18 arm | median token AUC | median context AUC | % context-dominated |
+|---|---|---|---|
+| unconstrained coarse | 0.902 | 0.679 | 1% |
+| temporal coarse | 0.659 | 0.750 | **93%** |
+| unconstrained fine | 0.889 | 0.650 | 2% |
+| temporal fine | 0.587 | 0.719 | **97%** |
 
 **Readings.**
 
