@@ -1,9 +1,10 @@
 # Layer-wise Lexicality of MoE Routing
 
-**Status: H1 measured at full depth and restated. H2 untested — C3, its pre-screen, needs a GPU.**
-The no-training tests C1, C2, C4, C6 and C7 are done, C5 is partial, and C3, C8, C9 and C10 are not run.
-Sections 1–2 are the measurements, §3 the hypotheses and what the results did to them, §§4–5 the tests
-and their status.
+**Status: H1 measured at full depth and restated. H2 falsified by C3, on its own pre-registered
+criterion.** Of the no-training tests, C1, C2, C3, C4, C6, C7, C9 and C10 are done; C5 is blocked on a
+re-capture; C8 is not run and is the largest remaining gap. The training tests T1–T3 are not started, and
+C3's result says T2 as designed would not test the effect that exists. Sections 1–2 are the measurements,
+§3 the hypotheses and what the results did to them, §§4–5 the tests and their status.
 
 **The two-line version.** Routing does move from lexical to contextual with depth, in the *unconstrained*
 baseline as well, so part of that trend belongs to transformer depth rather than to rolling residency.
@@ -21,9 +22,10 @@ restricted-range slopes are now reported alongside every slope, and `linear_r2`/
 
 Battery-wide housekeeping — re-running every mechinterp script across every model and layer — is
 tracked separately in [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md), whose §7 records what that
-re-run found, including a null control that turned out to be invalid and a probe split that leaked
-documents. Steps 1–2 of that plan are done; Step 3 (the capture sweep) is not, which is what bounds C5
-and keeps the locus family at three models.
+re-run found, including a null control that turned out to be invalid, a probe split that leaked
+documents, and a capture that keyed expert outputs one layer too shallow. Steps 1–2 of that plan are
+done, and Step 3 has run at 1e18: seven captures now exist rather than three, including matched
+temporal/unconstrained pairs at the budget where the temporal model wins.
 
 ## 0. Why
 
@@ -319,6 +321,24 @@ These are deterministic evaluations — one checkpoint, one fixed 33.5M-token ev
 on the identical tokens — so the comparison is paired and exact and differences of 0.003 are real, not
 sampling noise.
 
+**The opposite direction, on a different checkpoint, reproduces the same U with the same vertex.**
+Imposing residency on exactly one MoE layer of the trained *unconstrained* model (`flame38m_g1_moe`,
+native CE 3.9185, R=k there and R=E elsewhere):
+
+| MoE layer | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|
+| ΔCE from constraining it | **+0.411** | +0.273 | +0.253 | +0.219 | +0.241 | +0.184 | +0.215 | **+0.466** |
+
+Linear R² = **0.001**, quadratic R² = 0.762, vertex layer **5.5**, ends ÷ middle **1.52×**. Two different
+models, two opposite manipulations, the same shape with vertices at 5.3 and 5.5 — the U is a property of
+where in the network routing freedom matters, not of one checkpoint or one direction of swap. In both
+directions the two most expensive layers are the **first and the last** MoE layer.
+
+The magnitudes also extend §5 of [`delexicalization.md`](delexicalization.md) from the whole network to
+single layers. Imposing the constraint on one layer costs a mean +0.278 CE; removing it from one layer
+costs +0.039 — a **7×** asymmetry, in the same direction as the global result ("imposing residency on
+lexical routers costs two to five times more than unmasking contextual ones") and larger.
+
 Four things follow.
 
 1. **H2 is falsified by its own pre-registered criterion.** H2 said "Falsified by: a flat or U-shaped
@@ -360,16 +380,16 @@ Ordered by what they buy. C1–C4 are the critical path.
 
 | id | test | serves | needs | status |
 |---|---|---|---|---|
-| C1 | Replot on normalized depth `l/L`, with bootstrap CI bands | H1 | nothing | **done** — `locus_by_layer.png`, `mechinterp_locus_slopes.csv` |
-| C2 | Locus at layers 2–**14** on the three preserved captures | H1 | existing captures | **done** — H1 saturates; coarse arm peaks at L8 and declines |
-| C3 | Per-layer inference-time constraint swap | H2 pre-screen | existing checkpoints | **not run.** Driver committed; needs a GPU |
+| C1 | Replot on normalized depth `l/L`, with bootstrap CI bands | H1 | nothing | **done** — `locus_by_layer.png`, `mechinterp_locus_slopes.csv`, with curvature and vertex |
+| C2 | Locus at layers 2–**14** on **seven** captures | H1 | existing captures | **done** — H1 rises then turns over at ~2/3 depth in the temporal arms; unconstrained arms never turn |
+| C3 | Per-layer inference-time constraint swap | H2 pre-screen | existing checkpoints | **done**, both directions at 1e18 — U-shaped, vertex L5.3/L5.5, falsifies H2 |
 | C4 | Baseline hit rate by counterfactual replay | H1 control | existing router logs | **done**, one cell — the only unconstrained router log preserved |
-| C5 | Per-layer output lens (effective vocabulary) | H1, third view | captures; >L4 needs re-run | **partial** — layers 2–4, which is the whole stack at 1e16 and 3 of 13 at 1e19 |
+| C5 | Per-layer output lens (effective vocabulary) | H1, third view | captures; >L4 needs re-run | **blocked on a re-capture.** The capture keyed expert outputs one layer too shallow; fixed, but the lens needs captures taken after the fix — see `MECHINTERP_RERUN_PLAN.md` §7.4 |
 | C6 | Per-layer demand forecastability | H2 mechanism | existing captures | **done** — 0.920→0.953 temporal vs 0.570→0.698 baseline, separated at every layer |
 | C7 | Nonparametric token-id oracle | H1 ceiling | existing captures | **done** — probe is at the ceiling; ceiling is flat with depth |
-| C8 | Causal token / context substitution | H1, causal | forward passes | **not run** — needs a GPU |
-| C9 | Frequency-stratified `A_tok` | H1 refinement | captures + token ids | **not run** — token ids are now recoverable from the capture (see `delex_oracle.py`), so this is unblocked and CPU-only |
-| C10 | Cross-layer probe transfer | H1 refinement | existing captures | **not run** — CPU-only, unblocked |
+| C8 | Causal token / context substitution | H1, causal | forward passes | **not run.** The strongest non-training evidence available for H1 and the largest remaining gap |
+| C9 | Frequency-stratified `A_tok` | H1 refinement | captures + token ids | **done** — inverted U in both regimes, temporal at a constant 0.72–0.77× the baseline in every stratum; the shortcut is not a rare-token phenomenon |
+| C10 | Cross-layer probe transfer | H1 refinement | existing captures | **done** — as subspace overlap, since the literal form is ill-posed; 3–4× chance adjacent, 2.1–2.3× across the full stack |
 
 **C1 — normalized depth and confidence intervals.** Every H1 statement is about depth, and the
 current axis is not comparable across 4-, 6- and 9-layer models. A slope without an interval is not
