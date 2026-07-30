@@ -231,6 +231,22 @@ elif [ "${DELEXPROBE:-0}" = "1" ]; then
     --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
     --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
     2>&1 | tee "$OUT/delexprobe.log"
+elif [ "${CAUSALPROBE:-0}" = "1" ]; then
+  # C8 / N6: causal token-versus-context substitution. One invocation per arm (CAUSAL_ARM in
+  # ref|token|context); the three are compared offline and the analysis refuses to compare arms whose
+  # input-id hashes differ, which is what makes separate invocations sound. Same frozen-weight,
+  # throwaway-save discipline as DELEXPROBE.
+  export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  export CAUSAL_ARM=${CAUSAL_ARM:-ref}
+  export CAUSAL_OUT=${CAUSAL_OUT:-$OUT/causal_${CAUSAL_ARM}.pt}
+  export N_MB=${N_MB:-$(( (64 + MICRO_BATCH - 1) / MICRO_BATCH ))}
+  echo "[causalprobe] arm=$CAUSAL_ARM N_MB=$N_MB x mb=$MICRO_BATCH, TEMPORAL=$TEMPORAL"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/delex_causal.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/causalprobe_${CAUSAL_ARM}.log"
 elif [ "${QUANTEVAL:-0}" = "1" ]; then
   # Stability Part E: RTN fake-quant routed-expert weights (QUANT_BITS, group QUANT_GROUP) then
   # test-set eval. --finetune resets consumed_samples to 0 (end-of-training checkpoints have
