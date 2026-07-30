@@ -6,6 +6,15 @@ re-capture; C8 is not run and is the largest remaining gap. The training tests T
 C3's result says T2 as designed would not test the effect that exists. Sections 1–2 are the measurements,
 §3 the hypotheses and what the results did to them, §§4–5 the tests and their status.
 
+> **The H2 verdict below is superseded by
+> [`LAYER_LEXICALITY_ROUND2.md`](LAYER_LEXICALITY_ROUND2.md).** C3's U-shaped cost profile
+> decomposes into an endpoint effect at the first and last MoE layers and an interior gradient, and
+> only the second is about lexicality. Over the interior the cost does fall with depth
+> (ρ = −0.886, p = 0.035, impose direction), so H2 is falsified as pre-registered but supported
+> away from the endpoints; and the last MoE layer is the *least* lexical layer in the stack while
+> being the most expensive to constrain, which a lexical account cannot explain. Round 2 splits H2
+> into H2a/H2b and specifies the 1e19 sweep that separates them.
+
 **The two-line version.** Routing does move from lexical to contextual with depth, in the *unconstrained*
 baseline as well, so part of that trend belongs to transformer depth rather than to rolling residency.
 What the constraint adds is a shape: it starts from no measurable effect at the first MoE layer,

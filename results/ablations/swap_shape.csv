@@ -1,0 +1,5 @@
+arm,compare_run,span,layers,n_layers,rho_cost_vs_depth,p_cost_vs_depth,rho_cost_vs_ctxshare,p_cost_vs_ctxshare,endpoint_mean,interior_mean,endpoint_over_interior,ctx_at_last_layer,ctx_rank_of_last_layer
+impose_one,flame38m_g1_moe,full,2-9,8,-0.2857,0.501,-0.2857,0.5014,0.43898,0.2308,1.902,-0.1647,8
+impose_one,flame38m_g1_moe,interior,3-8,6,-0.8857,0.0352,-0.8857,0.0333,0.43898,0.2308,1.902,-0.1647,8
+unmask_one,flame38m_g1_temporal,full,2-9,8,-0.0714,0.8875,0.0,1.0,0.05023,0.03584,1.402,0.0979,5
+unmask_one,flame38m_g1_temporal,interior,3-8,6,-0.4286,0.4198,0.1429,0.8036,0.05023,0.03584,1.402,0.0979,5
