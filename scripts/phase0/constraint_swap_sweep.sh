@@ -50,7 +50,10 @@ shift
 
 RUNS_DIR=${CKPT_ROOT:-$ROOT/results/phase0/runs}
 OUTCSV=$ROOT/results/ablations/swap_sweep.csv
-[ -f "$OUTCSV" ] || echo "run,budget,regime,grain,arm,layer,R_at_layer,R_elsewhere,test_CE,test_BPB,log" > "$OUTCSV"
+# `perturbation` distinguishes the real residency constraint from N1's sham. Without it the sham rows
+# share the (run, arm, layer) key with the real C3 rows and the two are indistinguishable in the file.
+PERTURB=${TEMPORAL_SHAM:-real}
+[ -f "$OUTCSV" ] || echo "run,budget,regime,grain,perturbation,arm,layer,R_at_layer,R_elsewhere,test_CE,test_BPB,log" > "$OUTCSV"
 
 # BPB divisor: bytes-per-token of the eval corpus, as used by every published BPB in this repo.
 BPB_DIV=${BPB_DIV:-2.9780}
@@ -91,19 +94,19 @@ print('' if b == 'unknown' else b)")
       SHARED_MULT="${smult:-2}" \
       TEMPORAL_RESIDENCY_R="$relse" TEMPORAL_R_SCHEDULE="$sched" \
       TEMPORAL_EVICT="${TEMPORAL_EVICT:-min_logit}" EVAL_ITERS="${EVAL_ITERS:-16}" \
-      ./experiments/run.sh > "$RUNS_DIR/$run/$logname" 2>&1
+      ./experiments/run.sh > "$RUNS_DIR/$run/${PERTURB:+${PERTURB}_}$logname" 2>&1
   local rc=$?
   set -e
   # run.sh rewrites run.meta before the mode branch; restore the published provenance.
   cmp -s "$meta" "$meta.presweep" || echo "[warn] $run: run.meta was rewritten, restoring"
   mv -f "$meta.presweep" "$meta"
   if [ $rc -ne 0 ]; then
-    echo "[fail] $run [$arm]: exit $rc, see $RUNS_DIR/$run/$logname" >&2
+    echo "[fail] $run [$arm]: exit $rc, see $RUNS_DIR/$run/${PERTURB:+${PERTURB}_}$logname" >&2
     return 0
   fi
   # Megatron prints the test-set loss as "validation loss at ... | lm loss value: X" on the test pass.
   local ce
-  ce=$(grep -oE "lm loss value: [0-9.]+" "$RUNS_DIR/$run/$logname" | tail -1 | grep -oE "[0-9.]+$")
+  ce=$(grep -oE "lm loss value: [0-9.]+" "$RUNS_DIR/$run/${PERTURB:+${PERTURB}_}$logname" | tail -1 | grep -oE "[0-9.]+$")
   if [ -z "$ce" ]; then
     echo "[warn] $run [$arm]: no lm loss in log; recorded blank" >&2
   fi
@@ -118,7 +121,7 @@ r = registry.get(sys.argv[1])
 print(r.budget, r.regime, r.grain_label.replace(" ", ""))
 PY
 )
-  echo "$run,$budget,$regime,$grain_l,$arm,$layer,$rat,$relse,${ce:-},${bpb:-},$logname" >> "$OUTCSV"
+  echo "$run,$budget,$regime,$grain_l,$PERTURB,$arm,$layer,$rat,$relse,${ce:-},${bpb:-},$logname" >> "$OUTCSV"
   echo "[ok]   $run [$arm] layer=$layer  test CE=${ce:-?}  BPB=${bpb:-?}"
 }
 
