@@ -12,17 +12,20 @@ and reproducible. The hypothesis-driven analysis that motivated the audit lives 
 
 ## 1. Coverage
 
-**Status: Steps 1 and 2 are done. Step 3 has committed drivers but has not been run; Step 4 is
-partial.** The table below is the coverage after that work; the "was" column is what this plan was
-written against. Numbers and the findings they produced are in §7.
+**Status: Steps 1, 2 and 4 are done; Step 3 has run at 1e18 and covers 7 of 25 cells.** The table below
+is the coverage after that work; the "was" column is what this plan was written against. Numbers and the
+findings they produced are in §7.
 
 | metric | file | per-layer? | layers: was → now | models: was → now |
 |---|---|---|---|---|
-| locus probes (A_tok, A_ctx) | `mechinterp_locus{,_1e19}.csv` | yes | 2–6 → **2–14** at 1e19 | 8 → 8 |
-| null floors | `mechinterp_floors{,_1e19}.csv` | **now yes** | pooled → per layer | 5 → 8 |
+| locus probes (A_tok, A_ctx) | `mechinterp_locus{,_1e19}.csv` | yes | 2–6 → **all** (2–14 at 1e19, 2–9 at 1e18) | 8 → **12** |
+| null floors | `mechinterp_floors{,_1e19}.csv` | **now yes** | pooled → per layer | 5 → **12** |
 | token-id oracle ceiling (C7) | `mechinterp_oracle.csv` | yes | — → 2–14 | — → 3 |
+| frequency-stratified token AUC (C9) | `mechinterp_freqstrat.csv` | yes | — → 2–14 | — → 2 |
+| cross-layer probe transfer (C10) | `mechinterp_transfer.csv` | layer pairs | — → 2–14 | — → 2 |
+| per-layer constraint swap (C3) | `swap_sweep.csv` | yes | — → 2–9 | — → 2 (both directions) |
 | null battery (which null is valid) | `mechinterp_null_battery.csv` | one layer | — → 2 | — → 3 |
-| output logit lens (effective vocab) | `mechinterp_lens{,_1e19}.csv` | yes | **2–4**, still 2–4 | 6 → 6 |
+| output logit lens (effective vocab) | `mechinterp_lens{,_1e19}.csv` | yes | 2–4 → **2–9** at 1e18 | 6 → **10**; see §7.4, the published rows were misattributed |
 | logit lens (older) | `mechinterp_logitlens.csv` | yes | 1–3 | 2 |
 | cache hit rate | `e6_per_layer_ranking.csv` | yes | all | 3 → **22** |
 | swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | all | 5 → **22** |
@@ -201,7 +204,7 @@ Ordered so that anything usable without a GPU lands first.
 | 2 | 6. counterfactual baseline replay | **done**, one cell — `moe_coarse_1e19` is the only unconstrained router log preserved |
 | 2 | 7. `delex_structural` per layer | **done** for gate statistics (A6, A7, A9). A8 weight geometry needs checkpoints, none on this pod; blank with the reason per row |
 | 2 | 8. `delex_demand` per layer | **done** |
-| 3 | 9–11. capture sweep + lens past layer 4 | **not run.** Drivers committed: `scripts/phase0/delex_capture_sweep.sh` and the `DELEXPROBE=1` branch of `run.sh`, which did not exist. `registry.py --selection` lists the 28-cell set, 25 needing a capture |
+| 3 | 9–11. capture sweep + lens past layer 4 | **run at 1e18**, 7 of 25 cells captured. The `DELEXPROBE=1` branch of `run.sh` and `scripts/phase0/delex_capture_sweep.sh` did not exist; both are committed, along with shape entries s38m/s192f/s512f without which the entire 1e18 fleet was unaddressable. Lens now covers 2–9 at 1e18. 18 cells still need a capture — `registry.py --selection` |
 | 4 | 12. regenerate figures | **done** for everything whose data was regenerated |
 | 4 | 13. reconcile prose | **done** — §7.2 |
 
