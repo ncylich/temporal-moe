@@ -17,10 +17,11 @@ C3's result says T2 as designed would not test the effect that exists. Sections 
 
 **The two-line version.** Routing does move from lexical to contextual with depth, in the *unconstrained*
 baseline as well, so part of that trend belongs to transformer depth rather than to rolling residency.
-What the constraint adds is a shape: it starts from no measurable effect at the first MoE layer,
-accumulates with depth on every metric measured, moves the locus toward context about twice as fast as
-the baseline while it is rising, and then **turns over at roughly two thirds depth** while the
-unconstrained model is still climbing at its last layer.
+What the constraint adds is a shape: it moves the locus toward context at least as fast as the baseline
+while it is rising, then **turns over at roughly two thirds depth** while the unconstrained model is
+still climbing at its last layer. At 1e19 its effect on routing statistics also *starts* near zero at
+the first MoE layer and accumulates with depth — but that part does **not** generalise: at 1e18 the two
+regimes are already 0.78 apart in generalist fraction at layer 2. See §3.
 
 **A note on method, because it changed two conclusions in this document.** These curves are not lines.
 Summarising them by an OLS slope inverted the regime comparison in §1 (a full-range slope averages the
@@ -276,12 +277,22 @@ invert the regime comparison because they average the temporal arm's rise agains
 cache side agrees and adds a granularity dependence: the coarse arms saturate hard (deep-over-shallow
 half-slope 0.19 at 1e18, 0.62 at 1e19) while the fine arms stay roughly linear (0.88, 1.22).
 
-*What is genuinely constraint-specific is a widening gap, not a slope.* On cache hit rate the matched
-1e19 pair is identical at layer 2 (0.114 vs 0.117) and 0.21 apart by layer 11. Selectivity, generalist
-fraction and router entropy do the same: indistinguishable through layer 4, totally separated from
-layer 6 (`delexicalization.md` §2). The constraint's effect on routing is **near zero at the first MoE
-layer and accumulates with depth** — which is a stronger and more useful statement than H1's, and it is
-the one a per-layer schedule should be designed against.
+*A widening gap with depth — but only at 1e19.* On cache hit rate the matched 1e19 pair is identical at
+layer 2 (0.114 vs 0.117) and 0.21 apart by layer 11; selectivity, generalist fraction and router entropy
+do the same, indistinguishable through layer 4 and totally separated from layer 6
+(`delexicalization.md` §2).
+
+**This does not hold at 1e18, and an earlier revision of this section overstated it as general.** The
+matched 1e18 coarse pair is separated at the *first* MoE layer — generalist fraction 0.80 against 0.02 —
+and the temporal arm is not monotone with depth either, dipping to 0.12 at layer 3 before climbing back
+to 0.70 at layer 9. So "the constraint's effect starts near zero and accumulates with depth" describes
+the 1e19 model, not the constraint. Whether the 1e19 pattern or the 1e18 one is the exception is not
+settled by two budgets, and a per-layer schedule cannot be designed against the accumulation story until
+it is.
+
+What *does* generalise across both budgets is demand forecastability: 0.927–0.951 temporal against
+0.621–0.704 unconstrained at 1e18, separated at every layer including the first, exactly as at 1e19.
+That is the signature of a mechanical consequence of residency rather than learned reorganisation.
 
 The one metric that does *not* follow this pattern is demand forecastability, separated by 0.35 AUC at
 layer 2 and staying separated (0.920 vs 0.570 at 1e19 coarse). That is the signature of a mechanical
