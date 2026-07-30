@@ -121,7 +121,9 @@ r = registry.get(sys.argv[1])
 print(r.budget, r.regime, r.grain_label.replace(" ", ""))
 PY
 )
-  echo "$run,$budget,$regime,$grain_l,$PERTURB,$arm,$layer,$rat,$relse,${ce:-},${bpb:-},$logname" >> "$OUTCSV"
+  # A set's layer list is comma-separated on the command line but must not be written with the CSV
+  # delimiter: unquoted, it splits into extra columns and silently corrupts every field after it.
+  echo "$run,$budget,$regime,$grain_l,$PERTURB,$arm,$(echo "$layer" | tr ',' ';'),$rat,$relse,${ce:-},${bpb:-},$logname" >> "$OUTCSV"
   echo "[ok]   $run [$arm] layer=$layer  test CE=${ce:-?}  BPB=${bpb:-?}"
 }
 
