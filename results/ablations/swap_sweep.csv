@@ -88,3 +88,4 @@ flame38m_g3_temporal,1e18,temporal,fine18/192,real,native,-,18,18,3.976890,1.926
 flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,2,192,18,4.013086,1.9441,swap_unmask_L2.log
 flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,3,192,18,4.044459,1.9593,swap_unmask_L3.log
 flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,4,192,18,4.015787,1.9455,swap_unmask_L4.log
+flame38m_g3_temporal,1e18,temporal,fine18/192,real,unmask_one,5,192,18,4.009855,1.9426,swap_unmask_L5.log
