@@ -592,7 +592,18 @@ def e8():
     print("\n=== E8  document-boundary attribution ===")
     out = {}
     for run in ALL_RUNS:
-        batch = "50k" if "pythia" in (_BY_NAME[run].meta.get("tok") or "") else "16k"
+        # Pick the mask by which corpus the run was trained on. Keying off run.meta["tok"] alone
+        # silently mis-selects: every 1e19 run has that field empty and would fall to the 16k mask,
+        # though 1e19 trains on dclm_tokenized (50k). Only 1e16/1e17 use tok16k_full. Both masks are
+        # (64, 2048) with eod_id 0, so a shape check cannot catch the mistake -- e8 would just score
+        # boundary churn against boundaries that are not there.
+        _tok = _BY_NAME[run].meta.get("tok") or ""
+        if "pythia" in _tok:
+            batch = "50k"
+        elif _BY_NAME[run].budget in ("1e16", "1e17"):
+            batch = "16k"
+        else:
+            batch = "50k"
         eodfile = f"{CACHE}/eod_{batch}.npy"
         if not os.path.exists(eodfile):
             print(f"  [skip] {run}: EOD cache {eodfile} missing"); continue

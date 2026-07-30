@@ -128,14 +128,21 @@ def verify():
         d = torch.load(rl, map_location="cpu")
         rec = next(iter(d["layers"].values()))
         S, B = rec["logits"].shape[0], rec["logits"].shape[1]
+        # Which mask this run SHOULD use, from the corpus it trained on. Checking every tag and
+        # accepting whichever matches on shape is not a check at all: both masks are (64, 2048), so
+        # the wrong tokenizer's boundaries pass silently.
+        import registry as _reg
+        _r = _reg.get(run) if hasattr(_reg, "get") else None
+        want = "16k" if (_r is not None and _r.budget in ("1e16", "1e17")) else "50k"
         ok = False
-        for tag in ("16k", "50k"):
+        for tag in (want,):
             p = os.path.join(CACHE, f"eod_{tag}.npy")
             if not os.path.exists(p):
                 continue
             m = np.load(p)
             match = m.shape[1] == S and m.shape[0] >= B
-            print(f"  {run}: router log S={S} B={B} | eod_{tag} {m.shape} -> "
+            print(f"  {run}: router log S={S} B={B} | expects eod_{tag} (trained on "
+                  f"{'tok16k_full' if tag == '16k' else 'dclm_tokenized'}) {m.shape} -> "
                   f"{'USABLE' if match else 'shape mismatch'}")
             ok = ok or match
         if not ok:
