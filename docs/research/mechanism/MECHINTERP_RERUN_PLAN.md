@@ -189,13 +189,84 @@ Ordered so that anything usable without a GPU lands first.
 13. Reconcile the numbers quoted in [`delexicalization.md`](delexicalization.md) against the
     re-run outputs, and record any that move.
 
+### Status
+
+| step | item | status |
+|---|---|---|
+| 1 | 1. per-layer lens reporting | **done** — layers 2–4, the coverage that exists; `delexicalization.md` §4 |
+| 1 | 2. swap rate → `p95_burst_len` | **done** — both columns written, reason recorded in `results/ablations/README.md` |
+| 1 | 3. correct §3 of `delexicalization.md` | **done** — layer range stated, `s0_SOFTMAX_BASELINE` relabelled w=32 |
+| 2 | 4. locus at full depth | **done** — layers 2–14, all three windows, both splits, per-layer floors |
+| 2 | 5. `probe_replay` e1–e8 over all runs | **done** for e1–e7 (22 runs). e8 impossible: needs a gitignored EOD cache absent from `MANIFEST.csv` |
+| 2 | 6. counterfactual baseline replay | **done**, one cell — `moe_coarse_1e19` is the only unconstrained router log preserved |
+| 2 | 7. `delex_structural` per layer | **done** for gate statistics (A6, A7, A9). A8 weight geometry needs checkpoints, none on this pod; blank with the reason per row |
+| 2 | 8. `delex_demand` per layer | **done** |
+| 3 | 9–11. capture sweep + lens past layer 4 | **not run.** Drivers committed: `scripts/phase0/delex_capture_sweep.sh` and the `DELEXPROBE=1` branch of `run.sh`, which did not exist. `registry.py --selection` lists the 28-cell set, 25 needing a capture |
+| 4 | 12. regenerate figures | **done** for everything whose data was regenerated |
+| 4 | 13. reconcile prose | **done** — §7.2 |
+
 ## 6. Acceptance criteria
 
-- Every metric in the Section 1 table has a `layer` column and covers every MoE layer of every
-  model in the selection set.
-- No script contains a hardcoded model list or layer range.
-- The null-control gate already enforced by
-  [`delex_locus_driver.py`](../../../analysis/probes/delex_locus_driver.py) — median null AUC of
-  0.500 +/- 0.002 under both iid permutation and circular shift — passes for every newly captured
-  model, and is extended to the lens and structural re-runs where an analogous null exists.
-- Numbers quoted in prose are reconciled against the regenerated CSVs, with any movement recorded.
+| criterion | status |
+|---|---|
+| Every metric in §1 has a `layer` column and covers every MoE layer of every model in the selection set | **partial.** Layer column: done everywhere it is meaningful. Every MoE layer: done for all 22 router-log runs and all 3 captures. Every model in the selection set: **not done** — 25 of 28 cells need a capture pass (Step 3, not run). |
+| No script contains a hardcoded model list or layer range | **done.** Lists come from `registry.py` (MANIFEST.csv + run.meta); layer lists come from the artifact. |
+| The null-control gate passes for every model under both nulls | **changed, deliberately.** The iid permutation passes everywhere (0.4996–0.5002). The circular shift does not and cannot: it is not a valid null, see §7.1. The gate now enforces iid and reports the shift as a diagnostic. |
+| The gate is extended to the lens and structural re-runs where an analogous null exists | **done for the lens** — the `static` variant is that null (A5), and it is now written per layer, which matters because it is not depth-invariant. **No analogous null exists** for selectivity/entropy/geometry: they are descriptive statistics of the gate distribution, not fitted predictions, so there is nothing to permute. |
+| Numbers quoted in prose are reconciled against the regenerated CSVs, with any movement recorded | **done for everything regenerated.** See §7.2. |
+
+## 7. What the re-run found
+
+### 7.1 The circular-shift null is invalid, and the published split leaked documents
+
+Running the null controls at full depth over every expert, rather than a ~8-per-layer subsample of the
+token feature only, showed the two nulls disagreeing:
+
+| null | token | context w=k/2 | context w=k | context w=32 |
+|---|---|---|---|---|
+| iid permutation | 0.5000 | 0.4999 | 0.4998 | 0.5002 |
+| circular shift | 0.5025 | 0.5046 | 0.5059 | 0.5121 |
+
+with the shift's excess growing monotonically in the window width and with depth (0.5104 at layer 2 to
+0.5172 at layer 14 for w=32). Gating on it would have withheld every number in the program.
+
+[`delex_null_check.py`](../../../analysis/probes/delex_null_check.py) settles it with six nulls that
+each preserve or destroy one structure (`mechinterp_null_battery.csv`). Two candidate explanations were
+tested and rejected: generic label autocorrelation (a matched Markov surrogate lands at chance, and the
+real label series has lag-1 autocorrelation of 0.0023) and position-within-sequence (the arm that
+preserves position exactly is nearly clean, +0.005). What survives is **document-level association**: a
+context feature is a moving average inside one document and therefore a good document descriptor, an
+expert has a document-level base rate, and any null leaving a label series paired with its own sequence
+keeps that match intact. It scales with w because a wider window describes the document better.
+
+The root cause is that the shift is applied to the flattened `[S*B]` stream, whose adjacent entries are
+adjacent *batch elements*, not adjacent tokens — so it never shifted along the token axis at all. The
+same flattening makes the published `cut = int(0.7*S*B)` split a split on sequence **position**, which
+puts every document in both the fit and score halves. Splits are now document-disjoint by default
+(`split=sequence`), with the old behaviour available as `split=position`.
+
+### 7.2 Reconciliation
+
+| number | published | re-run | verdict |
+|---|---|---|---|
+| depth slope, fine 18/192 @1e16 temporal | +0.0257 [+0.0133, +0.0336] | +0.02565 [+0.01320, +0.03445] | reproduces exactly |
+| depth slope, fine 18/192 @1e16 baseline | +0.0223 [+0.0151, +0.0293] | +0.02232 [+0.01530, +0.02983] | reproduces exactly |
+| depth slope, coarse 6/64 @1e17 pair | −0.0032 / −0.0030 | −0.00325 / −0.00298 | reproduces exactly |
+| demand forecastability (pooled) | 0.604 / 0.926 / 0.979 | per-layer ranges 0.570–0.698 / 0.920–0.953 / 0.975–0.985 | pooled values sit inside the ranges |
+| generalist fraction, 64E | 13% baseline, 54% temporal | 97%→0% and 100%→44% over layers 2→14 | **pooling hid a regime change with depth**; see `delexicalization.md` §2 |
+| output lens, 192E @1e16 | 14,612 / 15,932 median | per layer 15,359→11,646 and 15,981→15,576 | **pooling hid a depth effect**; see `delexicalization.md` §4 |
+| per-layer hit rate, 38M @1e18 | 0.165 … 0.338 (L2–9) | 0.171 … 0.380 (L2–9) | different run in the same cell (the published one's log was not preserved); shape replicates, values ≤0.04 apart |
+| tokens per expert per batch | identical across regimes | 12,288 fine / 3,072 coarse, both regimes | reproduces; this is why A11 has no meaningful per-layer breakout |
+
+### 7.3 Two things the plan itself got wrong
+
+**The 1e19 models are 14 layers deep, not 9.** Both plan documents assume 9, and this plan asked for
+`LAYERS = range(2, 10)`. The captures hold MoE layers 2–14, so implementing that literally would have
+silently dropped layers 10–14 — the same defect this plan exists to fix, with a different cutoff. Layer
+lists are now taken from the artifact and nothing is hardcoded.
+
+**Most of the runs behind the published numbers were never preserved.** The five runs named in
+`probe_replay.py`'s old lists and the five behind the 1e16/1e17 locus rows are all absent from
+`MANIFEST.csv`. The replay re-run therefore covers a *different* population of 22 runs, and the
+1e16/1e17 locus cells can never be extended past layer 6 by anyone. This is a preservation gap, not a
+code gap, and no re-run can close it.
