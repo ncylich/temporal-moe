@@ -22,11 +22,13 @@ SHAPES = {
     # The 1e18 panel. These were trained by their own launchers in experiments/scale_1e18_1e19/ with
     # geometry hardcoded, so neither run.sh nor this table could address them and every probe branch
     # was unreachable for the whole budget. Each mirrors the matching case in run.sh, verified against
-    # every field of the runs' committed run.meta. s192f/s512f duplicate s1/s6 geometry and exist as
-    # separate names only so a 1e18 flank run is never confused with its 1e16/1e17 namesake.
-    "s38m":  dict(h=256, L=9,  ffn=1368, moe_ffn=176),   # flame38m_*, the 1e18 middle (38M active)
-    "s192f": dict(h=192, L=5,  ffn=1026, moe_ffn=132),   # flame192_*, 1e18 left flank
-    "s512f": dict(h=512, L=10, ffn=2736, moe_ffn=352),   # flame512_*, 1e18 right flank
+    # every field of the runs' committed run.meta. All three are L=9: the 1e18 panel varies hidden size
+    # at FIXED depth, which is what makes it an isoFLOP panel. s192f/s512f share h/ffn/moe_ffn with
+    # s1/s6 but NOT depth, which is exactly why they need their own names -- reading depth off the
+    # same-ffn 1e16/1e17 shape gave 5 and 10 and built models that did not match their checkpoints.
+    "s38m":  dict(h=256, L=9, ffn=1368, moe_ffn=176),   # flame38m_*, the 1e18 middle (38M active)
+    "s192f": dict(h=192, L=9, ffn=1026, moe_ffn=132),   # flame192_*, 1e18 left flank
+    "s512f": dict(h=512, L=9, ffn=2736, moe_ffn=352),   # flame512_*, 1e18 right flank
 }
 import os
 # GRAIN>1: fine-grain the ROUTED experts (see run.sh). num_experts and top-k scale by GRAIN; each

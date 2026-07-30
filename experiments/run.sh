@@ -34,15 +34,18 @@ case $SHAPE in
   # with the geometry hardcoded, so run.sh could not address them at all and the probe branches were
   # unreachable for the whole 1e18 fleet. Each entry reproduces its launcher's geometry exactly under
   # run.sh's own derivation rules -- verified against every field of the runs' committed run.meta:
-  #   s38m  flame38m_*   H=256 L=9  ffn=1368 moe_ffn=176 -> g1: 64E/top-6/shared 352
-  #                                                         g3: 192E/top-18/moe_ffn 58/shared 352
-  #   s192f flame192_*   H=192 L=5  ffn=1026 moe_ffn=132 -> g3: moe_ffn 44, shared 264
-  #   s512f flame512_*   H=512 L=10 ffn=2736 moe_ffn=352 -> g3: moe_ffn 118, shared 704
-  # (s192f/s512f are the same geometry as s1/s6; they exist as separate names so a 1e18 flank run is
-  # never mistaken for its 1e16/1e17 namesake, which differs in token budget only.)
-  s38m)  H=256; L=9;  FFN=1368; MOE_FFN=176;;
-  s192f) H=192; L=5;  FFN=1026; MOE_FFN=132;;
-  s512f) H=512; L=10; FFN=2736; MOE_FFN=352;;
+  #   s38m  flame38m_*   H=256 ffn=1368 moe_ffn=176 -> g1: 64E/top-6/shared 352
+  #                                                     g3: 192E/top-18/moe_ffn 58/shared 352
+  #   s192f flame192_*   H=192 ffn=1026 moe_ffn=132 -> g3: moe_ffn 44, shared 264
+  #   s512f flame512_*   H=512 ffn=2736 moe_ffn=352 -> g3: moe_ffn 118, shared 704
+  # All three are L=9. The panel varies hidden size at FIXED depth, which is what makes it an isoFLOP
+  # panel; flame_scale_run.sh takes --num-layers ${N_LAYERS:-9} and none of the three overrides it.
+  # Depth was briefly inferred from the 1e16/1e17 shape sharing each ffn (s1 is L=5, s6 is L=10) and
+  # that is wrong -- it built a 10-layer model against a 9-layer checkpoint and died on a missing
+  # decoder.layers.9. Verified against the checkpoints: transformer layers 0..8, MoE modules 1..8.
+  s38m)  H=256; L=9; FFN=1368; MOE_FFN=176;;
+  s192f) H=192; L=9; FFN=1026; MOE_FFN=132;;
+  s512f) H=512; L=9; FFN=2736; MOE_FFN=352;;
   *) echo "bad SHAPE $SHAPE"; exit 1;;
 esac
 MOE_LAYER_FREQ="[0]+[1]*$((L-1))"

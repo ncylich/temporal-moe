@@ -99,7 +99,8 @@ class Run:
 # from it; the rest are read from a sibling run in MANIFEST.csv that shares the shape, so nothing here
 # is guessed. Note s19opt is 14, not the 9 that both mechanism plan documents assumed.
 SHAPE_DEPTH = {"s0": 4, "s1": 5, "s2": 6, "s3": 7, "s19opt": 14,
-               "s38m": 9, "s192f": 5, "s512f": 10}
+               # the 1e18 panel is L=9 at every hidden size, verified against the checkpoints
+               "s38m": 9, "s192f": 9, "s512f": 9}
 
 # The 1e18 panel was trained by its own launchers in experiments/scale_1e18_1e19/ with the geometry
 # hardcoded, so those runs' run.meta records ffn/num_experts/topk but no shape= and no flops=. These
