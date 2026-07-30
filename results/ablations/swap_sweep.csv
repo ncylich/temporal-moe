@@ -75,3 +75,4 @@ g3_tmoe_s2_1e17,1e17,temporal,fine18/192,real,dose_R36,-,36,36,4.744318,2.2984,s
 g3_tmoe_s2_1e17,1e17,temporal,fine18/192,real,dose_R72,-,72,72,4.822067,2.3361,swap_dose_R72.log
 g3_tmoe_s2_1e17,1e17,temporal,fine18/192,real,dose_R144,-,144,144,4.922908,2.3849,swap_dose_R144.log
 g3_tmoe_s2_1e17,1e17,temporal,fine18/192,real,dose_R192,-,192,192,4.953909,2.3999,swap_dose_R192.log
+flame38m_g1_temporal_s2,1e18,temporal,coarse6/64,real,native,-,6,6,3.907698,1.8931,swap_native.log
