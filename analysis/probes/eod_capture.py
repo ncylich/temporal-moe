@@ -71,7 +71,25 @@ def _wrap_provider():
 def _dump():
     from megatron.training import get_tokenizer
     tok = get_tokenizer()
-    eod_id = int(getattr(tok, "eod", None) or getattr(tok, "eod_id"))
+    # Megatron's tokenizer wrappers disagree on the name, and _HuggingFaceTokenizer has none of the
+    # Megatron ones. `or` chaining is wrong here even when an attribute exists, because a legitimate
+    # id of 0 is falsy and would fall through to a name that raises.
+    eod_id = None
+    for attr in ("eod", "eod_id", "eos_id", "eos_token_id"):
+        v = getattr(tok, attr, None)
+        if isinstance(v, int):
+            eod_id = v
+            break
+    if eod_id is None:                                   # HF tokenizers keep it on the inner object
+        inner = getattr(tok, "_tokenizer", None) or getattr(tok, "tokenizer", None)
+        v = getattr(inner, "eos_token_id", None)
+        if isinstance(v, int):
+            eod_id = v
+    if eod_id is None:
+        raise RuntimeError(
+            f"[eod] cannot find an end-of-document id on {type(tok).__name__}; tried eod, eod_id, "
+            f"eos_id, eos_token_id and the inner tokenizer's eos_token_id. Available: "
+            f"{[a for a in dir(tok) if 'eo' in a.lower() or 'eos' in a.lower()]}")
     ids = np.concatenate(IDS, axis=0)                       # [B_total, S] (batch-first from the loader)
     if ids.shape[1] < ids.shape[0]:                          # be explicit rather than assume an order
         ids = ids.T
