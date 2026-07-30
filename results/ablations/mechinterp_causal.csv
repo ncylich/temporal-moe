@@ -1,4 +1,12 @@
 run,budget,regime,grain,layer,window_w,stride,positions_per_seq,n_sequences,token_jaccard_shift,context_jaccard_shift,context_over_token
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,2,6,26,79,64,0.50161,0.67385,1.3434
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,3,6,26,79,64,0.46759,0.72515,1.5508
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,4,6,26,79,64,0.45046,0.74844,1.6615
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,5,6,26,79,64,0.4597,0.74162,1.6133
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,6,6,26,79,64,0.48198,0.75214,1.5605
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,7,6,26,79,64,0.51022,0.75538,1.4805
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,8,6,26,79,64,0.52018,0.74675,1.4356
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,9,6,26,79,64,0.50454,0.71529,1.4177
 flame38m_g1_moe,1e18,full,coarse 6/64,2,6,26,79,64,0.87759,0.25969,0.2959
 flame38m_g1_moe,1e18,full,coarse 6/64,3,6,26,79,64,0.8524,0.39407,0.4623
 flame38m_g1_moe,1e18,full,coarse 6/64,4,6,26,79,64,0.83815,0.49803,0.5942
