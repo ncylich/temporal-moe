@@ -114,6 +114,23 @@ Treat every estimate as ±2x.
 | **N8** | Captures: re-take 3 x 1e19, add 1e16/1e17 arms | ~7 passes, 2 h | Makes the 1e19 output lens valid; unfreezes the low-budget end |
 | **N9** | Document corrections | no compute | Two claims still stand next to their own refutations |
 
+## 4a. Results (N1, N2, N5, N6 measured)
+
+| # | status | headline |
+|---|---|---|
+| **N1** | **done, both directions** | The sham **reproduces** the U in the impose direction (r = 0.78; L2 1.39× vs real 1.45×). H2b supported: the endpoints are positional. The unmask direction disagrees (r = 0.38) and should be discounted — there is no valid sham for "un-apply a perturbation the model never had", and its baseline is an off-distribution model at CE 4.895 vs native 3.909. |
+| **N2** | **done, both directions** | Endpoints add independently, interior does not: {2,9} ratio **1.02** imposing and **0.98** unmasking; {3–8} **0.81**. So single-layer costs predict the endpoint schedule and overstate an interior one by 23%. |
+| **N5** | **unmask arm done** | **Cost tracks depth, not lexicality**: r = **+0.770** with depth, **+0.152** with contextual share. Between L8 and L14 the contextual share falls while cost more than doubles. Test A: quadratic R² 0.92 vs linear 0.59, vertex L5.8, **L14 at 2.71× mean** — spikes at layers 2 and 14, i.e. the architectural boundaries. Impose arm running. |
+| **N6 (C8)** | **done, both regimes** | De-lexicalization shown causally. Ratio (context shift ÷ token shift): temporal **1.34–1.66**, unconstrained **0.30–0.73**, opposite sides of 1 at every layer. Token sensitivity falls 43% *and* context sensitivity nearly triples — a decomposition no AUC difference can separate. |
+
+**What this settles.** The constraint's effect on *routing* is large and causal (N6). The per-layer
+*cost* profile is architectural — endpoint sensitivity plus an interior depth trend — and lexicality
+explains almost none of it (r = 0.15). Those are different quantities; H2 conflated them.
+
+**A Round-1 reading this corrects.** The vertex at roughly two thirds depth was an artifact of the
+9-layer model, where "⅔ of the way down" and "just before the last layer" are not separable. At 14
+layers they separate and the endpoint reading wins.
+
 **Do N1–N4 first.** They fit in one pod day, they are all cheap, and N1 can answer H2b outright — in
 which case N5 narrows to the H2a dissociation question only.
 
