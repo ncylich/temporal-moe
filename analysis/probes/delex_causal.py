@@ -121,10 +121,14 @@ def _install(model):
         if not (name.endswith(".embedding") or mod.__class__.__name__ == "LanguageModelEmbedding"):
             continue
 
-        def pre(m, args, kwargs=None):
-            ids = args[0] if args else None
+        def pre(m, args, kwargs):
+            # Megatron calls the embedding with keyword arguments, so `args` is empty and a
+            # positional-only hook captured nothing -- EMB_IN stayed empty and the token arm died on
+            # EMB_IN[-1]. Registered with with_kwargs=True and read from either.
+            ids = args[0] if args else kwargs.get("input_ids")
             if ids is not None and _state["n_emb"] < N_MB:
                 EMB_IN.append(ids.detach().to(torch.int64).cpu())
+            return None
 
         def post(m, args, out):
             if _state["n_emb"] >= N_MB:
@@ -137,6 +141,9 @@ def _install(model):
             w = _state["w"]
             stride = STRIDE or (4 * w + 2)
             pos = _probe_positions(S, w, stride)
+            if not EMB_IN:
+                raise RuntimeError("[causal] no input ids captured: the embedding pre-hook never "
+                                   "fired. Check how LanguageModelEmbedding is being called.")
             ids = EMB_IN[-1]                                          # [S,B] or [B,S]
             if ids.shape[0] != S:
                 ids = ids.T
@@ -159,7 +166,7 @@ def _install(model):
             _state["plan"] = pos
             return (new,) + tuple(out[1:]) if isinstance(out, tuple) else new
 
-        mod.register_forward_pre_hook(pre)
+        mod.register_forward_pre_hook(pre, with_kwargs=True)
         mod.register_forward_hook(post)
 
 
