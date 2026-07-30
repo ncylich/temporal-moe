@@ -15,6 +15,16 @@
 #   scripts/phase0/constraint_swap_sweep.sh --global RUN            # X1: native vs other regime
 #   scripts/phase0/constraint_swap_sweep.sh --per-layer RUN         # X2/C3: one layer at a time
 #   LAYERS="2 3 4" scripts/phase0/constraint_swap_sweep.sh --per-layer RUN
+#   SETS="3,4,5,6,7,8 2,9" scripts/phase0/constraint_swap_sweep.sh --sets RUN   # N2: whole schedules
+#
+# --sets is N2, the additivity check. Every C3 number is a SINGLE-layer perturbation, and the thing
+# that would ship is a MULTI-layer schedule; nothing had checked that the two relate. Each set is
+# applied at once and compared against the sum of its members' single-layer costs, which is the
+# assumption T2's design rests on.
+#
+# TEMPORAL_SHAM=random turns any of these into N1's sham arm: the same R experts are eligible per
+# layer, chosen at random rather than by residency, so the perturbation carries no lexical
+# information. Comparing profiles answers whether the endpoint spikes are about routing at all.
 #
 # What the direction means, per trained regime:
 #   temporal checkpoint  -> UNMASK layer l (R=E there, R=k elsewhere). Cost of giving back freedom.
@@ -140,6 +150,23 @@ print(registry.depth_of('$run') or 0)")
       run_one "$run" native      - "$E" "$E" "" "swap_native.log"
       run_one "$run" impose_all  - "$k" "$k" "" "swap_impose_all.log"
     fi
+  elif [ "$MODE" = "--sets" ]; then
+    [ -n "${SETS:-}" ] || { echo "--sets needs SETS='3,4,5,6 2,9'" >&2; exit 1; }
+    if [ "$temporal" = "1" ]; then
+      run_one "$run" native - "$k" "$k" "" "swap_native.log"
+      for set in $SETS; do
+        sched=$(echo "$set" | tr ',' '\n' | while read l; do printf "%s:E," "$l"; done | sed 's/,$//')
+        tag=$(echo "$set" | tr ',' '-')
+        run_one "$run" unmask_set "$set" "$E" "$k" "$sched" "swap_unmask_set_$tag.log"
+      done
+    else
+      run_one "$run" native - "$E" "$E" "" "swap_native.log"
+      for set in $SETS; do
+        sched=$(echo "$set" | tr ',' '\n' | while read l; do printf "%s:%s," "$l" "$k"; done | sed 's/,$//')
+        tag=$(echo "$set" | tr ',' '-')
+        run_one "$run" impose_set "$set" "$k" "$E" "$sched" "swap_impose_set_$tag.log"
+      done
+    fi
   elif [ "$MODE" = "--per-layer" ]; then
     # Native reference first, so every per-layer delta is against a number measured in this same
     # environment rather than against a published one.
@@ -155,7 +182,7 @@ print(registry.depth_of('$run') or 0)")
       done
     fi
   else
-    echo "unknown mode $MODE (expected --global or --per-layer)" >&2; exit 1
+    echo "unknown mode $MODE (expected --global, --per-layer or --sets)" >&2; exit 1
   fi
 done
 
