@@ -48,17 +48,23 @@ class Run:
         self.depth = self.meta.get("L")         # transformer depth, or None for the 1e18 form
 
     # ---- artifact predicates: what analyses this run can actually feed ----
+    # An artifact counts if MANIFEST.csv preserved it OR it exists on disk. The second clause is not
+    # redundant: a capture produced locally by the Step 3 sweep is not in the manifest, and without it
+    # every downstream analysis silently skipped freshly captured runs while reporting success.
+    def _has(self, fname):
+        return fname in self.files or os.path.exists(self.path(fname))
+
     @property
     def has_router_log(self):
-        return "router_log.pt" in self.files
+        return self._has("router_log.pt")
 
     @property
     def has_capture(self):
-        return "delex_capture.pt" in self.files
+        return self._has("delex_capture.pt")
 
     @property
     def has_ckpt(self):
-        return "common.pt" in self.files
+        return self._has("common.pt") or os.path.isdir(os.path.join(RUNS, self.name, "ckpt"))
 
     def path(self, fname):
         return os.path.join(RUNS, self.name, fname)
