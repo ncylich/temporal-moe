@@ -53,3 +53,17 @@ g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,11,64,6,3.204810,1.
 g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,12,64,6,3.204416,1.5524,swap_unmask_L12.log
 g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,13,64,6,3.212761,1.5564,swap_unmask_L13.log
 g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,14,64,6,3.233701,1.5666,swap_unmask_L14.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,native,-,64,64,3.129898,1.5163,swap_native.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,2,6,64,3.263515,1.5810,swap_impose_L2.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,3,6,64,3.256462,1.5776,swap_impose_L3.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,4,6,64,3.256639,1.5777,swap_impose_L4.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,5,6,64,3.266242,1.5823,swap_impose_L5.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,6,6,64,3.265794,1.5821,swap_impose_L6.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,7,6,64,3.260457,1.5795,swap_impose_L7.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,8,6,64,3.267185,1.5828,swap_impose_L8.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,9,6,64,3.251446,1.5752,swap_impose_L9.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,10,6,64,3.249962,1.5744,swap_impose_L10.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,11,6,64,3.254039,1.5764,swap_impose_L11.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,12,6,64,3.265206,1.5818,swap_impose_L12.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,13,6,64,3.284120,1.5910,swap_impose_L13.log
+moe_coarse_1e19,1e19,full,coarse6/64,real,impose_one,14,6,64,3.353621,1.6247,swap_impose_L14.log
