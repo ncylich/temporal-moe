@@ -289,6 +289,11 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   # LR (not min-LR as an earlier comment claimed) — 10 such iters measurably corrupt a checkpoint
   # before eval (smoke: BPB 1.93 vs 1.4753 baseline). The temporal eval path therefore freezes
   # weights outright (--lr 0 --min-lr 0): routers/banners still fire, eval is of the true ckpt.
+  # EVAL_TRAIN_ITERS: the temporal eval path freezes weights (--lr 0 --min-lr 0), so every training
+  # iteration before the eval is forward+backward that changes nothing -- measured at 9.1 s each, 91 s
+  # per arm of the ~7 min total. 10 was needed by the expert_load path, whose router hook has to see
+  # real forward passes; the frozen temporal path needs only enough to reach the eval. Lowering it
+  # cannot change a result: identical weights in, identical eval out.
   EVAL_ENTRY=$ROOT/analysis/probes/expert_load.py; EVAL_LOG=expert_load.log; EVAL_FREEZE=""
   if [ "${TEMPORAL:-0}" = "1" ]; then
     EVAL_ENTRY=$ROOT/temporal/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
@@ -297,7 +302,7 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $EVAL_ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
-    --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
+    --finetune --train-iters ${EVAL_TRAIN_ITERS:-10} --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
     2>&1 | tee "$OUT/$EVAL_LOG"
 else
   # TEMPORAL=1: rolling-residency MoE -> run via pretrain_temporal.py (installs the router patch,
