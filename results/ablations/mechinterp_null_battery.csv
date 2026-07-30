@@ -1,0 +1,64 @@
+run,regime,budget,layer,feature,window,null,preserves,median_AUC,excess_over_chance,n_experts,label_autocorr_lag1
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,real,nothing destroyed (the measurement),0.6251,0.1251,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,flat-roll,partial document + position,0.5036,0.0036,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,seq-roll,document + near-position,0.5107,0.0107,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,perm-b,position only,0.5049,0.0049,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,perm-t,document only,0.509,0.009,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,iid,nothing,0.5026,0.0026,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,synth,autocorrelation only,0.5001,0.0001,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,real,nothing destroyed (the measurement),0.6413,0.1413,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,flat-roll,partial document + position,0.5052,0.0052,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,seq-roll,document + near-position,0.5196,0.0196,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,perm-b,position only,0.5094,0.0094,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,perm-t,document only,0.5299,0.0299,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,iid,nothing,0.498,-0.002,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,synth,autocorrelation only,0.4991,-0.0009,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,real,nothing destroyed (the measurement),0.5763,0.0763,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,flat-roll,partial document + position,0.5063,0.0063,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,seq-roll,document + near-position,0.5905,0.0905,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,perm-b,position only,0.5092,0.0092,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,perm-t,document only,0.5423,0.0423,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,iid,nothing,0.4986,-0.0014,24,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,synth,autocorrelation only,0.5005,0.0005,24,0.0007
+moe_coarse_1e19,full,1e19,2,token,0,real,nothing destroyed (the measurement),0.8799,0.3799,24,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,flat-roll,partial document + position,0.5019,0.0019,24,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,seq-roll,document + near-position,0.5118,0.0118,24,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,perm-b,position only,0.5043,0.0043,24,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,perm-t,document only,0.5095,0.0095,24,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,iid,nothing,0.5006,0.0006,24,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,synth,autocorrelation only,0.4986,-0.0014,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,real,nothing destroyed (the measurement),0.5673,0.0673,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,flat-roll,partial document + position,0.5045,0.0045,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,seq-roll,document + near-position,0.5248,0.0248,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,perm-b,position only,0.5019,0.0019,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,perm-t,document only,0.5207,0.0207,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,iid,nothing,0.5,0.0,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,synth,autocorrelation only,0.5001,0.0001,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,real,nothing destroyed (the measurement),0.5353,0.0353,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,flat-roll,partial document + position,0.5103,0.0103,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,seq-roll,document + near-position,0.5649,0.0649,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,perm-b,position only,0.5072,0.0072,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,perm-t,document only,0.527,0.027,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,iid,nothing,0.5008,0.0008,24,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,synth,autocorrelation only,0.502,0.002,24,0.0023
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,real,nothing destroyed (the measurement),0.5573,0.0573,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,flat-roll,partial document + position,0.5055,0.0055,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,seq-roll,document + near-position,0.5176,0.0176,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,perm-b,position only,0.5029,0.0029,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,perm-t,document only,0.517,0.017,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,iid,nothing,0.5005,0.0005,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,synth,autocorrelation only,0.4987,-0.0013,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,real,nothing destroyed (the measurement),0.6202,0.1202,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,flat-roll,partial document + position,0.5104,0.0104,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,seq-roll,document + near-position,0.5552,0.0552,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,perm-b,position only,0.5159,0.0159,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,perm-t,document only,0.5576,0.0576,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,iid,nothing,0.4982,-0.0018,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,synth,autocorrelation only,0.5028,0.0028,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,real,nothing destroyed (the measurement),0.611,0.111,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,flat-roll,partial document + position,0.5166,0.0166,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,seq-roll,document + near-position,0.601,0.101,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,perm-b,position only,0.516,0.016,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,perm-t,document only,0.5641,0.0641,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,iid,nothing,0.4993,-0.0007,24,-0.0012
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,synth,autocorrelation only,0.4995,-0.0005,24,-0.0012
