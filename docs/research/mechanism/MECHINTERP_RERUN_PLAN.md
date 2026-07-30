@@ -37,19 +37,30 @@ findings they produced are in §7.
 | demand forecastability | `mechinterp_demand_1e19.csv` | **now yes** | pooled 2–6 → 2–14 | 3 → 3 |
 | free-rider / tokens-per-expert | `mechinterp_freerider.csv` | no (architecturally fixed) | n/a | — |
 
-⚠ `e8` regressed to zero rows, and this is a preservation gap rather than a code one: it needs
-`results/phase0/probe_batch_cache/eod_*.npy`, a derived file that is gitignored and absent from
-`MANIFEST.csv`, so it cannot be rebuilt from the published artifacts. It is skipped loudly, once per
-run.
+⚠ `e8` regressed to zero rows: it needs `results/phase0/probe_batch_cache/eod_*.npy`, a derived file
+that is gitignored and absent from `MANIFEST.csv`, and it is skipped loudly, once per run. **It was
+described here as unrebuildable from the published artifacts, which is wrong.** The file is a `[B, S]`
+boolean mask of end-of-document positions on the fixed eval batch; no committed code produces it —
+`probe_replay.py` only reads it — but the corpus it derives from is present in both tokenizations. It
+needs a small producer script, not a preserved artifact.
 
 **Two limits that bound everything below.** First, the locus/lens/structural family needs a
-`delex_capture.pt` and only three were preserved, all at 1e19 — so "all models" for that family means
-three until the Step 3 sweep runs. Second, the runs behind the *published* 1e16/1e17 locus rows
-(`g3_tmoe_s0_1e16`, `g3_moe_s0_1e16{,_sigmoid}`, `v16k_sweep_s2_1e17`, `tmoe_minlogit_sh1_s2_1e17`)
-are **absent from `MANIFEST.csv` entirely** — no capture, no checkpoint. Those cells cannot be
-extended past layer 6, re-split, or re-windowed by anyone, ever. The same is true of the five runs
-the published e1–e8 numbers were computed on, so the replay re-run below **replaces** those numbers
-over a different run population rather than reproducing them.
+`delex_capture.pt` and only three were preserved — but every checkpoint in `MANIFEST.csv` is on the
+machine, so any cell can be captured with a forward pass. The Step 3 sweep has now done so.
+
+Second, **four of the five** runs behind the *published* 1e16/1e17 locus rows are absent from
+`MANIFEST.csv` entirely — no capture, no checkpoint — so those cells cannot be extended past layer 6,
+re-split, or re-windowed without retraining: `g3_tmoe_s0_1e16`, `g3_moe_s0_1e16_sigmoid`,
+`v16k_sweep_s2_1e17`, `tmoe_minlogit_sh1_s2_1e17`. An earlier revision said all five and said "by
+anyone, ever". **`g3_moe_s0_1e16` is the exception** — it is present with a checkpoint, and it is the
+run behind `s0_SOFTMAX_BASELINE`, the one cell this plan singles out as measured at w=32 alone. It has
+been captured, and its w=k measurement now exists.
+
+Note also that the coarse 6/64 pair at 1e17 is the substantive gap rather than any single run: every
+1e16 and 1e17 checkpoint on the machine is grain=3 fine 18/192, so no coarse cell survives at those
+budgets and none can be recovered by inference. The same is true of the five runs the published e1–e8
+numbers were computed on, so the replay re-run below **replaces** those numbers over a different run
+population rather than reproducing them.
 
 Where the limits are set:
 
