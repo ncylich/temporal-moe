@@ -15,8 +15,9 @@ made in analysis/plots/plot_locus_by_layer.py, which needs no torch.
 
 **The null-control gate is on the iid permutation only, and that is a change.** The acceptance
 criteria ask for 0.500 +- 0.002 under iid permutation *and* circular shift. Measured at full depth
-over every expert, the iid null holds everywhere (0.4996-0.5002) while the circular shift is inflated
-by up to +0.017, monotonically in the context window width. delex_null_check.py establishes that this
+over every expert, the iid null passes on every model (pooled medians within 0.0005 of 0.500) while the
+circular shift is inflated by up to +0.047 on a single layer, monotonically in the context window
+width. delex_null_check.py establishes that this
 is a defect of the shift, not of the models: the shift is applied to the flattened [S*B] stream whose
 adjacent entries are adjacent *batch elements*, so it never shifted along the token axis, and what it
 leaves intact is a document-level association between a label series and the feature. Gating on it

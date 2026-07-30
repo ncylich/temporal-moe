@@ -112,9 +112,12 @@ across models of different depth, and per layer index for continuity with the pu
   no checkpoint — so they cannot be extended past layer 6, re-split, or re-windowed by anyone. They
   remain at layers 2–6 on the positional split. The 1e19 rows are the only ones measured properly.
 - **Only the iid-permutation floor is trustworthy.** The circular-shift null is inflated by up to
-  +0.022 and is not a valid control here; see
-  [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md) §7.1. The iid floor holds at 0.500 ± 0.002 for
-  every model, layer, feature and window.
+  +0.047 on a single layer and is not a valid control here; see
+  [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md) §7.1. The iid floor passes the gate on every
+  model: per-model pooled medians are within 0.0005 of 0.500. Resolved to individual
+  (layer, feature, window) cells its median deviation is 0.0005 and its 95th percentile 0.0015, with 5
+  of 468 cells between 0.002 and 0.0025 — sampling noise in a 64-to-192-expert median, not a floor
+  problem.
 - **The document-disjoint split moves the AUCs but not their difference.** Token 0.605 vs 0.622 and
   context 0.683 vs 0.702 on the coarse temporal arm, so the difference is +0.078 vs +0.080. Leakage
   inflates both probes similarly and cancels in the reported statistic.
