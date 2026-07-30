@@ -140,7 +140,7 @@ def a3_scale():
         rows = []
         with open(f"{REPO}/results/ablations/learned_locality_vs_scale.csv") as f:
             for r in csv.DictReader(f):
-                if "coarse" not in r["model"]:
+                if "coarse" not in r["grain"]:
                     continue
                 rows.append((float(r["active_params_M"]), float(r["temporal_overlap_pct"]),
                              float(r["full_moe_overlap_pct"]) if r["full_moe_overlap_pct"] else None,

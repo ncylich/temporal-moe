@@ -90,6 +90,23 @@ def label(run, withN=True):
     return f"{r.regime} @{r.budget}, {grain}"
 
 
+def _active_params_m(run):
+    """Active non-embedding params in millions, from analysis/shapes.py rather than a hardcoded table.
+
+    The x-axis of the learned-locality figure is model scale, and the column carrying it was lost when
+    the opaque `model` label was replaced by run/budget/regime/grain. Deriving it from the shapes table
+    is better than the constant it replaces: shapes.py is what run.sh itself prices the FLOP budget
+    with, so the number is the same one the run was configured against.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import shapes
+    r = _BY_NAME.get(run) or registry.get(run)
+    sh = registry.shape_of(run)
+    if sh not in shapes.SHAPES:
+        return float("nan")
+    return shapes.active_nonembed(**shapes.SHAPES[sh], grain=r.grain or 1) / 1e6
+
+
 def meta_cols(run):
     """The (run, budget, regime, grain) prefix every per-run CSV row carries."""
     r = _BY_NAME.get(run) or registry.get(run)
@@ -972,6 +989,35 @@ def _fig_e8(out):
 
 
 # =====================================================================================
+def locality_csvs():
+    """The two plot_probe.py figures' data. Separated from _export_figure_data so it can be
+    regenerated on its own (`--locality-only`) without re-running e1-e8, which costs an hour."""
+    # plot_probe.py headline figures (learned-locality-vs-scale + rolling coverage/lifetime vs K).
+    # PAIRS/G3 in plot_probe.py name runs whose router logs were never preserved, so the pairing is
+    # rebuilt from the registry: each temporal run against the unconstrained run in its own
+    # (budget, granularity) cell, blank where no such baseline was preserved.
+    pair = {(r.budget, r.grain): r.name for r in _RUNS if not r.temporal}
+    rows = []
+    for run in HEADLINERS:
+        r = _BY_NAME[run]
+        rec = next(iter(load(run)["layers"].values())); k, E = rec["k"], rec["logits"].shape[-1]
+        mr = pair.get((r.budget, r.grain))
+        rows.append(meta_cols(run) + [f"{_active_params_m(run):.2f}",
+                                      f"{overlap(run)*100:.2f}",
+                                      (f"{overlap(mr)*100:.2f}" if mr and mr != run else ""),
+                                      mr or "", f"{100.0*k/E:.2f}"])
+    _csv("learned_locality_vs_scale.csv",
+         ["run", "budget", "regime", "grain", "active_params_M", "temporal_overlap_pct",
+          "full_moe_overlap_pct", "full_moe_run", "random_pct"], rows)
+    rows = []
+    for run in ALL_RUNS:
+        Ks, cov, life, k = sweep(run)
+        for K, c, l in zip(Ks, cov, life):
+            rows.append(meta_cols(run) + [f"{K/k:.3f}", f"{c:.5f}", f"{l:.3f}"])
+    _csv("rolling_coverage_lifetime_vs_K.csv",
+         ["run", "budget", "regime", "grain", "resident_cache_K_over_k", "hit_rate",
+          "mean_lifetime_tokens"], rows)
+
 def _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
                         e5_table, e6_perlayer, e7_curves, e8_out):
     """Write the small, tidy CSV behind every figure to results/ablations/.
@@ -1022,34 +1068,15 @@ def _export_figure_data(e1_rows, e1_victim, e2_summary, e3_rows, e4_curves,
          [M(r) + [o["batch"], w, f"{dd['hit_after']:.5f}", f"{dd['hit_within']:.5f}",
                   f"{dd['frac_tokens_after']:.5f}", f"{dd['deficit']:.5f}"]
           for r, o in e8_out.items() for w, dd in o["windows"].items()])
-    # plot_probe.py headline figures (learned-locality-vs-scale + rolling coverage/lifetime vs K).
-    # PAIRS/G3 in plot_probe.py name runs whose router logs were never preserved, so the pairing is
-    # rebuilt from the registry: each temporal run against the unconstrained run in its own
-    # (budget, granularity) cell, blank where no such baseline was preserved.
-    pair = {(r.budget, r.grain): r.name for r in _RUNS if not r.temporal}
-    rows = []
-    for run in HEADLINERS:
-        r = _BY_NAME[run]
-        rec = next(iter(load(run)["layers"].values())); k, E = rec["k"], rec["logits"].shape[-1]
-        mr = pair.get((r.budget, r.grain))
-        rows.append(meta_cols(run) + [f"{overlap(run)*100:.2f}",
-                                      (f"{overlap(mr)*100:.2f}" if mr and mr != run else ""),
-                                      mr or "", f"{100.0*k/E:.2f}"])
-    _csv("learned_locality_vs_scale.csv",
-         ["run", "budget", "regime", "grain", "temporal_overlap_pct", "full_moe_overlap_pct",
-          "full_moe_run", "random_pct"], rows)
-    rows = []
-    for run in ALL_RUNS:
-        Ks, cov, life, k = sweep(run)
-        for K, c, l in zip(Ks, cov, life):
-            rows.append(meta_cols(run) + [f"{K/k:.3f}", f"{c:.5f}", f"{l:.3f}"])
-    _csv("rolling_coverage_lifetime_vs_K.csv",
-         ["run", "budget", "regime", "grain", "resident_cache_K_over_k", "hit_rate",
-          "mean_lifetime_tokens"], rows)
+    locality_csvs()
+
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    if "--locality-only" in sys.argv:
+        locality_csvs()
+        return
     if "--a1" in sys.argv:
         a1_tau_ema()
         return
