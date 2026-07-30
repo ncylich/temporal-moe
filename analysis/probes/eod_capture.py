@@ -107,6 +107,13 @@ def _dump():
             np.array([ids.shape[0], ids.shape[1], eod_id, int(mask.sum())]))
     print(f"[eod] wrote {out}: shape {mask.shape}, eod_id {eod_id}, "
           f"{int(mask.sum())} boundaries ({mask.mean()*100:.2f}% of positions), tag {tag}")
+    # nvidia-smi reports what the caching allocator RESERVED, which is what collides when two arms
+    # run at once. What an arm actually needs is max_memory_allocated. If the gap is large, arms can
+    # be run concurrently by capping the pool rather than by buying a bigger GPU.
+    import torch as _t
+    if _t.cuda.is_available():
+        print(f"[mem] peak allocated {_t.cuda.max_memory_allocated()/2**30:.2f} GiB, "
+              f"peak reserved {_t.cuda.max_memory_reserved()/2**30:.2f} GiB")
 
 
 def verify():

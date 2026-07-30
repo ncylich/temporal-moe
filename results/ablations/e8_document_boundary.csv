@@ -1,1 +1,4 @@
 run,budget,regime,grain,batch,window_tokens,hit_after_eod,hit_within_doc,frac_tokens_after,deficit
+flame38m_g3_temporal,1e18,temporal,fine 18/192,50k,4,0.23362,0.27238,0.00293,0.03877
+flame38m_g3_temporal,1e18,temporal,fine 18/192,50k,16,0.26313,0.27238,0.01172,0.00925
+flame38m_g3_temporal,1e18,temporal,fine 18/192,50k,64,0.26179,0.27278,0.04668,0.01099
