@@ -234,6 +234,16 @@ elif [ "${DELEXPROBE:-0}" = "1" ]; then
     --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
     --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
     2>&1 | tee "$OUT/delexprobe.log"
+elif [ "${EODPROBE:-0}" = "1" ]; then
+  # 1f: produce the end-of-document mask e8 needs. Same pipeline and batch as PROBE=1, so the mask
+  # lines up with the router logs e8 replays; frozen weights because only the input ids matter.
+  export N_MB=${N_MB:-$(( (64 + MICRO_BATCH - 1) / MICRO_BATCH ))}
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/eod_capture.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/eodprobe.log"
 elif [ "${CAUSALPROBE:-0}" = "1" ]; then
   # C8 / N6: causal token-versus-context substitution. One invocation per arm (CAUSAL_ARM in
   # ref|token|context); the three are compared offline and the analysis refuses to compare arms whose
