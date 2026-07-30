@@ -375,10 +375,34 @@ def temporal_forward(self, input: torch.Tensor):
             if int(lay) == ln:
                 resid_R = E if val.strip().upper() == "E" else int(val)
                 break
-    mask = compute_resident_mask_accel(
-        trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
-        tau=float(os.environ.get("TEMPORAL_RHO", "0")),
-        ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
+    # N1 sham control. TEMPORAL_SHAM=random replaces the residency mask with a resident set drawn
+    # uniformly at random per token: the same R experts are eligible, but the choice carries no
+    # lexical information and no temporal dynamics. It answers whether the per-layer cost profile is
+    # about routing at all, or is positional sensitivity that any perturbation of that layer would
+    # show. Deliberately bypasses compute_resident_mask_accel rather than adding a policy to it: the
+    # fast path asserts bit-exactness against the reference scan, and a sham has no reference.
+    #
+    # Seeded from the layer number and a fixed base so repeated evaluations are identical -- C3's
+    # whole value is that it carries no seed noise, and a sham arm has to inherit that.
+    sham = os.environ.get("TEMPORAL_SHAM", "")
+    if sham:
+        E = logits.shape[-1]
+        if resid_R >= E:
+            mask = torch.ones_like(logits, dtype=torch.bool)
+        elif sham == "random":
+            g = torch.Generator(device=logits.device)
+            g.manual_seed(int(os.environ.get("TEMPORAL_SHAM_SEED", "1234"))
+                          + 1009 * int(getattr(self, "layer_number", 0)))
+            r = torch.rand(logits.shape, generator=g, device=logits.device, dtype=torch.float32)
+            mask = torch.zeros_like(logits, dtype=torch.bool)
+            mask.scatter_(-1, r.topk(resid_R, dim=-1).indices, True)
+        else:
+            raise ValueError(f"unknown TEMPORAL_SHAM={sham!r} (expected 'random')")
+    else:
+        mask = compute_resident_mask_accel(
+            trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
+            tau=float(os.environ.get("TEMPORAL_RHO", "0")),
+            ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
     lam = float(os.environ.get("TEMPORAL_COHERENCE_LAMBDA", "0"))
     if lam > 0 and self.training:
         from megatron.core.transformer.moe.moe_utils import (
