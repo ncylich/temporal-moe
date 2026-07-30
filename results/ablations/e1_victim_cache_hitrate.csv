@@ -1,36 +1,155 @@
-model,cache_size_experts,reload_hitrate
-"1.4M active, coarse (6 of 64 experts)",0,0.00000
-"1.4M active, coarse (6 of 64 experts)",1,0.02983
-"1.4M active, coarse (6 of 64 experts)",2,0.06602
-"1.4M active, coarse (6 of 64 experts)",4,0.13117
-"1.4M active, coarse (6 of 64 experts)",8,0.24576
-"1.4M active, coarse (6 of 64 experts)",16,0.44162
-"1.4M active, coarse (6 of 64 experts)",32,0.73042
-"8.1M active, coarse (6 of 64 experts)",0,0.00000
-"8.1M active, coarse (6 of 64 experts)",1,0.03296
-"8.1M active, coarse (6 of 64 experts)",2,0.07133
-"8.1M active, coarse (6 of 64 experts)",4,0.14045
-"8.1M active, coarse (6 of 64 experts)",8,0.25924
-"8.1M active, coarse (6 of 64 experts)",16,0.45617
-"8.1M active, coarse (6 of 64 experts)",32,0.74444
-"14.8M active, coarse (6 of 64 experts)",0,0.00000
-"14.8M active, coarse (6 of 64 experts)",1,0.03325
-"14.8M active, coarse (6 of 64 experts)",2,0.07050
-"14.8M active, coarse (6 of 64 experts)",4,0.13883
-"14.8M active, coarse (6 of 64 experts)",8,0.25738
-"14.8M active, coarse (6 of 64 experts)",16,0.45198
-"14.8M active, coarse (6 of 64 experts)",32,0.73381
-"3.9M active, fine-grained (18 of 192 experts)",0,0.00000
-"3.9M active, fine-grained (18 of 192 experts)",1,0.01160
-"3.9M active, fine-grained (18 of 192 experts)",2,0.02974
-"3.9M active, fine-grained (18 of 192 experts)",4,0.06731
-"3.9M active, fine-grained (18 of 192 experts)",8,0.13621
-"3.9M active, fine-grained (18 of 192 experts)",16,0.25836
-"3.9M active, fine-grained (18 of 192 experts)",32,0.44767
-"38.0M active, coarse (6 of 64 experts)",0,0.00000
-"38.0M active, coarse (6 of 64 experts)",1,0.03378
-"38.0M active, coarse (6 of 64 experts)",2,0.07088
-"38.0M active, coarse (6 of 64 experts)",4,0.13903
-"38.0M active, coarse (6 of 64 experts)",8,0.25539
-"38.0M active, coarse (6 of 64 experts)",16,0.44377
-"38.0M active, coarse (6 of 64 experts)",32,0.72550
+run,budget,regime,grain,cache_size_experts,reload_hitrate
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,0,0.00000
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,1,0.03493
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,2,0.07563
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,4,0.14675
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,8,0.25795
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,16,0.43738
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,32,0.70540
+flame38m_g3_temporal,1e18,temporal,fine 18/192,0,0.00000
+flame38m_g3_temporal,1e18,temporal,fine 18/192,1,0.01854
+flame38m_g3_temporal,1e18,temporal,fine 18/192,2,0.04439
+flame38m_g3_temporal,1e18,temporal,fine 18/192,4,0.09075
+flame38m_g3_temporal,1e18,temporal,fine 18/192,8,0.16056
+flame38m_g3_temporal,1e18,temporal,fine 18/192,16,0.27220
+flame38m_g3_temporal,1e18,temporal,fine 18/192,32,0.44126
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,0,0.00000
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,1,0.02360
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,2,0.05136
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,4,0.10446
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,8,0.19775
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,16,0.36088
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,32,0.62449
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,1,0.03907
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,2,0.09658
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,4,0.20326
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,8,0.37245
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,16,0.60635
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,32,0.86636
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,1,0.04300
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,2,0.10316
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,4,0.21255
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,8,0.38453
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,16,0.61980
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,32,0.87041
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,1,0.15971
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,2,0.32506
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,4,0.56843
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,8,0.81457
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,16,0.96023
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,32,0.99688
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,1,0.10256
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,2,0.20766
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,4,0.36700
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,8,0.57612
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,16,0.80949
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,32,0.97331
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,1,0.02101
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,2,0.04875
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,4,0.10546
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,8,0.20532
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,16,0.36770
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,32,0.60404
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,1,0.01410
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,2,0.03671
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,4,0.08339
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,8,0.16699
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,16,0.30615
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,32,0.51835
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,1,0.01177
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,2,0.02996
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,4,0.06821
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,8,0.13899
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,16,0.25777
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,32,0.44168
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,1,0.01669
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,2,0.04022
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,4,0.08738
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,8,0.17020
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,16,0.31016
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,32,0.52633
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,1,0.01237
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,2,0.03174
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,4,0.07043
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,8,0.14213
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,16,0.26663
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,32,0.46139
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,1,0.01173
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,2,0.03047
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,4,0.06903
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,8,0.14096
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,16,0.26582
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,32,0.46265
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,1,0.01344
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,2,0.03248
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,4,0.07135
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,8,0.14313
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,16,0.26884
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,32,0.46428
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,1,0.01295
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,2,0.03188
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,4,0.07143
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,8,0.14346
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,16,0.26660
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,32,0.45663
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,1,0.01315
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,2,0.03225
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,4,0.07050
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,8,0.14097
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,16,0.26093
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,32,0.44835
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,0,0.00000
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,1,0.01157
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,2,0.02986
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,4,0.06701
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,8,0.13401
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,16,0.24882
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,32,0.42970
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,0,0.00000
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,1,0.01169
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,2,0.03014
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,4,0.06849
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,8,0.13903
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,16,0.26075
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,32,0.45187
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,0,0.00000
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,1,0.01410
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,2,0.03565
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,4,0.08027
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,8,0.16185
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,16,0.29764
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,32,0.50241
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,0,0.00000
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,1,0.01408
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,2,0.03669
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,4,0.08280
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,8,0.16573
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,16,0.30482
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,32,0.51245
+moe_coarse_1e19,1e19,full,coarse 6/64,0,0.00000
+moe_coarse_1e19,1e19,full,coarse 6/64,1,0.02339
+moe_coarse_1e19,1e19,full,coarse 6/64,2,0.05105
+moe_coarse_1e19,1e19,full,coarse 6/64,4,0.10320
+moe_coarse_1e19,1e19,full,coarse 6/64,8,0.19905
+moe_coarse_1e19,1e19,full,coarse 6/64,16,0.36726
+moe_coarse_1e19,1e19,full,coarse 6/64,32,0.63334
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,0,0.00000
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,1,0.00894
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,2,0.02076
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,4,0.04564
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,8,0.09389
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,16,0.17776
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,32,0.31647
