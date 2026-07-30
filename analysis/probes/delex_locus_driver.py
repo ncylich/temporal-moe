@@ -32,6 +32,12 @@ import csv
 import os
 import sys
 
+# Each worker runs its own BLAS. Without a cap every one of them would try to use all cores and the
+# processes would thrash rather than scale. Must be set before numpy imports its backend.
+os.environ.setdefault("OMP_NUM_THREADS", "8")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "8")
+os.environ.setdefault("MKL_NUM_THREADS", "8")
+
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +54,18 @@ LABELS = {"moe_coarse_1e19": "moe_coarse_1e19",
 GATE = 0.002
 
 
+
+def _analyze_one(task):
+    """One (run, split) cell. Top-level and returning plain data so it can cross a process boundary.
+
+    Captures are independent -- nothing in analyze() reads another run -- so the only reason this was
+    ever serial is that the loop was written that way.
+    """
+    idx, cap, name, label, verify, split = task
+    rr, ff, cc, summary = delex_locus.analyze(cap, name, label=label, verify=verify, split=split)
+    return idx, name, label, split, rr, ff, cc, summary
+
+
 def main():
     verify = "--verify" in sys.argv
     only = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -57,6 +75,7 @@ def main():
 
     splits = ["sequence", "position"] if "--both-splits" in sys.argv else ["sequence"]
     rows, floors, coverage, gate_ok, headline = [], [], [], True, []
+    tasks = []
     for r in cells:
         cap = r.path("delex_capture.pt")
         if not os.path.exists(cap):
@@ -65,10 +84,21 @@ def main():
             continue
         label = LABELS.get(r.name, r.name)
         for split in splits:
-            print(f"[run] {label} ({r.name}, {r.regime}, {r.grain_label}, {r.budget}) "
-                  f"split={split}", flush=True)
-            rr, ff, cc, summary = delex_locus.analyze(cap, r.name, label=label, verify=verify,
-                                                      split=split)
+            tasks.append((len(tasks), cap, r.name, label, verify, split))
+
+    jobs = int(os.environ.get("JOBS", "0")) or min(len(tasks), max(1, (os.cpu_count() or 8) // 8))
+    print(f"[pool] {len(tasks)} (run, split) cells over {jobs} processes, "
+          f"{os.environ['OMP_NUM_THREADS']} BLAS threads each", flush=True)
+    if jobs > 1 and len(tasks) > 1:
+        import multiprocessing as mp
+        with mp.get_context("spawn").Pool(jobs) as pool:
+            done = [x for x in pool.imap_unordered(_analyze_one, tasks)]
+        done.sort(key=lambda x: x[0])           # deterministic CSV order regardless of finish order
+    else:
+        done = [_analyze_one(t) for t in tasks]
+
+    for _, name, label, split, rr, ff, cc, summary in done:
+            print(f"[run] {label} ({name}) split={split}", flush=True)
             rows += rr
             floors += ff
             coverage += cc
