@@ -109,23 +109,55 @@ def boot_median_ci(vals, n=BOOT):
     return float(np.median(a)), float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 
 
-def boot_slope(g, xs_by_layer, n=BOOT):
-    """OLS slope of per-layer median vs x, with a bootstrap interval.
+def boot_stat(g, xs_by_layer, stat, n=BOOT):
+    """Bootstrap a statistic of the per-layer median curve. Returns (point, lo95, hi95).
 
     Experts are resampled within each layer independently, mirroring how the medians were formed, so
     the interval reflects per-expert sampling noise rather than treating the medians as exact.
     """
     layers = sorted(g)
-    if len(layers) < 2:
+    if len(layers) < 3:
         return (float("nan"),) * 3
     x = np.array([xs_by_layer[l] for l in layers], float)
     arrs = [np.asarray(g[l], float) for l in layers]
-    fit = lambda y: np.polyfit(x, y, 1)[0]
-    point = fit(np.array([np.median(a) for a in arrs]))
+    point = stat(x, np.array([np.median(a) for a in arrs]))
     draws = np.empty(n)
     for i in range(n):
-        draws[i] = fit(np.array([np.median(RNG.choice(a, size=a.size, replace=True)) for a in arrs]))
+        y = np.array([np.median(RNG.choice(a, size=a.size, replace=True)) for a in arrs])
+        draws[i] = stat(x, y)
     return point, float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
+
+
+def _r2(p, x, y):
+    resid = ((y - np.polyval(p, x)) ** 2).sum()
+    tot = ((y - y.mean()) ** 2).sum()
+    return 1.0 - resid / tot if tot > 0 else float("nan")
+
+
+# A straight line is the wrong summary for these curves and reporting only its slope actively misleads.
+# The contextual share rises with depth and then turns over, so a full-range OLS slope mixes the rising
+# and falling halves: on the coarse temporal arm the linear fit explains R2=0.43 while a quadratic
+# explains 0.94, and the linear slope (+0.059) is dragged so far below the rising-region slope (+0.191)
+# that it reverses the comparison against the unconstrained baseline. Curvature and vertex are therefore
+# reported alongside, plus the slope restricted to layers at or above the vertex region.
+SLOPE = lambda x, y: np.polyfit(x, y, 1)[0]
+CURV = lambda x, y: np.polyfit(x, y, 2)[0]
+
+
+def vertex_in_layers(depth):
+    """Quadratic vertex, expressed as a layer index rather than in normalized-depth units."""
+    def f(x, y):
+        q = np.polyfit(x, y, 2)
+        return -q[1] / (2 * q[0]) * depth if q[0] != 0 else float("nan")
+    return f
+
+
+def rising_slope(cut_x):
+    """OLS slope over the rising portion only, i.e. x <= cut_x."""
+    def f(x, y):
+        m = x <= cut_x
+        return np.polyfit(x[m], y[m], 1)[0] if m.sum() >= 2 else float("nan")
+    return f
 
 
 if PAPER:
@@ -158,14 +190,27 @@ for fname, label, variant, color, budget, legend, ls in SERIES:
             linewidth=1.8, markeredgecolor="white", markeredgewidth=0.8,
             label=f"{legend} @ {budget}")
     # slopes in both units: per unit normalized depth (comparable across models) and per layer
-    # index (comparable with the published table)
-    s_nd = boot_slope(g, xs)
-    s_ix = boot_slope(g, {l: float(l) for l in layers})
+    # index (comparable with the published table), then the shape statistics that a slope hides
+    s_nd = boot_stat(g, xs, SLOPE)
+    s_ix = boot_stat(g, {l: float(l) for l in layers}, SLOPE)
+    cu = boot_stat(g, xs, CURV)
+    vx = boot_stat(g, xs, vertex_in_layers(depth))
+    ymed = np.array([np.median(g[l]) for l in layers])
+    xv = np.array([xs[l] for l in layers])
+    lin_r2 = _r2(np.polyfit(xv, ymed, 1), xv, ymed)
+    quad_r2 = _r2(np.polyfit(xv, ymed, 2), xv, ymed) if len(layers) >= 3 else float("nan")
+    # Rising region: up to the vertex where one falls inside the stack, else the whole range.
+    cut = min(max(vx[0], layers[0] + 1), layers[-1]) / depth if np.isfinite(vx[0]) else 1.0
+    rs = boot_stat(g, xs, rising_slope(cut))
     slope_rows.append([label, run, budget, "temporal" if med[0] > 0 else "full", variant,
                        window, SPLIT, depth,
                        layers[0], layers[-1], len(layers),
                        round(s_nd[0], 4), round(s_nd[1], 4), round(s_nd[2], 4),
                        round(s_ix[0], 5), round(s_ix[1], 5), round(s_ix[2], 5),
+                       round(lin_r2, 3), round(quad_r2, 3),
+                       round(cu[0], 4), round(cu[1], 4), round(cu[2], 4),
+                       round(vx[0], 2), round(vx[1], 2), round(vx[2], 2),
+                       round(rs[0], 4), round(rs[1], 4), round(rs[2], 4),
                        round(med[0], 4), round(med[-1], 4)])
     counts.append(f"{label}: n={min(len(v) for v in g.values())}-{max(len(v) for v in g.values())}"
                   f"/layer, layers {layers[0]}-{layers[-1]} of {depth}")
@@ -226,6 +271,10 @@ HEADER = ["label", "run", "budget", "regime", "variant", "window", "split", "dep
           "first_layer", "last_layer", "n_layers",
           "slope_per_normdepth", "slope_nd_lo95", "slope_nd_hi95",
           "slope_per_layer", "slope_ix_lo95", "slope_ix_hi95",
+          "linear_r2", "quadratic_r2",
+          "curvature", "curvature_lo95", "curvature_hi95",
+          "vertex_layer", "vertex_lo95", "vertex_hi95",
+          "rising_slope", "rising_lo95", "rising_hi95",
           "median_at_first_layer", "median_at_last_layer"]
 sp = os.path.join(DATA, "mechinterp_locus_slopes.csv")
 existing = []
@@ -235,12 +284,17 @@ if os.path.exists(sp):
 with open(sp, "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(HEADER)
-    w.writerows([[e[h] for h in HEADER] for e in existing])
+    # Rows carried over from another split may predate a schema change; fill absent columns rather
+    # than dropping the rows or crashing.
+    w.writerows([[e.get(h, "") for h in HEADER] for e in existing])
     w.writerows(slope_rows)
 print(f"wrote {sp}: {len(slope_rows)} rows at split={SPLIT}"
       f"{f' (kept {len(existing)} from other splits)' if existing else ''}")
-print(f"\n{'label':22} {'layers':8} {'slope/l-L':>22} {'slope/layer':>22}")
+print(f"\n{'label':22} {'R2 lin/quad':>12} {'full slope':>20} {'rising slope':>20} "
+      f"{'curvature':>20} {'vertex':>16}")
 for r in slope_rows:
-    print(f"{r[0]:22} {str(r[8])+'-'+str(r[9]):8} "
-          f"{r[11]:+.4f} [{r[12]:+.4f},{r[13]:+.4f}] "
-          f"{r[14]:+.5f} [{r[15]:+.5f},{r[16]:+.5f}]")
+    print(f"{r[0]:22} {r[17]:>5.2f}/{r[18]:<5.2f} "
+          f"{r[11]:+.4f} [{r[12]:+.3f},{r[13]:+.3f}] "
+          f"{r[25]:+.4f} [{r[26]:+.3f},{r[27]:+.3f}] "
+          f"{r[19]:+.4f} [{r[20]:+.3f},{r[21]:+.3f}] "
+          f"L{r[22]:.1f} [{r[23]:.1f},{r[24]:.1f}]")

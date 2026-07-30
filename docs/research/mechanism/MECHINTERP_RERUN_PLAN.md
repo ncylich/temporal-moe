@@ -252,6 +252,7 @@ puts every document in both the fit and score halves. Splits are now document-di
 | depth slope, fine 18/192 @1e16 temporal | +0.0257 [+0.0133, +0.0336] | +0.02565 [+0.01320, +0.03445] | reproduces exactly |
 | depth slope, fine 18/192 @1e16 baseline | +0.0223 [+0.0151, +0.0293] | +0.02232 [+0.01530, +0.02983] | reproduces exactly |
 | depth slope, coarse 6/64 @1e17 pair | −0.0032 / −0.0030 | −0.00325 / −0.00298 | reproduces exactly |
+| depth slope as a *summary statistic* | the only shape statistic reported | linear R² 0.43 where quadratic is 0.94 (coarse temporal @1e19) | **the statistic was inadequate, not the numbers.** Slopes reproduce; a slope is the wrong description of a curve that turns over, and using it inverted the regime comparison. Curvature, vertex and restricted-range slopes are now reported alongside — see `LAYER_LEXICALITY.md` §1 |
 | demand forecastability (pooled) | 0.604 / 0.926 / 0.979 | per-layer ranges 0.570–0.698 / 0.920–0.953 / 0.975–0.985 | pooled values sit inside the ranges |
 | generalist fraction, 64E | 13% baseline, 54% temporal | 97%→0% and 100%→44% over layers 2→14 | **pooling hid a regime change with depth**; see `delexicalization.md` §2 |
 | output lens, 192E @1e16 | 14,612 / 15,932 median | per layer 15,359→11,646 and 15,981→15,576 | **pooling hid a depth effect**; see `delexicalization.md` §4 |

@@ -5,11 +5,19 @@ The no-training tests C1, C2, C4, C6 and C7 are done, C5 is partial, and C3, C8,
 Sections 1–2 are the measurements, §3 the hypotheses and what the results did to them, §§4–5 the tests
 and their status.
 
-**The two-line version.** Routing does move from lexical to contextual with depth — but it does so in
-the *unconstrained* baseline too, and faster there, so that trend belongs to transformer depth rather
-than to rolling residency. What the constraint actually does is start from *no measurable effect at the
-first MoE layer* and accumulate with depth, on every metric measured. H1's prediction survives; its
-attribution does not.
+**The two-line version.** Routing does move from lexical to contextual with depth, in the *unconstrained*
+baseline as well, so part of that trend belongs to transformer depth rather than to rolling residency.
+What the constraint adds is a shape: it starts from no measurable effect at the first MoE layer,
+accumulates with depth on every metric measured, moves the locus toward context about twice as fast as
+the baseline while it is rising, and then **turns over at roughly two thirds depth** while the
+unconstrained model is still climbing at its last layer.
+
+**A note on method, because it changed two conclusions in this document.** These curves are not lines.
+Summarising them by an OLS slope inverted the regime comparison in §1 (a full-range slope averages the
+temporal arm's rise against its own fall) and would have hidden the U in C3's per-layer cost profile
+entirely (a symmetric U has near-zero linear trend by construction). Curvature, vertex and
+restricted-range slopes are now reported alongside every slope, and `linear_r2`/`quadratic_r2` are in
+`mechinterp_locus_slopes.csv` so the adequacy of a line is visible rather than assumed.
 
 Battery-wide housekeeping — re-running every mechinterp script across every model and layer — is
 tracked separately in [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md), whose §7 records what that
@@ -84,24 +92,45 @@ across models of different depth, and per layer index for continuity with the pu
 |---|---|---|---|
 | fine 18/192 @1e16 | +0.1026 [+0.0516, +0.1334] | +0.0893 [+0.0595, +0.1194] | +0.0257 / +0.0223 |
 | coarse 6/64 @1e17 | −0.0195 [−0.0534, +0.0289] | −0.0179 [−0.0784, +0.0263] | −0.0033 / −0.0030 |
-| coarse 6/64 @1e19 | **+0.0590 [+0.0458, +0.0748]** | **+0.0929 [+0.0773, +0.1148]** | +0.0042 / +0.0066 |
+| coarse 6/64 @1e19 | +0.0590 [+0.0458, +0.0748] | +0.0929 [+0.0773, +0.1148] | +0.0042 / +0.0066 |
 | fine 18/192 @1e19 | +0.0408 [+0.0307, +0.0513] | *no baseline capture preserved* | +0.0029 / — |
+
+**A straight line is the wrong summary of these curves, and the full-range slope above inverts the
+comparison it appears to make.** The contextual share rises with depth and then turns over, so an OLS
+slope across the whole stack averages a rise against a fall. On the coarse temporal arm a line explains
+R² = 0.43 while a quadratic explains **0.94**. Fitting the shape instead:
+
+| coarse 6/64 @1e19 | R² lin / quad | slope over the rising region | curvature | vertex (layer) |
+|---|---|---|---|---|
+| temporal | 0.43 / **0.94** | **+0.1704 [+0.136, +0.197]** | **−0.2739 [−0.334, −0.203]** | **9.5 [9.1, 10.3]** |
+| unconstrained | 0.68 / 0.72 | **+0.0929 [+0.076, +0.116]** | −0.1048 [−0.169, −0.001] | 14.2 [11.0, 60.7] |
+
+All three statistics separate, and they say the opposite of the full-range slopes: **while it is rising
+the temporal arm moves toward context about twice as fast as the unconstrained one** (+0.170 vs +0.093,
+non-overlapping), then reverses at layer 9.5 of 14 — a vertex tightly identified inside the stack — while
+the unconstrained arm is still climbing at its last layer, its vertex interval running well past the
+network. The full-range slope reads "baseline steeper" only because the temporal arm's own decline is
+folded into its average.
+
+Shape cannot be resolved for the 1e16/1e17 arms: 3–5 layers give curvature intervals that straddle zero.
+All shape statistics are in `mechinterp_locus_slopes.csv`.
 
 **Readings.**
 
 1. **The regimes never overlap at any depth.** Every temporal series is above 0 at every layer, every
    unconstrained series below −0.17. The regime gap (~0.3 AUC) still dwarfs every depth effect (~0.05).
-2. **The slopes now differ, and the baseline's is steeper.** Over layers 2–6 the matched pairs were
-   statistically indistinguishable; over 2–14 the 1e19 CIs do not overlap, and the *unconstrained*
-   model's locus moves toward context with depth faster than the constrained one's. So the depth trend
-   is a property of transformer depth — more attention mixing before deeper routers see the stream —
-   which the constraint **dampens rather than creates**. H1 is restated accordingly in §3.
-3. **The shape is increases-then-saturates, and the coarse temporal arm reverses.** Deep-half slope
-   divided by shallow-half slope (split at layer 8) is **−0.37** for temporal 6/64 — it peaks at layer
-   8 and declines — **+0.23** for temporal 18/192, and **+0.59** for the baseline. Measuring 2–6 and
-   extrapolating caught only the rising part. This settles the question §2 raised from the cache side,
-   and the two sides agree: the coarse temporal locus peaks at layer 8, its hit rate plateaus from
-   layer 10.
+2. **The arms differ in the shape of the curve, not in a slope.** Over layers 2–6 the matched pairs were
+   statistically indistinguishable. Over 2–14 they separate on curvature (−0.274 vs −0.105) and on where
+   the curve turns (layer 9.5 vs 14.2), and over the rising region the *temporal* arm is the steeper one
+   (+0.170 vs +0.093). So the depth trend is present in both regimes — that much is a property of
+   transformer depth, more attention mixing before deeper routers see the stream — but the constraint
+   does not merely fail to cause it and does not dampen it: it **accelerates the move toward context and
+   then reverses it in the deepest third**. H1 is restated accordingly in §3.
+3. **The shape is rises-then-turns-over, and only the temporal arms turn over inside the network.** The
+   coarse temporal locus peaks at layer 9.5 of 14 and declines; the fine temporal arm turns at 12.4; the
+   unconstrained arm's vertex sits beyond its last layer. Measuring 2–6 and extrapolating caught only
+   the rising part. This settles the question §2 raised from the cache side, and the two sides agree on
+   the same model: the coarse temporal locus turns at ~9.5 and its hit rate plateaus from layer 10.
 4. **The coarse 1e17 pair is flat in both regimes**, CI straddling zero. Still a real exception, and
    now the only arm that is flat.
 5. **Granularity sets the level more than compute does.**
@@ -187,18 +216,23 @@ schedule, and the one full-depth signal we have currently favours saturation.
 
 **Status: measured at full depth, and H1 needs restating in two ways.**
 
-*The prediction holds but is not about the constraint.* `A_ctx − A_tok` does increase with `l/L`, and
-cache hit rate does increase with `l/L`, in every arm except the flat coarse 1e17 pair. But both
-increase in the **unconstrained baseline too**, and on the probe side the baseline's slope is *steeper*
-than the temporal model's (+0.0929 [+0.0773, +0.1148] versus +0.0590 [+0.0458, +0.0748] per unit `l/L`,
-non-overlapping). H1's falsification criterion was "a flat or negative depth slope in the majority of
-arms", which is not met — but its framing, that this is what the residency constraint does to routing,
-is. The depth trend is a property of transformer depth that the constraint dampens.
+*The prediction holds, and the depth trend is not exclusive to the constraint — but the constraint does
+shape it.* `A_ctx − A_tok` increases with `l/L`, and cache hit rate increases with `l/L`, in every arm
+except the flat coarse 1e17 pair. Both increase in the **unconstrained baseline too**, so the trend is
+partly a property of transformer depth. H1's falsification criterion, "a flat or negative depth slope in
+the majority of arms", is not met.
 
-*The shape is increases-then-saturates, not monotone.* Deep-half over shallow-half slope is −0.37 for
-the coarse temporal locus (it peaks at layer 8 and declines), +0.23 for fine, +0.59 for the baseline.
-The cache side agrees and adds a granularity dependence: the coarse arms saturate hard (deep/shallow
-0.19 at 1e18, 0.62 at 1e19) while the fine arms stay roughly linear (0.88, 1.22).
+What the matched arms add is that the two regimes differ in the *shape* of the curve rather than in a
+slope. While the curve is rising the constrained arm moves toward context about twice as fast
+(+0.1704 [+0.136, +0.197] versus +0.0929 [+0.076, +0.116] per unit `l/L`, non-overlapping); it is more
+strongly concave (−0.2739 [−0.334, −0.203] versus −0.1048 [−0.169, −0.001]); and it turns over at layer
+**9.5 [9.1, 10.3]** of 14 while the unconstrained arm is still climbing at its last layer.
+
+*The shape is rises-then-turns-over, not monotone, and a linear slope hides that.* A line explains
+R² = 0.43 of the coarse temporal curve against a quadratic's 0.94, and the full-range linear slopes
+invert the regime comparison because they average the temporal arm's rise against its own fall. The
+cache side agrees and adds a granularity dependence: the coarse arms saturate hard (deep-over-shallow
+half-slope 0.19 at 1e18, 0.62 at 1e19) while the fine arms stay roughly linear (0.88, 1.22).
 
 *What is genuinely constraint-specific is a widening gap, not a slope.* On cache hit rate the matched
 1e19 pair is identical at layer 2 (0.114 vs 0.117) and 0.21 apart by layer 11. Selectivity, generalist
