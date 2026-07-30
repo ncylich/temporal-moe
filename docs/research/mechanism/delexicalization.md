@@ -160,26 +160,38 @@ weighted and within layer.
 | baseline | 14,612 | 9,683 | 15,990 |
 | temporal | 15,932 | 15,342 | 15,990 |
 
-These are medians pooled over MoE layers 2–4. Resolved by layer — the same rows, the layer key kept
-rather than averaged away — the effect is strongly depth-dependent, and only in the baseline:
+These are medians pooled over MoE layers 2–4, and **they should not be resolved by layer from the
+committed CSVs**: the capture that produced them attributed each layer's expert outputs one layer too
+shallow, so `mechinterp_lens_1e19.csv`'s layer *j* rows were computed from layer *j+1*'s experts and the
+deepest layer was never covered at all. See [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md) §7.4.
+The 1e16 rows above come from an earlier pipeline whose captures were not preserved, so whether they
+share the defect cannot be determined; they are neither confirmed nor cleared.
 
-| model (192E, 1e16) | L2 | L3 | L4 | no-signal reference (L2/L3/L4) |
-|---|---|---|---|---|
-| softmax-aux baseline | 15,359 | 14,729 | **11,646** | 15,984 / 15,984 / 15,982 |
-| temporal | 15,981 | 15,939 | 15,576 | 15,991 / 15,990 / 15,989 |
+**Re-measured correctly at 1e18**, on captures taken after the fix, matched pairs at both granularities,
+every MoE layer, and always weighted-versus-static *within* a layer — the static reference is itself
+depth-dependent, so the gap is the only readable quantity:
 
-The baseline's gap below its own no-signal reference grows from 625 effective words at layer 2 to
-4,336 at layer 4, while the temporal model's grows from 10 to 413 — an order of magnitude smaller at
-every depth. So lexical sharpening on the output side is something the unconstrained router acquires
-*with depth*, and the constraint suppresses it throughout.
+| gap (weighted − static), 1e18 | L2 | L3 | L4 | L5 | L6 | L7 | L8 | L9 |
+|---|---|---|---|---|---|---|---|---|
+| unconstrained 6/64 | −16.4k | −17.1k | −15.8k | −12.1k | −13.2k | −15.5k | −12.0k | −3.9k |
+| temporal 6/64 | −19.6k | −17.9k | −12.4k | −14.5k | −19.3k | **−24.8k** | −23.4k | −10.1k |
+| unconstrained 18/192 | −5.3k | −2.6k | −1.7k | −5.7k | −2.1k | −3.4k | −1.1k | +7.6k |
+| temporal 18/192 | −1.0k | −4.7k | −4.3k | −4.3k | −6.7k | **−8.2k** | −0.5k | +2.1k |
 
-Two cautions on reading this as depth evidence. The static reference is not constant with depth in
-general: at 1e19 it falls from 32.5k at layer 2 to 28.4k at layer 14, because mid-network projections
-are rotated relative to the output basis by an amount that itself varies with depth. Comparisons must
-therefore be weighted-versus-static *within* a layer, as above. And this table covers layers 2–4 only
-— the whole stack at 1e16, but 3 of 13 MoE layers at 1e19, where the same comparison is flat.
-Extending it needs a fresh capture pass ([`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md)
-Step 3).
+**This does not generalize the way §4 claims.** The section reads the temporal model as "barely
+distinguishable from no signal", containing "no word-list experts even in their extreme tail". At 1e18
+the temporal experts write *sharper* vocabulary distributions than the unconstrained ones at 6 of 8
+layers in the coarse pair, most starkly at layer 7 (median effective vocabulary **720** words against
+the baseline's 7,640, a gap of −24.8k against −15.5k). The fine pair shows the same crossover from
+layer 5 on.
+
+Two caveats bound this. The published cell is 192 experts at 1e16 and these are 1e18, so this is a new
+measurement at a different budget rather than a direct contradiction of the same cell; and the
+output-side story is the one part of the de-lexicalization argument that now rests on data from a
+different scale than the input-side story. The input side — token AUC 0.902 → 0.659 coarse and
+0.889 → 0.587 fine, context dominating 93% and 97% of experts — replicates at 1e18 cleanly
+([`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) §1). What has not survived is the claim that the
+constraint blunts what experts *write*.
 
 Baseline experts promote markedly narrower vocabularies (about 1,400 effective words of lexical
 preference at the median and over 6,000 in the sharpest decile, whose top promoted tokens read as

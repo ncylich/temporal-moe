@@ -83,7 +83,12 @@ def main():
             continue
         ip = ckpt_read.iter_dir(ck)
         want = ["output_layer.weight", "decoder.final_layernorm.weight"]
-        fc2 = {L: f"decoder.layers.{L}.mlp.experts.experts.linear_fc2.weight" for L in layers}
+        # Capture layer keys are TopKRouter.layer_number, 1-based; checkpoint module paths are 0-based,
+        # so the weights for layer L live at decoder.layers.{L-1}. Verified against the checkpoint: for
+        # an 8-MoE-layer model the expert modules are at indices 1..8 and the capture keys are 2..9.
+        # Using L directly read the next layer's weights and left the deepest layer with no static
+        # reference at all -- the same off-by-one the capture itself had (see delex_probe.py).
+        fc2 = {L: f"decoder.layers.{L - 1}.mlp.experts.experts.linear_fc2.weight" for L in layers}
         have = set(ckpt_read.weight_keys(ckpt_read.FileSystemReader(ip)))
         missing = [L for L in layers if fc2[L] not in have]
         if missing:

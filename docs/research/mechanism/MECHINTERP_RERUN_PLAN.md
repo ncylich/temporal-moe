@@ -259,7 +259,28 @@ puts every document in both the fit and score halves. Splits are now document-di
 | per-layer hit rate, 38M @1e18 | 0.165 … 0.338 (L2–9) | 0.171 … 0.380 (L2–9) | different run in the same cell (the published one's log was not preserved); shape replicates, values ≤0.04 apart |
 | tokens per expert per batch | identical across regimes | 12,288 fine / 3,072 coarse, both regimes | reproduces; this is why A11 has no meaningful per-layer breakout |
 
-### 7.3 Two things the plan itself got wrong
+### 7.4 The capture attributed expert outputs one layer too shallow
+
+`delex_probe.py` filed router logits under `TopKRouter.layer_number` (1-based) and expert output vectors
+under the module index from `decoder.layers.N` (0-based). For a `[0]+[1]*(L-1)` schedule the router
+writes keys 2..L while the expert modules sit at 1..L-1, so the `out_sum` stored at key *j* actually
+belonged to layer *j+1*, the deepest MoE layer got no `out_sum` at all, and the entry for index 1 was
+dropped for having no logits. The signature — `out_cnt is None` for the deepest layer — is present in
+every capture the script ever produced, including all three preserved 1e19 ones.
+
+**Only the output-lens family is affected.** Logits and mask were always keyed consistently by
+`layer_number`, so locus, floors, structural, demand, oracle, frequency-stratification and transfer are
+untouched; `out_sum` is read by nothing else. `mechinterp_lens_1e19.csv` as published had its layers 2–4
+computed from layers 3–5 and never covered layer 14. The 1e16/1e17 rows in `mechinterp_lens.csv` came
+from an earlier pipeline whose captures were not preserved and cannot be checked either way.
+
+Fixed, and `_dump` now refuses to write a capture whose two key spaces disagree. `delex_lens.py` had the
+mirror-image bug in its checkpoint key construction — it read `decoder.layers.{L}` for capture layer L,
+i.e. the next layer's weights, which left the deepest layer with no static reference — also fixed. The
+lens has been re-measured on re-taken 1e18 captures and the result contradicts §4 of
+`delexicalization.md`; see that section.
+
+### 7.5 Two things the plan itself got wrong
 
 **The 1e19 models are 14 layers deep, not 9.** Both plan documents assume 9, and this plan asked for
 `LAYERS = range(2, 10)`. The captures hold MoE layers 2–14, so implementing that literally would have
