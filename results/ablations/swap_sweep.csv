@@ -39,3 +39,17 @@ flame38m_g1_moe,1e18,full,coarse6/64,random,impose_one,9,6,64,4.686284,2.2703,sw
 flame38m_g1_moe,1e18,full,coarse6/64,real,impose_set,3;4;5;6;7;8,6,64,5.042416,2.4428,swap_impose_set_3-4-5-6-7-8.log
 flame38m_g1_moe,1e18,full,coarse6/64,real,impose_set,2;9,6,64,4.814318,2.3323,swap_impose_set_2-9.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_set,2;9,64,6,4.008203,1.9418,swap_unmask_set_2-9.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,native,-,6,6,3.178993,1.5401,swap_native.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,2,64,6,3.198879,1.5497,swap_unmask_L2.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,3,64,6,3.192138,1.5464,swap_unmask_L3.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,4,64,6,3.186571,1.5437,swap_unmask_L4.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,5,64,6,3.185121,1.5430,swap_unmask_L5.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,6,64,6,3.189000,1.5449,swap_unmask_L6.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,7,64,6,3.191094,1.5459,swap_unmask_L7.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,8,64,6,3.193563,1.5471,swap_unmask_L8.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,9,64,6,3.197599,1.5491,swap_unmask_L9.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,10,64,6,3.199427,1.5500,swap_unmask_L10.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,11,64,6,3.204810,1.5526,swap_unmask_L11.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,12,64,6,3.204416,1.5524,swap_unmask_L12.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,13,64,6,3.212761,1.5564,swap_unmask_L13.log
+g1_tmoe_coarse_1e19,1e19,temporal,coarse6/64,real,unmask_one,14,64,6,3.233701,1.5666,swap_unmask_L14.log
