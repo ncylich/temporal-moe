@@ -989,6 +989,50 @@ def _fig_e8(out):
 
 
 # =====================================================================================
+def a11_freerider():
+    """A11 -- distinct experts per sequence and tokens per expert, over every preserved router log.
+
+    The committed file had four rows carrying labels that decode only by reading a source file, for
+    runs that are not in MANIFEST.csv. Regenerated from the registry with run/budget/regime/grain.
+
+    No per-layer breakout, and that is a property of the architecture rather than a shortcut: top-k
+    routing assigns exactly k/E of each batch's tokens to each expert on average however those
+    assignments are distributed in time, so tokens-per-expert is pinned by (k, E) at every layer. The
+    measured column is here to show that it holds, which is what rules out the gradient-noise
+    explanation in Appendix A of delexicalization.md. Distinct-experts-per-sequence does vary by layer
+    and is reported per layer in e2_streamed_diversity.csv; this file keeps the per-model summary the
+    appendix quotes.
+    """
+    rows = []
+    for run in ALL_RUNS:
+        r = _BY_NAME[run]
+        rec = load(run)
+        per_seq, tpe = [], []
+        for ln, d in rec["layers"].items():
+            lg = d["logits"]; k = d["k"]; E = lg.shape[-1]
+            # The served set is top-k of the ROUTED logits: for a temporal run the router selects
+            # among residents, so it is top-k of the masked logits, not the intersection of the
+            # resident set with the unconstrained demand. That intersection is the cache hit set and
+            # is much smaller -- using it made tokens-per-expert read 447 where the architecture pins
+            # it at k/E of the batch.
+            if d["mask"] is not None:
+                routed = np.where(d["mask"], lg, -np.inf)
+            else:
+                routed = lg
+            served = topk_ids(routed, k)               # [S,B,E], exactly k True per token
+            per_seq.append(served.any(0).sum(1).astype(float))     # distinct experts per sequence
+            tpe.append(served.sum(0).sum(0).astype(float))         # tokens per expert, over the batch
+        u = np.concatenate(per_seq); t = np.concatenate(tpe)
+        rows.append(meta_cols(run) + [E, k, f"{u.mean():.2f}", f"{u.mean()/E:.4f}",
+                                      f"{np.median(t):.1f}", f"{t.mean():.1f}"])
+        print(f"  {label(run):46s} E={E:3d} distinct/seq={u.mean():6.2f} "
+              f"({u.mean()/E*100:4.1f}% of E)  tokens/expert mean={t.mean():.0f}")
+    _csv("mechinterp_freerider.csv",
+         ["run", "budget", "regime", "grain", "E", "k", "distinct_experts_per_seq",
+          "distinct_frac_of_E", "tokens_per_expert_median", "tokens_per_expert_mean"], rows)
+    return rows
+
+
 def locality_csvs():
     """The two plot_probe.py figures' data. Separated from _export_figure_data so it can be
     regenerated on its own (`--locality-only`) without re-running e1-e8, which costs an hour."""
@@ -1076,6 +1120,10 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     if "--locality-only" in sys.argv:
         locality_csvs()
+        return
+    if "--a11-only" in sys.argv:
+        print("\n=== A11  free-rider / tokens-per-expert ===")
+        a11_freerider()
         return
     if "--a1" in sys.argv:
         a1_tau_ema()
