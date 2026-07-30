@@ -99,28 +99,39 @@ fraction already resident when the token arrived, measured **pre-swap**. Range 0
 resident set matches demand better. A random resident set scores **k/E = 6/64 = 18/192 = 0.094**,
 identical for both granularities, so the two are directly comparable.
 
-Source: [`e6_per_layer_ranking.csv`](../../../results/ablations/e6_per_layer_ranking.csv).
+Source: [`e6_per_layer_ranking.csv`](../../../results/ablations/e6_per_layer_ranking.csv), now 22 runs
+and 112 rows rather than 3 runs and 17 rows.
 
-| MoE layer | 3.9M active, fine 18/192 @1e17 | 8.1M active, coarse 6/64 @1e17 | 38M active, coarse 6/64 @1e18 |
-|---|---|---|---|
-| 2 | 0.249 | 0.292 | 0.165 |
-| 3 | 0.332 | 0.319 | 0.259 |
-| 4 | 0.357 | 0.382 | 0.305 |
-| 5 | 0.453 | 0.438 | 0.331 |
-| 6 | — | 0.479 | 0.362 |
-| 7 | — | — | 0.334 |
-| 8 | — | — | 0.339 |
-| 9 | — | — | 0.338 |
+**The matched pair, and the answer to C4.** Same budget, same shape, same granularity, differing only
+in whether rolling residency was imposed during training. The unconstrained arm is a *counterfactual
+replay*: an unconstrained model logs no resident set, so the residency policy is replayed over its own
+demand to obtain the set it would have held. Random floor is `k/E = 6/64 = 0.094` for both.
 
-**Depth coverage here is complete** for all three models, which makes its shape important: hit rate
-climbs steeply from the first MoE layer through the middle (+82% relative for the fine model, +64%
-for the 8.1M coarse) and then **plateaus at 0.33–0.34 through L9 rather than continuing to rise.**
-If the locus curve does the same, H1's shape is *increases-then-saturates*, not monotone increase —
-a materially different prediction for where a per-layer schedule puts its cutoff.
+| MoE layer | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| temporal (`g1_tmoe_coarse_1e19`) | 0.114 | 0.149 | 0.162 | 0.183 | 0.227 | 0.265 | 0.293 | 0.317 | 0.380 | 0.404 | 0.390 | 0.375 | 0.424 |
+| unconstrained (`moe_coarse_1e19`) | 0.117 | 0.128 | 0.126 | 0.140 | 0.161 | 0.173 | 0.175 | 0.168 | 0.172 | 0.182 | 0.198 | 0.199 | 0.250 |
+| gap | **−0.003** | +0.021 | +0.036 | +0.043 | +0.066 | +0.092 | +0.118 | +0.149 | +0.208 | +0.222 | +0.192 | +0.176 | +0.174 |
 
-All three models are temporal; there is no unconstrained baseline hit rate at all (test C4).
-Swap rate is unusable for depth work: it is 0.994–1.000 everywhere because at R = k a swap fires
-iff at least one demanded expert is missing, so it saturates as "fraction of tokens with >= 1 miss".
+Three readings, and the first two are new:
+
+1. **The depth trend is present in the unconstrained regime too** (0.117 → 0.250), so part of it is a
+   property of transformer depth rather than of the constraint — the same conclusion the §1 slope
+   table forced on the probe side, now confirmed on the cache side with a matched arm.
+2. **But the constraint's contribution is not uniform: it is zero at the first MoE layer and is earned
+   with depth.** The two arms are within 0.003 at layer 2 and 0.21 apart by layer 11. Cacheability is
+   not a property the constraint confers on a network, it is one it builds up through depth.
+3. **The temporal curve saturates**, plateauing at 0.38–0.42 from layer 10 while the baseline keeps
+   creeping up. This is the *increases-then-saturates* shape §2 previously suspected from 8 layers of
+   one model, now seen over 13 layers with a control.
+
+The 1e18 arms, which had no depth-resolved measurement of any kind before, agree: `flame38m_g1_temporal`
+runs 0.171 → 0.266 → 0.317 → 0.342 → 0.331 → 0.331 → 0.362 → 0.380 over layers 2–9, i.e. a steep climb
+to layer 5 and a plateau after. The published 38M column above (0.165 … 0.338) was a different run in
+the same cell whose log was not preserved; the shape replicates, the values shift by ≤0.04.
+
+Swap rate remains unusable for depth work: 0.994–1.000 everywhere, because at R = k a swap fires iff
+at least one demanded expert is missing, so it saturates as "fraction of tokens with ≥ 1 miss".
 
 ## 3. The two hypotheses
 

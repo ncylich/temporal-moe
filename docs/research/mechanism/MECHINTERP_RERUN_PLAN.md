@@ -10,18 +10,43 @@ This is deliberately *not* hypothesis-driven work — it is making the existing 
 and reproducible. The hypothesis-driven analysis that motivated the audit lives in
 [`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) and depends on Section 5 Steps 1–3 below.
 
-## 1. Current coverage
+## 1. Coverage
 
-| metric | file | per-layer? | layers covered | models |
+**Status: Steps 1 and 2 are done. Step 3 has committed drivers but has not been run; Step 4 is
+partial.** The table below is the coverage after that work; the "was" column is what this plan was
+written against. Numbers and the findings they produced are in §7.
+
+| metric | file | per-layer? | layers: was → now | models: was → now |
 |---|---|---|---|---|
-| locus probes (A_tok, A_ctx) | `mechinterp_locus{,_1e19}.csv` | yes | 2–6 (of up to 9) | 8 |
-| output logit lens (effective vocab) | `mechinterp_lens{,_1e19}.csv` | yes | **2–4 only** | 6 |
+| locus probes (A_tok, A_ctx) | `mechinterp_locus{,_1e19}.csv` | yes | 2–6 → **2–14** at 1e19 | 8 → 8 |
+| null floors | `mechinterp_floors{,_1e19}.csv` | **now yes** | pooled → per layer | 5 → 8 |
+| token-id oracle ceiling (C7) | `mechinterp_oracle.csv` | yes | — → 2–14 | — → 3 |
+| null battery (which null is valid) | `mechinterp_null_battery.csv` | one layer | — → 2 | — → 3 |
+| output logit lens (effective vocab) | `mechinterp_lens{,_1e19}.csv` | yes | **2–4**, still 2–4 | 6 → 6 |
 | logit lens (older) | `mechinterp_logitlens.csv` | yes | 1–3 | 2 |
-| cache hit rate | `e6_per_layer_ranking.csv` | yes | all | 3 |
-| swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | all | 5 |
-| selectivity PR, generalist %, router entropy, weight geometry | `mechinterp_structural{,_1e19}.csv` | **no — pooled** | n/a | 11 |
-| demand forecastability | `mechinterp_demand_1e19.csv` | **no — pooled over 2–6** | n/a | 3 |
-| free-rider / tokens-per-expert | `mechinterp_freerider.csv` | no | n/a | — |
+| cache hit rate | `e6_per_layer_ranking.csv` | yes | all | 3 → **22** |
+| swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | all | 5 → **22** |
+| eviction headroom, demand smoothing | `e5_*.csv`, `e7_*.csv` | **now yes** | pooled → per layer | 3 → **22** |
+| every other replay metric (e2–e4) | `e2_*.csv` … | n/a | — | 5 → **22** |
+| document-boundary churn | `e8_document_boundary.csv` | n/a | — | 5 → **0** ⚠ |
+| selectivity PR, generalist %, router entropy | `mechinterp_structural_1e19.csv` | **now yes** | pooled → 2–14 | 11 → 3 |
+| weight geometry (A8) | same | **not measured** | needs checkpoints, none on disk | — |
+| demand forecastability | `mechinterp_demand_1e19.csv` | **now yes** | pooled 2–6 → 2–14 | 3 → 3 |
+| free-rider / tokens-per-expert | `mechinterp_freerider.csv` | no (architecturally fixed) | n/a | — |
+
+⚠ `e8` regressed to zero rows, and this is a preservation gap rather than a code one: it needs
+`results/phase0/probe_batch_cache/eod_*.npy`, a derived file that is gitignored and absent from
+`MANIFEST.csv`, so it cannot be rebuilt from the published artifacts. It is skipped loudly, once per
+run.
+
+**Two limits that bound everything below.** First, the locus/lens/structural family needs a
+`delex_capture.pt` and only three were preserved, all at 1e19 — so "all models" for that family means
+three until the Step 3 sweep runs. Second, the runs behind the *published* 1e16/1e17 locus rows
+(`g3_tmoe_s0_1e16`, `g3_moe_s0_1e16{,_sigmoid}`, `v16k_sweep_s2_1e17`, `tmoe_minlogit_sh1_s2_1e17`)
+are **absent from `MANIFEST.csv` entirely** — no capture, no checkpoint. Those cells cannot be
+extended past layer 6, re-split, or re-windowed by anyone, ever. The same is true of the five runs
+the published e1–e8 numbers were computed on, so the replay re-run below **replaces** those numbers
+over a different run population rather than reproducing them.
 
 Where the limits are set:
 

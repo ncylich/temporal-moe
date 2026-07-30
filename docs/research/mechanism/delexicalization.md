@@ -53,7 +53,28 @@ the median pairwise $\cos(w_e, w_{e'})$.
 
 Baseline experts each draw usage from a narrow recurring slice of the stream (2% generalists at
 192E), temporal experts from most of it (65%), under visibly flatter routing, and the regime gap
-is ten to forty times the seed spread on every routing metric. The weight geometry, by contrast,
+is ten to forty times the seed spread on every routing metric.
+
+**This table pools every expert of every MoE layer, and per layer the claim holds only below layer 5.**
+Re-measured with the layer key kept, on the matched 1e19 coarse pair (same budget, shape and
+granularity; `mechinterp_structural_1e19.csv`):
+
+| MoE layer | 2 | 3 | 4 | 5 | 6 | 9 | 11 | 14 |
+|---|---|---|---|---|---|---|---|---|
+| generalist % — temporal | 100 | 91 | 95 | 97 | 73 | 45 | 59 | 44 |
+| generalist % — baseline | 97 | 100 | 94 | 23 | **0** | 0 | 0 | 0 |
+| median PR — temporal | 0.857 | 0.755 | 0.795 | 0.787 | 0.693 | 0.494 | 0.542 | 0.458 |
+| median PR — baseline | 0.896 | 0.731 | 0.591 | 0.447 | 0.357 | 0.233 | 0.179 | 0.167 |
+| $\bar{H}$ — temporal | 0.986 | 0.971 | 0.973 | 0.972 | 0.950 | 0.933 | 0.936 | 0.925 |
+| $\bar{H}$ — baseline | 0.985 | 0.967 | 0.941 | 0.907 | 0.881 | 0.814 | 0.766 | 0.756 |
+
+The two regimes are **indistinguishable through layer 4** on all three routing metrics, and the
+baseline is at zero generalists from layer 6 down. "Baseline experts draw usage from a narrow slice,
+temporal experts from most of it" is a statement about layers 5 and deeper; in the first three MoE
+layers both regimes are near-total generalists. A single pooled median averaged a qualitative regime
+change across depth and reported it as a uniform property. The pooled conclusion is not wrong about
+the network as a whole — it is wrong about where in the network the effect lives, which is exactly what
+[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) exists to settle. The weight geometry, by contrast,
 is indistinguishable across regimes and seeds: experts remain equally distinct and near
 orthogonal either way. The constraint acts on traffic, not on expert identity, which sharpens
 the question: if a temporal expert is not specialized on a token slice, what is it specialized
@@ -138,6 +159,27 @@ weighted and within layer.
 |---|---|---|---|
 | baseline | 14,612 | 9,683 | 15,990 |
 | temporal | 15,932 | 15,342 | 15,990 |
+
+These are medians pooled over MoE layers 2–4. Resolved by layer — the same rows, the layer key kept
+rather than averaged away — the effect is strongly depth-dependent, and only in the baseline:
+
+| model (192E, 1e16) | L2 | L3 | L4 | no-signal reference (L2/L3/L4) |
+|---|---|---|---|---|
+| softmax-aux baseline | 15,359 | 14,729 | **11,646** | 15,984 / 15,984 / 15,982 |
+| temporal | 15,981 | 15,939 | 15,576 | 15,991 / 15,990 / 15,989 |
+
+The baseline's gap below its own no-signal reference grows from 625 effective words at layer 2 to
+4,336 at layer 4, while the temporal model's grows from 10 to 413 — an order of magnitude smaller at
+every depth. So lexical sharpening on the output side is something the unconstrained router acquires
+*with depth*, and the constraint suppresses it throughout.
+
+Two cautions on reading this as depth evidence. The static reference is not constant with depth in
+general: at 1e19 it falls from 32.5k at layer 2 to 28.4k at layer 14, because mid-network projections
+are rotated relative to the output basis by an amount that itself varies with depth. Comparisons must
+therefore be weighted-versus-static *within* a layer, as above. And this table covers layers 2–4 only
+— the whole stack at 1e16, but 3 of 13 MoE layers at 1e19, where the same comparison is flat.
+Extending it needs a fresh capture pass ([`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md)
+Step 3).
 
 Baseline experts promote markedly narrower vocabularies (about 1,400 effective words of lexical
 preference at the median and over 6,000 in the sharpest decile, whose top promoted tokens read as
