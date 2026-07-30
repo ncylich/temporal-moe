@@ -26,3 +26,7 @@ flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,4,64,6,4.832043,
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,5,64,6,4.848266,2.3487,swap_unmask_L5.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,6,64,6,4.857088,2.3530,swap_unmask_L6.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,7,64,6,4.853776,2.3514,swap_unmask_L7.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,unmask_one,8,64,6,4.841913,2.3457,swap_unmask_L8.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,unmask_one,9,64,6,4.838848,2.3442,swap_unmask_L9.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,8,64,6,4.841913,2.3457,swap_unmask_L8.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,9,64,6,4.838848,2.3442,swap_unmask_L9.log
