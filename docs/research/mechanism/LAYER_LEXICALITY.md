@@ -226,26 +226,68 @@ lose routing freedom" are different quantities. §5 of
 training, so per-layer cost must be measured on separately trained models — not by masking a
 trained checkpoint (which is test C3's limitation).
 
-**Status: still no direct evidence, and C3 has not been run.** The driver now exists
-([`scripts/phase0/constraint_swap_sweep.sh`](../../../scripts/phase0/constraint_swap_sweep.sh), and
-`TEMPORAL_R_SCHEDULE` makes R per-layer, which it was not), but the sweep needs a GPU and checkpoints.
-The existing dose curve still varies R uniformly across all layers.
+**Status: C3 has run. The per-layer cost profile is U-SHAPED — the first two and last MoE layers are the
+expensive ones — which is the shape H2 named as its own falsifier.**
 
-What H1's re-measurement changes about H2's prediction: H2 predicted cost "largest at the first MoE
-layer and falling with depth", reasoning from H1's contextual share. That prediction now looks
-**backwards**. The constraint's measured effect on routing is *smallest* at the first MoE layer — the
-regimes are indistinguishable there on hit rate, selectivity, generalist fraction and router entropy —
-and grows with depth. If per-layer cost tracks how much the constraint actually changes a layer's
-routing, cost should *rise* with depth, not fall, and a prefix schedule should free the **deep** layers
-rather than the shallow ones. If instead cost falls with depth as H2 predicted, then cost is not
-tracking the amount of reorganisation, which is itself informative.
+`flame38m_g1_temporal` at 1e18 — the budget where the temporal model wins — unmasking exactly one MoE
+layer of the trained model (R=E there, R=k elsewhere), 8 evaluation passes plus a native reference, same
+checkpoint and same fixed eval set throughout, so these differences carry no seed noise
+([`swap_sweep.csv`](../../../results/ablations/swap_sweep.csv)). Native CE 3.909461:
 
-Either way this is now a sharp, signed prediction rather than an open question, and C3 tests it for 2L
-evaluation passes.
+| MoE layer | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|
+| ΔCE from unmasking it | +.0425 | +.0463 | +.0350 | +.0337 | +.0326 | +.0300 | +.0374 | **+.0579** |
 
-**Payoff if both hold.** A schedule: leave the layers where the constraint costs most unconstrained and
-constrain the rest. One tunable parameter, with the per-layer curve giving the cutoff — though note the
-prefix direction is no longer the obvious one.
+**The shape is a parabola, and a linear slope is the wrong summary of it.** OLS on layer index gives
++0.00056 per layer at R² = **0.023**, which explains nothing — a symmetric U has near-zero linear trend
+by construction, so quoting that slope as "no depth trend" would hide the entire result. A quadratic
+fits at R² = **0.706** with curvature **+0.00155** (positive: U-shaped) and a vertex at layer **5.3**.
+The honest contrast is ends against middle:
+
+| grouping | mean ΔCE |
+|---|---|
+| ends — L2, L3, L8, L9 | **+0.0461** |
+| middle — L4–L7 | **+0.0328** |
+| ends ÷ middle | **1.40×** (min-to-max 1.93×, +0.0300 at L7 to +0.0579 at L9) |
+
+These are deterministic evaluations — one checkpoint, one fixed 33.5M-token eval set, every arm scored
+on the identical tokens — so the comparison is paired and exact and differences of 0.003 are real, not
+sampling noise.
+
+Four things follow.
+
+1. **H2 is falsified by its own pre-registered criterion.** H2 said "Falsified by: a flat or U-shaped
+   per-layer cost curve, or a cost curve uncorrelated with the per-layer contextual share from H1." The
+   curve is U-shaped, and it is also uncorrelated with H1's contextual share, which rises then saturates
+   rather than dipping in the middle. Both clauses fire.
+2. **The reversed prediction is refuted too.** §3 argued from H1's re-measurement that cost should
+   *rise* with depth, since the constraint's effect on routing is smallest at the first MoE layer. It
+   does not rise monotonically either. Per-layer cost is not tracking how much a layer's routing was
+   reorganised — the two quantities are genuinely different, as §3 warned, and now measurably so.
+3. **T2 as designed would return a null on this profile, and that would be an artefact.** T2 contrasts
+   layers 2–5 constrained against 6–9 constrained: a shallow-half versus deep-half contrast. A U-shape
+   symmetric about layer 5.3 puts roughly equal cost in each half, so T2 would measure ≈0 and be read as
+   "depth does not matter" when the real structure is ends versus middle. The specific training design
+   in §5 is mis-specified for the shape that actually exists; testing the U needs an ends-versus-middle
+   contrast at matched layer count.
+4. **Still sub-additive.** Unmasking all layers costs +0.4795 while the eight single-layer costs sum to
+   +0.3155, a ratio of 0.66 — so the layers' contributions overlap, and no per-layer profile predicts a
+   multi-layer configuration by addition.
+
+**This shape has been seen before in this project.** The OLMoE adaptation program's per-layer residency
+damage was also U-shaped with the ends worst (layers 0–1 and 15), measured a different way on a
+different model. Two architectures, two methods, same qualitative answer: routing freedom matters most
+at the input and at the layer that forms the output, and least in the middle.
+
+The limitation §4 identified still bounds all of this: no co-adaptation, so this is the cost of removing
+freedom from a model trained expecting it — an upper bound whose *shape* is the informative part. A
+trained sweep could still find something inference-time swapping cannot see, but H2 as written is
+falsified and T2 as written would not test the shape that is there.
+
+**Payoff — not as designed.** The prefix schedule this section was built around needs a monotone
+per-layer curve with a knee. The curve has a vertex, not a knee, so the configuration it suggests is
+"free the ends, constrain the middle", which is not a prefix and which the existing uniform-R dose curve
+does not sweep.
 
 ## 4. Cheap tests (no training)
 
@@ -372,6 +414,14 @@ meaningful comparison is against the existing uniform-R dose curve at equal spen
 
 **Run C3 before T1.** If the inference-time per-layer profile is flat, T1's prior drops sharply and
 the training budget is better spent elsewhere.
+
+**C3 has run, and it invalidates T2's design rather than T2's premise** (§3). The profile is U-shaped
+with a vertex at layer 5.3, so T2's shallow-half-versus-deep-half contrast splits the U near its
+minimum and would measure ≈0 whatever the truth. T1 keeps its logic — a per-layer sweep at s0/1e16 is
+agnostic about shape — but with only 3 MoE layers it cannot resolve a vertex. Any redesign should
+contrast **ends against middle** at matched layer count, which at 1e18 means {2,3,8,9} against
+{4,5,6,7}: matched layer count, matched resident-slot budget, and aligned with the shape that exists.
+Not started, and not to be started without a decision.
 
 **Implementation.** The R knob exists but is global —
 [`temporal_router.py:359`](../../../temporal/temporal_router.py) reads `TEMPORAL_RESIDENCY_R` once
