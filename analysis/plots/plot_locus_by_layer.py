@@ -77,9 +77,9 @@ SERIES = [
 
 
 def per_layer(fname, label, variant, split):
-    """-> {layer: [context_minus_token per expert]}, run name. Drops non-finite probes."""
+    """-> {layer: [context_minus_token per expert]}, run name, window. Drops non-finite probes."""
     g = defaultdict(list)
-    run = None
+    run = window = None
     path = os.path.join(DATA, fname)
     with open(path) as f:
         rdr = csv.DictReader(f)
@@ -96,7 +96,8 @@ def per_layer(fname, label, variant, split):
             if not math.isnan(d):
                 g[int(r["layer"])].append(d)
                 run = r["run"]
-    return g, run
+                window = r.get("window") or ""
+    return g, run, window
 
 
 def boot_median_ci(vals, n=BOOT):
@@ -136,7 +137,7 @@ fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(6.4, 6.2) if PAPER else
 
 slope_rows, counts, missing = [], [], []
 for fname, label, variant, color, budget, legend, ls in SERIES:
-    g, run = per_layer(fname, label, variant, SPLIT)
+    g, run, window = per_layer(fname, label, variant, SPLIT)
     if not g:
         print(f"[warn] no rows for {label}/{variant} at split={SPLIT}", file=sys.stderr)
         missing.append(f"{label}/{variant}")
@@ -161,7 +162,7 @@ for fname, label, variant, color, budget, legend, ls in SERIES:
     s_nd = boot_slope(g, xs)
     s_ix = boot_slope(g, {l: float(l) for l in layers})
     slope_rows.append([label, run, budget, "temporal" if med[0] > 0 else "full", variant,
-                       int(variant == "base" and 32 or 0) or "", SPLIT, depth,
+                       window, SPLIT, depth,
                        layers[0], layers[-1], len(layers),
                        round(s_nd[0], 4), round(s_nd[1], 4), round(s_nd[2], 4),
                        round(s_ix[0], 5), round(s_ix[1], 5), round(s_ix[2], 5),
