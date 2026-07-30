@@ -1,7 +1,6 @@
 run,budget,regime,grain,perturbation,arm,layer,R_at_layer,R_elsewhere,test_CE,test_BPB,log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,native,-,6,6,3.909461,1.8939,swap_native.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_all,-,64,64,4.388937,2.1262,swap_unmask_all.log
-flame38m_g1_temporal,1e18,temporal,coarse6/64,real,native,-,6,6,3.909461,1.8939,swap_native.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_one,2,64,6,3.951986,1.9145,swap_unmask_L2.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_one,3,64,6,3.955806,1.9164,swap_unmask_L3.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_one,4,64,6,3.944429,1.9109,swap_unmask_L4.log
@@ -26,8 +25,6 @@ flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,4,64,6,4.832043,
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,5,64,6,4.848266,2.3487,swap_unmask_L5.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,6,64,6,4.857088,2.3530,swap_unmask_L6.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,7,64,6,4.853776,2.3514,swap_unmask_L7.log
-flame38m_g1_temporal,1e18,temporal,coarse6/64,unmask_one,8,64,6,4.841913,2.3457,swap_unmask_L8.log
-flame38m_g1_temporal,1e18,temporal,coarse6/64,unmask_one,9,64,6,4.838848,2.3442,swap_unmask_L9.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,8,64,6,4.841913,2.3457,swap_unmask_L8.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,random,unmask_one,9,64,6,4.838848,2.3442,swap_unmask_L9.log
 flame38m_g1_moe,1e18,full,coarse6/64,random,native,-,64,64,3.918474,1.8983,swap_native.log
@@ -39,8 +36,6 @@ flame38m_g1_moe,1e18,full,coarse6/64,random,impose_one,6,6,64,4.358386,2.1114,sw
 flame38m_g1_moe,1e18,full,coarse6/64,random,impose_one,7,6,64,4.296220,2.0813,swap_impose_L7.log
 flame38m_g1_moe,1e18,full,coarse6/64,random,impose_one,8,6,64,4.295771,2.0811,swap_impose_L8.log
 flame38m_g1_moe,1e18,full,coarse6/64,random,impose_one,9,6,64,4.686284,2.2703,swap_impose_L9.log
-flame38m_g1_moe,1e18,full,coarse6/64,real,native,-,64,64,3.918474,1.8983,swap_native.log
 flame38m_g1_moe,1e18,full,coarse6/64,real,impose_set,3;4;5;6;7;8,6,64,5.042416,2.4428,swap_impose_set_3-4-5-6-7-8.log
 flame38m_g1_moe,1e18,full,coarse6/64,real,impose_set,2;9,6,64,4.814318,2.3323,swap_impose_set_2-9.log
-flame38m_g1_temporal,1e18,temporal,coarse6/64,real,native,-,6,6,3.909472,1.8939,swap_native.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_set,2;9,64,6,4.008203,1.9418,swap_unmask_set_2-9.log
