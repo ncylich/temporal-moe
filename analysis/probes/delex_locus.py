@@ -112,8 +112,12 @@ def auc_batch(scores, Y):
     npos = Y.sum(0).astype(np.float64)
     nneg = n - npos
     ok = (npos > 0) & (nneg > 0)
-    rpos = (ranks * Y).sum(0)
-    out[ok] = ((rpos - npos * (npos + 1) / 2) / (npos * nneg))[ok]
+    # Compute only on the defined columns. Evaluating the ratio everywhere and masking afterwards is
+    # correct but divides by zero for any all-positive or all-negative column, which is routine when
+    # scoring a frequency stratum or a lightly-used expert; the warning it raised was pure noise.
+    rpos = (ranks * Y).sum(0)[ok]
+    p, q = npos[ok], nneg[ok]
+    out[ok] = (rpos - p * (p + 1) / 2) / (p * q)
     return out
 
 

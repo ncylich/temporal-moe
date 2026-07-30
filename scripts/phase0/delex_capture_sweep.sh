@@ -60,20 +60,33 @@ for run in "${SELECTION[@]}"; do
     echo "[skip] $run: capture already present (FORCE=1 to recapture)"; skipped=$((skipped+1)); continue
   fi
 
-  # Reconstruct the configuration from run.meta. `shape=` is present only in the two-line form; the
-  # flame38m/flame192/flame512 runs record ffn/moe_ffn/num_experts but no shape, so those must be
-  # given a SHAPE explicitly via the environment.
+  # Reconstruct the configuration from run.meta. `shape=` and `flops=` are present only in the
+  # two-line form written by run.sh; the 1e18 launchers wrote neither, and both are recovered below.
   get() { sed -n "s/.*[[:space:]]$1=\([^[:space:]]*\).*/\1/p" "$meta" | head -1; }
   shape=$(get shape); grain=$(get grain); topk=$(get topk); mb=$(get mb); gb=$(get gb)
   flops=$(get flops); temporal=$(get temporal); dense=$(get dense); mode=$(get mode)
   smult=$(get shared_mult); lr=$(get lr)
   [ -z "$temporal" ] && { [ "$mode" = "temporal" ] && temporal=1 || temporal=0; }
   [ -z "$dense" ] && { [ "$mode" = "dense" ] && dense=1 || dense=0; }
+  # The 1e18 launchers wrote no shape= or flops=; registry.shape_of/budget_of recover both from the
+  # run name, and experiments/run.sh has a shape entry for each (s38m/s192f/s512f) verified to derive
+  # that launcher's geometry exactly. An explicit SHAPE/TARGET_FLOPS still wins.
+  [ -z "$shape" ] && shape=$("$PY" -c "
+import sys, os
+sys.path.insert(0, os.path.join('$ROOT', 'analysis', 'probes'))
+import registry
+print(registry.shape_of('$run') or '')")
+  [ -z "$flops" ] && flops=$("$PY" -c "
+import sys, os
+sys.path.insert(0, os.path.join('$ROOT', 'analysis', 'probes'))
+import registry
+b = registry.get('$run').budget
+print('' if b == 'unknown' else b)")
   shape=${SHAPE:-$shape}
   flops=${TARGET_FLOPS:-$flops}
   if [ -z "$shape" ] || [ -z "$flops" ]; then
-    echo "[skip] $run: run.meta records no shape=/flops= (the 1e18 single-line form)."
-    echo "        Re-run with an explicit shape, e.g.  SHAPE=s4 TARGET_FLOPS=1e18 $0 $run"
+    echo "[skip] $run: no shape/budget could be determined from run.meta or the run name."
+    echo "        Re-run with both explicit, e.g.  SHAPE=s38m TARGET_FLOPS=1e18 $0 $run"
     skipped=$((skipped+1)); continue
   fi
 

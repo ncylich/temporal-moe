@@ -26,7 +26,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ROOT, RUNS
 
-__all__ = ["Run", "runs", "get", "moe_layers", "budget_of"]
+__all__ = ["Run", "runs", "get", "moe_layers", "budget_of", "depth_of", "shape_of",
+           "selection"]
 
 MANIFEST = os.path.join(ROOT, "results/MANIFEST.csv")
 
@@ -88,14 +89,31 @@ class Run:
         return f"Run({self.name}, {self.regime}, {self.grain_label}, {self.budget})"
 
 
-# Transformer depth by shape, for runs whose own artifacts were never preserved and so have no
-# run.meta on disk -- the 1e16/1e17 cells in mechinterp_locus.csv are all in this position. Each
-# value is read from a run that IS in MANIFEST.csv and shares the shape, so nothing here is guessed:
-#   s0     -> g3_tmoe_s0_1e16_ant0p02  L=4
-#   s2     -> g3_tmoe_s2_1e17          L=6
-#   s19opt -> moe_coarse_1e19          L=14
-# Note s19opt is 14, not the 9 that both mechanism plan documents assume.
-SHAPE_DEPTH = {"s0": 4, "s2": 6, "s19opt": 14}
+# Transformer depth by run.sh shape name. Values for shapes whose runs preserved a run.meta are read
+# from it; the rest are read from a sibling run in MANIFEST.csv that shares the shape, so nothing here
+# is guessed. Note s19opt is 14, not the 9 that both mechanism plan documents assumed.
+SHAPE_DEPTH = {"s0": 4, "s1": 5, "s2": 6, "s3": 7, "s19opt": 14,
+               "s38m": 9, "s192f": 5, "s512f": 10}
+
+# The 1e18 panel was trained by its own launchers in experiments/scale_1e18_1e19/ with the geometry
+# hardcoded, so those runs' run.meta records ffn/num_experts/topk but no shape= and no flops=. These
+# are the run.sh shape names added for them; each was verified to derive every field of the
+# corresponding run.meta exactly (see the case block in experiments/run.sh).
+NAME_SHAPE = (("flame38m", "s38m"), ("flame192", "s192f"), ("flame512", "s512f"))
+
+
+def shape_of(name):
+    """run.sh shape name for a run: from run.meta if it records one, else from the run-name prefix."""
+    sh = get(name).meta.get("shape")
+    if sh:
+        return sh
+    for prefix, shape in NAME_SHAPE:
+        if name.startswith(prefix):
+            return shape
+    for shape in SHAPE_DEPTH:
+        if re.search(rf"(^|_){shape}(_|$)", name):
+            return shape
+    return None
 
 
 def depth_of(name):
@@ -103,12 +121,7 @@ def depth_of(name):
     r = get(name)
     if r.depth:
         return r.depth
-    for shape, L in SHAPE_DEPTH.items():
-        if re.search(rf"(^|_){shape}(_|$)", name):
-            return L
-    if "flame38m" in name:
-        return 9              # the 38M fleet: 8 MoE layers 2-9 per e6_per_layer_ranking.csv
-    return None
+    return SHAPE_DEPTH.get(shape_of(name) or "")
 
 
 def budget_of(name):
