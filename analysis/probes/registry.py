@@ -52,7 +52,10 @@ class Run:
     # redundant: a capture produced locally by the Step 3 sweep is not in the manifest, and without it
     # every downstream analysis silently skipped freshly captured runs while reporting success.
     def _has(self, fname):
-        return fname in self.files or os.path.exists(self.path(fname))
+        # Size > 0: a failed capture can leave a zero-byte file behind, which then reports as present
+        # and makes every downstream analysis crash on an empty layers dict rather than skip the run.
+        p = self.path(fname)
+        return fname in self.files or (os.path.exists(p) and os.path.getsize(p) > 0)
 
     @property
     def has_router_log(self):

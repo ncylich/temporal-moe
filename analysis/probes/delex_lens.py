@@ -75,6 +75,9 @@ def main():
     for r in cells:
         d = torch.load(r.path("delex_capture.pt"), map_location="cpu", weights_only=False)
         layers = registry.moe_layers(d)
+        if not layers:
+            print(f"[warn] {r.name}: capture holds no MoE layers, skipping (rerun its capture)")
+            continue
         ck = os.path.join(registry.RUNS, r.name, "ckpt")
         if not os.path.isdir(ck):
             skipped.append(f"{r.name}: no checkpoint on disk "

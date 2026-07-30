@@ -89,6 +89,9 @@ def main():
             delex_locus._standardize(emb.reshape(ntok, H).astype(np.float64)), tr, te)
         te_strat = strat[te]
         layers = registry.moe_layers(d)
+        if not layers:
+            print(f"[warn] {r.name}: capture holds no MoE layers, skipping (rerun its capture)")
+            continue
         print(f"[run] {r.name} ({r.regime}, {r.grain_label}, {r.budget}) "
               f"{nid} token ids, strata by occurrence count {bounds}", flush=True)
         for L in layers:

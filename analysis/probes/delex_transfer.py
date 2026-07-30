@@ -81,6 +81,9 @@ def main():
         design = delex_locus._Probe(
             delex_locus._standardize(emb.reshape(ntok, H).astype(np.float64)), tr, te)
         layers = registry.moe_layers(d)
+        if not layers:
+            print(f"[warn] {r.name}: capture holds no MoE layers, skipping (rerun its capture)")
+            continue
         Q = {}
         E = None
         for L in layers:

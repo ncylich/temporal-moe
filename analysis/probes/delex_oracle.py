@@ -103,6 +103,9 @@ def main():
         nid = int(ids.max()) + 1
         tr, te = delex_locus.split_index(S, B, split)
         layers = registry.moe_layers(d)
+        if not layers:
+            print(f"[warn] {r.name}: capture holds no MoE layers, skipping (rerun its capture)")
+            continue
         print(f"[run] {r.name} ({r.regime}, {r.grain_label}, {r.budget}) "
               f"{nid} distinct token ids in {ntok} tokens, layers {layers[0]}-{layers[-1]}, "
               f"split={split}", flush=True)
