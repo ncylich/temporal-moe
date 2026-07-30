@@ -90,7 +90,12 @@ def weight_geometry(run):
     sd = ckpt_read.load(ip, keys)
     by_layer = {}
     for kk in keys:
-        L = int(re.search(r"layers\.(\d+)\.", kk).group(1))
+        # +1: checkpoint module paths are 0-based, capture layer keys are TopKRouter.layer_number,
+        # which is 1-based. Using the raw index attributed each layer's weights to the layer above and
+        # left the deepest MoE layer with no geometry at all -- the same off-by-one delex_probe.py and
+        # delex_lens.py had. Verified against the checkpoint: expert modules occupy 1..L-1 where the
+        # capture holds 2..L.
+        L = int(re.search(r"layers\.(\d+)\.", kk).group(1)) + 1
         t = sd[kk].float()
         by_layer.setdefault(L, []).append(t.reshape(t.shape[0], -1))
     out = {}
