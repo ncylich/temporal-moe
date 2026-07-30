@@ -155,6 +155,22 @@ print(registry.depth_of('$run') or 0)")
       run_one "$run" native      - "$E" "$E" "" "swap_native.log"
       run_one "$run" impose_all  - "$k" "$k" "" "swap_impose_all.log"
     fi
+  elif [ "$MODE" = "--dose" ]; then
+    # X3 / 1d: the residency dose curve at uniform R. The published curve covers 1e16 only, so the
+    # quality-versus-resident-memory frontier has never been measured at the budgets where the
+    # constraint is actually interesting. R is swept uniformly across every layer -- no schedule --
+    # from R=k (maximal constraint) to R=E (recovers the unconstrained recipe exactly). FLOPs are
+    # identical at every R, so the curve is purely a serving-memory/quality tradeoff.
+    DOSE=${DOSE:-}
+    if [ -z "$DOSE" ]; then                       # default: k, 2k, 4k, ... up to E
+      r=$k; DOSE="$k"
+      while [ $((r*2)) -lt "$E" ]; do r=$((r*2)); DOSE="$DOSE $r"; done
+      DOSE="$DOSE $E"
+    fi
+    echo "--- $run dose sweep R in: $DOSE (k=$k E=$E)"
+    for R in $DOSE; do
+      run_one "$run" "dose_R$R" - "$R" "$R" "" "swap_dose_R$R.log"
+    done
   elif [ "$MODE" = "--sets" ]; then
     [ -n "${SETS:-}" ] || { echo "--sets needs SETS='3,4,5,6 2,9'" >&2; exit 1; }
     if [ "$temporal" = "1" ]; then
@@ -187,7 +203,7 @@ print(registry.depth_of('$run') or 0)")
       done
     fi
   else
-    echo "unknown mode $MODE (expected --global, --per-layer or --sets)" >&2; exit 1
+    echo "unknown mode $MODE (expected --global, --per-layer, --sets or --dose)" >&2; exit 1
   fi
 done
 
