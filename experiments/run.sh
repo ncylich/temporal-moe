@@ -244,6 +244,19 @@ elif [ "${EODPROBE:-0}" = "1" ]; then
     --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
     --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
     2>&1 | tee "$OUT/eodprobe.log"
+elif [ "${SWEEPEVAL:-0}" = "1" ]; then
+  # In-process sweep: load the model once and evaluate it under every residency setting in $SWEEP,
+  # replacing one process per arm. Startup dominates a single arm (~4 of 7 minutes), so this is where
+  # nearly all of a sweep's wall-clock goes. --train-iters 0 because nothing here trains; the frozen
+  # iterations the other branches inherit are pure overhead when no capture depends on them.
+  export TEMPORAL=${TEMPORAL:-1} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  echo "[sweepeval] SWEEP='$SWEEP'"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/sweep_eval.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --save /tmp/probe_junk_ckpt $EXTRA_ARGS ${SWEEP_EXTRA:-} \
+    2>&1 | tee "$OUT/sweepeval.log"
 elif [ "${CAUSALPROBE:-0}" = "1" ]; then
   # C8 / N6: causal token-versus-context substitution. One invocation per arm (CAUSAL_ARM in
   # ref|token|context); the three are compared offline and the analysis refuses to compare arms whose
