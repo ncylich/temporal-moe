@@ -42,3 +42,5 @@ flame38m_g1_moe,1e18,full,coarse6/64,random,impose_one,9,6,64,4.686284,2.2703,sw
 flame38m_g1_moe,1e18,full,coarse6/64,real,native,-,64,64,3.918474,1.8983,swap_native.log
 flame38m_g1_moe,1e18,full,coarse6/64,real,impose_set,3;4;5;6;7;8,6,64,5.042416,2.4428,swap_impose_set_3-4-5-6-7-8.log
 flame38m_g1_moe,1e18,full,coarse6/64,real,impose_set,2;9,6,64,4.814318,2.3323,swap_impose_set_2-9.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,real,native,-,6,6,3.909472,1.8939,swap_native.log
+flame38m_g1_temporal,1e18,temporal,coarse6/64,real,unmask_set,2;9,64,6,4.008203,1.9418,swap_unmask_set_2-9.log
