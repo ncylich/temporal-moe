@@ -352,6 +352,30 @@ done.
 Until then: **commit before running any of these on a subset.** That is the only reason the incident
 above cost nothing.
 
+### 3j. T1 models are captured but not registered — **open**
+
+The four T1 checkpoints (`t1_A0/A1/A5/A7_s0_1e16_seed1234`) have `delex_capture.pt` on disk, 30
+captures in total. They are **absent from `results/MANIFEST.csv`**, so `registry.runs()` does not
+return them and every capture-based analysis silently ran over the same 26 registered captures
+instead. The analyses reported success because they *did* succeed — on the wrong set. The coverage
+table is therefore unchanged and the new models are invisible to locus, oracle, structural and demand.
+
+To finish: register the four runs (and any future training output) in `MANIFEST.csv`, then re-run the
+capture-based analyses over all 30. The shrink guards make this safe — a partial run will abort rather
+than truncate.
+
+Worth noting as a gap in the gate: `reproduce.sh` cannot catch this. The analyses are not documented
+commands, and running them changes nothing when the new runs are unregistered, so the tree stays clean
+and everything passes. A registration step that is silently skipped looks identical to one that was
+never needed.
+
+### 3k. `delex_lens` cannot be run bare from the repo root — **open**
+
+It fails with `ModuleNotFoundError: No module named 'megatron'`. Unlike the other capture-based
+analyses it reads checkpoints, so it needs the import path `experiments/run.sh` sets up. Invoking it
+directly — as the P4 batch did — cannot work. Either give it the same path bootstrap the other entry
+points use, or document that it must be launched through `run.sh`.
+
 ### 3h. T1–T4 — deliberately not started
 
 Out of scope by explicit instruction. Everything they need is in §2.
