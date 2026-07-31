@@ -1,181 +1,181 @@
 label,run,budget,regime,grain,layer,E,k,PR_median,generalist_frac,router_entropy,eff_rank,strong_corr_pairs,dist2centroid_mean,pairwise_cos_med,pairwise_cos_p99,geometry_note
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,2,192,18,0.2497,0.0104,0.8628,30.39,302,0.883,0.0085,0.0425,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,3,192,18,0.2045,0.0,0.8356,35.28,218,0.8894,0.0071,0.0366,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,4,192,18,0.2033,0.0052,0.8365,39.09,147,0.8884,0.0071,0.0391,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,5,192,18,0.2,0.0,0.8355,39.33,156,0.8931,0.0062,0.0381,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,6,192,18,0.2189,0.0,0.8476,42.98,132,0.89,0.0068,0.0418,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,7,192,18,0.2573,0.0156,0.8687,36.44,204,0.8891,0.007,0.0464,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,8,192,18,0.3206,0.0573,0.891,33.91,213,0.8833,0.0085,0.0564,
-flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,9,192,18,0.6354,0.8698,0.9587,24.52,385,0.8702,0.0114,0.0702,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,2,192,18,0.6736,0.7083,0.9609,44.57,72,0.9221,0.0008,0.0191,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,3,192,18,0.3436,0.3802,0.9121,59.85,232,0.9213,0.0009,0.0194,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,4,192,18,0.4343,0.4583,0.9362,66.6,54,0.9198,0.0012,0.02,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,5,192,18,0.5064,0.5052,0.9438,55.32,15,0.9197,0.0012,0.0202,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,6,192,18,0.5309,0.5521,0.9477,65.15,9,0.9193,0.0013,0.0203,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,7,192,18,0.6212,0.6667,0.9549,53.62,19,0.9178,0.0015,0.0208,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,8,192,18,0.6958,0.7292,0.9627,51.47,9,0.9195,0.0011,0.0212,
-flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,9,192,18,0.6864,0.8021,0.9633,40.45,38,0.9161,0.0018,0.0234,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,2,64,6,0.246,0.0156,0.8186,25.78,9,0.8675,0.0021,0.0098,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,3,64,6,0.1727,0.0,0.7604,29.2,12,0.8676,0.0019,0.0109,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,4,64,6,0.1854,0.0,0.7642,28.43,8,0.8672,0.0021,0.0101,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,5,64,6,0.1826,0.0,0.766,29.58,17,0.8666,0.0021,0.0109,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,6,64,6,0.1962,0.0,0.7909,30.55,16,0.8639,0.0029,0.0117,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,7,64,6,0.2066,0.0,0.7884,27.69,11,0.8611,0.0038,0.0124,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,8,64,6,0.2228,0.0156,0.8127,26.59,22,0.8612,0.0037,0.0132,
-flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,9,64,6,0.3492,0.0625,0.8715,22.86,22,0.8578,0.0044,0.0158,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,2,64,6,0.6903,0.7969,0.9529,28.64,4,0.8719,0.0008,0.0078,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,3,64,6,0.2637,0.125,0.8728,42.23,1,0.8694,0.0014,0.0085,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,4,64,6,0.3532,0.1562,0.8997,40.96,1,0.8686,0.0017,0.0092,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,5,64,6,0.425,0.3125,0.9164,39.9,2,0.8685,0.0017,0.0098,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,6,64,6,0.5106,0.5312,0.9335,35.48,0,0.8687,0.0015,0.0097,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,7,64,6,0.4812,0.4531,0.9329,35.06,1,0.8705,0.0011,0.0089,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,8,64,6,0.5419,0.5469,0.937,34.74,0,0.8711,0.0009,0.0095,
-flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,9,64,6,0.5863,0.7031,0.9406,30.82,2,0.8711,0.0009,0.0094,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,2,192,18,0.295,0.0469,0.8816,32.69,184,0.8844,0.0082,0.0355,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,3,192,18,0.2325,0.0,0.8525,39.61,174,0.893,0.0061,0.0304,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,4,192,18,0.2244,0.0,0.8526,42.44,101,0.8934,0.0061,0.0343,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,5,192,18,0.2309,0.0,0.8539,43.9,125,0.8913,0.0067,0.0347,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,6,192,18,0.2457,0.0052,0.8607,41.52,129,0.8899,0.0069,0.0362,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,7,192,18,0.2731,0.0156,0.8738,37.25,126,0.8883,0.0073,0.0417,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,8,192,18,0.2991,0.0833,0.8867,32.94,236,0.8843,0.0081,0.0447,
-flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,9,192,18,0.4731,0.4323,0.9374,29.82,311,0.8764,0.0101,0.0511,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,2,192,18,0.8465,0.9635,0.981,35.55,27,0.9241,0.0006,0.014,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,3,192,18,0.3754,0.375,0.9234,66.02,79,0.9221,0.0009,0.0148,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,4,192,18,0.4584,0.4479,0.9403,61.12,45,0.9219,0.0009,0.015,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,5,192,18,0.5622,0.5677,0.9517,59.08,12,0.9221,0.0009,0.0151,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,6,192,18,0.6243,0.6354,0.9573,58.33,11,0.9207,0.0011,0.0157,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,7,192,18,0.6399,0.6771,0.9604,57.66,10,0.92,0.0012,0.0163,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,8,192,18,0.7332,0.8125,0.9679,51.49,5,0.9212,0.0009,0.0166,
-flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,9,192,18,0.7192,0.8073,0.9654,42.84,15,0.9165,0.0016,0.0188,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,2,320,30,0.3256,0.0969,0.9024,33.33,555,0.8825,0.0107,0.0589,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,3,320,30,0.2835,0.0187,0.8901,42.8,410,0.8916,0.0087,0.054,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,4,320,30,0.2731,0.0125,0.8847,48.2,255,0.8909,0.0091,0.061,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,5,320,30,0.2614,0.0063,0.8836,47.49,265,0.8899,0.009,0.0633,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,6,320,30,0.3116,0.0281,0.899,46.99,224,0.8919,0.0087,0.0685,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,7,320,30,0.3441,0.0938,0.9096,42.06,360,0.8872,0.0096,0.0723,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,8,320,30,0.3865,0.1844,0.9202,35.31,523,0.881,0.0112,0.078,
-flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,9,320,30,0.6374,0.8281,0.9612,27.72,1017,0.8642,0.0154,0.0859,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,2,320,30,0.8218,0.9437,0.9809,44.1,132,0.9392,0.0005,0.018,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,3,320,30,0.5495,0.5219,0.9369,66.88,315,0.9395,0.0005,0.0187,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,4,320,30,0.6075,0.575,0.9512,63.94,54,0.9343,0.0011,0.0202,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,5,320,30,0.7014,0.6844,0.9625,57.49,39,0.933,0.0013,0.0207,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,6,320,30,0.7766,0.7625,0.9694,64.45,13,0.9316,0.0015,0.0215,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,7,320,30,0.7822,0.7812,0.9705,60.7,29,0.9289,0.0019,0.0229,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,8,320,30,0.8318,0.8531,0.9758,58.54,14,0.929,0.0018,0.0233,
-flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,9,320,30,0.7713,0.8219,0.9725,42.13,64,0.9209,0.003,0.0279,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,2,64,6,0.6866,0.8906,0.9561,29.39,1,0.8697,0.0014,0.0054,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,3,64,6,0.6884,0.8438,0.9507,22.14,2,0.8722,0.0007,0.0049,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,4,64,6,0.5289,0.5938,0.9191,28.39,2,0.8724,0.0007,0.0049,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,5,64,6,0.3894,0.1406,0.8794,29.01,3,0.8718,0.0008,0.005,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,6,64,6,0.2672,0.0312,0.8444,33.21,0,0.8711,0.001,0.0053,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,7,64,6,0.2095,0.0,0.8078,32.75,4,0.8693,0.0015,0.0058,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,8,64,6,0.1978,0.0,0.8013,35.96,2,0.8684,0.0017,0.0062,
-flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,9,64,6,0.1893,0.0,0.8022,34.41,5,0.8661,0.0023,0.008,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,2,64,6,0.867,1.0,0.9847,47.68,0,0.8709,0.0011,0.0045,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,3,64,6,0.8628,1.0,0.9807,37.03,0,0.8716,0.0009,0.0047,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,4,64,6,0.8847,0.9688,0.9817,30.59,0,0.8727,0.0006,0.0042,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,5,64,6,0.8203,0.9375,0.9709,17.87,0,0.8731,0.0004,0.0045,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,6,64,6,0.7305,0.8906,0.9639,34.87,0,0.8734,0.0004,0.0041,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,7,64,6,0.6589,0.75,0.9518,35.92,0,0.8732,0.0005,0.0047,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,8,64,6,0.6733,0.75,0.9535,31.38,0,0.8736,0.0004,0.0045,
-flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,9,64,6,0.4786,0.4375,0.9345,37.33,0,0.8727,0.0006,0.0046,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,2,192,18,0.6033,0.6771,0.9469,34.99,37,0.9035,0.004,0.0159,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,3,192,18,0.6551,0.8438,0.9548,29.55,51,0.9094,0.003,0.0146,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,4,192,18,0.618,0.7448,0.9492,39.12,15,0.9066,0.0035,0.0168,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,5,192,18,0.4388,0.375,0.9205,44.09,13,0.9036,0.0041,0.0185,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,6,192,18,0.4058,0.2812,0.9135,43.73,15,0.9017,0.0044,0.0192,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,7,192,18,0.3265,0.0781,0.893,46.25,35,0.9007,0.0045,0.0204,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,8,192,18,0.3351,0.1042,0.8975,45.48,48,0.8956,0.0056,0.0217,
-flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,9,192,18,0.2687,0.0417,0.8838,47.39,76,0.8955,0.0056,0.0214,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,2,192,18,0.8313,0.9844,0.9839,83.59,0,0.9246,0.0005,0.0072,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,3,192,18,0.8136,0.9271,0.9779,62.46,1,0.9255,0.0003,0.0071,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,4,192,18,0.8513,0.9583,0.9812,55.27,4,0.9258,0.0003,0.0071,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,5,192,18,0.8113,0.901,0.9746,42.84,4,0.926,0.0002,0.0071,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,6,192,18,0.7902,0.8698,0.9717,48.28,5,0.9251,0.0004,0.0074,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,7,192,18,0.789,0.8698,0.9735,58.13,0,0.9246,0.0005,0.0076,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,8,192,18,0.7825,0.8438,0.9725,51.62,0,0.9241,0.0005,0.0077,
-flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,9,192,18,0.6663,0.7031,0.9619,63.47,2,0.9201,0.0012,0.0093,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,2,64,6,0.8574,1.0,0.9861,51.78,0,0.8633,0.0031,0.0057,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,3,64,6,0.7555,0.9062,0.9709,37.41,0,0.8585,0.0045,0.0072,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,4,64,6,0.7946,0.9531,0.973,42.8,0,0.8581,0.0046,0.0071,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,5,64,6,0.7874,0.9688,0.9721,43.96,0,0.859,0.0043,0.007,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,6,64,6,0.6928,0.7344,0.9504,28.1,0,0.8581,0.0046,0.0076,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,7,64,6,0.5683,0.6406,0.9418,39.97,0,0.8593,0.0042,0.0072,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,8,64,6,0.5206,0.5625,0.9377,44.44,0,0.8591,0.0043,0.0071,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,9,64,6,0.4937,0.4531,0.9331,46.03,0,0.8594,0.0042,0.0073,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,10,64,6,0.5295,0.5781,0.9381,46.24,0,0.8619,0.0035,0.0066,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,11,64,6,0.5419,0.5938,0.9357,37.41,0,0.8635,0.003,0.0061,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,12,64,6,0.5194,0.5469,0.9338,45.4,0,0.8642,0.0029,0.0062,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,13,64,6,0.5053,0.5156,0.9319,36.09,0,0.8642,0.0028,0.006,
-g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,14,64,6,0.4583,0.4375,0.9252,34.72,0,0.8657,0.0024,0.0055,
-g3_moe_s0_1e16,g3_moe_s0_1e16,1e16,full,fine 18/192,2,192,18,0.3152,0.026,0.8815,30.29,150,0.8887,0.0071,0.0345,
-g3_moe_s0_1e16,g3_moe_s0_1e16,1e16,full,fine 18/192,3,192,18,0.3008,0.0052,0.8783,31.86,223,0.8976,0.0052,0.0309,
-g3_moe_s0_1e16,g3_moe_s0_1e16,1e16,full,fine 18/192,4,192,18,0.3079,0.0156,0.8773,23.96,427,0.9154,0.0019,0.028,
-g3_moe_s0_1e16_sigmoid_seed2,g3_moe_s0_1e16_sigmoid_seed2,1e16,full,fine 18/192,2,192,18,0.2778,0.0469,0.8629,28.82,248,0.8838,0.0083,0.0355,
-g3_moe_s0_1e16_sigmoid_seed2,g3_moe_s0_1e16_sigmoid_seed2,1e16,full,fine 18/192,3,192,18,0.253,0.0312,0.8574,26.4,370,0.8955,0.0057,0.0312,
-g3_moe_s0_1e16_sigmoid_seed2,g3_moe_s0_1e16_sigmoid_seed2,1e16,full,fine 18/192,4,192,18,0.333,0.1042,0.8936,23.45,525,0.9067,0.0035,0.0288,
-g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,2,192,18,0.4939,0.4792,0.9293,26.83,137,0.9058,0.0036,0.0305,
-g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,3,192,18,0.3827,0.1719,0.9082,38.17,84,0.907,0.0033,0.0286,
-g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,4,192,18,0.3595,0.0573,0.9006,36.99,111,0.9081,0.0031,0.0265,
-g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,5,192,18,0.3681,0.099,0.9067,37.53,122,0.9068,0.0033,0.0284,
-g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,2,192,18,0.2937,0.0104,0.8775,35.67,134,0.8991,0.0051,0.0224,
-g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,3,192,18,0.2593,0.0,0.8587,35.24,179,0.8978,0.0052,0.0229,
-g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,4,192,18,0.2543,0.0052,0.8597,30.0,287,0.9068,0.0035,0.0207,
-g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,5,192,18,0.2582,0.0208,0.8514,19.36,745,0.9231,0.0007,0.0178,
-g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,2,192,18,0.3504,0.026,0.8987,37.05,118,0.8872,0.0075,0.0234,
-g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,3,192,18,0.3551,0.0312,0.8964,40.17,65,0.8841,0.0082,0.0241,
-g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,4,192,18,0.2997,0.0052,0.8791,38.26,97,0.8845,0.0082,0.0232,
-g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,5,192,18,0.2979,0.0,0.8773,30.4,205,0.9044,0.0039,0.018,
-g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,6,192,18,0.2959,0.0312,0.8773,24.22,466,0.9154,0.002,0.0159,
-g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,2,192,18,0.4602,0.3281,0.9273,37.01,77,0.8823,0.0085,0.0255,
-g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,3,192,18,0.3318,0.0156,0.8908,40.22,62,0.8649,0.013,0.0295,
-g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,4,192,18,0.3416,0.0104,0.8958,48.08,26,0.8763,0.0101,0.0238,
-g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,5,192,18,0.3485,0.0365,0.8991,44.42,52,0.8892,0.0071,0.0196,
-g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,6,192,18,0.3441,0.0156,0.8965,36.12,155,0.8961,0.0055,0.0184,
-g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,7,192,18,0.3344,0.0573,0.8913,28.77,201,0.8906,0.0065,0.0236,
-g3_moe_sm1_1e16,g3_moe_sm1_1e16,1e16,full,fine 18/192,2,192,18,0.2626,0.0,0.8604,37.38,138,0.8838,0.0082,0.0424,
-g3_moe_sm1_1e16,g3_moe_sm1_1e16,1e16,full,fine 18/192,3,192,18,0.2267,0.0,0.8385,31.11,247,0.8898,0.007,0.0409,
-g3_moe_sm1_1e16,g3_moe_sm1_1e16,1e16,full,fine 18/192,4,192,18,0.249,0.0052,0.8456,17.73,621,0.9192,0.0015,0.0335,
-g3_tmoe_s0_1e16_mom,g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,2,192,18,0.6308,0.6406,0.9252,29.07,337,0.8734,0.0109,0.0367,
-g3_tmoe_s0_1e16_mom,g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,3,192,18,0.6696,0.6823,0.9387,20.51,174,0.8694,0.0117,0.0382,
-g3_tmoe_s0_1e16_mom,g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,4,192,18,0.7587,0.776,0.948,14.31,196,0.8731,0.0108,0.0382,
-g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,2,192,18,0.5494,0.5208,0.9205,37.5,644,0.8486,0.0172,0.0419,
-g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,3,192,18,0.4509,0.474,0.9013,27.32,163,0.8698,0.0116,0.0297,
-g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,4,192,18,0.4913,0.4896,0.9111,37.08,65,0.8809,0.009,0.0237,
-g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,5,192,18,0.5561,0.5573,0.9162,18.91,69,0.8883,0.0073,0.0213,
-g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,6,192,18,0.6386,0.7031,0.9215,20.11,99,0.8846,0.0081,0.0229,
-g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,2,192,18,0.9189,0.9896,0.9884,37.18,21,0.8267,0.0227,0.0668,
-g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,3,192,18,0.8552,0.7917,0.9677,24.04,10,0.8417,0.0189,0.0496,
-g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,4,192,18,0.7526,0.7448,0.9619,42.0,24,0.8632,0.013,0.0353,
-g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,5,192,18,0.709,0.7708,0.9622,46.18,21,0.8753,0.0102,0.0264,
-g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,6,192,18,0.6657,0.7656,0.9589,40.28,50,0.8894,0.007,0.0203,
-g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,7,192,18,0.6898,0.7812,0.9623,43.34,61,0.877,0.0097,0.0271,
-g3_tmoe_sm1_1e16,g3_tmoe_sm1_1e16,1e16,temporal,fine 18/192,2,192,18,0.5016,0.5,0.9057,46.3,399,0.8638,0.0133,0.0482,
-g3_tmoe_sm1_1e16,g3_tmoe_sm1_1e16,1e16,temporal,fine 18/192,3,192,18,0.5159,0.5104,0.924,47.3,146,0.8617,0.0139,0.0485,
-g3_tmoe_sm1_1e16,g3_tmoe_sm1_1e16,1e16,temporal,fine 18/192,4,192,18,0.6003,0.6146,0.9402,39.68,110,0.8745,0.0104,0.0446,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,2,64,6,0.8959,0.9688,0.9849,17.13,0,0.8608,0.0038,0.0069,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,3,64,6,0.7313,1.0,0.9665,33.12,0,0.8649,0.0027,0.0056,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,4,64,6,0.5909,0.9375,0.9407,36.52,0,0.8656,0.0025,0.0055,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,5,64,6,0.4473,0.2344,0.9071,36.48,0,0.868,0.0018,0.0048,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,6,64,6,0.3566,0.0,0.8806,41.66,0,0.8689,0.0016,0.0043,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,7,64,6,0.3102,0.0,0.8589,40.43,0,0.8707,0.0011,0.0039,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,8,64,6,0.2655,0.0,0.8351,36.01,1,0.8716,0.0009,0.0033,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,9,64,6,0.2332,0.0,0.8139,36.28,1,0.8716,0.0009,0.0034,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,10,64,6,0.1963,0.0,0.7885,35.59,3,0.8716,0.0008,0.0034,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,11,64,6,0.1792,0.0,0.7659,35.78,8,0.8709,0.001,0.0038,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,12,64,6,0.1577,0.0,0.7573,36.68,2,0.8708,0.0011,0.0038,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,13,64,6,0.1619,0.0,0.7569,36.04,8,0.8695,0.0014,0.0045,
-moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,14,64,6,0.1666,0.0,0.7565,28.24,8,0.8679,0.0018,0.005,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,2,192,18,0.8437,0.9948,0.9872,103.68,1,0.9056,0.0037,0.0085,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,3,192,18,0.558,0.6094,0.963,115.27,0,0.9022,0.0044,0.0093,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,4,192,18,0.6356,0.7396,0.9638,77.66,1,0.9062,0.0036,0.0083,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,5,192,18,0.5671,0.651,0.9598,94.3,0,0.9075,0.0034,0.008,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,6,192,18,0.552,0.6094,0.9581,102.36,0,0.9095,0.003,0.0079,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,7,192,18,0.5093,0.5208,0.9519,95.45,1,0.9096,0.003,0.0079,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,8,192,18,0.5086,0.5156,0.9509,86.53,0,0.9127,0.0024,0.0073,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,9,192,18,0.4773,0.4271,0.9466,93.82,1,0.9134,0.0023,0.0075,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,10,192,18,0.45,0.4062,0.9465,97.82,0,0.9165,0.0017,0.0068,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,11,192,18,0.4394,0.3854,0.9395,60.01,3,0.9191,0.0013,0.0065,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,12,192,18,0.3897,0.3073,0.937,89.35,0,0.9191,0.0013,0.0064,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,13,192,18,0.4054,0.3125,0.9363,49.76,0,0.92,0.0012,0.0063,
-temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,14,192,18,0.4317,0.3906,0.9306,36.17,7,0.917,0.0017,0.0073,
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,2,192,18,0.2497,0.0104,0.8628,30.39,302,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,3,192,18,0.2045,0.0,0.8356,35.28,218,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,4,192,18,0.2033,0.0052,0.8365,39.09,147,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,5,192,18,0.2,0.0,0.8355,39.33,156,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,6,192,18,0.2189,0.0,0.8476,42.98,132,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,7,192,18,0.2573,0.0156,0.8687,36.44,204,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,8,192,18,0.3206,0.0573,0.891,33.91,213,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_moe,flame192_g3_moe,1e18,full,fine 18/192,9,192,18,0.6354,0.8698,0.9587,24.52,385,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,2,192,18,0.6736,0.7083,0.9609,44.57,72,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,3,192,18,0.3436,0.3802,0.9121,59.85,232,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,4,192,18,0.4343,0.4583,0.9362,66.6,54,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,5,192,18,0.5064,0.5052,0.9438,55.32,15,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,6,192,18,0.5309,0.5521,0.9477,65.15,9,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,7,192,18,0.6212,0.6667,0.9549,53.62,19,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,8,192,18,0.6958,0.7292,0.9627,51.47,9,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame192_g3_temporal,flame192_g3_temporal,1e18,temporal,fine 18/192,9,192,18,0.6864,0.8021,0.9633,40.45,38,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,2,64,6,0.246,0.0156,0.8186,25.78,9,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,3,64,6,0.1727,0.0,0.7604,29.2,12,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,4,64,6,0.1854,0.0,0.7642,28.43,8,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,5,64,6,0.1826,0.0,0.766,29.58,17,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,6,64,6,0.1962,0.0,0.7909,30.55,16,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,7,64,6,0.2066,0.0,0.7884,27.69,11,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,8,64,6,0.2228,0.0156,0.8127,26.59,22,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_moe,flame38m_g1_moe,1e18,full,coarse 6/64,9,64,6,0.3492,0.0625,0.8715,22.86,22,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,2,64,6,0.6903,0.7969,0.9529,28.64,4,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,3,64,6,0.2637,0.125,0.8728,42.23,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,4,64,6,0.3532,0.1562,0.8997,40.96,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,5,64,6,0.425,0.3125,0.9164,39.9,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,6,64,6,0.5106,0.5312,0.9335,35.48,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,7,64,6,0.4812,0.4531,0.9329,35.06,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,8,64,6,0.5419,0.5469,0.937,34.74,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g1_temporal,flame38m_g1_temporal,1e18,temporal,coarse 6/64,9,64,6,0.5863,0.7031,0.9406,30.82,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,2,192,18,0.295,0.0469,0.8816,32.69,184,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,3,192,18,0.2325,0.0,0.8525,39.61,174,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,4,192,18,0.2244,0.0,0.8526,42.44,101,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,5,192,18,0.2309,0.0,0.8539,43.9,125,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,6,192,18,0.2457,0.0052,0.8607,41.52,129,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,7,192,18,0.2731,0.0156,0.8738,37.25,126,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,8,192,18,0.2991,0.0833,0.8867,32.94,236,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_moe,flame38m_g3_moe,1e18,full,fine 18/192,9,192,18,0.4731,0.4323,0.9374,29.82,311,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,2,192,18,0.8465,0.9635,0.981,35.55,27,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,3,192,18,0.3754,0.375,0.9234,66.02,79,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,4,192,18,0.4584,0.4479,0.9403,61.12,45,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,5,192,18,0.5622,0.5677,0.9517,59.08,12,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,6,192,18,0.6243,0.6354,0.9573,58.33,11,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,7,192,18,0.6399,0.6771,0.9604,57.66,10,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,8,192,18,0.7332,0.8125,0.9679,51.49,5,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g3_temporal,flame38m_g3_temporal,1e18,temporal,fine 18/192,9,192,18,0.7192,0.8073,0.9654,42.84,15,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,2,320,30,0.3256,0.0969,0.9024,33.33,555,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,3,320,30,0.2835,0.0187,0.8901,42.8,410,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,4,320,30,0.2731,0.0125,0.8847,48.2,255,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,5,320,30,0.2614,0.0063,0.8836,47.49,265,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,6,320,30,0.3116,0.0281,0.899,46.99,224,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,7,320,30,0.3441,0.0938,0.9096,42.06,360,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,8,320,30,0.3865,0.1844,0.9202,35.31,523,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_moe,flame38m_g5_moe,1e18,full,coarse 30/320,9,320,30,0.6374,0.8281,0.9612,27.72,1017,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,2,320,30,0.8218,0.9437,0.9809,44.1,132,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,3,320,30,0.5495,0.5219,0.9369,66.88,315,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,4,320,30,0.6075,0.575,0.9512,63.94,54,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,5,320,30,0.7014,0.6844,0.9625,57.49,39,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,6,320,30,0.7766,0.7625,0.9694,64.45,13,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,7,320,30,0.7822,0.7812,0.9705,60.7,29,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,8,320,30,0.8318,0.8531,0.9758,58.54,14,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame38m_g5_temporal,flame38m_g5_temporal,1e18,temporal,coarse 30/320,9,320,30,0.7713,0.8219,0.9725,42.13,64,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,2,64,6,0.6866,0.8906,0.9561,29.39,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,3,64,6,0.6884,0.8438,0.9507,22.14,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,4,64,6,0.5289,0.5938,0.9191,28.39,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,5,64,6,0.3894,0.1406,0.8794,29.01,3,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,6,64,6,0.2672,0.0312,0.8444,33.21,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,7,64,6,0.2095,0.0,0.8078,32.75,4,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,8,64,6,0.1978,0.0,0.8013,35.96,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_moe,flame512_g1_moe,1e18,full,coarse 6/64,9,64,6,0.1893,0.0,0.8022,34.41,5,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,2,64,6,0.867,1.0,0.9847,47.68,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,3,64,6,0.8628,1.0,0.9807,37.03,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,4,64,6,0.8847,0.9688,0.9817,30.59,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,5,64,6,0.8203,0.9375,0.9709,17.87,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,6,64,6,0.7305,0.8906,0.9639,34.87,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,7,64,6,0.6589,0.75,0.9518,35.92,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,8,64,6,0.6733,0.75,0.9535,31.38,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g1_temporal,flame512_g1_temporal,1e18,temporal,coarse 6/64,9,64,6,0.4786,0.4375,0.9345,37.33,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,2,192,18,0.6033,0.6771,0.9469,34.99,37,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,3,192,18,0.6551,0.8438,0.9548,29.55,51,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,4,192,18,0.618,0.7448,0.9492,39.12,15,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,5,192,18,0.4388,0.375,0.9205,44.09,13,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,6,192,18,0.4058,0.2812,0.9135,43.73,15,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,7,192,18,0.3265,0.0781,0.893,46.25,35,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,8,192,18,0.3351,0.1042,0.8975,45.48,48,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_moe,flame512_g3_moe,1e18,full,fine 18/192,9,192,18,0.2687,0.0417,0.8838,47.39,76,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,2,192,18,0.8313,0.9844,0.9839,83.59,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,3,192,18,0.8136,0.9271,0.9779,62.46,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,4,192,18,0.8513,0.9583,0.9812,55.27,4,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,5,192,18,0.8113,0.901,0.9746,42.84,4,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,6,192,18,0.7902,0.8698,0.9717,48.28,5,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,7,192,18,0.789,0.8698,0.9735,58.13,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,8,192,18,0.7825,0.8438,0.9725,51.62,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+flame512_g3_temporal,flame512_g3_temporal,1e18,temporal,fine 18/192,9,192,18,0.6663,0.7031,0.9619,63.47,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,2,64,6,0.8574,1.0,0.9861,51.78,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,3,64,6,0.7555,0.9062,0.9709,37.41,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,4,64,6,0.7946,0.9531,0.973,42.8,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,5,64,6,0.7874,0.9688,0.9721,43.96,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,6,64,6,0.6928,0.7344,0.9504,28.1,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,7,64,6,0.5683,0.6406,0.9418,39.97,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,8,64,6,0.5206,0.5625,0.9377,44.44,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,9,64,6,0.4937,0.4531,0.9331,46.03,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,10,64,6,0.5295,0.5781,0.9381,46.24,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,11,64,6,0.5419,0.5938,0.9357,37.41,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,12,64,6,0.5194,0.5469,0.9338,45.4,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,13,64,6,0.5053,0.5156,0.9319,36.09,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g1_tmoe_coarse_1e19,g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,14,64,6,0.4583,0.4375,0.9252,34.72,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s0_1e16,g3_moe_s0_1e16,1e16,full,fine 18/192,2,192,18,0.3152,0.026,0.8815,30.29,150,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s0_1e16,g3_moe_s0_1e16,1e16,full,fine 18/192,3,192,18,0.3008,0.0052,0.8783,31.86,223,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s0_1e16,g3_moe_s0_1e16,1e16,full,fine 18/192,4,192,18,0.3079,0.0156,0.8773,23.96,427,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s0_1e16_sigmoid_seed2,g3_moe_s0_1e16_sigmoid_seed2,1e16,full,fine 18/192,2,192,18,0.2778,0.0469,0.8629,28.82,248,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s0_1e16_sigmoid_seed2,g3_moe_s0_1e16_sigmoid_seed2,1e16,full,fine 18/192,3,192,18,0.253,0.0312,0.8574,26.4,370,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s0_1e16_sigmoid_seed2,g3_moe_s0_1e16_sigmoid_seed2,1e16,full,fine 18/192,4,192,18,0.333,0.1042,0.8936,23.45,525,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,2,192,18,0.4939,0.4792,0.9293,26.83,137,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,3,192,18,0.3827,0.1719,0.9082,38.17,84,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,4,192,18,0.3595,0.0573,0.9006,36.99,111,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e16,g3_moe_s1_1e16,1e16,full,fine 18/192,5,192,18,0.3681,0.099,0.9067,37.53,122,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,2,192,18,0.2937,0.0104,0.8775,35.67,134,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,3,192,18,0.2593,0.0,0.8587,35.24,179,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,4,192,18,0.2543,0.0052,0.8597,30.0,287,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s1_1e17,g3_moe_s1_1e17,1e17,full,fine 18/192,5,192,18,0.2582,0.0208,0.8514,19.36,745,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,2,192,18,0.3504,0.026,0.8987,37.05,118,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,3,192,18,0.3551,0.0312,0.8964,40.17,65,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,4,192,18,0.2997,0.0052,0.8791,38.26,97,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,5,192,18,0.2979,0.0,0.8773,30.4,205,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s2_1e17,g3_moe_s2_1e17,1e17,full,fine 18/192,6,192,18,0.2959,0.0312,0.8773,24.22,466,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,2,192,18,0.4602,0.3281,0.9273,37.01,77,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,3,192,18,0.3318,0.0156,0.8908,40.22,62,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,4,192,18,0.3416,0.0104,0.8958,48.08,26,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,5,192,18,0.3485,0.0365,0.8991,44.42,52,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,6,192,18,0.3441,0.0156,0.8965,36.12,155,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_s3_1e17,g3_moe_s3_1e17,1e17,full,fine 18/192,7,192,18,0.3344,0.0573,0.8913,28.77,201,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_sm1_1e16,g3_moe_sm1_1e16,1e16,full,fine 18/192,2,192,18,0.2626,0.0,0.8604,37.38,138,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_sm1_1e16,g3_moe_sm1_1e16,1e16,full,fine 18/192,3,192,18,0.2267,0.0,0.8385,31.11,247,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_moe_sm1_1e16,g3_moe_sm1_1e16,1e16,full,fine 18/192,4,192,18,0.249,0.0052,0.8456,17.73,621,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s0_1e16_mom,g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,2,192,18,0.6308,0.6406,0.9252,29.07,337,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s0_1e16_mom,g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,3,192,18,0.6696,0.6823,0.9387,20.51,174,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s0_1e16_mom,g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,4,192,18,0.7587,0.776,0.948,14.31,196,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,2,192,18,0.5494,0.5208,0.9205,37.5,644,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,3,192,18,0.4509,0.474,0.9013,27.32,163,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,4,192,18,0.4913,0.4896,0.9111,37.08,65,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,5,192,18,0.5561,0.5573,0.9162,18.91,69,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,6,192,18,0.6386,0.7031,0.9215,20.11,99,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,2,192,18,0.9189,0.9896,0.9884,37.18,21,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,3,192,18,0.8552,0.7917,0.9677,24.04,10,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,4,192,18,0.7526,0.7448,0.9619,42.0,24,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,5,192,18,0.709,0.7708,0.9622,46.18,21,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,6,192,18,0.6657,0.7656,0.9589,40.28,50,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_s3_1e17,g3_tmoe_s3_1e17,1e17,temporal,fine 18/192,7,192,18,0.6898,0.7812,0.9623,43.34,61,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_sm1_1e16,g3_tmoe_sm1_1e16,1e16,temporal,fine 18/192,2,192,18,0.5016,0.5,0.9057,46.3,399,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_sm1_1e16,g3_tmoe_sm1_1e16,1e16,temporal,fine 18/192,3,192,18,0.5159,0.5104,0.924,47.3,146,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+g3_tmoe_sm1_1e16,g3_tmoe_sm1_1e16,1e16,temporal,fine 18/192,4,192,18,0.6003,0.6146,0.9402,39.68,110,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,2,64,6,0.8959,0.9688,0.9849,17.13,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,3,64,6,0.7313,1.0,0.9665,33.12,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,4,64,6,0.5909,0.9375,0.9407,36.52,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,5,64,6,0.4473,0.2344,0.9071,36.48,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,6,64,6,0.3566,0.0,0.8806,41.66,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,7,64,6,0.3102,0.0,0.8589,40.43,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,8,64,6,0.2655,0.0,0.8351,36.01,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,9,64,6,0.2332,0.0,0.8139,36.28,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,10,64,6,0.1963,0.0,0.7885,35.59,3,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,11,64,6,0.1792,0.0,0.7659,35.78,8,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,12,64,6,0.1577,0.0,0.7573,36.68,2,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,13,64,6,0.1619,0.0,0.7569,36.04,8,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+moe_coarse_1e19,moe_coarse_1e19,1e19,full,coarse 6/64,14,64,6,0.1666,0.0,0.7565,28.24,8,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,2,192,18,0.8437,0.9948,0.9872,103.68,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,3,192,18,0.558,0.6094,0.963,115.27,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,4,192,18,0.6356,0.7396,0.9638,77.66,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,5,192,18,0.5671,0.651,0.9598,94.3,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,6,192,18,0.552,0.6094,0.9581,102.36,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,7,192,18,0.5093,0.5208,0.9519,95.45,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,8,192,18,0.5086,0.5156,0.9509,86.53,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,9,192,18,0.4773,0.4271,0.9466,93.82,1,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,10,192,18,0.45,0.4062,0.9465,97.82,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,11,192,18,0.4394,0.3854,0.9395,60.01,3,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,12,192,18,0.3897,0.3073,0.937,89.35,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,13,192,18,0.4054,0.3125,0.9363,49.76,0,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
+temporal_fine_g3_1e19,temporal_fine_g3_1e19,1e19,temporal,fine 18/192,14,192,18,0.4317,0.3906,0.9306,36.17,7,,,,checkpoint unreadable: ModuleNotFoundError: No module named 'megatron'
