@@ -1,0 +1,17 @@
+run,budget,regime,grain,sham,sigma,layer,test_CE,baseline_CE,cost
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,2,4.270592,3.918475,0.352117
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,3,4.228719,3.918475,0.310244
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,4,4.184841,3.918475,0.266366
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,5,4.136867,3.918475,0.218392
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,6,4.128286,3.918475,0.209811
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,7,4.099470,3.918475,0.180995
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,8,4.105874,3.918475,0.187399
+flame38m_g1_moe,1e18,full,coarse6/64,noise,1.93,9,4.258311,3.918475,0.339836
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,2,4.307756,3.918475,0.389281
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,3,4.260416,3.918475,0.341941
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,4,4.210113,3.918475,0.291638
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,5,4.156508,3.918475,0.238033
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,6,4.146223,3.918475,0.227748
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,7,4.114365,3.918475,0.195890
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,8,4.121458,3.918475,0.202983
+flame38m_g1_moe,1e18,full,coarse6/64,noise,2.020,9,4.290067,3.918475,0.371592
