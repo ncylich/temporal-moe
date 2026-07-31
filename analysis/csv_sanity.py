@@ -107,6 +107,14 @@ def check(path):
     # A ragged row yields a None key from DictReader's restkey; drop it rather than crash.
     cols = [c for c in rows[0] if isinstance(c, str)]
 
+    # Field count must match the header. An unquoted separator inside a value silently shifts every
+    # column after it -- DictReader then reads one field as another, e.g. a schedule fragment '3:18'
+    # parsed as a loss. This linter passed a file with two such rows, so the check was missing.
+    ragged = sum(1 for r in rows if None in r or any(v is None for v in r.values()))
+    if ragged:
+        out.append(f"{rel}: RAGGED ROWS {ragged}/{len(rows)} have a field count differing from the "
+                   f"header — an unquoted separator inside a value shifts every later column")
+
     # degenerate intervals: lo == hi on any row
     for lo in [c for c in cols if c.endswith("_lo95")]:
         hi = lo[:-5] + "_hi95"
