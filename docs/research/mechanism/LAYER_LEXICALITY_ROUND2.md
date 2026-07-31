@@ -10,7 +10,8 @@ monotone, and this document originally argued the U decomposes into an **endpoin
   cost-vs-depth correlation flips sign on a seed replicate at the same budget (−0.429 → **+0.257**)
   and reverses at 1e19 (**+0.891**). See §3.
 - **H2b (endpoint effect) survives only as a *last*-layer effect**, not an effect at both ends, and a
-  magnitude-matched, lexicality-free sham reproduces **58%** of it. What remains is largely
+  magnitude-matched, lexicality-free sham reproduces **58% and 85%** of it on the two models tested —
+  the higher figure on the model with the largest effect. What remains is largely
   architectural: **the final MoE layer is expensive to constrain, plausibly because it feeds the
   unembedding** — but ~20% of that layer's cost is *not* reproduced by noise of the same average size,
   so it is not purely positional. The first MoE layer is unremarkable at depth (1.01–1.17× the interior
@@ -138,6 +139,15 @@ architectural position rather than routing locus. The remainder is concentrated 
 real minus sham is **+0.022** at L2 but **+0.095** at L9. So L2's excess is fully positional while L9
 carries ~20% that a same-sized perturbation does not explain. Full table in the N1 row of §4a.
 
+**Replicated on a second model, and the positional share is higher there.** `flame38m_g3_moe` carries
+the largest endpoint effect in the set (ends/interior **2.482×**). Its magnitude-matched sham, mean
+matched to −6%, gives ends/interior **2.255×**, so the positional fraction is
+(2.255−1)/(2.482−1) = **85%** — against 58% on `flame38m_g1_moe`. Two models, and the
+lexicality-free share is larger exactly where the effect is biggest, which leaves **15%** unexplained
+there rather than 42%. Rows are in `sweep_eval.csv` under `flame38m_g3_moe`, keyed `zero` (the σ=0
+baseline, CE 4.009125) and `L2`–`L9`; they are not in `sham_magnitude_matched.csv`, which is why the
+generated coverage table still counts the sham as one model.
+
 ## 4. The next round, in priority order
 
 Every run here is **eval-only or a single forward pass — no training**. Training is deferred to §5
@@ -183,7 +193,15 @@ Treat every estimate as ±2x.
 | **N3** | **done** — *replicates in half* | Second seed at 1e18, same direction. The **endpoint spike replicates**: ends/interior **1.463×** against seed 1's **1.402×**. The **interior gradient does not**: ρ goes from **−0.429** to **+0.257**, a sign flip on a seed change alone. The half that replicated is the half now attributed to architecture; the half that failed is the half H2a rested on. |
 | **N4** | **done** | Fine granularity at 1e18. Endpoint spike replicates (ends/interior **1.394×**); interior ρ = **−0.943**. Its non-temporal control (`flame38m_g3_moe`, impose) gives ends/interior **2.482×**, ρ = −0.943 — the endpoint effect appears in a model that never trained under residency, which is the strongest single piece of evidence that it is positional. |
 | **N7** | **done, free** | Per-layer cost against per-layer swap rate. At 1e18 cost tracks position (ρ(cost, dist-from-middle) 0.63–0.83 over five models). At 1e19 the temporal model instead tracks churn, ρ(cost, swap rate) = **−0.864** — the churniest layers are the cheapest to exempt. Only three runs carry per-layer swap rates, so the 1e19 reading rests on one model. |
-| **N6 (C8)** | **done, both regimes** | De-lexicalization shown causally. Ratio (context shift ÷ token shift): temporal **1.34–1.66**, unconstrained **0.30–0.73**, opposite sides of 1 at every layer. Token sensitivity falls **42%** (median 0.843 → 0.492) *and* context sensitivity rises **35%** (median 0.551 → 0.744) — a decomposition no AUC difference can separate. *(An earlier version said context "nearly triples". That is layer 2 alone, at 2.59×, which is the maximum; the ratio decays monotonically to 1.16× by layer 9, and the median is 1.35×. The conclusion is unaffected — the two regimes sit on opposite sides of 1 at every layer — but the magnitude was overstated.)* |
+| **N6 (C8)** | **done — 6 arms, 3 cells, 58 rows** | De-lexicalization shown causally, and the separation is total: every unconstrained layer sits below 1 and every temporal layer above it, at every layer, across two granularities and two budgets including all thirteen MoE layers at 1e19 (per-cell ranges in the table below). An earlier version of this row reported only the 1e18 coarse pair, which was the whole of C8 at the time. Token sensitivity falls **42%** (median 0.843 → 0.492) *and* context sensitivity rises **35%** (median 0.551 → 0.744) — a decomposition no AUC difference can separate. *(An earlier version said context "nearly triples". That is layer 2 alone, at 2.59×, which is the maximum; the ratio decays monotonically to 1.16× by layer 9, and the median is 1.35×. The conclusion is unaffected — the two regimes sit on opposite sides of 1 at every layer — but the magnitude was overstated.)* |
+
+**C8 coverage in full** — context shift ÷ token shift, per cell; >1 means context dominates:
+
+| cell | unconstrained | temporal |
+|---|---|---|
+| 1e18 coarse 6/64, L2–9 | 0.30–0.73 | 1.34–1.66 |
+| 1e18 fine 18/192, L2–9 | 0.40–0.79 | 1.85–2.18 |
+| 1e19 coarse 6/64, L2–14 | 0.28–0.79 | 1.25–1.71 |
 
 **What this settles.** The constraint's effect on *routing* is large and causal (N6). The per-layer
 *cost* profile is architectural, and lexicality explains almost none of it. Those are different
@@ -191,7 +209,8 @@ quantities; H2 conflated them.
 
 The interior "depth trend" an earlier version of this paragraph asserted does not survive replication:
 it flips sign across seeds at one budget and reverses at another (§3). What is left is a single
-last-layer effect that a magnitude-matched, lexicality-free sham reproduces 58% of. Nothing in the
+last-layer effect that a magnitude-matched, lexicality-free sham reproduces 58% of on one model and
+85% of on a second. Nothing in the
 per-layer cost profile is evidence about routing *locus* — but the ~20% of the last layer's cost that
 noise does not reproduce is the one place where the constraint does something a generic perturbation
 of the same size does not, and it is worth explaining rather than assuming away.

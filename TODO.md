@@ -172,9 +172,13 @@ Kept separate from §2 because none of this needs training. It is work that was 
 deliberately not finished, recorded so the next person does not rediscover it or assume it was
 overlooked.
 
-**Current state:** 3a, 3f and 3g are **resolved** and kept for the record of what was wrong and how it
-was found. 3d is **not a bug** — it is recorded because it was wrongly escalated into one. 3b, 3c, 3e
-and 3i remain genuinely open. 3h is out of scope by instruction.
+**Current state:** 3a, 3f, 3g and 3i are **resolved** and kept for the record of what was wrong and
+how it was found. 3d is **not a bug** — it is recorded because it was wrongly escalated into one.
+**3b, 3c, 3e, 3j and 3k remain open**, plus one not yet written up: the writer behind
+`t1_perlayer_training.csv` emits an unquoted comma inside the `schedule` field, so two rows are
+ragged. It was fixed in the file by `8f59c949` and regenerated broken again by `1660af76` — the fix
+has to go into the writer, not the output. `csv_sanity.py` now detects it. 3h is out of scope by
+instruction.
 
 ### 3a. In-process sweep evaluation — **fixed and validated**
 
@@ -336,7 +340,7 @@ The seed-1234 arm also reproduced the original per-arm measurements to about 2e-
 which is a second independent validation of the repaired in-process sweep (3a) on a different model and
 with per-layer schedules rather than uniform R.
 
-### 3i. Subset runs silently truncate the full results CSV — **open trap**
+### 3i. Subset runs silently truncate the full results CSV — **resolved**
 
 `delex_locus_driver.py`, `delex_oracle.py` and their siblings **rewrite their entire output CSV from
 whatever cells they were given**, rather than merging into what is already there. Running one on a
@@ -349,8 +353,10 @@ The fix is either to merge on `(run, layer, expert, …)` rather than overwrite,
 file with fewer runs than the one on disk unless an explicit `--replace` flag is passed. Neither is
 done.
 
-Until then: **commit before running any of these on a subset.** That is the only reason the incident
-above cost nothing.
+**The second option was taken.** `analysis/probes/safe_csv.py` now guards nine writers, and all four
+scripts named above import it: `delex_locus_driver`, `delex_oracle`, `delex_transfer`, `delex_freq`.
+A subset run aborts rather than truncating. The advice to commit first is still good practice but is
+no longer the only thing standing between a diagnostic run and data loss.
 
 ### 3j. T1 models are captured but not registered — **open**
 
