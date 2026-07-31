@@ -363,6 +363,49 @@ Out of scope by explicit instruction. Everything they need is in §2.
 Each entry: what was audited, how, what was found, what was fixed. A pass that finds nothing is still
 recorded — it tells the next person that class was checked and when, so it does not get redone.
 
+### 2026-07-31 (later) — a fix introduced a worse bug than it closed
+
+`b0da2720` correctly diagnosed a shared module-level RNG in `plot_locus_by_layer.py` and shipped two
+new defects, both committed, both caught by review rather than by any check I had.
+
+**Defect 1 — zero-width intervals.** The repair moved the generator construction *inside* the
+resampling loop, so all 2000 draws were seeded identically and the percentiles collapsed to a point:
+`lo95 == hi95` on 12 of 24 rows. Fixed: one generator per array, built once, drawn from n times.
+
+**Defect 2 — row loss on `--split position`.** The reported cause (`registry.depth_of` returning
+`None` for the 1e19 runs) is **not** what happens — all three resolve to `s19opt`, depth 14, and no
+depth warning is emitted. The real cause: `mechinterp_locus_1e19.csv` holds **zero** position-split
+rows for any run (all 87552 are `sequence`, because the locus driver last ran without
+`--both-splits`), so that command computes 5 series where 12 are on disk and rewrites the split
+wholesale, 24 rows → 17, exiting 0. The class was right; the mechanism was not.
+
+**Three checks, and only the weakest was running:**
+
+| check | catches | status |
+|---|---|---|
+| idempotent — two runs agree | nondeterminism | was running |
+| faithful — regenerated == committed | silent scope loss | **now added** |
+| sane — output still means something | degenerate intervals, constant/empty columns | **now added** — `analysis/csv_sanity.py` |
+
+Both defects passed idempotence cleanly: two runs of the broken script agree perfectly on the same
+zero-width interval. **Idempotence is not sanity, and neither is faithfulness.**
+
+Also fixed: all nine bootstrap CIs quoted in `LAYER_LEXICALITY.md` prose, refreshed programmatically
+from the repaired CSV and marked with their source column. They had drifted for two separate reasons in
+sequence — copied from a pre-fix generation, then contradicted by the broken fix's degenerate values.
+Point estimates were always right, being deterministic, which is exactly why only the bounds moved.
+**This resolves the "verified but unresolved" item recorded in the previous entry:** the cause was not
+`delex_locus.py`'s seeding, it was this script.
+
+**Standing rules added from this round:**
+- **A run that emits warnings is not a clean run.** Both defects announced themselves — the row-count
+  line said 9 where the file held 24. They were emitted and not read. Act on a warning or record why
+  it is acceptable; if benign, silence it deliberately rather than leaving it to train everyone to skim.
+- **A fix is a change and gets the same scrutiny as any other.** Run the reproduction and sanity checks
+  against the *output of a fix* before committing it. When a fix touches a statistic, look at the
+  numbers it produces, not only at whether the script runs.
+
+
 ### 2026-07-31 — six-pass fresh-context audit of the doc set
 
 Scope: `docs/research/mechanism/*.md`, `TODO.md`, `README.md`, against `results/ablations/*.csv`.
@@ -420,10 +463,10 @@ Rejected. Reading a CSV and running a command are different evidence, and runnin
   explicitly exonerated it as adequately marked by the section header. The header is adequate, but two
   of three fresh readers tripping on it suggests the marker could be stronger.
 
-**Verified but unresolved:** the depth-slope CI bounds in prose differ from `mechinterp_locus_slopes.csv`
-by 0.0004–0.0026 while every point estimate matches exactly. The auditor attributed this to an unseeded
-bootstrap; `delex_locus.py` seeds with `default_rng(0)`, so that explanation is wrong and the cause is
-unidentified. Recorded rather than guessed at.
+**Verified, and since RESOLVED** (see the later entry above): the depth-slope CI bounds in prose
+differed from `mechinterp_locus_slopes.csv` while every point estimate matched exactly. Rejecting the
+"unseeded bootstrap" explanation was right, but the script was wrong — it was
+`plot_locus_by_layer.py`, not `delex_locus.py`.
 
 **Caveat on the method itself:** running several agents with git access in one working tree caused
 `.git/index.lock` contention, and one pass runs `git checkout -- .` as cleanup, which would discard
