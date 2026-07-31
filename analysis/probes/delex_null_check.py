@@ -91,7 +91,12 @@ def autocorr1(y):
     return float((y[1:] * y[:-1]).mean() / v) if v > 0 else float("nan")
 
 
-def battery(run, layer=None, min_usage=500, max_experts=24):
+def battery(run, layer=None, min_usage=500, max_experts=256):
+    # max_experts was 24, which gives the median iid null about +-0.002 of sampling noise -- the same
+    # size as the 0.002 gate tolerance it is compared against. A test whose noise floor equals its
+    # threshold flags healthy models at a steady rate, and it did: four of 26 fell outside the gate at
+    # 24 experts and all four came back inside at 256 (deviations 0.0020-0.0025 -> 0.0001-0.0009,
+    # shrinking like 1/sqrt(n) as a correctly-centred median should).
     """Run every null arm on one capture's chosen layer. Returns CSV rows + a printable table."""
     import torch
     r = registry.get(run)
