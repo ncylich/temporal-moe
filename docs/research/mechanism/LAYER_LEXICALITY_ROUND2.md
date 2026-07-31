@@ -1,11 +1,24 @@
 # Layer Lexicality, Round 2: the C3 correction and what to run next
 
-**Status: a correction to a conclusion already committed in
-[`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md), plus the next round of tests.** Round 1 measured H1 at
-full depth, ran C3 in both directions, and recorded H2 as falsified because the per-layer cost
-profile came out U-shaped rather than monotone. That reading is incomplete: the U decomposes into an
-**endpoint effect** and an **interior gradient**, and only the second is about lexicality. H2 is
-falsified as literally pre-registered and supported over the interior of the network.
+**Status: H1 is supported and now demonstrated causally. H2 is dead in both forms.**
+
+Round 1 recorded H2 as falsified because the per-layer cost profile came out U-shaped rather than
+monotone, and this document originally argued the U decomposes into an **endpoint effect** plus an
+**interior gradient**, with the second rescuing H2 over the interior. **That rescue has not held.**
+
+- **H2a (interior gradient) is falsified.** Its own pre-registered falsifier fired. The interior
+  cost-vs-depth correlation flips sign on a seed replicate at the same budget (−0.429 → **+0.257**)
+  and reverses at 1e19 (**+0.891**). See §3.
+- **H2b (endpoint effect) survives only as a *last*-layer effect**, not an effect at both ends, and a
+  sham perturbation carrying no lexical information largely reproduces it. What remains is
+  architectural: **the final MoE layer is expensive to constrain, plausibly because it feeds the
+  unembedding.** The first MoE layer is unremarkable at depth (1.01–1.17× the interior mean at 1e19).
+- **H1 is supported causally**, not merely by probe: C8 / N6 shows the token-versus-context
+  sensitivity ratio on opposite sides of 1 in the two regimes at every layer.
+
+The practical consequence: there is no lexicality-justified layer schedule. Any per-layer policy
+should be justified by architectural position — exempt the last MoE layer — and not by where routing
+is most lexical.
 
 Everything below reproduces from committed CSVs. The decomposition is
 [`analysis/probes/swap_shape.py`](../../../analysis/probes/swap_shape.py) ->
@@ -78,17 +91,48 @@ declines to +0.083 by layer 14, while depth keeps increasing. That is the dissoc
 **H2a — interior gradient.** Among MoE layers not adjacent to the embedding or the unembedding, the
 cost of imposing rolling residency falls as the layer's contextual share rises.
 
-*Supported* at 1e18 in the impose direction (ρ = −0.886, p = 0.035, n = 6). Not yet separable from a
-pure depth effect. Falsified by a flat or positive interior correlation once depth and contextual
-share are dissociated.
+**FALSIFIED.** Its own pre-registered falsifier — "a flat or positive interior correlation once depth
+and contextual share are dissociated" — fired on two independent tests. Interior cost-vs-depth
+(Spearman, L3–8 at 1e18, L3–13 at 1e19), from `swap_shape.csv`:
+
+| arm | ρ |
+|---|---|
+| 1e18 g1 impose | −0.886 |
+| 1e18 g3 impose | −0.943 |
+| 1e18 g3 unmask | −0.943 |
+| 1e18 g1 unmask | −0.429 |
+| **1e18 g1 unmask, seed 2** | **+0.257** |
+| 1e19 impose | +0.064 |
+| **1e19 unmask** | **+0.891** |
+
+The correlation flips sign on a *seed replicate at the same budget and in the same direction*
+(−0.429 → +0.257), and reverses outright at 1e19 (+0.891). A gradient that does not survive a seed
+change is not a property of depth or of lexicality; a gradient that inverts with budget is not a
+gradient. The original ρ = −0.886 at 1e18 impose stands as a measurement and is reproducible, but it
+does not generalise, and the two arms with the most interior points (n = 11 at 1e19) are the two that
+contradict it.
 
 **H2b — endpoint effect.** The first and last MoE layers cost more to constrain than the interior
 gradient predicts, for reasons of architectural position rather than routing locus.
 
-*Consistent with* the 1e18 data (1.90× / 1.40×, and the last layer is the least lexical while being
-the most expensive). Falsified if the spike tracks depth-relative position rather than
-first/last-layer adjacency — i.e. if in a 14-layer model it moves to ~⅔ depth instead of staying at
-the first and last MoE layers.
+*Supported, but as a **last**-layer effect only — not an effect at both ends.* The 14-layer test
+that would have moved a depth-relative spike to ~⅔ depth instead leaves it at the final layer, so the
+falsifier did not fire. But it also shows the first MoE layer is unremarkable. Cost relative to the
+interior (L3–13) mean at 1e19:
+
+| | layer 2 | layer 14 |
+|---|---|---|
+| impose (`moe_coarse_1e19`) | 1.01× | 1.70× |
+| unmask (`g1_tmoe_coarse_1e19`) | 1.17× | 3.21× |
+
+Layer 2 sits at the interior level in both directions. The "U" seen at 1e18 was two endpoints of a
+short stack; at 14 layers only the top one survives. Restate the claim as: **the last MoE layer is
+expensive to constrain, plausibly because it feeds the unembedding directly.** The first-layer half
+of H2b is not supported.
+
+A sham perturbation carrying no lexical information largely reproduces the last-layer spike, which is
+why this is read as architectural position rather than routing locus — with the magnitude caveat
+recorded against N1 in §4a.
 
 ## 4. The next round, in priority order
 
@@ -118,21 +162,29 @@ Treat every estimate as ±2x.
 
 | # | status | headline |
 |---|---|---|
-| **N1** | **done, both directions** | The sham **reproduces** the U in the impose direction (r = 0.78; L2 1.39× vs real 1.45×). H2b supported: the endpoints are positional. The unmask direction disagrees (r = 0.38) and should be discounted — there is no valid sham for "un-apply a perturbation the model never had", and its baseline is an off-distribution model at CE 4.895 vs native 3.909. |
+| **N1** | **done, both directions** — *with a magnitude caveat* | The sham **reproduces** the endpoint shape in the impose direction (ends/interior **1.508×** sham vs **1.902×** real). Read as: the endpoint effect is largely positional, not lexical. **Caveat:** the two perturbations are not the same size — mean cost over L2–9 is **+0.283 real vs +0.596 sham, 2.11×** (`swap_shape.csv`, `mean_cost`). Comparing endpoint *ratios* across perturbations that differ 2× in magnitude assumes the profile scales linearly in perturbation size, which is untested. The conclusion is probably right but weaker than "confirmed"; a magnitude-matched sham (§4b) would remove the confound. The unmask direction disagrees and should be discounted — there is no valid sham for "un-apply a perturbation the model never had", and its baseline is an off-distribution model at CE 4.895 vs native 3.909. |
 | **N2** | **done, both directions** | Endpoints add independently, interior does not: {2,9} ratio **1.02** imposing and **0.98** unmasking; {3–8} **0.81**. So single-layer costs predict the endpoint schedule and overstate an interior one by 23%. |
-| **N5** | **unmask arm done** | **Cost tracks depth, not lexicality**: r = **+0.770** with depth, **+0.152** with contextual share. Between L8 and L14 the contextual share falls while cost more than doubles. Test A: quadratic R² 0.92 vs linear 0.59, vertex L5.8, **L14 at 2.71× mean** — spikes at layers 2 and 14, i.e. the architectural boundaries. Impose arm running. |
+| **N5** | **done, both directions** (impose landed in `229f0f68`, 13 layers) | **Cost does not track lexicality** (ρ = +0.37 unmask, +0.22 impose with contextual share). It does not track depth consistently either: interior ρ = **+0.891** unmask but **+0.064** impose — the arm that falsifies H2a. The endpoint effect is real and is **last-layer only**: relative to the L3–13 interior mean, L2 is **1.01×** (impose) / **1.17×** (unmask) while L14 is **1.70×** / **3.21×**. An earlier version of this row said "spikes at layers 2 and 14"; that was read off the 1e18 U and does not hold at 14 layers. |
+| **N3** | **done** — *replicates in half* | Second seed at 1e18, same direction. The **endpoint spike replicates**: ends/interior **1.463×** against seed 1's **1.402×**. The **interior gradient does not**: ρ goes from **−0.429** to **+0.257**, a sign flip on a seed change alone. The half that replicated is the half now attributed to architecture; the half that failed is the half H2a rested on. |
+| **N4** | **done** | Fine granularity at 1e18. Endpoint spike replicates (ends/interior **1.394×**); interior ρ = **−0.943**. Its non-temporal control (`flame38m_g3_moe`, impose) gives ends/interior **2.482×**, ρ = −0.943 — the endpoint effect appears in a model that never trained under residency, which is the strongest single piece of evidence that it is positional. |
+| **N7** | **done, free** | Per-layer cost against per-layer swap rate. At 1e18 cost tracks position (ρ(cost, dist-from-middle) 0.63–0.83 over five models). At 1e19 the temporal model instead tracks churn, ρ(cost, swap rate) = **−0.864** — the churniest layers are the cheapest to exempt. Only three runs carry per-layer swap rates, so the 1e19 reading rests on one model. |
 | **N6 (C8)** | **done, both regimes** | De-lexicalization shown causally. Ratio (context shift ÷ token shift): temporal **1.34–1.66**, unconstrained **0.30–0.73**, opposite sides of 1 at every layer. Token sensitivity falls 43% *and* context sensitivity nearly triples — a decomposition no AUC difference can separate. |
 
 **What this settles.** The constraint's effect on *routing* is large and causal (N6). The per-layer
-*cost* profile is architectural — endpoint sensitivity plus an interior depth trend — and lexicality
-explains almost none of it (r = 0.15). Those are different quantities; H2 conflated them.
+*cost* profile is architectural, and lexicality explains almost none of it. Those are different
+quantities; H2 conflated them.
+
+The interior "depth trend" an earlier version of this paragraph asserted does not survive replication:
+it flips sign across seeds at one budget and reverses at another (§3). What is left is a single
+last-layer effect that a lexicality-free sham largely reproduces. Nothing in the per-layer cost
+profile is evidence about routing locus.
 
 **A Round-1 reading this corrects.** The vertex at roughly two thirds depth was an artifact of the
 9-layer model, where "⅔ of the way down" and "just before the last layer" are not separable. At 14
 layers they separate and the endpoint reading wins.
 
-**Do N1–N4 first.** They fit in one pod day, they are all cheap, and N1 can answer H2b outright — in
-which case N5 narrows to the H2a dissociation question only.
+*(Sequencing note, now historical: N1–N4 were prioritised first and are all complete. Retained only
+so the ordering rationale is not lost — it is not an instruction to redo them.)*
 
 ### N1 — sham-perturbation control. The cheapest decisive test for H2b.
 
