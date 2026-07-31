@@ -363,6 +363,44 @@ Out of scope by explicit instruction. Everything they need is in §2.
 Each entry: what was audited, how, what was found, what was fixed. A pass that finds nothing is still
 recorded — it tells the next person that class was checked and when, so it does not get redone.
 
+### 2026-07-31 (third) — a guard built for CSVs did not cover a figure written by the same code
+
+**The class-B guard was scoped to CSV writers, so the PNG beside them was unprotected.** The slopes CSV
+is merged per series and cannot shrink; `locus_by_layer.png` is rewritten wholesale by whichever split
+ran last, so the documented `--split position` command replaced a 12-series figure with a 5-series one
+(384909 → 252674 bytes), exit 0, leaving a caption describing curves the image no longer contained.
+Same function, same command, one artifact guarded and one not. Fixed: the figure now refuses to
+overwrite a committed one with fewer series unless `--replace`. **An artifact that is regenerated and
+committed may not silently narrow, whatever its file extension.**
+
+**Vertex bounds — not drift, and wider than reported.** Consecutive runs are byte-identical. The real
+problem is that **20 of 24** vertex intervals span more layers than the model has, one covering 550
+layers of a 14-layer stack. `quadratic_r2` is the wrong gate: `s0_FULL` has r² = 1.00 with a ±25-layer
+interval on a 4-layer model, because a near-flat parabola fits well and still fails to locate its own
+turning point. Gated on **identifiability** instead — an interval wider than the stack it should place a
+layer within excludes nothing and is not reported. Point estimates kept; new `vertex_identified` column
+records the verdict so a blank reads as deliberate. **2 of 12 survive**, both with tight intervals.
+Doc claims of "vertex L5.3/5.5" come from the C3 cost profile, a different quantity — checked, unaffected.
+
+**Not reproduced, second round running:** `depth_of()` returns 14 for all three 1e19 runs, with and
+without `CKPT_ROOT`, and no "unknown depth" warning is emitted. The warnings on that command are
+`no rows … at split=position` — a different cause, and the one the figure guard now handles.
+
+**`scripts/reproduce.sh` — the change that makes the next round self-checking.** Runs every documented
+CPU command in order, runs the sanity linter, fails if `git status` is non-empty afterwards, and fails
+on any warning not allowlisted **with a reason**. It does not know what a figure or a CSV is, so a new
+kind of regenerated artifact is covered the day it appears rather than after someone names the
+category. Commands whose correct behaviour is a non-zero exit are annotated, not deleted — removing
+them would stop testing that the guard fires.
+
+**It earned itself immediately:** on its first real run it caught a regression *I had just written* —
+adding `vertex_identified` shifted every column after it, so the summary line printed the wrong field
+and then crashed formatting a suppressed bound as a float. Now indexed by column name.
+
+Run it as the last step before every push. Current state: **REPRODUCE: PASS**, tree clean, figure
+byte-identical to committed with 12 of 12 series.
+
+
 ### 2026-07-31 (later) — a fix introduced a worse bug than it closed
 
 `b0da2720` correctly diagnosed a shared module-level RNG in `plot_locus_by_layer.py` and shipped two
