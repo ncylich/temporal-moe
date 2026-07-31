@@ -28,6 +28,11 @@ import csv
 import os
 import sys
 
+# Cap BLAS per worker before numpy loads its backend: N processes each claiming all cores thrash.
+os.environ.setdefault("OMP_NUM_THREADS", "8")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "8")
+os.environ.setdefault("MKL_NUM_THREADS", "8")
+
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -85,6 +90,46 @@ def oracle(ids, Y, tr, te, nid):
     return auc, mi_over_h, frac_back
 
 
+
+def _oracle_one(task):
+    """One capture, start to finish. Top-level and returning plain data so it can be sent to a pool.
+
+    Captures are independent -- nothing here reads another run -- so this was only ever serial
+    because the loop was written that way.
+    """
+    import torch
+    idx, cap, name, regime, grain_label, budget, split = task
+    d = torch.load(cap, map_location="cpu", weights_only=False)
+    emb = d["emb"].float().numpy()
+    S, B, H = emb.shape
+    ntok = S * B
+    ids = token_ids(emb)
+    nid = int(ids.max()) + 1
+    tr, te = delex_locus.split_index(S, B, split)
+    layers = registry.moe_layers(d)
+    if not layers:
+        return idx, [], [], [f"[warn] {name}: capture holds no MoE layers, skipping (rerun its capture)"]
+    log = [f"[run] {name} ({regime}, {grain_label}, {budget}) "
+           f"{nid} distinct token ids in {ntok} tokens, layers {layers[0]}-{layers[-1]}, "
+           f"split={split}"]
+    rows, summary = [], []
+    for L in layers:
+        Ld = d["layers"][L]
+        lg = Ld["logits"].float().numpy()
+        mask = Ld["mask"].numpy() if Ld["mask"] is not None else None
+        Y = delex_locus.firing(lg, mask, int(Ld["k"])).reshape(ntok, lg.shape[-1]).astype(np.float64)
+        auc, mih, back = oracle(ids, Y, tr, te, nid)
+        usage = Y.sum(0).astype(int)
+        for e in range(Y.shape[1]):
+            rows.append([name, name, budget, regime, L, e, split, int(usage[e]),
+                         delex_locus._r(auc[e]), delex_locus._r(mih[e]), nid, round(back, 4)])
+        fin = np.isfinite(auc)
+        log.append(f"    L{L:<3} oracle token AUC median = {np.median(auc[fin]):.4f}   "
+                   f"I/H median = {np.median(mih[fin]):.4f}   backoff rows = {back*100:.1f}%")
+        summary.append((name, L, float(np.median(auc[fin])), float(np.median(mih[fin]))))
+    return idx, rows, summary, log
+
+
 def main():
     import torch
     split = "position" if "--split=position" in sys.argv else "sequence"
@@ -93,38 +138,24 @@ def main():
              if (not only or r.name in only) and os.path.exists(r.path("delex_capture.pt"))]
     if not cells:
         sys.exit("no captures on disk")
+    tasks = [(i, r.path("delex_capture.pt"), r.name, r.regime, r.grain_label, r.budget, split)
+             for i, r in enumerate(cells)]
+    jobs = int(os.environ.get("JOBS", "0")) or min(len(tasks), max(1, (os.cpu_count() or 8) // 8))
+    print(f"[pool] {len(tasks)} captures over {jobs} processes", flush=True)
+    if jobs > 1 and len(tasks) > 1:
+        import multiprocessing as mp
+        with mp.get_context("spawn").Pool(jobs) as pool:
+            done = list(pool.imap_unordered(_oracle_one, tasks))
+        done.sort(key=lambda x: x[0])       # deterministic CSV order regardless of finish order
+    else:
+        done = [_oracle_one(t) for t in tasks]
+
     rows, summary = [], []
-    for r in cells:
-        d = torch.load(r.path("delex_capture.pt"), map_location="cpu", weights_only=False)
-        emb = d["emb"].float().numpy()
-        S, B, H = emb.shape
-        ntok = S * B
-        ids = token_ids(emb)
-        nid = int(ids.max()) + 1
-        tr, te = delex_locus.split_index(S, B, split)
-        layers = registry.moe_layers(d)
-        if not layers:
-            print(f"[warn] {r.name}: capture holds no MoE layers, skipping (rerun its capture)")
-            continue
-        print(f"[run] {r.name} ({r.regime}, {r.grain_label}, {r.budget}) "
-              f"{nid} distinct token ids in {ntok} tokens, layers {layers[0]}-{layers[-1]}, "
-              f"split={split}", flush=True)
-        for L in layers:
-            Ld = d["layers"][L]
-            lg = Ld["logits"].float().numpy()
-            mask = Ld["mask"].numpy() if Ld["mask"] is not None else None
-            Y = delex_locus.firing(lg, mask, int(Ld["k"])).reshape(ntok, lg.shape[-1]) \
-                .astype(np.float64)
-            auc, mih, back = oracle(ids, Y, tr, te, nid)
-            usage = Y.sum(0).astype(int)
-            for e in range(Y.shape[1]):
-                rows.append([r.name, r.name, r.budget, r.regime, L, e, split, int(usage[e]),
-                             delex_locus._r(auc[e]), delex_locus._r(mih[e]), nid, round(back, 4)])
-            fin = np.isfinite(auc)
-            print(f"    L{L:<3} oracle token AUC median = {np.median(auc[fin]):.4f}   "
-                  f"I/H median = {np.median(mih[fin]):.4f}   backoff rows = {back*100:.1f}%",
-                  flush=True)
-            summary.append((r.name, L, float(np.median(auc[fin])), float(np.median(mih[fin]))))
+    for _, rr, ss, log in done:
+        for line in log:
+            print(line, flush=True)
+        rows += rr
+        summary += ss
 
     os.makedirs(ABLATIONS, exist_ok=True)
     with open(OUT, "w", newline="") as f:
