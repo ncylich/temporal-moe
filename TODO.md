@@ -172,29 +172,42 @@ Kept separate from §2 because none of this needs training. It is work that was 
 deliberately not finished, recorded so the next person does not rediscover it or assume it was
 overlooked.
 
-### 3a. In-process sweep evaluation — written, **fails validation, do not use**
+**Current state:** 3a, 3f and 3g are **resolved** and kept for the record of what was wrong and how it
+was found. 3d is **not a bug** — it is recorded because it was wrongly escalated into one. 3b, 3c, 3e
+and 3i remain genuinely open. 3h is out of scope by instruction.
 
-`analysis/probes/sweep_eval.py` loads the model once and loops residency settings in-process, to avoid
-paying ~4 min of Megatron/TE init, dataset index build and checkpoint load per arm. It does not work.
-Three arms at R=24/48/64 returned an identical loss of 4.403726, against a measured `dose_R24` of
-4.102362.
+### 3a. In-process sweep evaluation — **fixed and validated**
 
-Cause: the script calls `pretrain()` on `pretrain_gpt` directly and never installs the temporal router
-patch, so the model evaluates as a plain MoE and `TEMPORAL_RESIDENCY_R` is read by code that never
-runs. The result lands near the unconstrained reference (4.3890), which is what an unpatched model
-should give.
+`analysis/probes/sweep_eval.py` loads the model once and loops residency settings in-process, avoiding
+the ~4 min of Megatron/TE init, dataset index build and checkpoint load that each separate arm pays.
+It reproduces independently-measured references to **1e-6**:
 
-To finish: install the temporal patch the way the other entry points do, and match the cached batch
-count to the reference config (it caches 20 micro-batches; the references use 16 eval iters at global
-batch 1024, so losses are not comparable until that agrees). Acceptance is reproducing `dose_R24 =
-4.102362`, not a speedup.
+| arm | in-process | per-arm reference |
+|---|---|---|
+| dose_R24 | 4.102363 | 4.102362 |
+| dose_R48 | 4.316587 | 4.316586 |
+| dose_R64 | 4.388953 | 4.388952 |
 
-**Lesson worth keeping.** Its `SWEEP_SELFTEST` check passed. It only verified that a *repeated* arm
-sees the same batches; it could not detect that all three arms were identical *to each other*, which
-was the actual defect. The check that would have caught it is trivial: two different R values must
-produce different losses. This is the same shape of error as the EOD mask verifier that compared
-shapes when both tokenizers give (64, 2048) — a guard written against the imagined failure rather than
-the real one.
+Validated a second time on a different model with per-layer schedules rather than uniform R
+(`flame38m_g3_temporal`, five arms, ~2e-6). Measured effect: five arms in ~10 min against ~10 min
+*each* for the per-process path.
+
+**It was broken in three independent ways, each of which produced plausible output:**
+
+1. **The temporal router was never installed.** The script called `pretrain()` on `pretrain_gpt`
+   directly instead of patching `TopKRouter.forward` first, as `temporal/pretrain_temporal.py` does.
+   The model ran as a plain MoE and the residency env vars were read by code that never executed, so
+   every arm returned the same loss — a flat dose curve, which is a *result-shaped* failure, not a
+   crash.
+2. **The cache held 1/32 of the reference data.** The iterator yields micro-batches but an eval
+   iteration consumes a whole global batch, so caching `eval_iters` micro-batches scored on 16 where
+   the reference used 512.
+3. **The selftest demanded 1e-9 agreement between repeated GPU passes**, which are not bitwise
+   deterministic. It failed at 3.87e-08 — a correct result rejected by an unmeetable check.
+
+**The check that was missing, now added:** distinct R values must produce distinct losses. The
+original selftest only verified that a *repeated* arm saw the same batches, so it was structurally
+incapable of noticing that every arm was identical to every other — the actual failure.
 
 ### 3b. Eval volume — measured, not cut
 
@@ -266,24 +279,24 @@ being built as 64 experts because `GRAIN=3` was omitted.
 Not done because the existing captures have no `input_ids` field, so it only helps future captures
 unless all 26 are re-run — which was not worth the GPU time once the mask existed.
 
-### 3f. Four models flagged by the null battery — reported, not resolved
+### 3f. Four models flagged by the null battery — **resolved: the test's own noise**
 
-Under the stop rule, these four fall outside median iid-null AUC 0.500 +- 0.002:
+Four of 26 fell outside median iid-null AUC 0.500 ± 0.002. Re-running the identical arm with the
+expert cap raised from 24 to 256:
 
-| run | median iid null AUC |
-|---|---|
-| `g3_moe_s0_1e16_sigmoid_seed2` | 0.5025 |
-| `g3_tmoe_s0_1e16_mom` | 0.4975 |
-| `flame512_g1_temporal` | 0.4979 |
-| `flame38m_g1_moe` | 0.5020 |
+| run | dev at n=24 | dev at n=256 |
+|---|---|---|
+| `flame38m_g1_moe` | 0.0020 | 0.0002 |
+| `flame512_g1_temporal` | 0.0021 | 0.0001 |
+| `g3_moe_s0_1e16_sigmoid_seed2` | 0.0025 | 0.0009 |
+| `g3_tmoe_s0_1e16_mom` | 0.0025 | 0.0004 |
 
-**Assessment, which is an interpretation and not a measurement:** the battery samples layer 2 and 24
-experts, where a median carries roughly +-0.002 of sampling noise by itself, so these sit about one
-standard error from 0.500. The authoritative gate inside `delex_locus_driver` covers every layer and
-every expert — 832 to 2496 per model — and passed on all 26 at a maximum deviation of 0.0005.
+Every deviation shrinks 3–20×, as a median genuinely centred on 0.500 should. All 26 runs now pass at
+the raised default (worst deviation 0.0012). **No model's numbers are withdrawn.**
 
-To settle it rather than argue it: re-run the battery on these four with more layers and experts. Not
-done. Their numbers are in use on the strength of the full-depth gate.
+The defect was in the test: `max_experts=24` gives the median about ±0.002 of sampling noise — *the
+same size as the 0.002 tolerance it is compared against*. A gate whose noise floor equals its
+threshold flags healthy models at a steady rate. Default raised to 256.
 
 ### 3g. L3 disagreement — **resolved: real, not sampling noise**
 
@@ -315,6 +328,22 @@ g3 model at a different training seed, which is a training run -- see section 2.
 The seed-1234 arm also reproduced the original per-arm measurements to about 2e-6 on all five points,
 which is a second independent validation of the repaired in-process sweep (3a) on a different model and
 with per-layer schedules rather than uniform R.
+
+### 3i. Subset runs silently truncate the full results CSV — **open trap**
+
+`delex_locus_driver.py`, `delex_oracle.py` and their siblings **rewrite their entire output CSV from
+whatever cells they were given**, rather than merging into what is already there. Running one on a
+named subset for a quick diagnostic therefore replaces the full result set with the subset. It bit me
+once: a two-run pool-versus-no-pool comparison cut `mechinterp_locus_1e19.csv` from 87552 rows over 26
+runs to 9216 over 2. Recovered from the committed version with no loss, because it was committed.
+
+This is fine when a full regeneration is intended and dangerous otherwise, and nothing warns about it.
+The fix is either to merge on `(run, layer, expert, …)` rather than overwrite, or to refuse to write a
+file with fewer runs than the one on disk unless an explicit `--replace` flag is passed. Neither is
+done.
+
+Until then: **commit before running any of these on a subset.** That is the only reason the incident
+above cost nothing.
 
 ### 3h. T1–T4 — deliberately not started
 
