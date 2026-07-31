@@ -389,6 +389,27 @@ def temporal_forward(self, input: torch.Tensor):
         E = logits.shape[-1]
         if resid_R >= E:
             mask = torch.ones_like(logits, dtype=torch.bool)
+        elif sham == "noise":
+            # Magnitude-matched sham (N1, round 2). The random-resident sham above has no size knob:
+            # its damage is fixed by R and lands 2.11x the real constraint's, so comparing endpoint
+            # ratios between them assumes the profile scales linearly in perturbation size. This adds
+            # Gaussian noise to the router logits instead and imposes no residency at all, giving a
+            # continuous sigma that can be calibrated until the mean CE penalty matches the real
+            # constraint's. It carries no lexical information and no temporal dynamics, which is what
+            # a sham has to establish.
+            sigma = float(os.environ.get("TEMPORAL_SHAM_SIGMA", "0"))
+            # TEMPORAL_SHAM_LAYER restricts the noise to one layer, mirroring impose_one so the two
+            # profiles are comparable arm for arm. Empty means every MoE layer.
+            _only = os.environ.get("TEMPORAL_SHAM_LAYER", "")
+            if _only and int(_only) != int(getattr(self, "layer_number", 0)):
+                sigma = 0.0
+            g = torch.Generator(device=logits.device)
+            g.manual_seed(int(os.environ.get("TEMPORAL_SHAM_SEED", "1234"))
+                          + 1009 * int(getattr(self, "layer_number", 0)))
+            noise = torch.randn(logits.shape, generator=g, device=logits.device,
+                                dtype=torch.float32).to(logits.dtype)
+            logits = logits + sigma * noise
+            mask = torch.ones_like(logits, dtype=torch.bool)
         elif sham == "random":
             g = torch.Generator(device=logits.device)
             g.manual_seed(int(os.environ.get("TEMPORAL_SHAM_SEED", "1234"))
@@ -397,7 +418,7 @@ def temporal_forward(self, input: torch.Tensor):
             mask = torch.zeros_like(logits, dtype=torch.bool)
             mask.scatter_(-1, r.topk(resid_R, dim=-1).indices, True)
         else:
-            raise ValueError(f"unknown TEMPORAL_SHAM={sham!r} (expected 'random')")
+            raise ValueError(f"unknown TEMPORAL_SHAM={sham!r} (expected 'random' or 'noise')")
     else:
         mask = compute_resident_mask_accel(
             trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),

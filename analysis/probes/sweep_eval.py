@@ -43,7 +43,14 @@ def _parse_sweep():
     for item in spec:
         tag, _, val = item.partition(":")
         env = {}
-        if "@" in val:
+        if "=" in val:
+            # Generic form, tag:VAR=VAL;VAR2=VAL2 -- lets an arm set any knob the router reads from
+            # the environment per forward call, not just residency R.
+            for kv in val.split(";"):
+                if "=" in kv:
+                    k2, _, v2 = kv.partition("=")
+                    env[k2] = v2
+        elif "@" in val:
             r, _, layer = val.partition("@")
             env["TEMPORAL_R_SCHEDULE"] = f"{layer}:{r}"
             env["TEMPORAL_RESIDENCY_R"] = "0"
