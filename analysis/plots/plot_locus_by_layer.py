@@ -290,13 +290,21 @@ lo.text(0.012, 0.08, "token-dominated (unconstrained MoE)", transform=lo.transAx
 
 hh, ll = hi.get_legend_handles_labels()
 h2, l2 = lo.get_legend_handles_labels()
-lo.legend(hh + h2, ll + l2, loc="upper center", bbox_to_anchor=(0.5, -0.28),
-          framealpha=0.95, ncol=2, handlelength=2.6, columnspacing=1.4)
+LEGEND_NCOL, LEGEND_Y = 2, -0.28
+lo.legend(hh + h2, ll + l2, loc="upper center", bbox_to_anchor=(0.5, LEGEND_Y),
+          framealpha=0.95, ncol=LEGEND_NCOL, handlelength=2.6, columnspacing=1.4)
+
+# The caption sits below the legend, so its offset has to follow the legend's height rather than be a
+# constant. It was a constant, tuned when SERIES held 8 entries (4 rows); adding the four 1e18 arms
+# grew the legend to 6 rows and it landed on top of the caption. Deriving the offset from the row
+# count reproduces the known-good 4-row spacing (-0.72) and keeps working as series are added.
+_legend_rows = -(-len(hh + h2) // LEGEND_NCOL)          # ceil division
+CAPTION_Y = LEGEND_Y - 0.095 * _legend_rows - 0.06
 
 if PAPER:
     out = os.path.join(OUT, "locus_by_layer_nocaption.png")
 else:
-    lo.text(-0.14, -0.72,
+    lo.text(-0.14, CAPTION_Y,
             "Locus of routing specialization by normalized depth. Per (layer, expert) ridge probes\n"
             "predict whether expert e serves token t, from either the current token embedding E[x_t]\n"
             "or the excluded-context mean over +-w=k neighbours; AUC is held out on unseen documents,\n"
