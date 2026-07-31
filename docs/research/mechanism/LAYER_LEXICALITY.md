@@ -549,7 +549,7 @@ contrast **ends against middle** at matched layer count, which at 1e18 means {2,
 Not started, and not to be started without a decision.
 
 **Implementation.** The R knob exists but is global —
-[`temporal_router.py:359`](../../../temporal/temporal_router.py) reads `TEMPORAL_RESIDENCY_R` once
+[`temporal_router.py`](../../../temporal/temporal_router.py) (`temporal_forward`) reads `TEMPORAL_RESIDENCY_R` once
 and applies it at every layer. `self.layer_number` is already in scope a few lines below, so a
 per-layer schedule (an env-var list, or `R=E` sentinel per layer) is a small change. FLOPs are
 unchanged at any R, so every arm above is compute-matched to the baseline.

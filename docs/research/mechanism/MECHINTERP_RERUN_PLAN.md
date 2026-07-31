@@ -64,12 +64,12 @@ population rather than reproducing them.
 
 Where the limits are set:
 
-- `LAYERS = [2,3,4,5,6]` at [`delex_locus.py:18`](../../../analysis/probes/delex_locus.py), with
+- the former `LAYERS = [2,3,4,5,6]` constant in [`delex_locus.py`](../../../analysis/probes/delex_locus.py) (since removed — layers now come from the capture), with
   the note "paper convention". Layers outside the list are dropped by
   `if L not in d["layers"]: continue` — **silently**, with no warning and no record in the output.
-- `HEADLINERS` (3 runs) and `ALL_TEMPORAL` (5 runs) at
-  [`probe_replay.py:55-57`](../../../analysis/probes/probe_replay.py). `e6()` uses the former,
-  `e1()` the latter; nothing uses the full set of captured runs.
+- the former `HEADLINERS` (3 runs) and `ALL_TEMPORAL` (5 runs) lists in
+  [`probe_replay.py`](../../../analysis/probes/probe_replay.py) (since replaced by the registry).
+  `e6()` used the former, `e1()` the latter; nothing used the full set of captured runs.
 - `delex_structural.py` and `delex_demand.py` pool experts across layers before writing, discarding
   the layer key they already have.
 - `delex_lens.py` runs layers 2–4.

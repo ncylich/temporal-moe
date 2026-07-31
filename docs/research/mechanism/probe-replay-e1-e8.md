@@ -1,6 +1,6 @@
 # Probe-replay results — Tier-1 experiments E1–E8
 
-Follow-up to `docs/research/mechanistic-probe-results.md`. **Everything here is offline CPU replay of
+Follow-up to [`probe-results.md`](probe-results.md). **Everything here is offline CPU replay of
 the already-saved router-probe logs — zero training, no GPU.** Each experiment replays a *selection
 policy* over the logged per-token gating logits; the trained weights are never touched. Code:
 `analysis/probes/probe_replay.py` (regenerates every number and figure); tests:
