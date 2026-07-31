@@ -307,36 +307,44 @@ HEADER = ["label", "run", "budget", "regime", "variant", "window", "split", "dep
           "rising_slope", "rising_lo95", "rising_hi95",
           "median_at_first_layer", "median_at_last_layer"]
 sp = os.path.join(DATA, "mechinterp_locus_slopes.csv")
-existing, prior_this_split = [], []
+KEY = ("label", "variant", "split")          # one row per series per split
+
+
+def _key_of_row(row):
+    return (row[HEADER.index("label")], row[HEADER.index("variant")], row[HEADER.index("split")])
+
+
+prior = []
 if os.path.exists(sp):
     with open(sp) as f:
-        allrows = list(csv.DictReader(f))
-    existing = [r for r in allrows if r.get("split") != SPLIT]
-    prior_this_split = [r for r in allrows if r.get("split") == SPLIT]
+        prior = list(csv.DictReader(f))
 
-# Refuse to shrink the file. Rows for the current split are replaced wholesale, so if the inputs for
-# a series are missing this run, that series silently disappears from a committed artifact -- which is
-# how a --split position run cut this file from 24 rows to 17 while exiting 0. Losing rows is
-# sometimes correct (a series genuinely retired), so it is allowed, but only when asked for.
-if len(slope_rows) < len(prior_this_split) and "--replace" not in sys.argv:
-    lost = {(r.get("label"), r.get("variant")) for r in prior_this_split} - \
-           {(r[0], r[4]) for r in slope_rows}
-    sys.exit(
-        f"[abort] refusing to shrink {os.path.basename(sp)} at split={SPLIT}: "
-        f"{len(prior_this_split)} rows on disk, {len(slope_rows)} computed now.\n"
-        f"         would drop: {sorted(x for x in lost if x[0])}\n"
-        f"         Usually this means the input CSV lacks rows for this split (check that the locus "
-        f"driver ran with --both-splits). Pass --replace if the loss is intended.")
+# Merge per SERIES, not per split. Replacing a whole split wholesale creates a dilemma with no good
+# answer: allow it and a run whose inputs are missing silently deletes series from a committed file
+# (24 rows -> 17); forbid it and the series that CAN be recomputed are frozen at stale values, because
+# the only command that would refresh them aborts. Both happened here in turn.
+#
+# Keying on (label, variant, split) dissolves it. A series computed this run is updated; a series not
+# computed keeps whatever it had. Nothing is lost and nothing is stranded, so no --replace escape and
+# no shrink check are needed for the normal path.
+fresh = {_key_of_row(r): r for r in slope_rows}
+merged, updated, carried = [], 0, 0
+for e in prior:
+    k = (e.get("label"), e.get("variant"), e.get("split"))
+    if k in fresh:
+        merged.append(fresh.pop(k)); updated += 1
+    else:
+        # May predate a schema change; fill absent columns rather than dropping the row.
+        merged.append([e.get(h, "") for h in HEADER]); carried += 1
+added = len(fresh)
+merged.extend(fresh.values())                # series that did not exist in the file before
 
 with open(sp, "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(HEADER)
-    # Rows carried over from another split may predate a schema change; fill absent columns rather
-    # than dropping the rows or crashing.
-    w.writerows([[e.get(h, "") for h in HEADER] for e in existing])
-    w.writerows(slope_rows)
-print(f"wrote {sp}: {len(slope_rows)} rows at split={SPLIT}"
-      f"{f' (kept {len(existing)} from other splits)' if existing else ''}")
+    w.writerows(merged)
+print(f"wrote {sp}: {len(merged)} rows total at split={SPLIT} "
+      f"({updated} updated, {added} added, {carried} carried over untouched)")
 print(f"\n{'label':22} {'R2 lin/quad':>12} {'full slope':>20} {'rising slope':>20} "
       f"{'curvature':>20} {'vertex':>16}")
 for r in slope_rows:
