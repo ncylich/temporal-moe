@@ -358,22 +358,19 @@ scripts named above import it: `delex_locus_driver`, `delex_oracle`, `delex_tran
 A subset run aborts rather than truncating. The advice to commit first is still good practice but is
 no longer the only thing standing between a diagnostic run and data loss.
 
-### 3j. T1 models are captured but not registered — **open**
+### 3j. T1 models registered — **RESOLVED**
 
-The four T1 checkpoints (`t1_A0/A1/A5/A7_s0_1e16_seed1234`) have `delex_capture.pt` on disk, 30
-captures in total. They are **absent from `results/MANIFEST.csv`**, so `registry.runs()` does not
-return them and every capture-based analysis silently ran over the same 26 registered captures
-instead. The analyses reported success because they *did* succeed — on the wrong set. The coverage
-table is therefore unchanged and the new models are invisible to locus, oracle, structural and demand.
+The four T1 checkpoints were captured but absent from `MANIFEST.csv`, so `registry.runs()` skipped
+them and every capture-based analysis silently ran over the same 26 registered captures. Closed in
+`d72a97bd`: `registry` now also discovers runs that exist on disk with a `run.meta`, so newly trained
+models enter the registry by existing. Verified — **30 captures visible, all 4 T1 models among them**,
+and all five analysis families (locus, oracle, structural, demand, lens) re-run at 30 runs each.
 
-To finish: register the four runs (and any future training output) in `MANIFEST.csv`, then re-run the
-capture-based analyses over all 30. The shrink guards make this safe — a partial run will abort rather
-than truncate.
-
-Worth noting as a gap in the gate: `reproduce.sh` cannot catch this. The analyses are not documented
-commands, and running them changes nothing when the new runs are unregistered, so the tree stays clean
-and everything passes. A registration step that is silently skipped looks identical to one that was
-never needed.
+**Carry this forward: `reproduce.sh` structurally cannot catch this class.** The analyses are not
+documented commands, and re-running them changes nothing while the new runs are unregistered, so the
+tree stays clean and the gate passes green. A registration step that was skipped and one that was
+never needed leave identical evidence. The gate proves that documented commands reproduce committed
+artifacts; it cannot prove the artifacts cover everything they should.
 
 ### 3k. `delex_lens` and `delex_structural` need the run environment — **partly resolved**
 
