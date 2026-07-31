@@ -8,13 +8,24 @@ C3's result says T2 as designed would not test the effect that exists. Sections 
 §3 the hypotheses and what the results did to them, §§4–5 the tests and their status.
 
 > **The H2 verdict below is superseded by
-> [`LAYER_LEXICALITY_ROUND2.md`](LAYER_LEXICALITY_ROUND2.md).** C3's U-shaped cost profile
-> decomposes into an endpoint effect at the first and last MoE layers and an interior gradient, and
-> only the second is about lexicality. Over the interior the cost does fall with depth
-> (ρ = −0.886, p = 0.035, impose direction), so H2 is falsified as pre-registered but supported
-> away from the endpoints; and the last MoE layer is the *least* lexical layer in the stack while
-> being the most expensive to constrain, which a lexical account cannot explain. Round 2 splits H2
-> into H2a/H2b and specifies the 1e19 sweep that separates them.
+> [`LAYER_LEXICALITY_ROUND2.md`](LAYER_LEXICALITY_ROUND2.md), and so is the intermediate rescue that
+> once stood here.** Round 2 split H2 into an interior gradient (H2a) and an endpoint effect (H2b).
+> Both are now settled against H2:
+>
+> - **H2a is falsified.** An earlier version of this banner said cost "does fall with depth over the
+>   interior (ρ = −0.886)" and that H2 was therefore supported away from the endpoints. That
+>   correlation does not replicate: it flips sign on a seed replicate at the same budget
+>   (−0.429 → **+0.257**) and reverses at 1e19 (**+0.891**). The −0.886 measurement stands; the
+>   generalisation drawn from it does not.
+> - **H2b survives only as a *last*-layer effect**, and only partly as a lexical-free one. At 14
+>   layers the first MoE layer is unremarkable (1.01–1.17× the interior mean). A magnitude-matched
+>   sham carrying no lexical information reproduces **58%** of the endpoint excess; the ~20% of the
+>   last layer's cost it fails to reproduce is the only part of the per-layer profile that is
+>   specific to this constraint.
+>
+> The surviving statement is architectural, not lexical: **the final MoE layer is expensive to
+> constrain, plausibly because it feeds the unembedding.** It is also true, and unexplained by a
+> lexical account, that this layer is the *least* lexical in the stack.
 
 **The two-line version.** Routing does move from lexical to contextual with depth, in the *unconstrained*
 baseline as well, so part of that trend belongs to transformer depth rather than to rolling residency.

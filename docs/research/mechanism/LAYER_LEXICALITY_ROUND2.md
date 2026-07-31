@@ -10,9 +10,11 @@ monotone, and this document originally argued the U decomposes into an **endpoin
   cost-vs-depth correlation flips sign on a seed replicate at the same budget (−0.429 → **+0.257**)
   and reverses at 1e19 (**+0.891**). See §3.
 - **H2b (endpoint effect) survives only as a *last*-layer effect**, not an effect at both ends, and a
-  sham perturbation carrying no lexical information largely reproduces it. What remains is
+  magnitude-matched, lexicality-free sham reproduces **58%** of it. What remains is largely
   architectural: **the final MoE layer is expensive to constrain, plausibly because it feeds the
-  unembedding.** The first MoE layer is unremarkable at depth (1.01–1.17× the interior mean at 1e19).
+  unembedding** — but ~20% of that layer's cost is *not* reproduced by noise of the same average size,
+  so it is not purely positional. The first MoE layer is unremarkable at depth (1.01–1.17× the interior
+  mean at 1e19) and its 1e18 excess *is* fully positional.
 - **H1 is supported causally**, not merely by probe: C8 / N6 shows the token-versus-context
   sensitivity ratio on opposite sides of 1 in the two regimes at every layer.
 
@@ -130,9 +132,11 @@ short stack; at 14 layers only the top one survives. Restate the claim as: **the
 expensive to constrain, plausibly because it feeds the unembedding directly.** The first-layer half
 of H2b is not supported.
 
-A sham perturbation carrying no lexical information largely reproduces the last-layer spike, which is
-why this is read as architectural position rather than routing locus — with the magnitude caveat
-recorded against N1 in §4a.
+A magnitude-matched, lexicality-free sham reproduces **58%** of the endpoint excess (ends/interior
+1.524× against the real 1.902×, means matched to 0.2%), which is why this is read as mostly
+architectural position rather than routing locus. The remainder is concentrated at the last layer:
+real minus sham is **+0.022** at L2 but **+0.095** at L9. So L2's excess is fully positional while L9
+carries ~20% that a same-sized perturbation does not explain. Full table in the N1 row of §4a.
 
 ## 4. The next round, in priority order
 
@@ -187,8 +191,10 @@ quantities; H2 conflated them.
 
 The interior "depth trend" an earlier version of this paragraph asserted does not survive replication:
 it flips sign across seeds at one budget and reverses at another (§3). What is left is a single
-last-layer effect that a lexicality-free sham largely reproduces. Nothing in the per-layer cost
-profile is evidence about routing locus.
+last-layer effect that a magnitude-matched, lexicality-free sham reproduces 58% of. Nothing in the
+per-layer cost profile is evidence about routing *locus* — but the ~20% of the last layer's cost that
+noise does not reproduce is the one place where the constraint does something a generic perturbation
+of the same size does not, and it is worth explaining rather than assuming away.
 
 **A Round-1 reading this corrects.** The vertex at roughly two thirds depth was an artifact of the
 9-layer model, where "⅔ of the way down" and "just before the last layer" are not separable. At 14
@@ -206,6 +212,9 @@ instead.
 Sweep the same layers with a perturbation of matched magnitude that carries **no lexical
 information**: keep k experts active but choose the resident set uniformly at random, or add noise to
 the router logits calibrated to produce a comparable mean CE penalty. Then compare profiles.
+
+*(Outcome: the middle branch. The sham reproduces 58% of the endpoint excess — most of it, not all,
+and the shortfall sits entirely at the last layer. See the N1 row above.)*
 
 - Sham reproduces the same U -> **H2b confirmed outright.** The endpoints are positional sensitivity
   and have nothing to do with routing; report C3 as an interior trend plus two structural outliers.
