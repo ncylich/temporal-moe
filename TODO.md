@@ -383,6 +383,26 @@ Passes: numbers, status, cross-document, superseded, reproduction, links.
 | broken cross-document link after a file move | 1 | 1 |
 | miscounted artifacts (PNGs, `.distcp`, disk size) | 3 | 3 |
 
+**Checked and rejected — recorded because a fresh reader tripping on correct text is also signal:**
+
+- *"README's Pixel 10a claim has no supporting evidence"* — false positive caused by the **brief**, not
+  the doc. The auditor was scoped to `results/ablations/`; the evidence is in `androidbench/`. Scope a
+  numeric audit to every directory that could hold evidence, or expect this class of false positive.
+- *"`delexicalization.md` reports native CE 3.9037 against 3.909461 in the CSV"* — a real conflict with
+  the wrong diagnosis. 3.9037 is `val_CE` from `unmask_eval.csv` and its partner 4.3890 is the same
+  row, so the table is internally consistent; the defect is an **unlabelled metric** sitting beside
+  test-CE figures. Fixed by labelling, not by changing the value.
+- *"17% decode slowdown should be 18%"* — rounding convention, and a different candidate row gives 12%.
+  The claim is not wrong; which row is canonical is ambiguous. Left alone.
+- *"`TODO.md` §1's per-item text describes outstanding cells"* — one auditor flagged it, another
+  explicitly exonerated it as adequately marked by the section header. The header is adequate, but two
+  of three fresh readers tripping on it suggests the marker could be stronger.
+
+**Verified but unresolved:** the depth-slope CI bounds in prose differ from `mechinterp_locus_slopes.csv`
+by 0.0004–0.0026 while every point estimate matches exactly. The auditor attributed this to an unseeded
+bootstrap; `delex_locus.py` seeds with `default_rng(0)`, so that explanation is wrong and the cause is
+unidentified. Recorded rather than guessed at.
+
 **Caveat on the method itself:** running several agents with git access in one working tree caused
 `.git/index.lock` contention, and one pass runs `git checkout -- .` as cleanup, which would discard
 another agent's uncommitted work. Commit before starting a sweep, and expect to wait on the lock.
