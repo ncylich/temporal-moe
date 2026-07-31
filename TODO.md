@@ -224,17 +224,37 @@ The remaining three share the same `for r in cells` shape. `delex_lens` has two 
 rather than one, so it needs slightly more care than a mechanical copy of the patch. Use the same
 acceptance test: save the serial CSV, run parallel, diff by key — identical rows, not wall-clock.
 
-### 3d. The BLAS-thread explanation is inferred, not demonstrated
+### 3d. Serial/parallel numeric difference — **cause UNKNOWN, my explanation was wrong**
 
-Parallel and serial outputs differ at the 1e-3 level (median exactly 0, p99 0.0007, max 0.0034 on
-locus). The explanation is floating-point reduction order: workers are capped at 8 BLAS threads where
-the serial run used all 208. That is well supported but not proven. The clean control is a **serial**
-run at `OMP_NUM_THREADS=8`, which should reproduce the parallel output exactly. Not run.
+Parallel and serial locus outputs differ at the 1e-3 level (median exactly 0, 60% bit-identical, p99
+0.0007, max 0.0034). I attributed this to BLAS reduction order, on the reasoning that workers are
+capped at 8 threads where the serial run used all 208, and floating-point addition is not associative.
 
-Worth recording regardless: per-expert AUCs carry about +-0.003 of numerical tolerance from thread
-count alone. That sits below the effect sizes being resolved (smallest real deltas ~0.03) and the
-gates are on medians, but the null-gate tolerance is itself 0.002, so these numbers were never
-bit-reproducible across machine configurations.
+**That is disproven.** Running the same capture serially twice, changing only OMP_NUM_THREADS between
+8 and 208, gives output that is **100% bit-identical** — 4608 of 4608 rows. Thread count does not move
+these numbers. The capture tested, `flame192_g3_moe`, is one that *does* differ between the serial and
+parallel runs, so this is not a case of an insensitive test subject.
+
+Two further candidates were checked and also do not explain it: the RNG is constructed inside
+`analyze()` seeded with 0, so it is fresh per call in both paths; and row counts and keys match
+exactly, so the two runs cover identical cells.
+
+**The cause is currently unknown.** What is established:
+
+- the parallel output covers exactly the same 87552 cells as the serial output, none added or lost
+- the differences are tiny and centred on zero (median exactly 0.000000)
+- they are NOT caused by BLAS thread count
+
+Suggested next steps: run one capture through `_analyze_one` in-process versus through the pool and
+diff, which isolates the process boundary itself; and check whether the serial baseline predates any
+edit to `delex_locus.py` or its imports, since the baseline was captured at 18:13 before several fixes
+landed that day.
+
+Until this is understood, treat per-expert AUCs as carrying about +-0.003 of tolerance. That sits
+below the effect sizes being resolved (smallest real deltas ~0.03), but the null-gate tolerance is
+itself 0.002 — the same order — so a gate verdict on a marginal model could in principle depend on it.
+That is the same pathology as the `max_experts=24` default in §3f: a threshold at the scale of its own
+noise.
 
 ### 3e. `input_ids` not added to the capture writer
 
