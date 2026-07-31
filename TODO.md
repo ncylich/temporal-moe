@@ -408,15 +408,22 @@ shared one pattern — a run list from argv filtering the registry, then `open(O
 no merge, no comparison. `analysis/probes/safe_csv.py` now guards all nine. §3i had recorded this trap
 in one script; it was in nine.
 
-**New, unfixed — the guard freezes staleness.** Protecting a file from loss and protecting it from
+**~~New, unfixed~~ — RESOLVED: the guard froze staleness, and per-series merging dissolved it.** Protecting a file from loss and protecting it from
 staleness are opposing requirements, and only the first was built. Five 1e16/1e17 series come from
 `mechinterp_locus.csv`, which has no `split` column, so their position and sequence arrays are
 byte-identical and determinism requires their CIs to match. They do not: committed position rows read
 `[0.0516, 0.1334]` where current code produces `[0.0534, 0.1354]`. The guard aborts `--split position`
 before writing, so those rows can never refresh, and `--replace` would drop the seven series that
-legitimately have no position data. **The right fix is merging per series rather than per split.** Not
-done. Scope: position-split rows of five series only; every sequence row is current and verified
-byte-identical to what the code produces.
+legitimately have no position data. The fix was merging per series rather than per split, keyed on `(label, variant, split)`: a series
+computed this run is updated, one that is not keeps what it had. **Done.** `--split position` now
+writes 24 rows — updating the 5 series it can compute, carrying 19 — where before it either destroyed
+7 or aborted. The five series now report identical CIs across splits as determinism requires. The
+shrink guard on this path is no longer needed and was removed with it.
+
+Seven series still differ across splits and cannot be refreshed: their position-split source rows no
+longer exist in `mechinterp_locus_1e19.csv`. They are carried rather than deleted — the correct
+handling for data whose provenance is gone, and a reason to re-run the locus driver with
+`--both-splits` if those rows ever need to be current.
 
 **Standing rules added from this round:**
 - **A run that emits warnings is not a clean run.** Both defects announced themselves — the row-count
