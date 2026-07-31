@@ -102,7 +102,10 @@ def battery(run, layer=None, min_usage=500, max_experts=24):
     emb = d["emb"].float().numpy()
     S, B, H = emb.shape
     ntok = S * B
-    cut = int(0.7 * ntok)
+    # Document-disjoint split, matching the locus probes. The old scalar 70% cut landed at a
+    # sequence position, so every document appeared in both halves; _Probe now takes an index
+    # pair precisely so that split is expressible.
+    tr, te = delex_locus.split_index(S, B, "sequence")
     L = layer if layer is not None else registry.moe_layers(d)[0]
     Ld = d["layers"][L]
     lg = Ld["logits"].float().numpy()
@@ -111,11 +114,11 @@ def battery(run, layer=None, min_usage=500, max_experts=24):
     Y = delex_locus.firing(lg, mask, k).reshape(ntok, lg.shape[-1]).astype(np.float64)
 
     designs = [("token", 0, delex_locus._Probe(
-        delex_locus._standardize(emb.reshape(ntok, H).astype(np.float64)), cut))]
+        delex_locus._standardize(emb.reshape(ntok, H).astype(np.float64)), tr, te))]
     for vname in ("kfull", "base"):
         w = delex_locus.WINDOWS[vname](k)
         designs.append((f"context", w, delex_locus._Probe(delex_locus._standardize(
-            delex_locus.context_mean(emb, w).reshape(ntok, H).astype(np.float64)), cut)))
+            delex_locus.context_mean(emb, w).reshape(ntok, H).astype(np.float64)), tr, te)))
 
     picks = [e for e in range(Y.shape[1]) if Y[:, e].sum() > min_usage][:max_experts]
     if not picks:
@@ -148,7 +151,7 @@ def battery(run, layer=None, min_usage=500, max_experts=24):
             rows.append([run, r.regime, r.budget, L, feat, w, arm, PRESERVES[arm],
                          round(m, 4), round(m - 0.5, 4), nE, round(ac, 4)])
         table.append((f"{feat} w={w}" if feat == "context" else feat, vals))
-    return rows, (run, r, L, k, S, B, ntok, cut, nE, ac, table)
+    return rows, (run, r, L, k, S, B, ntok, len(tr), len(te), nE, ac, table)
 
 
 def main():
@@ -165,9 +168,9 @@ def main():
             print(f"[skip] {r.name}: no sufficiently used experts")
             continue
         allrows += rows
-        run, rr, L, k, S, B, ntok, cut, nE, ac, table = info
+        run, rr, L, k, S, B, ntok, n_fit, n_score, nE, ac, table = info
         print(f"\n=== {run} ({rr.regime}, {rr.grain_label}, {rr.budget}) MoE layer {L}, k={k}")
-        print(f"    S={S} B={B} ({ntok} tokens; fit {cut}, score {ntok-cut}), "
+        print(f"    S={S} B={B} ({ntok} tokens; fit {n_fit}, score {n_score}), "
               f"{nE} experts with >500 firings")
         print(f"    lag-1 autocorrelation of the real label series: {ac:.4f}")
         print(f"    {'feature':14} " + " ".join(f"{a:>9}" for a in arms))
