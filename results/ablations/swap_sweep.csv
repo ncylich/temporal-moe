@@ -104,3 +104,4 @@ flame38m_g3_moe,1e18,full,fine18/192,real,impose_one,8,18,192,4.364983,2.1146,sw
 flame38m_g3_moe,1e18,full,fine18/192,real,impose_one,9,18,192,5.313453,2.5741,swap_impose_L9.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,dose_R6,-,6,6,3.909472,1.8939,swap_dose_R6.log
 flame38m_g1_temporal,1e18,temporal,coarse6/64,real,dose_R12,-,12,12,3.954516,1.9158,swap_dose_R12.log
+flame38m_g1_moe,1e18,full,coarse6/64,real,impose_all,-,6,6,5.569861,2.6983,swap_impose_all.log
