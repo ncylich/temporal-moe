@@ -32,7 +32,7 @@ findings they produced are in §7.
 | magnitude-matched sham (N1) | `sham_magnitude_matched.csv` | yes | 2–9 | **1** | 16 |
 | causal token/context substitution (C8) | `mechinterp_causal.csv` | yes | 2–14 | **6** | 58 |
 | null battery (which null is valid) | `mechinterp_null_battery.csv` | one layer | 2–2 | **26** | 546 |
-| output logit lens (effective vocab) | `mechinterp_lens.csv`, `mechinterp_lens_1e19.csv` | yes | 2–14 | **28** | 61824 |
+| output logit lens (effective vocab) | `mechinterp_lens.csv`, `mechinterp_lens_1e19.csv` | yes | 2–14 | **32** | 66432 |
 | cache hit rate | `e6_per_layer_ranking.csv` | yes | 2–14 | **22** | 112 |
 | swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | 2–14 | **22** | 112 |
 | document-boundary churn (e8) | `e8_document_boundary.csv` | n/a | — | **22** | 66 |
