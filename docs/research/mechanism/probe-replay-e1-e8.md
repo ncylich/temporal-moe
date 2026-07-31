@@ -1,5 +1,13 @@
 # Probe-replay results — Tier-1 experiments E1–E8
 
+> **Provenance.** Every per-model number in this document was computed on runs that are **no longer on
+> disk** — they are absent from `MANIFEST.csv` and from every current `e1`–`e8` CSV (see `TODO.md` §2b).
+> The metrics themselves have since been recomputed over the 22 preserved router logs, so the *findings*
+> stand, but the specific values here cannot be reproduced from committed data and should not be quoted
+> as if they could. Where a same-cell run survives under a new name the values differ slightly — e.g.
+> the 38M hit-rate quoted here as 16.5% → 36.2% is 17.1% → 38.0% for `flame38m_g1_temporal` in
+> `e6_per_layer_ranking.csv`.
+
 Follow-up to [`probe-results.md`](probe-results.md). **Everything here is offline CPU replay of
 the already-saved router-probe logs — zero training, no GPU.** Each experiment replays a *selection
 policy* over the logged per-token gating logits; the trained weights are never touched. Code:
