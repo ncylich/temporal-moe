@@ -80,9 +80,15 @@ def _install():
         # Cache the evaluation batches once, then replay the identical tensors for every arm.
         if _CACHE["batches"] is None:
             it = data_iterator if not isinstance(data_iterator, list) else data_iterator[0]
-            _CACHE["batches"] = [next(it) for _ in range(args.eval_iters)]
-            print(f"[sweep] cached {len(_CACHE['batches'])} evaluation batches; "
-                  f"every arm is scored on these same tensors", flush=True)
+            # The iterator yields MICRO-batches, and one eval iteration consumes a full global batch.
+            # Caching args.eval_iters micro-batches would score on 1/32 of the reference data and give
+            # a loss that matches nothing already measured.
+            per_iter = max(1, args.global_batch_size // args.micro_batch_size)
+            n_mb = args.eval_iters * per_iter
+            _CACHE["batches"] = [next(it) for _ in range(n_mb)]
+            print(f"[sweep] cached {len(_CACHE['batches'])} micro-batches "
+                  f"({args.eval_iters} eval iters x {per_iter} micro-batches of {args.micro_batch_size} "
+                  f"x {args.seq_length}); every arm is scored on these same tensors", flush=True)
 
         mdl = model[0] if isinstance(model, list) else model
         # Env var, not a CLI flag: everything on argv is parsed by Megatron, which
@@ -105,14 +111,29 @@ def _install():
                   f"sched='{env.get('TEMPORAL_R_SCHEDULE')}'", flush=True)
             _RESULTS.append((label, lm, env.get("TEMPORAL_RESIDENCY_R"),
                              env.get("TEMPORAL_R_SCHEDULE")))
+        # Two independent checks, because the first one alone passed while the sweep was broken.
         if selftest and len(_RESULTS) >= 2:
             a, b = _RESULTS[0][1], _RESULTS[-1][1]
-            ok = abs(a - b) < 1e-9
-            print(f"[sweep] SELFTEST {'PASS' if ok else 'FAIL'}: first arm {a:.6f} vs repeat "
+            # GPU reductions are not bitwise deterministic across repeated passes, so an exact
+            # threshold is unmeetable. 1e-6 is far below any effect being measured (smallest real
+            # dose step is ~0.045) while still catching a genuinely different batch, which would
+            # move the loss by order 1e-3 or more.
+            ok = abs(a - b) < 1e-6
+            print(f"[sweep] SELFTEST replay {'PASS' if ok else 'FAIL'}: first arm {a:.6f} vs repeat "
                   f"{b:.6f} (delta {abs(a-b):.2e}). A mismatch means the arms did not see the same "
                   f"batches.", flush=True)
             if not ok:
                 raise RuntimeError("sweep_eval: repeated arm disagreed; batches are not being replayed")
+        # The knob must actually do something. Distinct R values that return the same loss mean the
+        # residency setting is not reaching the model -- the exact failure the replay check missed,
+        # and one that otherwise reads as a clean flat dose curve.
+        distinct_R = {r[2] for r in _RESULTS[:len(sweep)]}
+        distinct_loss = {round(r[1], 9) for r in _RESULTS[:len(sweep)]}
+        if len(distinct_R) > 1 and len(distinct_loss) == 1:
+            raise RuntimeError(
+                f"sweep_eval: {len(distinct_R)} different R values all returned {_RESULTS[0][1]:.6f}. "
+                f"The residency knob is not reaching the model -- check that the temporal router is "
+                f"installed (TEMPORAL=1) before the model is built.")
         _dump()
 
     T.evaluate_and_print_results = patched
@@ -139,6 +160,17 @@ if __name__ == "__main__":
     from megatron.training import pretrain
     from megatron.core.enums import ModelType
     import pretrain_gpt
+
+    # Patch TopKRouter.forward BEFORE the model is built, the same way temporal/pretrain_temporal.py
+    # does. Omitting this was the whole bug: without it the model evaluates as a plain MoE, the
+    # residency env vars are read by code that never runs, and every arm returns the same loss --
+    # which looks like a working sweep whose knob has no effect.
+    if os.environ.get("TEMPORAL", "0") not in ("0", ""):
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from temporal import temporal_router
+        temporal_router.install()
+        print("[sweep] temporal router installed", flush=True)
+
     _install()
     pretrain_gpt.train_valid_test_datasets_provider.is_distributed = True
     pretrain(pretrain_gpt.train_valid_test_datasets_provider, pretrain_gpt.model_provider,
