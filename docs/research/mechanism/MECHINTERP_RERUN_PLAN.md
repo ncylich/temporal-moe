@@ -12,7 +12,7 @@ and reproducible. The hypothesis-driven analysis that motivated the audit lives 
 
 ## 1. Coverage
 
-**Status: Steps 1, 2 and 4 are done; Step 3 has run at 1e18 and covers 7 of 25 cells.** The table below
+**Status: Steps 1–4 are done. The capture sweep covers 26 cells.** The table below
 is the coverage after that work; the "was" column is what this plan was written against. Numbers and the
 findings they produced are in §7.
 
@@ -31,9 +31,9 @@ findings they produced are in §7.
 | swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | all | 5 → **22** |
 | eviction headroom, demand smoothing | `e5_*.csv`, `e7_*.csv` | **now yes** | pooled → per layer | 3 → **22** |
 | every other replay metric (e2–e4) | `e2_*.csv` … | n/a | — | 5 → **22** |
-| document-boundary churn | `e8_document_boundary.csv` | n/a | — | 5 → **0** ⚠ |
+| document-boundary churn | `e8_document_boundary.csv` | n/a | EOD masks produced by `eod_capture.py` (1f) | **22 runs** |
 | selectivity PR, generalist %, router entropy | `mechinterp_structural_1e19.csv` | **now yes** | pooled → 2–14 | 11 → 3 |
-| weight geometry (A8) | same | **not measured** | needs checkpoints, none on disk | — |
+| weight geometry (A8) | `mechinterp_structural_1e19.csv` | **measured** | checkpoints were on disk in the sibling checkout all along | **26 runs, 180 rows** |
 | demand forecastability | `mechinterp_demand_1e19.csv` | **now yes** | pooled 2–6 → 2–14 | 3 → 3 |
 | free-rider / tokens-per-expert | `mechinterp_freerider.csv` | no (architecturally fixed) | n/a | — |
 
@@ -215,7 +215,7 @@ Ordered so that anything usable without a GPU lands first.
 | 2 | 6. counterfactual baseline replay | **done**, one cell — `moe_coarse_1e19` is the only unconstrained router log preserved |
 | 2 | 7. `delex_structural` per layer | **done** for gate statistics (A6, A7, A9). A8 weight geometry needs checkpoints, none on this pod; blank with the reason per row |
 | 2 | 8. `delex_demand` per layer | **done** |
-| 3 | 9–11. capture sweep + lens past layer 4 | **run at 1e18**, 7 of 25 cells captured. The `DELEXPROBE=1` branch of `run.sh` and `scripts/phase0/delex_capture_sweep.sh` did not exist; both are committed, along with shape entries s38m/s192f/s512f without which the entire 1e18 fleet was unaddressable. Lens now covers 2–9 at 1e18. 18 cells still need a capture — `registry.py --selection` |
+| 3 | 9–11. capture sweep + lens past layer 4 | **done — 26 captures on disk.** The `DELEXPROBE=1` branch of `run.sh` and `scripts/phase0/delex_capture_sweep.sh` did not exist; both are committed, along with shape entries s38m/s192f/s512f without which the entire 1e18 fleet was unaddressable. Lens covers every captured model at full depth. No cells outstanding — verify with `analysis/todo_status.py` |
 | 4 | 12. regenerate figures | **done** for everything whose data was regenerated |
 | 4 | 13. reconcile prose | **done** — §7.2 |
 

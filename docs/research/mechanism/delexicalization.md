@@ -193,12 +193,19 @@ different scale than the input-side story. The input side — token AUC 0.902 �
 ([`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) §1). What has not survived is the claim that the
 constraint blunts what experts *write*.
 
-Baseline experts promote markedly narrower vocabularies (about 1,400 effective words of lexical
-preference at the median and over 6,000 in the sharpest decile, whose top promoted tokens read as
-coherent lexical clusters). Temporal experts are barely distinguishable from no signal (about 60
-at the median) and contain no word-list experts even in their extreme tail. One expert's write is
-a nudge rather than a full prediction, so the median shifts are modest, but input side, output
-side, and structure now agree.
+> **RETRACTED.** The paragraph below is superseded by the measurement immediately above it, which
+> found the output-side claim does not survive at 1e18. It is kept struck rather than deleted so the
+> original claim remains on the record next to its refutation.
+>
+> ~~Baseline experts promote markedly narrower vocabularies (about 1,400 effective words of lexical
+> preference at the median and over 6,000 in the sharpest decile, whose top promoted tokens read as
+> coherent lexical clusters). Temporal experts are barely distinguishable from no signal (about 60
+> at the median) and contain no word-list experts even in their extreme tail. One expert's write is
+> a nudge rather than a full prediction, so the median shifts are modest, but input side, output
+> side, and structure now agree.~~
+>
+> The three do **not** agree. The input side replicates at 1e18; the output side does not. Any claim
+> resting on their agreement is unsupported.
 
 ## 5. The mechanism is load-bearing and dose-tunable
 

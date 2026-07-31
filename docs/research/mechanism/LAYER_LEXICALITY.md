@@ -1,8 +1,9 @@
 # Layer-wise Lexicality of MoE Routing
 
 **Status: H1 measured at full depth and restated. H2 falsified by C3, on its own pre-registered
-criterion.** Of the no-training tests, C1, C2, C3, C4, C6, C7, C9 and C10 are done; C5 is blocked on a
-re-capture; C8 is not run and is the largest remaining gap. The training tests T1–T3 are not started, and
+criterion.** **All ten no-training tests C1–C10 are done.** C5's re-capture landed (26 captures,
+`mechinterp_lens_1e19.csv`) and C8 has run in both regimes (`mechinterp_causal.csv`) — it was the
+largest remaining gap and it is closed. The training tests T1–T3 are not started, and
 C3's result says T2 as designed would not test the effect that exists. Sections 1–2 are the measurements,
 §3 the hypotheses and what the results did to them, §§4–5 the tests and their status.
 
