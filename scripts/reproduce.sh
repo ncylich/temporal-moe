@@ -34,7 +34,11 @@ COMMANDS=(
   "$PY analysis/probes/swap_shape.py"
   "$PY analysis/probes/n7_cost_vs_churn.py"
   "$PY analysis/plots/plot_locus_by_layer.py"
-  "$PY analysis/plots/plot_locus_by_layer.py --split position"
+  # Expected to abort: the source CSV has no position rows for the 1e18/1e19 series, so this cannot
+  # produce a full figure, and the guard correctly declines to narrow the committed one. A documented
+  # command whose correct behaviour is a non-zero exit is annotated rather than removed -- removing it
+  # would stop testing that the guard still fires.
+  "$PY analysis/plots/plot_locus_by_layer.py --split position|1"
   "$PY analysis/coverage_table.py --write"
   "$PY analysis/todo_status.py"
 )
@@ -46,7 +50,7 @@ ALLOWED=(
 $'no locus capture, contextual-share columns left blank\tflame38m_g1_temporal_s2 has swap arms but no capture; the column is left blank rather than imputed'
 $'refusing to overwrite locus_by_layer.png\tthe --split position variant cannot plot the 1e18/1e19 series (no position rows in the source); the guard correctly declines to narrow a committed figure'
 $'refusing to shrink\tsame guard on the CSV side'
-$'no rows for .* at split=position\tthe 1e18/1e19 captures were taken with the locus driver default (sequence only), so no position rows exist for them; re-run the driver with --both-splits if the position split is ever needed. The figure and CSV guards prevent this from narrowing a committed artifact.'
+$'no rows for \tthe 1e18/1e19 captures were taken with the locus driver default (sequence only), so no position rows exist for them; re-run the driver with --both-splits if the position split is ever needed. The figure and CSV guards prevent this from narrowing a committed artifact.'
 $'experts unprobeable (too few firings)\trecorded in the coverage output rather than dropped; expected for rare experts'
 $'FutureWarning\tthird-party deprecation notices from torch/pynvml, not this repository'
 $'UserWarning: resource_tracker\tmultiprocessing cleanup notice on interpreter exit'
@@ -61,12 +65,17 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 echo "=== 1. documented commands"
-for c in "${COMMANDS[@]}"; do
+for spec in "${COMMANDS[@]}"; do
+  c=${spec%|*}; want=0
+  [[ "$spec" == *"|"* ]] && want=${spec##*|}
   out="$tmp/$(echo "$c" | md5sum | cut -c1-8).log"
   eval "$c" >"$out" 2>&1
   rc=$?
-  printf '  %-62s exit=%d\n' "$(echo "$c" | sed 's|.*/||' | cut -c1-62)" "$rc"
-  [[ $rc -ne 0 ]] && { echo "     FAILED:"; sed 's/^/       /' "$out" | tail -15; fail=1; }
+  note=""; [[ "$want" != 0 ]] && note=" (expected $want)"
+  printf '  %-56s exit=%d%s\n' "$(echo "$c" | sed 's|.*/||' | cut -c1-56)" "$rc" "$note"
+  if [[ $rc -ne $want ]]; then
+    echo "     FAILED (wanted exit $want):"; sed 's/^/       /' "$out" | tail -15; fail=1
+  fi
 done
 
 echo "=== 2. csv sanity"
