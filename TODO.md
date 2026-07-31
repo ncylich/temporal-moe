@@ -285,14 +285,36 @@ every expert — 832 to 2496 per model — and passed on all 26 at a maximum dev
 To settle it rather than argue it: re-run the battery on these four with more layers and experts. Not
 done. Their numbers are in use on the strength of the full-depth gate.
 
-### 3g. L3 disagreement between the seed and granularity variations — unresolved
+### 3g. L3 disagreement — **resolved: real, not sampling noise**
 
-Exempting layer 3 costs +0.068 nats under the granularity variation but +0.039 under the seed
-variation, while every other interior layer agrees to within 0.006 across the two. One run per cell
-means there is no error bar on a single layer, so this cannot be called a granularity effect or
-dismissed as noise. It needs a replicate at the same granularity. The L9 endpoint spike does not
-depend on it — that reproduces at nearly the same magnitude in both models and again in the
-non-temporal control.
+Exempting layer 3 costs +0.068 nats on the granularity-variation model against +0.039 on the
+seed-variation model, while every other interior layer agrees between the two to within 0.006. With one
+run per cell there was no error bar, so this could be neither claimed nor dismissed.
+
+Tested by re-running native and L2-L5 on `flame38m_g3_temporal` across two independent evaluation data
+draws (seeds 1234 and 4321). Per-layer costs against each draw's own native:
+
+| layer | seed 1234 | seed 4321 | difference |
+|---|---|---|---|
+| L2 | +0.036192 | +0.036187 | 5e-6 |
+| L3 | +0.067568 | +0.067727 | 1.6e-4 |
+| L4 | +0.038897 | +0.038894 | 3e-6 |
+| L5 | +0.032965 | +0.033136 | 1.7e-4 |
+
+Absolute losses moved with the data as expected (native 3.9769 -> 3.9709), but the costs are stable to
+about 1e-4 -- three orders of magnitude below L3's 0.031 excess over its neighbours. L3 is 1.8x its
+neighbours in both draws.
+
+**Conclusion:** the L3 spike is a real property of this model, so the gap against the seed-variation
+model is a genuine model-level difference rather than measurement noise.
+
+**What this does NOT establish:** it varies the evaluation draw, not the training seed, so it cannot
+separate "granularity produces an L3 spike" from "this particular model has one". That needs a second
+g3 model at a different training seed, which is a training run -- see section 2.
+
+The seed-1234 arm also reproduced the original per-arm measurements to about 2e-6 on all five points,
+which is a second independent validation of the repaired in-process sweep (3a) on a different model and
+with per-layer schedules rather than uniform R.
 
 ### 3h. T1–T4 — deliberately not started
 

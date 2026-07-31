@@ -7,3 +7,13 @@ flame38m_g1_temporal,dose_R24,4.102363,24,
 flame38m_g1_temporal,dose_R48,4.316587,48,
 flame38m_g1_temporal,dose_R64,4.388953,64,
 flame38m_g1_temporal,dose_R24__selftest,4.102363,24,
+flame38m_g3_temporal,native,3.976892,0,
+flame38m_g3_temporal,L2,4.013084,0,2:E
+flame38m_g3_temporal,L3,4.044460,0,3:E
+flame38m_g3_temporal,L4,4.015789,0,4:E
+flame38m_g3_temporal,L5,4.009857,0,5:E
+flame38m_g3_temporal,native,3.970872,0,
+flame38m_g3_temporal,L2,4.007059,0,2:E
+flame38m_g3_temporal,L3,4.038599,0,3:E
+flame38m_g3_temporal,L4,4.009766,0,4:E
+flame38m_g3_temporal,L5,4.004008,0,5:E
