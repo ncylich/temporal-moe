@@ -198,6 +198,22 @@ def _manifest_runs():
             if name.startswith("_"):             # _batch_logs, _lmeval_scratch: not runs
                 continue
             out.setdefault(name, set()).add(os.path.basename(r["hf_path"]))
+
+    # Also discover runs that exist on disk but were never added to MANIFEST.csv. Registration is a
+    # manual step, and a skipped one is invisible: the analyses run, report success, and quietly cover
+    # a smaller set than intended. That happened to the four T1 models -- captured, analysed over, and
+    # absent from every output, with nothing failing. Newly trained runs now enter the registry by
+    # existing, and MANIFEST.csv goes back to being what it is, a record of what was uploaded.
+    if os.path.isdir(RUNS):
+        for d in sorted(os.listdir(RUNS)):
+            if d.startswith("_") or d in out:
+                continue
+            rd = os.path.join(RUNS, d)
+            if not os.path.isdir(rd) or not os.path.exists(os.path.join(rd, "run.meta")):
+                continue
+            out[d] = {f for f in os.listdir(rd) if not os.path.isdir(os.path.join(rd, f))}
+            if os.path.isdir(os.path.join(rd, "ckpt")):
+                out[d].add("ckpt")
     return out
 
 
