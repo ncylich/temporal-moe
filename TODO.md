@@ -37,6 +37,12 @@ but no TE, so it cannot run a capture or an eval pass.
 
 ## 1. No retraining required — checkpoint is on disk
 
+> **STATUS: all nine items complete.** Verified against artifacts on disk by
+> `analysis/todo_status.py`, which checks contents — run counts, columns, arm sets — rather than file
+> existence, because every failure on this branch came from a claim about "done" that a weaker check
+> would have passed. Run it to re-confirm; it prints an explicit complete/outstanding line. The
+> per-item text below is kept as the record of what each item was.
+
 ### 1a. Capture sweep (re-run plan Step 3) — 21 cells outstanding of 25
 
 One forward pass each over the fixed 64×2048 batch, single GPU, a few minutes per run.
@@ -157,3 +163,121 @@ pre-registered criterion. It also mis-specifies T2: T2 contrasts shallow-half ag
 splits the U through its minimum and would return a null whatever the truth. Any redesign should contrast
 ends against middle — {2,3,8,9} versus {4,5,6,7} at 1e18 — at matched layer count and resident-slot
 budget. See `LAYER_LEXICALITY.md` §3 and §5.
+
+---
+
+## 3. Not done, and why
+
+Kept separate from §2 because none of this needs training. It is work that was identified, scoped and
+deliberately not finished, recorded so the next person does not rediscover it or assume it was
+overlooked.
+
+### 3a. In-process sweep evaluation — written, **fails validation, do not use**
+
+`analysis/probes/sweep_eval.py` loads the model once and loops residency settings in-process, to avoid
+paying ~4 min of Megatron/TE init, dataset index build and checkpoint load per arm. It does not work.
+Three arms at R=24/48/64 returned an identical loss of 4.403726, against a measured `dose_R24` of
+4.102362.
+
+Cause: the script calls `pretrain()` on `pretrain_gpt` directly and never installs the temporal router
+patch, so the model evaluates as a plain MoE and `TEMPORAL_RESIDENCY_R` is read by code that never
+runs. The result lands near the unconstrained reference (4.3890), which is what an unpatched model
+should give.
+
+To finish: install the temporal patch the way the other entry points do, and match the cached batch
+count to the reference config (it caches 20 micro-batches; the references use 16 eval iters at global
+batch 1024, so losses are not comparable until that agrees). Acceptance is reproducing `dose_R24 =
+4.102362`, not a speedup.
+
+**Lesson worth keeping.** Its `SWEEP_SELFTEST` check passed. It only verified that a *repeated* arm
+sees the same batches; it could not detect that all three arms were identical *to each other*, which
+was the actual defect. The check that would have caught it is trivial: two different R values must
+produce different losses. This is the same shape of error as the EOD mask verifier that compared
+shapes when both tokenizers give (64, 2048) — a guard written against the imagined failure rather than
+the real one.
+
+### 3b. Eval volume — measured, not cut
+
+Each eval arm pushes **~88M tokens to produce one scalar**, at a measured 226k tokens/s and 40
+TFLOP/s. Throughput is not the problem; volume is. Of that: 21M tokens are frozen "training"
+(forward *and* backward) at `lr=0`, and ~33M are a validation set that is computed and discarded —
+only the test number is read. `eval_iters=16` at global batch 1024 x 2048 is roughly 16x more data
+than a stable CE needs; val and test already agree to 0.0008 nats, which is the signature of being
+far past diminishing returns.
+
+Three cuts, worth ~3x per arm: drop the frozen train iters (`EVAL_TRAIN_ITERS`, already wired into
+`experiments/run.sh`), skip the validation pass, and reduce `eval_iters` to ~2. Comparability holds as
+long as every arm uses the same setting — which is exactly why this was **not** applied mid-programme:
+the arms already measured would not be comparable to arms measured after the change. Do it at a clean
+boundary and re-measure the reference points.
+
+### 3c. Parallelism not yet applied to `delex_lens`, `delex_structural`, `delex_demand`
+
+The pool pattern is proven on two analyses and both were verified equivalent, not merely faster:
+
+| analysis | before | after | verification |
+|---|---|---|---|
+| `delex_locus_driver` | 9143 s | 1288 s (7.1x) | all 87552 rows matched by key, median diff 0.000000 |
+| `delex_oracle` | part of a 2032 s block | 53 s | all 29184 rows matched, `n_token_ids` identical in all 26 runs |
+
+The remaining three share the same `for r in cells` shape. `delex_lens` has two row-append sites
+rather than one, so it needs slightly more care than a mechanical copy of the patch. Use the same
+acceptance test: save the serial CSV, run parallel, diff by key — identical rows, not wall-clock.
+
+### 3d. The BLAS-thread explanation is inferred, not demonstrated
+
+Parallel and serial outputs differ at the 1e-3 level (median exactly 0, p99 0.0007, max 0.0034 on
+locus). The explanation is floating-point reduction order: workers are capped at 8 BLAS threads where
+the serial run used all 208. That is well supported but not proven. The clean control is a **serial**
+run at `OMP_NUM_THREADS=8`, which should reproduce the parallel output exactly. Not run.
+
+Worth recording regardless: per-expert AUCs carry about +-0.003 of numerical tolerance from thread
+count alone. That sits below the effect sizes being resolved (smallest real deltas ~0.03) and the
+gates are on medians, but the null-gate tolerance is itself 0.002, so these numbers were never
+bit-reproducible across machine configurations.
+
+### 3e. `input_ids` not added to the capture writer
+
+`eod_capture.py` loads a full model — checkpoint, dataset index, ~5 minutes of GPU — purely to read
+back **input token IDs**, discarding the model's output entirely. Those IDs are the same fixed batch
+`delex_probe.py` and `router_probe.py` already push through when they write the capture. Recording
+`input_ids` alongside the router logits would make 1f pure post-processing: no GPU, no model, seconds.
+
+It would also have prevented both of this item's failures, since neither is possible without a model
+load: the tokenizer `eod_id` lookup raising on `_HuggingFaceTokenizer`, and the 192-expert checkpoint
+being built as 64 experts because `GRAIN=3` was omitted.
+
+Not done because the existing captures have no `input_ids` field, so it only helps future captures
+unless all 26 are re-run — which was not worth the GPU time once the mask existed.
+
+### 3f. Four models flagged by the null battery — reported, not resolved
+
+Under the stop rule, these four fall outside median iid-null AUC 0.500 +- 0.002:
+
+| run | median iid null AUC |
+|---|---|
+| `g3_moe_s0_1e16_sigmoid_seed2` | 0.5025 |
+| `g3_tmoe_s0_1e16_mom` | 0.4975 |
+| `flame512_g1_temporal` | 0.4979 |
+| `flame38m_g1_moe` | 0.5020 |
+
+**Assessment, which is an interpretation and not a measurement:** the battery samples layer 2 and 24
+experts, where a median carries roughly +-0.002 of sampling noise by itself, so these sit about one
+standard error from 0.500. The authoritative gate inside `delex_locus_driver` covers every layer and
+every expert — 832 to 2496 per model — and passed on all 26 at a maximum deviation of 0.0005.
+
+To settle it rather than argue it: re-run the battery on these four with more layers and experts. Not
+done. Their numbers are in use on the strength of the full-depth gate.
+
+### 3g. L3 disagreement between the seed and granularity variations — unresolved
+
+Exempting layer 3 costs +0.068 nats under the granularity variation but +0.039 under the seed
+variation, while every other interior layer agrees to within 0.006 across the two. One run per cell
+means there is no error bar on a single layer, so this cannot be called a granularity effect or
+dismissed as noise. It needs a replicate at the same granularity. The L9 endpoint spike does not
+depend on it — that reproduces at nearly the same magnitude in both models and again in the
+non-temporal control.
+
+### 3h. T1–T4 — deliberately not started
+
+Out of scope by explicit instruction. Everything they need is in §2.
