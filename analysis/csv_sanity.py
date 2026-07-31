@@ -36,6 +36,42 @@ from paths import ABLATIONS
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Standing verdicts. A flag with a recorded reason is answered, not silenced -- the point of the
+# linter is that every flag gets a verdict, and one repeated 30 times does not need re-deciding.
+# Anything not matched here is reported and needs a fresh judgement.
+#   (flag substring, reason)
+VERDICTS = (
+    ("CONSTANT COLUMN seed", "training seed, fixed at 1234 by design"),
+    ("CONSTANT COLUMN budget", "one file per compute budget; constant is the file's definition"),
+    ("CONSTANT COLUMN k ", "top-k is an architectural constant within a grain"),
+    ("CONSTANT COLUMN topk_k", "as above"),
+    ("CONSTANT COLUMN E ", "expert count is an architectural constant within a grain"),
+    ("CONSTANT COLUMN num_experts", "as above"),
+    ("CONSTANT COLUMN hidden", "hidden size is fixed within a shape"),
+    ("CONSTANT COLUMN iters", "iteration count fixed by the isoFLOP budget"),
+    ("CONSTANT COLUMN first_layer", "MoE layers start at 2 in every config; layer 1 is dense"),
+    ("CONSTANT COLUMN layer ", "single-layer probe by design"),
+    ("CONSTANT COLUMN window_w", "fixed probe window"),
+    ("CONSTANT COLUMN stride", "fixed probe stride"),
+    ("CONSTANT COLUMN positions_per_seq", "fixed by the probe geometry"),
+    ("CONSTANT COLUMN n_sequences", "fixed evaluation batch"),
+    ("CONSTANT COLUMN n_fit_rows", "fit sample capped at a constant"),
+    ("CONSTANT COLUMN base_rate", "k/E, an architectural constant"),
+    ("CONSTANT COLUMN divisor", "a fixed normalisation constant"),
+    ("CONSTANT COLUMN baseline_CE", "one baseline per file by construction"),
+    ("CONSTANT COLUMN random_pct", "k/E expressed as a percentage"),
+    ("CONSTANT COLUMN swaprate", "a fixed-rate arm; the rate is the arm's definition"),
+    ("CONSTANT COLUMN expert_swap_bytes", "bytes per expert are fixed by the architecture"),
+    ("CONSTANT COLUMN packs", "fixed pack count for the eval"),
+    ("CONSTANT COLUMN seqlen", "sequence length fixed at 2048 throughout"),
+    ("CONSTANT COLUMN ref_", "reference constants, identical across rows by definition"),
+    ("CONSTANT COLUMN train_tokens", "fixed token budget for the cell"),
+    ("CONSTANT COLUMN ubatch", "fixed micro-batch for the serving benchmark"),
+    ("CONSTANT COLUMN context", "fixed context length for the serving benchmark"),
+    ("EMPTY COLUMN geometry_note", "records why weight geometry was skipped; empty means it was not"),
+    ("EMPTY COLUMN val_ce", "this probe recorded test CE only"),
+)
+
 
 def _num(v):
     try:
@@ -49,7 +85,10 @@ def committed(rel):
     try:
         out = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=REPO, capture_output=True,
                              text=True, check=True).stdout
-        return list(csv.DictReader(out.splitlines()))
+        # Same comment filter as the working-file read. Filtering one side and not the other makes
+        # every commented file look like it shrank -- which it did, on this linter's own output.
+        return list(csv.DictReader([ln for ln in out.splitlines()
+                                    if not ln.lstrip().startswith("#")]))
     except subprocess.CalledProcessError:
         return None
 
@@ -57,7 +96,11 @@ def committed(rel):
 def check(path):
     rel = os.path.relpath(path, REPO)
     with open(path) as f:
-        rows = list(csv.DictReader(f))
+        # Some files carry '#' provenance lines above the header. DictReader would take the first of
+        # them as the header, turning prose fragments into column names -- which is exactly how this
+        # linter reported '8 packs' and 'D=3.1089.' as empty columns.
+        lines = [ln for ln in f if not ln.lstrip().startswith("#")]
+    rows = list(csv.DictReader(lines))
     out = []
     if not rows:
         return [f"{rel}: EMPTY (no data rows)"]
@@ -104,8 +147,15 @@ def main():
         findings += check(p)
     if not quiet:
         print(f"checked {n} CSVs in {ABLATIONS}")
+    answered, open_ = [], []
     for f in findings:
+        why = next((r for pat, r in VERDICTS if pat in f), None)
+        (answered if why else open_).append((f, why))
+    for f, why in open_:
         print(f"  [flag] {f}")
+    if answered and not quiet:
+        print(f"  ({len(answered)} flag(s) with standing verdicts, suppressed — see VERDICTS)")
+    findings = [f for f, _ in open_]
     if findings:
         print(f"\n{len(findings)} flag(s). A flag is not automatically a defect — a constant column "
               f"may be a fixed setting, and a file may legitimately shrink. State the verdict either "
