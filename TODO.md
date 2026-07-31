@@ -209,7 +209,7 @@ Validated a second time on a different model with per-layer schedules rather tha
 original selftest only verified that a *repeated* arm saw the same batches, so it was structurally
 incapable of noticing that every arm was identical to every other — the actual failure.
 
-### 3b. Eval volume — measured, not cut
+### 3b. Eval volume — two cuts are free, the third is not
 
 Each eval arm pushes **~88M tokens to produce one scalar**, at a measured 226k tokens/s and 40
 TFLOP/s. Throughput is not the problem; volume is. Of that: 21M tokens are frozen "training"
@@ -218,11 +218,18 @@ only the test number is read. `eval_iters=16` at global batch 1024 x 2048 is rou
 than a stable CE needs; val and test already agree to 0.0008 nats, which is the signature of being
 far past diminishing returns.
 
-Three cuts, worth ~3x per arm: drop the frozen train iters (`EVAL_TRAIN_ITERS`, already wired into
-`experiments/run.sh`), skip the validation pass, and reduce `eval_iters` to ~2. Comparability holds as
-long as every arm uses the same setting — which is exactly why this was **not** applied mid-programme:
-the arms already measured would not be comparable to arms measured after the change. Do it at a clean
-boundary and re-measure the reference points.
+Three cuts are available, and they differ in whether they change the measured number:
+
+| cut | saving/arm | changes the number? | evidence |
+|---|---|---|---|
+| drop frozen train iters (`EVAL_TRAIN_ITERS`, already wired into `run.sh`) | ~1.5 min | **no** | `sweep_eval` ran at `--train-iters 1` against references at 10 and reproduced `dose_R24/R48/R64` to **1e-6**. At `lr=0` the weights do not move. |
+| skip the validation pass | ~0.8 min | **no** (one confirmation run to be sure) | separate iterator from test; only the test number is ever read |
+| `eval_iters` 16 → 2 | ~0.7 min | **yes** | at 160 micro-batches the sweep gave 4.099577 against the reference 4.102362 — off by 0.0028, the same order as the effects being resolved. Matched to 1e-6 only at the full 512. |
+
+**Apply the first two and not the third: they are free, already evidenced, and worth ~30% per arm,
+whereas the third buys a further ~10% at the price of making every new arm incomparable to the ~60
+already measured.** All of it is small next to the in-process sweep (3a), which amortises the ~4 min
+startup that actually dominates an arm — that is the 5x, and it has landed.
 
 ### 3c. Parallelism not yet applied to `delex_lens`, `delex_structural`, `delex_demand`
 
