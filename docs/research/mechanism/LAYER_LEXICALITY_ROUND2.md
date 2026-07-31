@@ -361,6 +361,6 @@ what N1 and N5 measure.
 ## 7. Reproduction
 
 ```bash
-python3 analysis/probes/swap_shape.py                    # -> results/ablations/swap_shape.csv
-python3 analysis/plots/plot_locus_by_layer.py            # H1 curves + slope/shape statistics
+$PY analysis/probes/swap_shape.py                    # -> results/ablations/swap_shape.csv
+$PY analysis/plots/plot_locus_by_layer.py            # H1 curves + slope/shape statistics
 ```

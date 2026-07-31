@@ -42,6 +42,8 @@ import sys
 from collections import defaultdict
 
 import matplotlib
+import hashlib
+
 import numpy as np
 
 matplotlib.use("Agg")
@@ -57,7 +59,25 @@ sys.path.insert(0, os.path.join(REPO, "analysis", "probes"))
 import registry                                                    # noqa: E402  (needs REPO first)
 
 BOOT = 2000
-RNG = np.random.default_rng(0)
+
+
+def _rng_for(vals):
+    """A generator seeded from the data itself, so a bootstrap interval depends only on its own
+    inputs.
+
+    A single module-level RNG shared across every call looks seeded but is not reproducible: each
+    draw advances the shared state, so every interval depends on how many were computed before it.
+    Adding one run or one layer silently shifts every subsequent CI -- which is what happened here.
+    The committed CSV stopped matching what the script produced, and both the intervals and the point
+    estimates moved (slope 0.0408 -> 0.0397 on one row).
+
+    Seeding from a hash of the values makes each interval a pure function of its own input, so the
+    file regenerates byte-identically regardless of what else is in the run set or what order it is
+    processed in.
+    """
+    h = hashlib.blake2b(np.ascontiguousarray(np.asarray(vals, dtype=np.float64)).tobytes(),
+                        digest_size=8).digest()
+    return np.random.default_rng(int.from_bytes(h, "little"))
 
 MOE_FINE, MOE_COARSE = "#0d3b66", "#5aa0dd"
 TMP_FINE, TMP_COARSE = "#145a14", "#5cc85c"
@@ -111,7 +131,7 @@ def boot_median_ci(vals, n=BOOT):
     a = np.asarray(vals, float)
     if a.size < 3:
         return float(np.median(a)), float(np.median(a)), float(np.median(a))
-    draws = np.median(RNG.choice(a, size=(n, a.size), replace=True), axis=1)
+    draws = np.median(_rng_for(a).choice(a, size=(n, a.size), replace=True), axis=1)
     return float(np.median(a)), float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 
 
@@ -129,7 +149,7 @@ def boot_stat(g, xs_by_layer, stat, n=BOOT):
     point = stat(x, np.array([np.median(a) for a in arrs]))
     draws = np.empty(n)
     for i in range(n):
-        y = np.array([np.median(RNG.choice(a, size=a.size, replace=True)) for a in arrs])
+        y = np.array([np.median(_rng_for(a).choice(a, size=a.size, replace=True)) for a in arrs])
         draws[i] = stat(x, y)
     return point, float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 

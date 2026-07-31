@@ -83,7 +83,7 @@ better predicted by surrounding context than by the token being processed.
 
 ![Locus of routing specialization by depth](../../../results/phase0/figures/locus_by_layer.png)
 
-Regenerate with `python3 analysis/plots/plot_locus_by_layer.py [--no-caption]`.
+Regenerate with `$PY analysis/plots/plot_locus_by_layer.py [--no-caption]`.
 
 | model | budget | L2 | L3 | L4 | L5 | L6 |
 |---|---|---|---|---|---|---|

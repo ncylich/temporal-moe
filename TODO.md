@@ -109,7 +109,7 @@ covered by `e2_streamed_diversity.csv` plus Appendix A rather than regenerating 
 tokens-per-expert is architecturally fixed (12,288 fine / 3,072 coarse, both regimes) and e2 gives
 distinct-experts-per-sequence for 22 runs, but the file itself was never refreshed.
 
-### 1h. `plot_probe.py` is broken — regression I introduced
+### 1h. `plot_probe.py` was broken — regression I introduced, now fixed
 
 Not a plan item. Replacing the `model` column with `run,budget,regime,grain` in the replay CSVs broke
 `plot_probe.py` (`KeyError: 'model'`), and `docs/ENVIRONMENT.md` guarantees all eleven plot scripts run
