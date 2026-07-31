@@ -22,9 +22,9 @@ findings they produced are in §7.
 
 | metric | file | per-layer? | layers | models | rows |
 |---|---|---|---|---|---|
-| locus probes (A_tok, A_ctx) | `mechinterp_locus.csv`, `mechinterp_locus_1e19.csv`, `mechinterp_locus_coverage.csv`, `mechinterp_locus_slopes.csv` | yes | 2–14 | **30** | 93867 |
-| null floors | `mechinterp_floors.csv`, `mechinterp_floors_1e19.csv` | yes | 2–14 | **31** | 2180 |
-| token-id oracle ceiling (C7) | `mechinterp_oracle.csv` | yes | 2–14 | **26** | 29184 |
+| locus probes (A_tok, A_ctx) | `mechinterp_locus.csv`, `mechinterp_locus_1e19.csv`, `mechinterp_locus_coverage.csv`, `mechinterp_locus_slopes.csv` | yes | 2–14 | **34** | 100815 |
+| null floors | `mechinterp_floors.csv`, `mechinterp_floors_1e19.csv` | yes | 2–14 | **35** | 2324 |
+| token-id oracle ceiling (C7) | `mechinterp_oracle.csv` | yes | 2–14 | **30** | 31488 |
 | frequency-stratified token AUC (C9) | `mechinterp_freqstrat.csv` | yes | 2–14 | **26** | 145920 |
 | cross-layer probe transfer (C10) | `mechinterp_transfer.csv` | layer pairs | — | **26** | 1474 |
 | per-layer constraint swap (C3) | `swap_sweep.csv` | yes | 2–14 | **8** | 106 |
@@ -36,8 +36,8 @@ findings they produced are in §7.
 | cache hit rate | `e6_per_layer_ranking.csv` | yes | 2–14 | **22** | 112 |
 | swap rate / burst length | `e1_swap_rate_by_layer.csv` | yes | 2–14 | **22** | 112 |
 | document-boundary churn (e8) | `e8_document_boundary.csv` | n/a | — | **22** | 66 |
-| selectivity, generalists, router entropy | `mechinterp_structural.csv`, `mechinterp_structural_1e19.csv` | yes | 2–14 | **32** | 188 |
-| demand forecastability (A10/C6) | `mechinterp_demand_1e19.csv` | yes | 2–14 | **26** | 180 |
+| selectivity, generalists, router entropy | `mechinterp_structural.csv`, `mechinterp_structural_1e19.csv` | yes | 2–14 | **36** | 200 |
+| demand forecastability (A10/C6) | `mechinterp_demand_1e19.csv` | yes | 2–14 | **30** | 192 |
 | free-rider / tokens-per-expert (A11) | `mechinterp_freerider.csv` | n/a | — | **22** | 22 |
 | per-layer cost vs churn (N7) | `n7_cost_vs_churn.csv` | yes | 2–14 | **7** | 66 |
 
