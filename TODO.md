@@ -383,6 +383,28 @@ Passes: numbers, status, cross-document, superseded, reproduction, links.
 | broken cross-document link after a file move | 1 | 1 |
 | miscounted artifacts (PNGs, `.distcp`, disk size) | 3 | 3 |
 
+**Reproduction pass — the one that found the most consequential defect.** Running every documented
+command and diffing the tree afterwards showed `analysis/plots/plot_locus_by_layer.py` **did not
+reproduce its own committed output**: 5 of 16 rows in `mechinterp_locus_slopes.csv` changed on every
+run, and point estimates moved, not only intervals (slope 0.0408 → 0.0397; vertex bound 60.67 → 58.53).
+
+Cause: one module-level RNG shared across every bootstrap call. It *looks* seeded — `default_rng(0)` —
+but each draw advances shared state, so every interval depends on how many were computed before it,
+and adding a run or a layer shifts all subsequent results. Each interval is now seeded from a hash of
+its own inputs. Verified byte-identical over two consecutive runs.
+
+This also explains the CI drift the numbers pass flagged: the proposed cause (no seed) was wrong, and
+the real one was order-dependence. **A seeded RNG is not sufficient for reproducibility if the
+generator is shared across calls.**
+
+Also from this pass: docs wrote `python3 analysis/...`, which fails with `ModuleNotFoundError` unless
+`scripts/env.sh` has been sourced (now `$PY`); README said 11 plot scripts against 12; item 1h still
+called `plot_probe.py` broken when it exits 0.
+
+**Cross-pass contradiction, resolved by execution.** The numbers pass reported README's `summarize.py`
+example as not reproducing. The reproduction pass *ran it* and got the documented values exactly.
+Rejected. Reading a CSV and running a command are different evidence, and running wins.
+
 **Checked and rejected — recorded because a fresh reader tripping on correct text is also signal:**
 
 - *"README's Pixel 10a claim has no supporting evidence"* — false positive caused by the **brief**, not
