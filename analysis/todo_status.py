@@ -70,10 +70,19 @@ def check():
          f"missing {sorted(want - got) or 'none'}")
     item("1e", "C8 causal token-vs-context", len(rows("mechinterp_causal.csv")) > 0,
          f"{len(rows('mechinterp_causal.csv'))} rows in mechinterp_causal.csv")
+    # Same treatment as 1a. The EOD masks are gitignored derived files under
+    # results/phase0/probe_batch_cache/, so a fresh clone cannot have them and a MISS there reports an
+    # absent environment as unfinished work. Skip when the directory is absent; MISS only when it
+    # exists and the masks do not, which is a real gap.
     eod = [t for t in ("16k", "50k") if os.path.exists(os.path.join(CACHE, f"eod_{t}.npy"))]
-    item("1f", "eod masks + e8 over all runs",
-         len(eod) >= 1 and n_runs("e8_document_boundary.csv") >= 20,
-         f"masks {eod or 'none'}, e8 covers {n_runs('e8_document_boundary.csv')} runs")
+    if not os.path.isdir(CACHE):
+        item("1f", "eod masks + e8 over all runs", None,
+             f"SKIPPED — no probe cache at {CACHE}; masks are derived and gitignored, "
+             f"regenerate with eod_capture.py")
+    else:
+      item("1f", "eod masks + e8 over all runs",
+           len(eod) >= 1 and n_runs("e8_document_boundary.csv") >= 20,
+           f"masks {eod or 'none'}, e8 covers {n_runs('e8_document_boundary.csv')} runs")
     item("1g", "A11 free-rider refresh", n_runs("mechinterp_freerider.csv") >= 20,
          f"{n_runs('mechinterp_freerider.csv')} runs in mechinterp_freerider.csv")
     plotp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plots", "plot_probe.py")

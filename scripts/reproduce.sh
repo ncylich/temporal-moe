@@ -83,8 +83,24 @@ if ! "$PY" analysis/csv_sanity.py --quiet; then
   echo "  (flags above -- each needs a verdict; a legitimate flag still has to be stated)"
 fi
 
-echo "=== 3. working tree unchanged"
-dirty=$(git status --porcelain | grep -v 'paper/talk_figures' || true)
+echo "=== 3a. figure content (portable check)"
+# PNG bytes are NOT reproducible across machines -- matplotlib version and font rendering shift them
+# (358575 bytes on one machine, 386169 on another, same code and same data). Requiring byte equality
+# would make this gate permanently red for somebody, and a gate that cannot go green stops being run.
+# So figures are checked on what is portable: every series the data supports must be plotted. That is
+# the property whose loss mattered -- the regression this gate exists for was a figure silently
+# dropping 7 of 12 series, and this still catches it.
+series=$("$PY" analysis/plots/plot_locus_by_layer.py 2>&1 | grep -cE '^  [A-Za-z0-9_]+: n=')
+omitted=$("$PY" analysis/plots/plot_locus_by_layer.py 2>&1 | grep -c 'omitted' || true)
+if [[ "$series" -lt 12 || "$omitted" -gt 0 ]]; then
+  echo "  FAIL: locus figure has $series series (want 12), $omitted omitted"; fail=1
+else
+  echo "  locus figure: $series/12 series, none omitted"
+fi
+
+echo "=== 3b. working tree unchanged"
+# Binary figures excluded per 3a; everything else must match byte for byte.
+dirty=$(git status --porcelain | grep -v 'paper/talk_figures' | grep -vE '\.png$' || true)
 if [[ -n "$dirty" ]]; then
   echo "  FAIL: documented commands modified committed files:"
   echo "$dirty" | sed 's/^/    /'
