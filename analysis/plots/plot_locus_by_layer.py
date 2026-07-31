@@ -386,9 +386,18 @@ print(f"wrote {sp}: {len(merged)} rows total at split={SPLIT} "
       f"({updated} updated, {added} added, {carried} carried over untouched)")
 print(f"\n{'label':22} {'R2 lin/quad':>12} {'full slope':>20} {'rising slope':>20} "
       f"{'curvature':>20} {'vertex':>16}")
+# Index by name rather than by position: adding vertex_identified shifted every column after it and
+# silently broke this line, which is the kind of breakage a positional index invites.
+_i = {h: n for n, h in enumerate(HEADER)}
 for r in slope_rows:
-    print(f"{r[0]:22} {r[17]:>5.2f}/{r[18]:<5.2f} "
-          f"{r[11]:+.4f} [{r[12]:+.3f},{r[13]:+.3f}] "
-          f"{r[25]:+.4f} [{r[26]:+.3f},{r[27]:+.3f}] "
-          f"{r[19]:+.4f} [{r[20]:+.3f},{r[21]:+.3f}] "
-          f"L{r[22]:.1f} [{r[23]:.1f},{r[24]:.1f}]")
+    _v = (f"L{r[_i['vertex_layer']]:.1f} [{r[_i['vertex_lo95']]:.1f},{r[_i['vertex_hi95']]:.1f}]"
+          if r[_i["vertex_identified"]] else
+          f"L{r[_i['vertex_layer']]:.1f} (CI wider than the stack; not identified)")
+    print(f"{r[0]:22} {r[_i['linear_r2']]:>5.2f}/{r[_i['quadratic_r2']]:<5.2f} "
+          f"{r[_i['slope_per_normdepth']]:+.4f} "
+          f"[{r[_i['slope_nd_lo95']]:+.3f},{r[_i['slope_nd_hi95']]:+.3f}] "
+          f"{r[_i['rising_slope']]:+.4f} "
+          f"[{r[_i['rising_lo95']]:+.3f},{r[_i['rising_hi95']]:+.3f}] "
+          f"{r[_i['curvature']]:+.4f} "
+          f"[{r[_i['curvature_lo95']]:+.3f},{r[_i['curvature_hi95']]:+.3f}] "
+          f"{_v}")
