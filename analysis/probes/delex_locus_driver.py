@@ -43,6 +43,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import delex_locus
 import registry
+import safe_csv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS
@@ -138,6 +139,8 @@ def main():
 
 
 def _write(name, header, rows):
+    # A partial run rewrites the whole file; refuse to shrink it. See safe_csv.
+    safe_csv.guard(os.path.join(ABLATIONS, name), rows, key_index=1)
     os.makedirs(ABLATIONS, exist_ok=True)
     p = os.path.join(ABLATIONS, name)
     with open(p, "w", newline="") as f:

@@ -37,6 +37,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import registry
+import safe_csv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS
@@ -123,6 +124,7 @@ def main():
                   f"gap={mw - ms:+9.0f}", flush=True)
 
     os.makedirs(ABLATIONS, exist_ok=True)
+    safe_csv.guard(OUT, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
     with open(OUT, "w", newline="") as f:
         wr = csv.writer(f)
         wr.writerow(HEADER)

@@ -212,6 +212,7 @@ def analyze():
     import csv
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import registry
+    import safe_csv
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from paths import ABLATIONS
 
@@ -256,6 +257,7 @@ def analyze():
     if rows:
         os.makedirs(ABLATIONS, exist_ok=True)
         p = os.path.join(ABLATIONS, "mechinterp_causal.csv")
+        safe_csv.guard(p, rows, key_index=0)
         with open(p, "w", newline="") as f:
             wtr = csv.writer(f)
             wtr.writerow(["run", "budget", "regime", "grain", "layer", "window_w", "stride",
