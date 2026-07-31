@@ -111,6 +111,18 @@ SHAPE_DEPTH = {"s0": 4, "s1": 5, "s2": 6, "s3": 7, "s19opt": 14,
 # corresponding run.meta exactly (see the case block in experiments/run.sh).
 NAME_SHAPE = (("flame38m", "s38m"), ("flame192", "s192f"), ("flame512", "s512f"))
 
+# The 1e19 runs carry shape=s19opt in run.meta, so they resolve on a machine that has the artifact
+# tree — and only there. In a clone without it there is no run.meta, no NAME_SHAPE prefix matches
+# (their names begin with moe_/g1_/temporal_/dense_), and the token fallback finds no shape name
+# inside `moe_coarse_1e19`. depth_of() then returns None, plot_locus_by_layer drops all three 1e19
+# series, and the figure quietly loses a third of its curves. That is why this looked resolved from
+# the pod for three rounds while being broken for anyone else.
+#
+# A suffix rule rather than three exact names, because it also covers dense_1e19. Verified against the
+# checkpoints, not the docs: all four runs' run.meta record `shape=s19opt H=800 L=14`, matching
+# SHAPE_DEPTH["s19opt"] = 14. No other run in the registry ends in _1e19.
+SUFFIX_SHAPE = (("_1e19", "s19opt"),)
+
 
 def shape_of(name):
     """run.sh shape name for a run: from run.meta if it records one, else from the run-name prefix."""
@@ -119,6 +131,9 @@ def shape_of(name):
         return sh
     for prefix, shape in NAME_SHAPE:
         if name.startswith(prefix):
+            return shape
+    for suffix, shape in SUFFIX_SHAPE:
+        if name.endswith(suffix):
             return shape
     for shape in SHAPE_DEPTH:
         if re.search(rf"(^|_){shape}(_|$)", name):

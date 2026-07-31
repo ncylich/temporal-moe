@@ -47,8 +47,18 @@ def check():
     def item(key, desc, ok, detail):
         out.append((key, desc, ok, detail))
 
-    item("1a", "capture sweep (21 cells + 4 leads)", ncap >= 25,
-         f"{ncap} captures on disk with non-zero size")
+    # Distinguish "not done" from "cannot tell from here". The captures live under the artifact tree
+    # ($CKPT_ROOT), not in the repository, so from a fresh clone this check finds nothing and reports a
+    # MISS that is really an absent environment. A gate that goes red for environmental reasons is a
+    # gate people stop reading, which is the same decay the warning allowlist exists to prevent.
+    have_artifacts = os.path.isdir(RUNS) and any(
+        os.path.isdir(os.path.join(RUNS, d)) for d in (os.listdir(RUNS) if os.path.isdir(RUNS) else []))
+    if not have_artifacts:
+        item("1a", "capture sweep (21 cells + 4 leads)", None,
+             f"SKIPPED — no artifact tree at {RUNS}; set CKPT_ROOT to check this from a clone")
+    else:
+        item("1a", "capture sweep (21 cells + 4 leads)", ncap >= 25,
+             f"{ncap} captures on disk with non-zero size")
     item("1b", "A8 weight geometry", n_runs("mechinterp_structural_1e19.csv") >= 20,
          f"{n_runs('mechinterp_structural_1e19.csv')} runs in mechinterp_structural_1e19.csv")
     item("1c", "C5 lens at 1e19", n_runs("mechinterp_lens_1e19.csv") >= 20,
@@ -79,12 +89,18 @@ def main():
     print(f"\n{'item':6} {'what':38} {'':4} detail")
     print("-" * 100)
     for key, desc, ok, detail in out:
-        print(f"{key:6} {desc:38} {'OK  ' if ok else 'MISS'} {detail}")
-    bad = [k for k, _, ok, _ in out if not ok]
+        mark = "SKIP" if ok is None else ("OK  " if ok else "MISS")
+        print(f"{key:6} {desc:38} {mark} {detail}")
+    bad = [k for k, _, ok, _ in out if ok is False]
+    skipped = [k for k, _, ok, _ in out if ok is None]
     print("-" * 100)
     if bad:
         print(f"\n>>> {len(bad)} OUTSTANDING: {', '.join(bad)}\n")
         return 1
+    if skipped:
+        print(f"\n>>> ALL CHECKABLE ITEMS COMPLETE; {len(skipped)} skipped for want of the artifact "
+              f"tree: {', '.join(skipped)}\n")
+        return 0
     print("\n>>> ALL NON-RETRAINING TODO.md ITEMS COMPLETE (1a-1i)\n")
     return 0
 
