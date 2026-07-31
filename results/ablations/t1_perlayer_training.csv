@@ -1,0 +1,3 @@
+run_name,arm,seed,schedule,test_CE,wall_s
+t1_A6_s0_1e16_seed1234,A6,1234,DEFERRED,DEFERRED_window_too_short,0
+t1_A0_s0_1e16_seed1234,A0,1234,none,4.027487E+00,3961
