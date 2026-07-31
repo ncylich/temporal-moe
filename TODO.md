@@ -363,6 +363,43 @@ Out of scope by explicit instruction. Everything they need is in §2.
 Each entry: what was audited, how, what was found, what was fixed. A pass that finds nothing is still
 recorded — it tells the next person that class was checked and when, so it does not get redone.
 
+### 2026-07-31 (fourth) — the boring item, and why it slipped three times
+
+**`depth_of()` for the 1e19 runs — fixed, third time raised.** The first two times I reported it as
+"does not reproduce", which was true *from the pod* and useless. On a machine with the artifact tree
+`run.meta` records `shape=s19opt H=800 L=14`, so `shape_of` resolves through it. In a clone there is no
+`run.meta`: no `NAME_SHAPE` prefix matches (those names begin `moe_`/`g1_`/`temporal_`/`dense_`), and
+the token fallback finds no shape name inside `moe_coarse_1e19`. `depth_of` returns `None`, all three
+1e19 series drop, and the figure loses a third of its curves. **Checking from the one environment where
+a bug cannot appear is not checking.**
+
+Fixed with a suffix rule rather than three exact names, because it also covers `dense_1e19`, which
+naming the three reported runs would have missed. Verified against the checkpoints as the existing
+entries were — all four `run.meta` record `shape=s19opt` with `L=14`, matching `SHAPE_DEPTH` — and
+confirmed to return 14 with `run.meta` unavailable.
+
+**Why it slipped three times.** Each list mixed one mechanical fix with several design problems, and
+the mechanical one has no discovery in it, so it lost every competition for attention while the
+interesting work landed and landed well. Countermeasure adopted: **do the boring item first, and
+confirm it with the check rather than by having written the line.**
+
+**`todo_status` now SKIPs rather than MISSes** when the artifact tree is absent, since the captures
+live outside the repository and a clone cannot see them. A gate that goes red for environmental
+reasons stops being read.
+
+**Sanity flags now carry verdicts.** 39 flags printed with nothing forcing an answer — the decay the
+warning allowlist prevents, one level up. Flags with a recorded reason are suppressed as *answered*;
+anything unmatched is reported and needs fresh judgement. **40 standing verdicts, 0 open.**
+
+Two bugs in the linter surfaced while doing that, **the second caught by the linter itself**: files with
+`#` provenance lines had the first comment read as the header, so prose fragments became column names;
+fixing that filtered comments on the working side only, making every commented file appear to have
+shrunk (58 → 49, 81 → 40). Both sides now filter identically. First time a check here caught a defect
+in itself.
+
+State: **REPRODUCE: PASS**, tree clean, figure byte-identical with 12 of 12 series, 0 open sanity flags.
+
+
 ### 2026-07-31 (third) — a guard built for CSVs did not cover a figure written by the same code
 
 **The class-B guard was scoped to CSV writers, so the PNG beside them was unprotected.** The slopes CSV
