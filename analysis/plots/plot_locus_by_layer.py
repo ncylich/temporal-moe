@@ -147,10 +147,14 @@ def boot_stat(g, xs_by_layer, stat, n=BOOT):
     x = np.array([xs_by_layer[l] for l in layers], float)
     arrs = [np.asarray(g[l], float) for l in layers]
     point = stat(x, np.array([np.median(a) for a in arrs]))
-    draws = np.empty(n)
-    for i in range(n):
-        y = np.array([np.median(_rng_for(a).choice(a, size=a.size, replace=True)) for a in arrs])
-        draws[i] = stat(x, y)
+    # One generator per array, built ONCE and then drawn from n times. Constructing it inside the
+    # resampling loop reseeds it identically on every iteration, so all n draws come out the same and
+    # the percentiles collapse to a point -- a "confidence interval" of zero width that still passes
+    # an idempotence check, because two runs agree perfectly on the same degenerate number.
+    rngs = [_rng_for(a) for a in arrs]
+    resampled = [np.median(r.choice(a, size=(n, a.size), replace=True), axis=1)
+                 for r, a in zip(rngs, arrs)]        # [n] medians per layer
+    draws = np.array([stat(x, np.array([col[i] for col in resampled])) for i in range(n)])
     return point, float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 
 
@@ -303,10 +307,27 @@ HEADER = ["label", "run", "budget", "regime", "variant", "window", "split", "dep
           "rising_slope", "rising_lo95", "rising_hi95",
           "median_at_first_layer", "median_at_last_layer"]
 sp = os.path.join(DATA, "mechinterp_locus_slopes.csv")
-existing = []
+existing, prior_this_split = [], []
 if os.path.exists(sp):
     with open(sp) as f:
-        existing = [r for r in csv.DictReader(f) if r.get("split") != SPLIT]
+        allrows = list(csv.DictReader(f))
+    existing = [r for r in allrows if r.get("split") != SPLIT]
+    prior_this_split = [r for r in allrows if r.get("split") == SPLIT]
+
+# Refuse to shrink the file. Rows for the current split are replaced wholesale, so if the inputs for
+# a series are missing this run, that series silently disappears from a committed artifact -- which is
+# how a --split position run cut this file from 24 rows to 17 while exiting 0. Losing rows is
+# sometimes correct (a series genuinely retired), so it is allowed, but only when asked for.
+if len(slope_rows) < len(prior_this_split) and "--replace" not in sys.argv:
+    lost = {(r.get("label"), r.get("variant")) for r in prior_this_split} - \
+           {(r[0], r[4]) for r in slope_rows}
+    sys.exit(
+        f"[abort] refusing to shrink {os.path.basename(sp)} at split={SPLIT}: "
+        f"{len(prior_this_split)} rows on disk, {len(slope_rows)} computed now.\n"
+        f"         would drop: {sorted(x for x in lost if x[0])}\n"
+        f"         Usually this means the input CSV lacks rows for this split (check that the locus "
+        f"driver ran with --both-splits). Pass --replace if the loss is intended.")
+
 with open(sp, "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(HEADER)
