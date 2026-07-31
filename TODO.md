@@ -369,7 +369,28 @@ commands, and running them changes nothing when the new runs are unregistered, s
 and everything passes. A registration step that is silently skipped looks identical to one that was
 never needed.
 
-### 3k. `delex_lens` cannot be run bare from the repo root — **open**
+### 3k. `delex_lens` and `delex_structural` need the run environment — **partly resolved**
+
+Both read *checkpoints* rather than captures, so both need what `experiments/run.sh` sets up: the
+Megatron import path and, less obviously, the CUDA libraries from `scripts/env.sh`. Invoked bare from
+the repo root, `delex_lens` dies with `ModuleNotFoundError: No module named 'megatron'` and
+`delex_structural` gets past that only to hit `OSError: libcudnn`.
+
+The correct invocation, verified, is:
+
+    source scripts/env.sh
+    PYTHONPATH=$PWD/Megatron-LM:$PYTHONPATH CKPT_ROOT=... $PY analysis/probes/delex_structural.py
+
+`delex_structural` is fixed this way and A8 geometry is back at 192/192 rows over 30 runs.
+`delex_lens` has not been re-run with it yet.
+
+**Worth noting how this was found.** `delex_structural` degrades *gracefully* when it cannot read a
+checkpoint: it writes the reason into `geometry_note`, blanks the geometry columns, and exits 0. A
+batch that ran it bare therefore silently emptied a completed measurement with nothing failing. The
+`EMPTY COLUMN` check in `csv_sanity.py` is what surfaced it — graceful degradation and silent failure
+are the same event seen from different distances.
+
+### 3k-orig. `delex_lens` cannot be run bare from the repo root — **open**
 
 It fails with `ModuleNotFoundError: No module named 'megatron'`. Unlike the other capture-based
 analyses it reads checkpoints, so it needs the import path `experiments/run.sh` sets up. Invoking it
