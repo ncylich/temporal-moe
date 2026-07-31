@@ -223,7 +223,7 @@ Ordered so that anything usable without a GPU lands first.
 
 | criterion | status |
 |---|---|
-| Every metric in §1 has a `layer` column and covers every MoE layer of every model in the selection set | **partial.** Layer column: done everywhere it is meaningful. Every MoE layer: done for all 22 router-log runs and all 3 captures. Every model in the selection set: **not done** — 25 of 28 cells need a capture pass (Step 3, not run). |
+| Every metric in §1 has a `layer` column and covers every MoE layer of every model in the selection set | **done.** Layer column: everywhere it is meaningful. Every MoE layer: all 22 router-log runs and all **26** captures. Every model in the selection set: the capture sweep completed — verify with `analysis/todo_status.py`. |
 | No script contains a hardcoded model list or layer range | **done.** Lists come from `registry.py` (MANIFEST.csv + run.meta); layer lists come from the artifact. |
 | The null-control gate passes for every model under both nulls | **changed, deliberately.** The iid permutation passes on every model (pooled medians within 0.0005 of 0.500; per-cell median deviation 0.0005, p95 0.0015, 5 of 468 cells at 0.002–0.0025). The circular shift does not and cannot: it is not a valid null, see §7.1. The gate now enforces iid and reports the shift as a diagnostic. |
 | The gate is extended to the lens and structural re-runs where an analogous null exists | **done for the lens** — the `static` variant is that null (A5), and it is now written per layer, which matters because it is not depth-invariant. **No analogous null exists** for selectivity/entropy/geometry: they are descriptive statistics of the gate distribution, not fitted predictions, so there is nothing to permute. |

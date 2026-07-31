@@ -153,7 +153,7 @@ Treat every estimate as ±2x.
 | **N3** | C3 on a second seed at 1e18 | ~18 evals, 1.5 h | Is the U a property of the regime or of one trained model? |
 | **N4** | C3 on the fine granularity at 1e18 | ~18 evals, 1.5 h | Does the endpoint spike replicate across granularity? |
 | **N5** | C3 at 1e19, both directions, layers 2–14 | ~30 evals, 3–5 h | H2a: does cost track contextual share or depth? The dissociation |
-| **N6** | C8 — causal token and context substitution | 2–4 h | H1, causally rather than by probe. Still never run |
+| **N6** | C8 — causal token and context substitution | 2–4 h | H1, causally rather than by probe. **Done** — see the results table below |
 | **N7** | Per-layer cost versus per-layer hit rate | free, CPU | Rules out (or in) cacheability as a third explanation |
 | **N8** | Captures: re-take 3 x 1e19, add 1e16/1e17 arms | ~7 passes, 2 h | Makes the 1e19 output lens valid; unfreezes the low-budget end |
 | **N9** | Document corrections | no compute | Two claims still stand next to their own refutations |
