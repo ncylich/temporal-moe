@@ -49,7 +49,7 @@ needs a small producer script, not a preserved artifact.
 machine, so any cell can be captured with a forward pass. The Step 3 sweep has now done so.
 
 Second, **four of the five** runs behind the *published* 1e16/1e17 locus rows are absent from
-`MANIFEST.csv` entirely — no capture, no checkpoint — so those cells cannot be extended past layer 6,
+`MANIFEST.csv` entirely — no capture, no checkpoint — so those cells cannot be extended past layer 6 (**except `g3_moe_s0_1e16`, which is on disk and now reaches layer 14**),
 re-split, or re-windowed without retraining: `g3_tmoe_s0_1e16`, `g3_moe_s0_1e16_sigmoid`,
 `v16k_sweep_s2_1e17`, `tmoe_minlogit_sh1_s2_1e17`. An earlier revision said all five and said "by
 anyone, ever". **`g3_moe_s0_1e16` is the exception** — it is present with a checkpoint, and it is the
@@ -211,9 +211,9 @@ Ordered so that anything usable without a GPU lands first.
 | 1 | 2. swap rate → `p95_burst_len` | **done** — both columns written, reason recorded in `results/ablations/README.md` |
 | 1 | 3. correct §3 of `delexicalization.md` | **done** — layer range stated, `s0_SOFTMAX_BASELINE` relabelled w=32 |
 | 2 | 4. locus at full depth | **done** — layers 2–14, all three windows, both splits, per-layer floors |
-| 2 | 5. `probe_replay` e1–e8 over all runs | **done** for e1–e7 (22 runs). e8 impossible: needs a gitignored EOD cache absent from `MANIFEST.csv` |
+| 2 | 5. `probe_replay` e1–e8 over all runs | **done** for e1–e8 (22 runs). e8 was called impossible because its EOD cache is gitignored and absent from `MANIFEST.csv`; that was wrong — the cache is *derived*, `eod_capture.py` produces it, and e8 now covers 22 runs |
 | 2 | 6. counterfactual baseline replay | **done**, one cell — `moe_coarse_1e19` is the only unconstrained router log preserved |
-| 2 | 7. `delex_structural` per layer | **done** for gate statistics (A6, A7, A9). A8 weight geometry needs checkpoints, none on this pod; blank with the reason per row |
+| 2 | 7. `delex_structural` per layer | **done**, including A8. Weight geometry was recorded as needing checkpoints 'none on this pod'; they were in the sibling checkout all along, and A8 is now populated on 180/180 rows |
 | 2 | 8. `delex_demand` per layer | **done** |
 | 3 | 9–11. capture sweep + lens past layer 4 | **done — 26 captures on disk.** The `DELEXPROBE=1` branch of `run.sh` and `scripts/phase0/delex_capture_sweep.sh` did not exist; both are committed, along with shape entries s38m/s192f/s512f without which the entire 1e18 fleet was unaddressable. Lens covers every captured model at full depth. No cells outstanding — verify with `analysis/todo_status.py` |
 | 4 | 12. regenerate figures | **done** for everything whose data was regenerated |
@@ -304,5 +304,5 @@ lists are now taken from the artifact and nothing is hardcoded.
 **Most of the runs behind the published numbers were never preserved.** The five runs named in
 `probe_replay.py`'s old lists and the five behind the 1e16/1e17 locus rows are all absent from
 `MANIFEST.csv`. The replay re-run therefore covers a *different* population of 22 runs, and the
-1e16/1e17 locus cells can never be extended past layer 6 by anyone. This is a preservation gap, not a
+1e16/1e17 locus cells can never be extended past layer 6 — with the exception of `g3_moe_s0_1e16`, which survived. This is a preservation gap, not a
 code gap, and no re-run can close it.

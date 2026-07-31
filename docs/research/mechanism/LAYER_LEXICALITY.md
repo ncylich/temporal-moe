@@ -194,7 +194,7 @@ at the winning budget (medians over layers 2–9, w=k, documents held out):
 **Caveats.**
 
 - **The 1e16/1e17 rows cannot be fixed.** Those five runs are absent from `MANIFEST.csv` — no capture,
-  no checkpoint — so they cannot be extended past layer 6, re-split, or re-windowed by anyone. They
+  no checkpoint — so they cannot be extended past layer 6, re-split, or re-windowed. (**Exception:** `g3_moe_s0_1e16` *is* on disk with a checkpoint and now carries locus data to layer 14; the blanket 'by anyone' claim originally made here was false.) They
   remain at layers 2–6 on the positional split. The 1e19 rows are the only ones measured properly.
 - **Only the iid-permutation floor is trustworthy.** The circular-shift null is inflated by up to
   +0.047 on a single layer and is not a valid control here; see
