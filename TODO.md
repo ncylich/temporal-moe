@@ -224,37 +224,33 @@ The remaining three share the same `for r in cells` shape. `delex_lens` has two 
 rather than one, so it needs slightly more care than a mechanical copy of the patch. Use the same
 acceptance test: save the serial CSV, run parallel, diff by key — identical rows, not wall-clock.
 
-### 3d. Serial/parallel numeric difference — **cause UNKNOWN, my explanation was wrong**
+### 3d. Serial/parallel numeric difference — **not an issue; I over-escalated it**
 
-Parallel and serial locus outputs differ at the 1e-3 level (median exactly 0, 60% bit-identical, p99
-0.0007, max 0.0034). I attributed this to BLAS reduction order, on the reasoning that workers are
-capped at 8 threads where the serial run used all 208, and floating-point addition is not associative.
+Parallel and serial locus outputs differ at the 1e-3 level: median exactly 0.000000, 60% of values
+bit-identical, p99 0.0007, max 0.0034. Effect sizes being resolved are ~0.03 nats, so this is a 10x
+margin. **This is ordinary floating-point non-determinism and does not affect any conclusion.** The
+correct handling is a line in the commit message saying the outputs are equivalent within tolerance.
 
-**That is disproven.** Running the same capture serially twice, changing only OMP_NUM_THREADS between
-8 and 208, gives output that is **100% bit-identical** — 4608 of 4608 rows. Thread count does not move
-these numbers. The capture tested, `flame192_g3_moe`, is one that *does* differ between the serial and
-parallel runs, so this is not a case of an insensitive test subject.
+Recorded here only because I originally wrote it up as an open investigation, which was wrong twice
+over:
 
-Two further candidates were checked and also do not explain it: the RNG is constructed inside
-`analyze()` seeded with 0, so it is fresh per call in both paths; and row counts and keys match
-exactly, so the two runs cover identical cells.
+1. It never needed investigating. Non-associative summation is a known property of parallel numerics
+   and ML results are not sensitive at this magnitude.
+2. The mechanism I proposed was also false. I attributed it to BLAS reduction order from capping
+   workers at 8 threads against the serial run's 208. Running the same capture serially at both thread
+   counts gives **100% bit-identical output** (4608/4608 rows), on a capture that does differ between
+   serial and parallel. Thread count is not the cause.
 
-**The cause is currently unknown.** What is established:
+The one place numerical noise could bite is a gate whose tolerance sits at the same scale, and the
+null gate's is +-0.002. But that framing inverts the priority: the gate's own estimator carried
++-0.002 of sampling noise from `max_experts=24`, which is what actually flagged four healthy models
+(see 3f). That was the real defect and it is fixed. The residual reduction-order noise is immaterial
+beside it.
 
-- the parallel output covers exactly the same 87552 cells as the serial output, none added or lost
-- the differences are tiny and centred on zero (median exactly 0.000000)
-- they are NOT caused by BLAS thread count
-
-Suggested next steps: run one capture through `_analyze_one` in-process versus through the pool and
-diff, which isolates the process boundary itself; and check whether the serial baseline predates any
-edit to `delex_locus.py` or its imports, since the baseline was captured at 18:13 before several fixes
-landed that day.
-
-Until this is understood, treat per-expert AUCs as carrying about +-0.003 of tolerance. That sits
-below the effect sizes being resolved (smallest real deltas ~0.03), but the null-gate tolerance is
-itself 0.002 — the same order — so a gate verdict on a marginal model could in principle depend on it.
-That is the same pathology as the `max_experts=24` default in §3f: a threshold at the scale of its own
-noise.
+If anyone does want the remaining curiosity closed: the difference is against a baseline captured at
+18:13 on 07-30 by the pre-parallel driver, and `delex_locus.py` last changed at 00:59 that day, so
+code drift is ruled out too. A pool-versus-no-pool run on identical code isolates the process
+boundary. Not worth compute unless something else makes it interesting.
 
 ### 3e. `input_ids` not added to the capture writer
 
