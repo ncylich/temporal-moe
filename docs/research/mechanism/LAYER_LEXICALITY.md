@@ -103,6 +103,7 @@ some experts fall below the probe's minimum-usage threshold).
 documents previously assumed 9 — and were measured with every document present in both the probe's fit
 and score halves. Re-measured at full depth on held-out documents (`mechinterp_locus_1e19.csv`, w=k):
 
+*(Bootstrap intervals in this section are copies of `results/ablations/mechinterp_locus_slopes.csv` columns `slope_nd_lo95` / `slope_nd_hi95`. They drifted once already, when a bad fix made the generator emit zero-width intervals — check them against that file rather than trusting the prose.)*
 | MoE layer | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | temporal 6/64 @1e19 | +.024 | +.041 | +.054 | +.069 | +.087 | +.091 | **+.107** | +.105 | +.095 | +.101 | +.082 | +.076 | +.083 |
@@ -115,10 +116,10 @@ across models of different depth, and per layer index for continuity with the pu
 
 | matched pair | temporal slope / `l/L` | baseline slope / `l/L` | (per layer index: temporal / baseline) |
 |---|---|---|---|
-| fine 18/192 @1e16 | +0.1026 [+0.0516, +0.1334] | +0.0893 [+0.0595, +0.1194] | +0.0257 / +0.0223 |
+| fine 18/192 @1e16 | +0.1026 [+0.0534, +0.1354] | +0.0893 [+0.0534, +0.1354] | +0.0257 / +0.0223 |
 | coarse 6/64 @1e17 | −0.0195 [−0.0534, +0.0289] | −0.0179 [−0.0784, +0.0263] | −0.0033 / −0.0030 |
-| coarse 6/64 @1e19 | +0.0590 [+0.0458, +0.0748] | +0.0929 [+0.0773, +0.1148] | +0.0042 / +0.0066 |
-| fine 18/192 @1e19 | +0.0408 [+0.0307, +0.0513] | *no baseline capture preserved* | +0.0029 / — |
+| coarse 6/64 @1e19 | +0.0590 [+0.0464, +0.0740] | +0.0929 [+0.0590, +0.1190] | +0.0042 / +0.0066 |
+| fine 18/192 @1e19 | +0.0408 [+0.0310, +0.0510] | *no baseline capture preserved* | +0.0029 / — |
 
 **A straight line is the wrong summary of these curves, and the full-range slope above inverts the
 comparison it appears to make.** The contextual share rises with depth and then turns over, so an OLS
@@ -128,7 +129,7 @@ R² = 0.43 while a quadratic explains **0.94**. Fitting the shape instead:
 | coarse 6/64 @1e19 | R² lin / quad | slope over the rising region | curvature | vertex (layer) |
 |---|---|---|---|---|
 | temporal | 0.43 / **0.94** | **+0.1704 [+0.136, +0.197]** | **−0.2739 [−0.334, −0.203]** | **9.5 [9.1, 10.3]** |
-| unconstrained | 0.68 / 0.72 | **+0.0929 [+0.076, +0.116]** | −0.1048 [−0.169, −0.001] | 14.2 [11.0, 60.7] |
+| unconstrained | 0.68 / 0.72 | **+0.0929 [+0.0590, +0.1190]** | −0.1048 [−0.169, −0.001] | 14.2 [11.0, 60.7] |
 
 All three statistics separate, and they say the opposite of the full-range slopes: **while it is rising
 the temporal arm moves toward context about twice as fast as the unconstrained one** (+0.170 vs +0.093,
@@ -144,7 +145,7 @@ both granularities, 8 MoE layers each:
 | coarse 6/64 @1e18 | R² lin / quad | full-range slope | rising slope | curvature | vertex |
 |---|---|---|---|---|---|
 | temporal | **0.01** / 0.40 | +0.0067 [−0.015, +0.031] | **+0.1282 [+0.063, +0.173]** | −0.1529 [−0.234, −0.037] | **5.7 [5.0, 7.5]** |
-| unconstrained | **0.94** / 0.94 | +0.1384 [+0.112, +0.169] | +0.1384 [+0.112, +0.169] | −0.0378 [−0.174, +0.079] | 22.0 (outside) |
+| unconstrained | **0.94** / 0.94 | +0.1384 [+0.1130, +0.1683] | +0.1384 [+0.1130, +0.1683] | −0.0378 [−0.174, +0.079] | 22.0 (outside) |
 
 A line fits the unconstrained arm well (R² 0.94, curvature interval containing zero: it is simply
 rising) and fits the temporal arm not at all (R² **0.01**). Reporting only the full-range slope would
@@ -280,7 +281,7 @@ the majority of arms", is not met.
 
 What the matched arms add is that the two regimes differ in the *shape* of the curve rather than in a
 slope. While the curve is rising the constrained arm moves toward context about twice as fast
-(+0.1704 [+0.136, +0.197] versus +0.0929 [+0.076, +0.116] per unit `l/L`, non-overlapping); it is more
+(+0.1704 [+0.136, +0.197] versus +0.0929 [+0.0590, +0.1190] per unit `l/L`, non-overlapping); it is more
 strongly concave (−0.2739 [−0.334, −0.203] versus −0.1048 [−0.169, −0.001]); and it turns over at layer
 **9.5 [9.1, 10.3]** of 14 while the unconstrained arm is still climbing at its last layer.
 
