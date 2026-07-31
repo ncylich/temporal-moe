@@ -23,7 +23,7 @@ each arm rebuilt the iterator and relied on the seed and shard order matching.
 Emits `[sweep] <tag> lm_loss=<x>` per arm and writes results/ablations/sweep_eval.csv.
 
 Validate before trusting: a tag whose setting reproduces an arm already measured the old way must
-return the same loss to eval precision. `--selftest` re-runs the first arm at the end and checks the
+return the same loss to eval precision. `SWEEP_SELFTEST=1` re-runs the first arm at the end and checks the
 two agree exactly, which catches an iterator that was consumed rather than replayed.
 """
 import os
@@ -85,7 +85,9 @@ def _install():
                   f"every arm is scored on these same tensors", flush=True)
 
         mdl = model[0] if isinstance(model, list) else model
-        selftest = "--selftest" in sys.argv
+        # Env var, not a CLI flag: everything on argv is parsed by Megatron, which
+        # rejects arguments it does not know.
+        selftest = os.environ.get("SWEEP_SELFTEST", "") not in ("", "0")
         order = sweep + ([sweep[0]] if selftest else [])
         for i, (tag, env) in enumerate(order):
             os.environ.update(env)
