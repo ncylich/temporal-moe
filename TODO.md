@@ -355,3 +355,34 @@ above cost nothing.
 ### 3h. T1–T4 — deliberately not started
 
 Out of scope by explicit instruction. Everything they need is in §2.
+
+---
+
+## 4. Audit log
+
+Each entry: what was audited, how, what was found, what was fixed. A pass that finds nothing is still
+recorded — it tells the next person that class was checked and when, so it does not get redone.
+
+### 2026-07-31 — six-pass fresh-context audit of the doc set
+
+Scope: `docs/research/mechanism/*.md`, `TODO.md`, `README.md`, against `results/ablations/*.csv`.
+Method: six independent Sonnet subagents with **disjoint scopes**, briefed with the artifacts only —
+no narrative, no conclusions, no history, since a briefed auditor confirms the briefer's framing.
+Passes: numbers, status, cross-document, superseded, reproduction, links.
+
+**Found and fixed, by class rather than by instance:**
+
+| class | instances found | instances fixed |
+|---|---|---|
+| stale `file.py:NN` line pins | 3 (2 broken, 1 correct-by-luck) | 3 — all converted to symbol references, which break only on a rename |
+| detail text left stale when a status line was updated | 12 across 5 files | 12 |
+| "cannot be extended past layer 6 by anyone" — false for `g3_moe_s0_1e16` | 3 passages | 3 |
+| hand-maintained coverage counts drifting from their CSVs | 6 rows | replaced with generation (`analysis/coverage_table.py`) |
+| unlabelled metric (val CE quoted beside test CE) | 1 | 1 |
+| corrections identified elsewhere but never applied | 2 | 2 |
+| broken cross-document link after a file move | 1 | 1 |
+| miscounted artifacts (PNGs, `.distcp`, disk size) | 3 | 3 |
+
+**Caveat on the method itself:** running several agents with git access in one working tree caused
+`.git/index.lock` contention, and one pass runs `git checkout -- .` as cleanup, which would discard
+another agent's uncommitted work. Commit before starting a sweep, and expect to wait on the lock.
