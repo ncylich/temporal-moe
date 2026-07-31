@@ -90,7 +90,7 @@ scripts/setup.sh analysis                    # creates .venv: numpy, pandas, mat
 for f in analysis/plots/*.py; do $PY "$f"; done
 ```
 
-All 11 scripts run and write 42 PNGs to `results/phase0/figures/` — 31 distinct figures (isoFLOP
+All 11 scripts run and write 44 PNGs to `results/phase0/figures/` — 32 distinct figures (isoFLOP
 panels, loss curves, residency and swap-rate analyses, the de-lexicalization locus scatter, serving
 sweeps) plus caption-free variants for the paper, which `--no-caption` produces on their own. The
 CSVs behind them are committed, so nothing downloads.

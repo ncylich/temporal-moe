@@ -46,8 +46,9 @@ Battery-wide housekeeping — re-running every mechinterp script across every mo
 tracked separately in [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md), whose §7 records what that
 re-run found, including a null control that turned out to be invalid, a probe split that leaked
 documents, and a capture that keyed expert outputs one layer too shallow. Steps 1–2 of that plan are
-done, and Step 3 has run at 1e18: seven captures now exist rather than three, including matched
-temporal/unconstrained pairs at the budget where the temporal model wins.
+done, and the capture sweep has completed: **26 captures** now exist rather than three, including
+matched temporal/unconstrained pairs at every budget. (Counts here are generated — see the coverage
+table in `MECHINTERP_RERUN_PLAN.md` §1.)
 
 ## 0. Why
 
@@ -416,10 +417,10 @@ Ordered by what they buy. C1–C4 are the critical path.
 | C2 | Locus at layers 2–**14** on **seven** captures | H1 | existing captures | **done** — H1 rises then turns over at ~2/3 depth in the temporal arms; unconstrained arms never turn |
 | C3 | Per-layer inference-time constraint swap | H2 pre-screen | existing checkpoints | **done**, both directions at 1e18 — U-shaped, vertex L5.3/L5.5, falsifies H2 |
 | C4 | Baseline hit rate by counterfactual replay | H1 control | existing router logs | **done**, one cell — the only unconstrained router log preserved |
-| C5 | Per-layer output lens (effective vocabulary) | H1, third view | captures; >L4 needs re-run | **blocked on a re-capture.** The capture keyed expert outputs one layer too shallow; fixed, but the lens needs captures taken after the fix — see `MECHINTERP_RERUN_PLAN.md` §7.4 |
+| C5 | Per-layer output lens (effective vocabulary) | H1, third view | captures; >L4 needs re-run | **done.** The capture keyed expert outputs one layer too shallow; fixed, and the lens re-ran on captures taken after the fix (26 runs, `mechinterp_lens_1e19.csv`) — see `MECHINTERP_RERUN_PLAN.md` §7.4 |
 | C6 | Per-layer demand forecastability | H2 mechanism | existing captures | **done** — 0.920→0.953 temporal vs 0.570→0.698 baseline, separated at every layer |
 | C7 | Nonparametric token-id oracle | H1 ceiling | existing captures | **done** — probe is at the ceiling; ceiling is flat with depth |
-| C8 | Causal token / context substitution | H1, causal | forward passes | **not run.** The strongest non-training evidence available for H1 and the largest remaining gap |
+| C8 | Causal token / context substitution | H1, causal | forward passes | **done, both regimes.** Was the largest remaining gap; closed. Ratio (context shift / token shift) 1.34–1.66 temporal vs 0.30–0.73 unconstrained, opposite sides of 1 at every layer (`mechinterp_causal.csv`) |
 | C9 | Frequency-stratified `A_tok` | H1 refinement | captures + token ids | **done** — inverted U in both regimes, temporal at a constant 0.72–0.77× the baseline in every stratum; the shortcut is not a rare-token phenomenon |
 | C10 | Cross-layer probe transfer | H1 refinement | existing captures | **done** — as subspace overlap, since the literal form is ill-posed; 3–4× chance adjacent, 2.1–2.3× across the full stack |
 

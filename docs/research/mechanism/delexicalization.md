@@ -6,7 +6,7 @@ Rolling residency restricts each token to the currently resident expert set, rem
 freedom, yet at 1e18 FLOPs the temporally constrained model achieves *lower* validation loss
 than the unconstrained MoE baseline of identical architecture, data, and compute, at both
 granularities (test CE — coarse: 3.9094 vs 3.9184, fine: 3.9768 vs 4.0087, both far below the dense
-floor of 4.137, with a 1e19 replication in progress). A constraint that improves generalization
+floor of 4.137, with the 1e19 replication complete (`t19_1e19_curves.csv`)). A constraint that improves generalization
 must be suppressing a harmful behavior, and this section identifies it.
 
 We analyze the softmax-aux baseline and the temporal model at the two budgets where full
@@ -141,7 +141,7 @@ equally explains why temporal routing demand is far more forecastable from histo
 0.64 in our demand prediction analysis): context persists across neighboring tokens, token
 identity does not.
 
-## 4. The output lens agrees
+## 4. The output lens does *not* agree (heading corrected; see the retraction at the end of this section)
 
 The two analyses above examine what makes an expert fire. As an independent check we examine
 what an expert *writes*. For each expert, average its output vectors over the tokens actually
@@ -182,8 +182,11 @@ depth-dependent, so the gap is the only readable quantity:
 distinguishable from no signal", containing "no word-list experts even in their extreme tail". At 1e18
 the temporal experts write *sharper* vocabulary distributions than the unconstrained ones at 6 of 8
 layers in the coarse pair, most starkly at layer 7 (median effective vocabulary **720** words against
-the baseline's 7,640, a gap of −24.8k against −15.5k). The fine pair shows the same crossover from
-layer 5 on.
+the baseline's 7,640, a gap of −24.8k against −15.5k). **The fine pair does not replicate this.**
+At layers 5 and 8 the unconstrained arm is the sharper one (L5 −5.7k unconstrained vs −4.3k temporal;
+L8 −1.1k vs −0.5k), so the crossover claimed here does not hold at the fine granularity — the
+defensible statement is "does not replicate". (Correction identified in `LAYER_LEXICALITY_ROUND2.md`
+§N9 and previously not applied here.)
 
 Two caveats bound this. The published cell is 192 experts at 1e16 and these are 1e18, so this is a new
 measurement at a different budget rather than a direct contradiction of the same cell; and the
@@ -219,6 +222,8 @@ rolling residency on an unconstrained checkpoint), with each pair's native evalu
 | temporal, 192E at 1e16 | 1.4750 (masked) | 1.5744 (unmasked) | +0.10 |
 | temporal, 64E at 1e17 | 1.2821 (masked) | 1.4063 (unmasked) | +0.12 |
 | temporal, 1e18 (the winning case) | 3.9037 (masked) | 4.3890 (unmasked) | +0.49 |
+
+*Metric note: this table reports **validation** CE, from `unmask_eval.csv`. Elsewhere this document and `LAYER_LEXICALITY.md` quote **test** CE for the same model (native 3.909461, `swap_sweep.csv`). The two are different metrics on the same model, not conflicting measurements of one — do not compare across the two without converting.*
 | unconstrained control (sigmoid, 192E at 1e16) | 1.4499 | 1.6902 (imposed) | +0.24 |
 | baseline (64E at 1e17) | 1.2690 | 1.8789 (imposed) | +0.61 |
 

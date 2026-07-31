@@ -11,7 +11,7 @@ it needed artifacts fetched from Hugging Face. **That was wrong.** Every checkpo
 corpus shard in `results/MANIFEST.csv` is already on this machine, under a sibling checkout:
 
 ```
-/workspace/FLAME-MoE/results/phase0/runs/     201 GB — all 72 runs, 69 with checkpoints (178 .distcp),
+/workspace/FLAME-MoE/results/phase0/runs/     237 GB — all 72 runs, 69 with checkpoints (188 .distcp),
                                              22 router_log.pt, 3 delex_capture.pt, 9 act_log.pt
 /workspace/FLAME-MoE/data/dclm_tokenized/      23 GB — 50k-vocab corpus (1e18, 1e19)
 /workspace/FLAME-MoE/data/tok16k_full/         13 GB — 16k-vocab corpus (1e16, 1e17), complete
