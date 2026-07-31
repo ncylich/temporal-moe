@@ -397,6 +397,27 @@ Point estimates were always right, being deterministic, which is exactly why onl
 **This resolves the "verified but unresolved" item recorded in the previous entry:** the cause was not
 `delex_locus.py`'s seeding, it was this script.
 
+**Re-audit of the fix itself (fresh-context, artifacts only).** The repaired bootstrap was verified
+empirically rather than by reading: CI coverage **0.947** against nominal 0.95 over 1000 trials,
+interval widths matching an independently-seeded reference at **ratio 1.0000**, draw autocorrelation
+−0.044, and no implausible rows in the committed CSV. Hash-seeding introduces no spurious correlation —
+arrays differing by 1e-9 receive completely different seeds. **The statistics are sound.**
+
+**Class B closed.** An auditor enumerated every CSV writer in the repo: **9 at-risk, 24 safe.** All nine
+shared one pattern — a run list from argv filtering the registry, then `open(OUT, "w")` with no read,
+no merge, no comparison. `analysis/probes/safe_csv.py` now guards all nine. §3i had recorded this trap
+in one script; it was in nine.
+
+**New, unfixed — the guard freezes staleness.** Protecting a file from loss and protecting it from
+staleness are opposing requirements, and only the first was built. Five 1e16/1e17 series come from
+`mechinterp_locus.csv`, which has no `split` column, so their position and sequence arrays are
+byte-identical and determinism requires their CIs to match. They do not: committed position rows read
+`[0.0516, 0.1334]` where current code produces `[0.0534, 0.1354]`. The guard aborts `--split position`
+before writing, so those rows can never refresh, and `--replace` would drop the seven series that
+legitimately have no position data. **The right fix is merging per series rather than per split.** Not
+done. Scope: position-split rows of five series only; every sequence row is current and verified
+byte-identical to what the code produces.
+
 **Standing rules added from this round:**
 - **A run that emits warnings is not a clean run.** Both defects announced themselves — the row-count
   line said 9 where the file held 24. They were emitted and not read. Act on a warning or record why
