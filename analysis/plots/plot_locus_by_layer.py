@@ -158,6 +158,27 @@ def boot_stat(g, xs_by_layer, stat, n=BOOT):
     return point, float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 
 
+
+def _vertex_ci(vx, depth):
+    """Report the vertex interval only when it locates the vertex inside the model.
+
+    A quadratic fitted to a nearly straight per-layer profile fits well and still says nothing about
+    where its vertex is: `s0_FULL` has quadratic_r2 = 1.00 and a vertex interval of +-25 layers on a
+    4-layer model, and one 14-layer run spans 550 layers. So goodness of fit is the wrong gate --
+    r2 measures whether a parabola describes the points, not whether the data pin down its turning
+    point.
+
+    The gate used instead is identifiability: if the interval is wider than the stack it is supposed
+    to locate a layer within, it excludes nothing and is not reported. The point estimate is kept,
+    being a deterministic property of the fit, and `vertex_identified` records the verdict so a reader
+    sees a blank was deliberate rather than missing.
+    """
+    lo, hi = vx[1], vx[2]
+    if not (np.isfinite(lo) and np.isfinite(hi)) or (hi - lo) > depth:
+        return "", "", 0
+    return round(lo, 2), round(hi, 2), 1
+
+
 def _r2(p, x, y):
     resid = ((y - np.polyval(p, x)) ** 2).sum()
     tot = ((y - y.mean()) ** 2).sum()
@@ -239,7 +260,7 @@ for fname, label, variant, color, budget, legend, ls in SERIES:
                        round(s_ix[0], 5), round(s_ix[1], 5), round(s_ix[2], 5),
                        round(lin_r2, 3), round(quad_r2, 3),
                        round(cu[0], 4), round(cu[1], 4), round(cu[2], 4),
-                       round(vx[0], 2), round(vx[1], 2), round(vx[2], 2),
+                       round(vx[0], 2), *_vertex_ci(vx, depth),
                        round(rs[0], 4), round(rs[1], 4), round(rs[2], 4),
                        round(med[0], 4), round(med[-1], 4)])
     counts.append(f"{label}: n={min(len(v) for v in g.values())}-{max(len(v) for v in g.values())}"
@@ -290,6 +311,24 @@ else:
     out = os.path.join(OUT, "locus_by_layer.png")
 
 os.makedirs(OUT, exist_ok=True)
+
+# A regenerated, committed artifact may not silently narrow -- and that applies to the figure, not
+# only to the CSV beside it. The slopes CSV is merged per series so a run missing some inputs cannot
+# shrink it; the PNG is rewritten wholesale by whichever split ran last, so the documented
+# `--split position` invocation replaced a 12-series figure with a 5-series one (384909 -> 252674
+# bytes) while exiting 0, leaving a caption describing curves the image no longer contained.
+#
+# `missing` already lists every series that could not be plotted this run, so the check is just:
+# refuse to overwrite a committed figure with a partial one.
+if missing and "--replace" not in sys.argv and os.path.exists(out):
+    sys.exit(
+        f"[abort] refusing to overwrite {os.path.basename(out)} with a partial figure: "
+        f"{len(SERIES) - len(missing)} of {len(SERIES)} series plotted.\n"
+        + "".join(f"         omitted: {m}\n" for m in missing)
+        + f"         The committed figure has all {len(SERIES)}. This usually means the requested "
+          f"split\n         lacks rows for those series -- check the locus driver ran with "
+          f"--both-splits.\n         Pass --replace if a narrower figure is intended.")
+
 fig.savefig(out, dpi=190, bbox_inches="tight")
 print("wrote", out)
 for c in counts:
@@ -303,7 +342,7 @@ HEADER = ["label", "run", "budget", "regime", "variant", "window", "split", "dep
           "slope_per_layer", "slope_ix_lo95", "slope_ix_hi95",
           "linear_r2", "quadratic_r2",
           "curvature", "curvature_lo95", "curvature_hi95",
-          "vertex_layer", "vertex_lo95", "vertex_hi95",
+          "vertex_layer", "vertex_lo95", "vertex_hi95", "vertex_identified",
           "rising_slope", "rising_lo95", "rising_hi95",
           "median_at_first_layer", "median_at_last_layer"]
 sp = os.path.join(DATA, "mechinterp_locus_slopes.csv")
