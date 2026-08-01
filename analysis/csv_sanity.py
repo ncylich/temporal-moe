@@ -99,7 +99,10 @@ def check(path):
         # Some files carry '#' provenance lines above the header. DictReader would take the first of
         # them as the header, turning prose fragments into column names -- which is exactly how this
         # linter reported '8 packs' and 'D=3.1089.' as empty columns.
-        lines = [ln for ln in f if not ln.lstrip().startswith("#")]
+        # Provenance comments appear both bare and quoted -- '# note' and '"# note'. Skipping only
+        # the bare form left the quoted one to be read as the header, which then made every real row
+        # look like it had extra fields. That produced three spurious SHIFTED reports.
+        lines = [ln for ln in f if not ln.lstrip().lstrip('"').startswith("#")]
     rows = list(csv.DictReader(lines))
     out = []
     if not rows:
@@ -110,10 +113,23 @@ def check(path):
     # Field count must match the header. An unquoted separator inside a value silently shifts every
     # column after it -- DictReader then reads one field as another, e.g. a schedule fragment '3:18'
     # parsed as a loss. This linter passed a file with two such rows, so the check was missing.
-    ragged = sum(1 for r in rows if None in r or any(v is None for v in r.values()))
-    if ragged:
-        out.append(f"{rel}: RAGGED ROWS {ragged}/{len(rows)} have a field count differing from the "
-                   f"header — an unquoted separator inside a value shifts every later column")
+    # Distinguish two very different things that both make a row's field count differ:
+    #
+    #   too MANY fields  an unquoted separator inside a value. Every column after it shifts, so a
+    #                    reader silently gets the wrong data -- this is the real defect, and it is how
+    #                    A5's test_CE came to be read as the string '3:18'.
+    #   too FEW fields   a trailing value simply absent. Nothing shifts; the reader gets None for the
+    #                    missing tail. Some files hold heterogeneous row types by design --
+    #                    stability_trunk.csv writes resid_absmean only on residual rows, per its
+    #                    writer's docstring -- so this is reported separately and only as a note.
+    over = sum(1 for r in rows if None in r)                       # DictReader restkey => extra fields
+    under = sum(1 for r in rows if any(v is None for v in r.values()))
+    if over:
+        out.append(f"{rel}: SHIFTED ROWS {over}/{len(rows)} have MORE fields than the header — an "
+                   f"unquoted separator inside a value shifts every later column")
+    if under:
+        out.append(f"{rel}: SHORT ROWS {under}/{len(rows)} omit trailing field(s) — no column shift; "
+                   f"check whether the file holds more than one row type by design")
 
     # degenerate intervals: lo == hi on any row
     for lo in [c for c in cols if c.endswith("_lo95")]:
