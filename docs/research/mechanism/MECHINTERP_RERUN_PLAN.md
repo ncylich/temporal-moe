@@ -29,7 +29,7 @@ findings they produced are in §7.
 | cross-layer probe transfer (C10) | `mechinterp_transfer.csv` | layer pairs | — | **26** | 1474 |
 | per-layer constraint swap (C3) | `swap_sweep.csv` | yes | 2–14 | **8** | 106 |
 | constraint cost shape (C3 decomposition) | `swap_shape.csv` | summary | — | **7** | 18 |
-| magnitude-matched sham (N1) | `sham_magnitude_matched.csv` | yes | 2–9 | **1** | 16 |
+| magnitude-matched sham (N1) | `sham_magnitude_matched.csv` | yes | 2–9 | **2** | 24 |
 | causal token/context substitution (C8) | `mechinterp_causal.csv` | yes | 2–14 | **6** | 58 |
 | null battery (which null is valid) | `mechinterp_null_battery.csv` | one layer | 2–2 | **26** | 546 |
 | output logit lens (effective vocab) | `mechinterp_lens.csv`, `mechinterp_lens_1e19.csv` | yes | 2–14 | **32** | 66432 |
