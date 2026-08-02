@@ -517,12 +517,60 @@ BPB across seeds of the same config:
 **s2/1e17 — the testbed originally proposed — is the worst of the three and is underpowered at
 n=1.** Revised plan:
 
-**T1 (optional) — single-layer sweep at s0/1e16. 3 runs, cheapest available, first real H2
-evidence.**
-Constrain exactly one MoE layer at a time (R = k there, R = E elsewhere); the two reference
-endpoints (all-constrained 1.4750, none-constrained 1.4519) already exist. Only 3 MoE layers, so
-the depth resolution is coarse — but at SNR ~7 per layer it cleanly answers *"is the per-layer cost
-curve flat or sloped?"*, which is the binary H2 turns on.
+### T1 — **DONE. All three pre-registered readings resolve negative.**
+
+24 cells at s0/1e16: 8 arms × 3 seeds (1234, 2, 3). MoE layers are 2–4; layer 1 is dense. E = 192,
+k = 18. Data: [`t1_perlayer_training.csv`](../../../results/ablations/t1_perlayer_training.csv);
+producer [`scripts/phase0/t1_sweep.sh`](../../../scripts/phase0/t1_sweep.sh).
+
+| arm | constrained | mean CE | sd |
+|---|---|---|---|
+| A0 | none | 4.018156 | 0.0128 |
+| A3 | L3 | 4.020772 | 0.0078 |
+| A4 | L4 | 4.033476 | 0.0049 |
+| A2 | L2 | 4.034894 | 0.0108 |
+| A6 | {3,4} | 4.047541 | 0.0044 |
+| A5 | {2,3} | 4.049193 | 0.0036 |
+| A7 | uniform R=76 | 4.057184 | 0.0204 |
+| A1 | {2,3,4} | 4.060062 | 0.0047 |
+
+| contrast | Δ CE | se |
+|---|---|---|
+| **all-constrained vs none** | **+0.0419** | **5.3** |
+| L4 only | +0.0153 | 1.9 |
+| L2 only | +0.0167 | 1.7 |
+| exempt-last vs uniform (A5 vs A7) | −0.0080 | 0.7 |
+| exempt-last vs exempt-first (A5 vs A6) | +0.0017 | 0.5 |
+| L3 only | +0.0026 | 0.3 |
+| **L2 vs L4 — the endpoint spike** | **+0.0014** | **0.2** |
+
+**One result survives: constraining all three MoE layers costs +0.0419 CE (5.3 se)** — which the
+published dose curve already established. Nothing else clears 2 se.
+
+Against the pre-registered readings:
+
+1. **No endpoint spike under co-adaptation** (A2 vs A4, 0.2 se). The 1.40–1.90× ends/interior ratios
+   from perturbing trained checkpoints, and the +1.304 nats on the non-temporal control, do not appear
+   once the model trains under the constraint.
+2. **No last-layer effect.**
+3. **No advantage to a position-justified schedule** over uniform R at matched resident memory
+   (0.7 se), nor between exempting the first layer and the last (0.5 se).
+
+**Two claims made at one seed are withdrawn:**
+
+- *A3's interior improvement.* It read −0.0120 CE at seed 1234 and was reported as the interior
+  constraint making the model better. Across three seeds it **changed sign** to +0.0026 and is null
+  (0.3 se). Its trajectory was −0.0120 → −0.0029 → +0.0026: an estimate wandering across zero, which is
+  what a null does when read early.
+- *Non-additivity.* Single-layer costs sum to 0.0346 against a joint cost of 0.0419, a gap of 0.0073
+  that is inside noise. This was reported as "9 seed sd" at n=1 under a noise model taken from a
+  different cell.
+
+**Why this matters beyond H2.** Four headline claims were made from one seed per arm; three died on
+replication and one reversed sign. The noise estimate itself moved four times, each time because it
+was taken from arms other than the one under test — arm-level sds here span 0.0036 to 0.0204, so no
+single pooled figure describes them. Measured cost: ~65 min/run, ~26 h for the design, against the
+~10 min/run this plan assumed. **The case for born-replicated designs is made by our own data.**
 
 **T2 (optional) — shallow-half versus deep-half contrast at 1e18. 2 arms x 3 seeds = 6 runs.** Constrain
 layers 2–5 with 6–9 free, versus 2–5 free with 6–9 constrained: matched layer count, matched

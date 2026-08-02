@@ -19,9 +19,17 @@ monotone, and this document originally argued the U decomposes into an **endpoin
 - **H1 is supported causally**, not merely by probe: C8 / N6 shows the token-versus-context
   sensitivity ratio on opposite sides of 1 in the two regimes at every layer.
 
-The practical consequence: there is no lexicality-justified layer schedule. Any per-layer policy
-should be justified by architectural position — exempt the last MoE layer — and not by where routing
-is most lexical.
+**T1 has since closed this, and it closes it further than the above implies.** 24 cells at s0/1e16
+(8 arms × 3 seeds) show the endpoint effect does **not** survive co-adaptation: L2 vs L4 is +0.0014 CE
+at 0.2 se, and exempting the last layer beats neither a uniform schedule at matched memory (0.7 se)
+nor exempting the first (0.5 se). The only surviving result is that constraining all three MoE layers
+costs +0.0419 CE (5.3 se), which the dose curve already gave. See `LAYER_LEXICALITY.md` §5.
+
+The practical consequence: **there is no layer schedule to justify, on any basis.** Not by lexicality —
+H2a is falsified. Not by architectural position — the endpoint effect is 58–85% reproducible by a
+lexicality-free sham at inference, and absent entirely under training. A per-layer cost profile
+measured by perturbing a trained checkpoint does not predict what a model trained under the constraint
+will do.
 
 Everything below reproduces from committed CSVs. The decomposition is
 [`analysis/probes/swap_shape.py`](../../../analysis/probes/swap_shape.py) ->
