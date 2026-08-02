@@ -168,9 +168,21 @@ budget. See `LAYER_LEXICALITY.md` §3 and §5.
 
 ## 3. Not done, and why
 
-Kept separate from §2 because none of this needs training. It is work that was identified, scoped and
-deliberately not finished, recorded so the next person does not rediscover it or assume it was
-overlooked.
+**Nothing outstanding needs a GPU.** Every measurement the program set out to make has been made. What
+remains is four tooling items and one training gap that is not worth the compute:
+
+| item | kind | why it is open |
+|---|---|---|
+| 3b eval volume | speed | two cuts free, one changes the number; applying the third breaks comparability with ~80 measured arms |
+| 3c pool for lens/structural/demand | speed | proven pattern, produces no new numbers, no re-run scheduled |
+| 3e `input_ids` in the capture writer | robustness | would make 1f GPU-free; existing 30 captures lack the field so it only helps future ones |
+| 3i / 3j / 3k / 3l | — | closed |
+| **P3 coarse 1e17 pair** | data | the only permanently-missing *cell type* — every 1e16/1e17 checkpoint is grain 3, so no coarse 6/64 cell survives at either budget. ~8–13 h. Nothing currently depends on it. |
+
+**On P3:** it is the one thing here that a GPU could still buy, and it buys a cell for completeness
+rather than for any open question. Given T1's outcome — that per-layer and per-schedule structure does
+not survive replication — filling a missing granularity cell at a low budget is unlikely to change any
+conclusion. Worth doing only if the write-up needs the isoFLOP panel complete.
 
 **Current state:** 3a, 3f, 3g and 3i are **resolved** and kept for the record of what was wrong and
 how it was found. 3d is **not a bug** — it is recorded because it was wrongly escalated into one.
