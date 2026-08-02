@@ -10,10 +10,9 @@ committed CSV, not from the transcript, so every number below is reproducible fr
 |---|---|
 | Phase-0 isoflop sweeps, dense floor, temporal MoE, fine-graining at G1/G3 | [`results/ablations/FINDINGS.md`](../../results/ablations/FINDINGS.md) |
 | OLMoE residency adaptation, Stage 2 LR sweep and the eight-arm bake-off | [`results/ablations/olmoe_adapt_RESULTS.md`](../../results/ablations/olmoe_adapt_RESULTS.md) |
-| De-lexicalization battery at 1e19 | [`mechanism/delexicalization.md`](mechanism/delexicalization.md) |
-| Layer-wise lexicality: locus and cache-hit depth curves, hypotheses, test plan | [`mechanism/LAYER_LEXICALITY.md`](mechanism/LAYER_LEXICALITY.md) |
-| Mechinterp battery re-run: coverage audit and per-layer housekeeping plan | [`mechanism/MECHINTERP_RERUN_PLAN.md`](mechanism/MECHINTERP_RERUN_PLAN.md) |
-| Layer lexicality round 2: the per-layer cost profile decomposed, and the next round | [`mechanism/LAYER_LEXICALITY_ROUND2.md`](mechanism/LAYER_LEXICALITY_ROUND2.md) |
+| De-lexicalization, narrative write-up (see the corrections doc first) | [`mechanism/delexicalization.md`](mechanism/delexicalization.md) |
+| What rolling residency does to routing — findings, by claim | [`mechanism/01-findings.md`](mechanism/01-findings.md) |
+| Corrections to the published de-lexicalization write-up | [`mechanism/02-corrections.md`](mechanism/02-corrections.md) |
 | Selection-shaping program: anticipatory loss, bursty loss, Karen, momentum variants | [`ablations/alignment-program.md`](ablations/alignment-program.md) |
 | MinFlow / O-series offline scheduling, and the calibration and init-axis screens (Cal-0, Cal-2) | [`olmoe-adaptation-plan.md`](olmoe-adaptation-plan.md) close-out, and the `olmoe_minflow_*` / `olmoe_cal*` rows of [`results/ablations/README.md`](../../results/ablations/README.md) |
 | Block-local routing, serving floor | [`ablations/local-global-program.md`](ablations/local-global-program.md), [`background/batch1-offload-feasibility.md`](background/batch1-offload-feasibility.md) |
