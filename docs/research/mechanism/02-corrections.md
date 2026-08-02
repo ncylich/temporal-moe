@@ -11,7 +11,7 @@ one without the others would leave the rest.
 
 | published claim | status | now | cause |
 |---|---|---|---|
-| Output lens: constrained experts are "barely distinguishable from no signal", unconstrained ones promote narrow vocabularies | **retracted** | The output-side regime difference **does not replicate**. At 1e18 the constrained model writes *sharper* distributions at 6 of 8 layers in the coarse pair; the fine pair has no consistent direction | Defect A, plus §2 below |
+| Output lens: constrained experts are "barely distinguishable from no signal", unconstrained ones promote narrow vocabularies | **retracted** | The output-side regime difference **does not replicate**. At 1e18 the constrained model writes *sharper* distributions at 4 of 8 layers in the coarse pair on the data-weighted metric and 0 of 8 on the static one; the fine pair has no consistent direction either way | Defect A, plus §2 below |
 | "Input side, output side, and structure now agree" | **withdrawn** | Input side and structure agree. The output side does not participate | follows from the row above |
 | Selectivity and generalist fraction: 13% vs 54% generalists, stated as a uniform property | **corrected** | Pooling hid a regime change with depth. The two regimes are **indistinguishable through layer 4**; the unconstrained arm reaches 0% generalists only from layer 6 down | Defect B |
 | Locus table row labelled "baseline (192E, w=18)" | **corrected** | That cell was only ever measured at **w=32**. Its sigmoid sibling has w=k and sits ~0.02 lower, which brackets the missing measurement | Defect C |

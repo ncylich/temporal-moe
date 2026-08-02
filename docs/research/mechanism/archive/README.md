@@ -20,7 +20,7 @@ Two reasons a document lands here:
 | `probe-replay-e1-e8.md` | **Reason 1.** Same provenance failure — the five runs behind E1–E8 are absent everywhere | Same; the current replay numbers are in the `e1`–`e8` CSVs and `04-coverage.md` |
 | `delexicalization-original.md` | The paper-facing write-up as published, before corrections were applied | The corrected version is `../delexicalization.md`; the delta is `02-corrections.md` |
 
-**The notebook now lives at [`../05-notebook.md`](../05-notebook.md).** It is the process record and the
-reproduction gate depends on it — `analysis/todo_status.py` parses it and `scripts/reproduce.sh` runs
-that. Migrating it to `05-notebook.md` requires updating both, and is tracked as follow-on work rather
-than done here, because filing should not break a working gate.
+**The notebook now lives at [`../05-notebook.md`](../05-notebook.md)**, moved from `TODO.md` at the
+repository root. It is the process record and the reproduction gate depends on it —
+`analysis/todo_status.py` parses it and `scripts/reproduce.sh` runs that — so the move and the parser
+change landed in one commit, and the gate never saw a broken state.
