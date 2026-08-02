@@ -68,8 +68,11 @@ change in the selected expert set — above 1 means context dominates (`mechinte
 | 1e18, 18 of 192, layers 2–9 | 0.40 – 0.79 | 1.85 – 2.18 |
 | 1e19, 6 of 64, layers 2–14 | 0.28 – 0.79 | 1.25 – 1.71 |
 
-**Every unconstrained layer sits below 1 and every temporal layer above it**, in all three cells, with
-nothing approaching a crossing. The effect decomposes: token sensitivity falls ~42% while context
+**Every unconstrained layer sits below 1 and every temporal layer above it**, in all three cells —
+and the two populations do not merely straddle the threshold, they are *separated*. Aggregated over
+all 58 layer-measurements: unconstrained spans 0.280–0.794, temporal spans 1.248–2.177, so **the
+closest temporal measurement sits 0.453 above the highest unconstrained one**. There is no overlap
+across two budgets, two granularities and depths of 9 and 14. The effect decomposes: token sensitivity falls ~42% while context
 sensitivity rises ~35%, which no difference of probe AUCs could have separated.
 
 **Strength: high.** This is the claim that makes §1 a mechanism rather than an association.
