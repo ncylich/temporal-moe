@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the coverage table in MECHINTERP_RERUN_PLAN.md §1 from the CSVs it describes.
+"""Generate the coverage table in docs/research/mechanism/04-coverage.md from the CSVs it describes.
 
 That table is a hand-maintained copy of numbers that live in `results/ablations/*.csv`, and it has
 drifted twice: rows claimed a metric covered 2, 3 or 12 models while its CSV held 26, and a warning
@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import ABLATIONS
 
 DOC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   "docs", "research", "mechanism", "MECHINTERP_RERUN_PLAN.md")
+                   "docs", "research", "mechanism", "04-coverage.md")
 BEGIN, END = "<!-- COVERAGE:BEGIN -->", "<!-- COVERAGE:END -->"
 
 # (label, csv glob relative to ABLATIONS, per-layer?)
