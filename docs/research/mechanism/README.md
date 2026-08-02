@@ -11,7 +11,7 @@ Five documents, numbered in reading order. Start at 01 unless you know what you 
 | [`delexicalization.md`](delexicalization.md) | The narrative write-up | You want the argument in prose rather than as claims |
 
 The chronological record — every defect found, how, and whether the conclusion drawn from it survived
-— is `TODO.md` at the repository root. It is deliberately off this path: it is a lab notebook, not a
+— is [`05-notebook.md`](05-notebook.md). It is deliberately last on this path: it is a lab notebook, not a
 result, and it is long.
 
 [`archive/`](archive/) holds the superseded documents and the pre-correction write-up. Nothing there

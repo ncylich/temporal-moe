@@ -4,7 +4,7 @@
 writing, and each claim names the file it came from. Metric definitions, controls and the identifiers
 used by the analysis scripts are in [`03-methods.md`](03-methods.md); what changed against the
 published write-up is in [`02-corrections.md`](02-corrections.md); the chronological record of how
-this was found, including what turned out to be wrong, is in `TODO.md`.
+this was found, including what turned out to be wrong, is in [`05-notebook.md`](05-notebook.md).
 
 Nothing superseded is preserved here. Where an earlier document said something different, the
 difference is recorded in the corrections document or the archive, not in this one.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Check every non-retraining item of TODO.md against artifacts on disk, not against memory.
+"""Check every non-retraining item of the notebook (docs/research/mechanism/05-notebook.md)
+against artifacts on disk, not against memory.
 
 The point of this file is that "done" is a claim about the filesystem, and every failure this branch
 hit came from a claim that was checked too loosely: a zero-byte capture that passed an existence test,
@@ -110,7 +111,7 @@ def main():
         print(f"\n>>> ALL CHECKABLE ITEMS COMPLETE; {len(skipped)} skipped for want of the artifact "
               f"tree: {', '.join(skipped)}\n")
         return 0
-    print("\n>>> ALL NON-RETRAINING TODO.md ITEMS COMPLETE (1a-1i)\n")
+    print("\n>>> ALL NON-RETRAINING NOTEBOOK ITEMS COMPLETE (1a-1i)\n")
     return 0
 
 
