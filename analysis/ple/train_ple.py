@@ -56,6 +56,13 @@ ap.add_argument("--lora", type=int, default=0,
                 help="add per-expert LoRA of this rank to the trained surface, making the base CE "
                      "(router + norms + LoRA r32) instead of C. Default 0 = bare C surface, which "
                      "is what the rank ladder runs on so that rank is isolated.")
+ap.add_argument("--lora-attn", type=int, default=0,
+                help="add LoRA of this rank to the attention projections (q/k/v/o) on top of "
+                     "whatever --lora does to the experts. Attention is frozen in every published "
+                     "arm of this program, including F' the full-parameter finetune, so the "
+                     "'irreducible constraint price' was measured without it ever being asked to "
+                     "help. Residency restricts which experts a token may reach; attention decides "
+                     "what the token carries when it gets there.")
 ap.add_argument("--ple-start", type=int, default=0,
                 help="PHASE 3 (§7, sequential vs joint): withhold PLE updates until this many "
                      "tokens have been seen, so the run is router+norms alone and then router+"
@@ -128,6 +135,15 @@ if A.lora:
     for p in extra:
         p.requires_grad = True
 
+if A.lora_attn:
+    # Attention is frozen in every arm of this program, F' included, so the constraint price was
+    # established without testing whether attention can absorb any of it. Added last so the
+    # parameter order is a prefix-extension of a run without it, which is what lets a checkpoint
+    # from such a run be resumed into one with it.
+    extra = extra + RES.add_lora_attn(model, r=A.lora_attn, alpha=2 * A.lora_attn)
+    for p in extra:
+        p.requires_grad = True
+
 train_params = rp + extra
 masters = [p.detach().float().clone().requires_grad_(True) for p in train_params]
 opt = torch.optim.AdamW(masters, lr=A.lr, betas=(0.9, 0.95), weight_decay=0.0)
@@ -178,7 +194,7 @@ n_ple = ple_mod.n_params() if ple_mod else 0
 print(f"[ple] tag={A.tag} rank={RANK} lr={A.lr} "
       f"table_wd={'n/a (flag off)' if RANK == 'off' else A.table_wd} adam8bit={A.adam8bit} "
       f"trainable_C={sum(p.numel() for p in train_params)} "
-      f"(router={sum(p.numel() for p in rp)} extra={sum(p.numel() for p in extra)} lora_r={A.lora}) "
+      f"(router={sum(p.numel() for p in rp)} extra={sum(p.numel() for p in extra)} lora_r={A.lora} lora_attn={A.lora_attn}) "
       f"ple={n_ple} tokens={A.tokens} D={D:.7f}", flush=True)
 
 corpus = torch.load(f"{DATA_DIR}/finetune_ids.pt")
@@ -211,6 +227,25 @@ seen = step = pos = 0
 hist = []
 if A.resume_c:
     _ck = torch.load(A.resume_c, map_location="cuda")
+    # zip() stops at the shorter sequence, so a length mismatch here loads a prefix and says
+    # nothing. That is the RIGHT behaviour when this run adds a mechanism the checkpoint predates
+    # -- the new parameters stay at their zero init and start contributing from step 0 of the
+    # second leg -- and the WRONG behaviour if the recipes simply disagree. Both look identical
+    # without this, so state which it is.
+    if len(_ck["masters"]) != len(masters):
+        if len(_ck["masters"]) > len(masters):
+            sys.exit(f"[abort] {os.path.basename(A.resume_c)} holds {len(_ck['masters'])} tensors, "
+                     f"this run has {len(masters)}. The checkpoint was written by a LARGER recipe; "
+                     f"resuming would silently drop what it trained.")
+        print(f"[resume] checkpoint has {len(_ck['masters'])} tensors, this run has {len(masters)}: "
+              f"the {len(masters) - len(_ck['masters'])} added parameters stay at their zero init "
+              f"and begin training now. Verify this is a mechanism being ADDED, not a recipe "
+              f"mismatch.", flush=True)
+        for _i, (_a, _b) in enumerate(zip(masters, _ck["masters"])):
+            if tuple(_a.shape) != tuple(_b.shape):
+                sys.exit(f"[abort] tensor {_i} is {tuple(_a.shape)} here and {tuple(_b.shape)} in "
+                         f"the checkpoint; the shared prefix does not line up, so this is a recipe "
+                         f"mismatch rather than an extension.")
     with torch.no_grad():
         for _m, _s in zip(masters, _ck["masters"]):
             _m.data.copy_(_s.to("cuda"))
@@ -219,10 +254,18 @@ if A.resume_c:
     # A synthetic surface (one written by cal_stack.py from closed-form calibration rather than by
     # training) carries no optimizer state. Resuming those means starting Adam fresh, which is
     # correct: there is no moment history to continue.
-    if _ck.get("opt"):
-        opt.load_state_dict(_ck["opt"])
-    else:
+    if not _ck.get("opt"):
         print("[resume] checkpoint carries no optimizer state; starting Adam fresh", flush=True)
+    elif len(_ck["masters"]) != len(masters):
+        # AdamW's state_dict indexes its parameter group positionally, so it cannot be loaded into
+        # an optimizer holding a different number of tensors -- it raises rather than misaligning,
+        # which is the safe failure but still ends the run. Starting fresh loses the moment history
+        # for the shared prefix; that cost is stated rather than hidden.
+        print(f"[resume] optimizer state covers {len(_ck['masters'])} tensors but this run has "
+              f"{len(masters)}; starting Adam fresh. The shared parameters resume at their trained "
+              f"values but without their moment history.", flush=True)
+    else:
+        opt.load_state_dict(_ck["opt"])
     # `pos` is an index into `order`, which is rebuilt here from --data-seed. Resuming under a
     # different seed would carry the cursor into a different permutation: the run would silently
     # re-see packs the first leg already trained on and skip others, with nothing in the output
@@ -315,6 +358,7 @@ res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lor
        "ple_start": A.ple_start, "calib_init": A.calib_init, "free_layers": A.free_layers, "free_set": A.free_set,
        "calib_suffix": A.calib_suffix,
        "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed, "data_seed": A.data_seed,
+       "lora_attn": A.lora_attn,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
        "final_bpb": fb, "final_swap": fswap, "final_entropy": fent,
        "divisor": D, "divisor_source": "bpb_slice_meta.json (ln2 * bytes_per_token)",

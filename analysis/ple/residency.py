@@ -276,6 +276,47 @@ def add_lora(model, r=32, alpha=64):
     return ps
 
 
+def _lora_linear_hook(mod, inp, out):
+    """out + scale * (x A^T) B^T, added to whatever the wrapped Linear produced."""
+    x = inp[0]
+    return out + mod._lora_scale * F.linear(F.linear(x, mod._lora_A), mod._lora_B)
+
+
+def add_lora_attn(model, r=32, alpha=64, targets=("q_proj", "k_proj", "v_proj", "o_proj")):
+    """Attach LoRA to the attention projections and return the parameter list.
+
+    Everything the adaptation program has adapted so far lives in or after the router: router
+    linears, RMSNorm gains, and per-expert LoRA. Attention has been frozen in every arm including
+    F', the full-parameter finetune -- so "the constraint price is irreducible" was established
+    without ever asking whether attention can absorb any of it. Residency restricts which experts a
+    token may reach; attention decides what the token's representation contains when it gets there,
+    and that is a different lever.
+
+    Implemented as a forward hook rather than by swapping the Linear out, so the module tree, the
+    checkpoint key names and `norm_params`/`router_params` see exactly what they saw before. B is
+    zero-initialised, so the branch is an exact no-op at step 0 and flag-off parity is preserved by
+    construction, the same property the expert LoRA and the PLE table rely on.
+    """
+    ps = []
+    for m in model.modules():
+        if type(m).__name__ != "OlmoeAttention":
+            continue
+        for name in targets:
+            lin = getattr(m, name, None)
+            if lin is None:
+                continue
+            dev, dt = lin.weight.device, lin.weight.dtype
+            A = torch.zeros(r, lin.in_features, device=dev, dtype=dt)
+            torch.nn.init.normal_(A, std=1.0 / r)
+            lin._lora_A = torch.nn.Parameter(A)
+            lin._lora_B = torch.nn.Parameter(
+                torch.zeros(lin.out_features, r, device=dev, dtype=dt))
+            lin._lora_scale = alpha / r
+            lin.register_forward_hook(_lora_linear_hook)
+            ps += [lin._lora_A, lin._lora_B]
+    return ps
+
+
 def freeze_all_but_router(model):
     rp = set(id(p) for p in router_params(model))
     n_tr = 0
