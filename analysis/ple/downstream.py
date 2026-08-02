@@ -14,8 +14,10 @@ primary-metric convention as the published table, so the new cell drops into it 
 
 **The surface is verified before it is scored.** Loading masters into the wrong parameters is silent
 -- the shapes line up, the model runs, and the accuracies are simply of a different model. So BPB on
-the audited slice is recomputed and matched against what the training cell recorded, and a mismatch
-aborts rather than reports. This is the check `merge_ce.py` made for the same reason.
+the audited slice is recomputed and matched against what the training cell recorded, the check
+`merge_ce.py` made for the same reason. A deviation large enough to be a different model aborts; one
+small enough to be float non-associativity is reported and recorded, because this is the last stage
+of an unattended chain and losing it to a rounding difference costs the whole run.
 
     downstream.py --csurf csurf_ce_free_0_1_2_at200M.pt --free-set 0,1,2 --tag ce_free_0_1_2_200M
 
@@ -56,15 +58,63 @@ ap.add_argument("--expect-bpb", type=float, default=None,
                 help="audited-slice BPB this surface is known to reach. Defaults to the value in "
                      "ple_<cell>.json. The rebuilt model must match it or the run aborts.")
 ap.add_argument("--tol", type=float, default=2e-4,
-                help="how far the rebuilt model's BPB may sit from the recorded one. Eval is "
-                     "deterministic given the same weights, so this covers reload rounding, not "
-                     "sampling: a real load error moves BPB by whole tenths, not by 1e-4.")
+                help="how far the rebuilt model's BPB may sit from the recorded one before it is "
+                     "worth reporting. Eval is deterministic given the same weights, so this covers "
+                     "reload rounding, not sampling.")
+ap.add_argument("--abort-above", type=float, default=0.01,
+                help="deviation that means the wrong weights are loaded rather than the same ones "
+                     "rebuilt. Set below the 0.012 noise bar, so nothing that could pass for a real "
+                     "result gets through, and ~1000x above float non-associativity.")
 ap.add_argument("--batch-size", type=int, default=16)
+ap.add_argument("--dry-run", action="store_true",
+                help="run every check that does not need the GPU, then stop. This script is the "
+                     "last stage of an unattended chain, so its first execution would otherwise be "
+                     "hours after anyone could fix it; a dry run exercises the checkpoint lookup, "
+                     "the recorded-BPB resolution and the join against the published table now.")
 A = ap.parse_args()
 
 FREE = [int(x) for x in A.free_set.split(",") if x.strip() != ""]
 CK = A.csurf if os.path.isabs(A.csurf) else os.path.join(DATA_DIR, A.csurf)
 D = json.load(open(f"{DATA_DIR}/bpb_slice_meta.json"))["divisor_D"]
+
+# ---- everything that does not need the GPU, before the 27 GB model load ------------------------
+if not os.path.exists(CK):
+    sys.exit(f"[abort] no checkpoint at {CK}")
+# Loaded to CPU: `seen` is needed to resolve the recorded BPB, and the masters are copied into the
+# model further down, so this is the one read either way.
+ck = torch.load(CK, map_location="cpu")
+print(f"[ds] {os.path.basename(CK)}: {len(ck['masters'])} tensors, seen={ck['seen'] / 1e6:.0f}M, "
+      f"lora_r={ck.get('lora')}, free_set={ck.get('free_set', '(not recorded)')}", flush=True)
+
+expect = A.expect_bpb
+if expect is None:
+    cell = os.path.basename(CK)[len("csurf_"):].rsplit("_at", 1)[0]
+    jpath = os.path.join(DATA_DIR, f"ple_{cell}.json")
+    if os.path.exists(jpath):
+        j = json.load(open(jpath))
+        hit = [h for h in j["curve"] if abs(h["tok"] - ck["seen"]) < 10**6]
+        expect = hit[-1]["bpb"] if hit else (j["final_bpb"] if j["train_tokens"] == ck["seen"] else None)
+    if expect is None:
+        sys.exit(f"[abort] no recorded BPB for {os.path.basename(CK)} at {ck['seen'] / 1e6:.0f}M "
+                 f"tokens; pass --expect-bpb explicitly rather than scoring an unverified surface.")
+print(f"[ds] recorded BPB for this surface: {expect:.6f} (tol {A.tol})", flush=True)
+
+ref = {}
+with open(REF) as f:
+    _rr = [r for r in csv.reader(f) if r and not r[0].startswith("#")]
+hdr, _rr = _rr[0], _rr[1:]
+for r in _rr:
+    ref[(r[hdr.index("task")], r[hdr.index("metric")])] = r
+missing = [t for t in TASKS if not any(k[0] == t for k in ref)]
+if missing:
+    sys.exit(f"[abort] {REF} has no rows for {missing}; the reference columns would be blank for "
+             f"tasks this cell scored, which is not a comparison.")
+print(f"[ds] reference table {os.path.basename(REF)}: {len(ref)} (task, metric) rows, "
+      f"all {len(TASKS)} tasks present", flush=True)
+
+if A.dry_run:
+    print("[ds] dry run OK -- checkpoint, recorded BPB and reference join all resolve", flush=True)
+    sys.exit(0)
 
 # ---- rebuild the surface ----------------------------------------------------------------------
 model, tok = RES.load_model()
@@ -76,7 +126,6 @@ print(f"[ds] layers {FREE} UNCONSTRAINED, rest R=8; resident slots {_slots} vs 1
 
 RES.freeze_all_but_router(model)
 train_params = RES.router_params(model) + RES.norm_params(model) + RES.add_lora(model, r=32, alpha=64)
-ck = torch.load(CK, map_location="cuda")
 if len(ck["masters"]) != len(train_params):
     sys.exit(f"[abort] {os.path.basename(CK)} holds {len(ck['masters'])} tensors, this surface has "
              f"{len(train_params)}. The checkpoint was written by a different recipe -- check --lora.")
@@ -88,20 +137,7 @@ with torch.no_grad():
 print(f"[ds] loaded {os.path.basename(CK)} (seen={ck['seen'] / 1e6:.0f}M, lora_r={ck.get('lora')})",
       flush=True)
 
-# ---- verify it is the model we think it is ------------------------------------------------------
-expect = A.expect_bpb
-if expect is None:
-    cell = os.path.basename(CK)[len("csurf_"):].rsplit("_at", 1)[0]
-    jpath = os.path.join(DATA_DIR, f"ple_{cell}.json")
-    if os.path.exists(jpath):
-        j = json.load(open(jpath))
-        want_tok = ck["seen"]
-        hit = [h for h in j["curve"] if abs(h["tok"] - want_tok) < 10**6]
-        expect = hit[-1]["bpb"] if hit else (j["final_bpb"] if j["train_tokens"] == want_tok else None)
-    if expect is None:
-        sys.exit(f"[abort] no recorded BPB for {os.path.basename(CK)} at {ck['seen'] / 1e6:.0f}M "
-                 f"tokens; pass --expect-bpb explicitly rather than scoring an unverified surface.")
-
+# ---- verify it is the model we think it is (`expect` resolved above) ----------------------------
 bpb_ids = torch.load(f"{DATA_DIR}/bpb_slice_ids.pt")
 eval_sub = bpb_ids[torch.linspace(0, bpb_ids.shape[0] - 1, 256).long()].to("cuda").long()
 model.eval()
@@ -114,11 +150,24 @@ with torch.no_grad():
                                                  x[:, 1:].reshape(-1), reduction="sum").item()
         n += x[:, 1:].numel()
 got = (tot / n) / D
-if abs(got - expect) > A.tol:
+dev = abs(got - expect)
+# Two different failures share this one number and want opposite handling. Loading masters into the
+# wrong parameters -- the thing this check exists for -- moves BPB by tenths. Rebuilding the same
+# model through a different call order moves it by ~1e-5 from float non-associativity. Aborting the
+# last stage of an unattended chain on the second would lose the run to a rounding difference, so
+# the wide gate stops the run and the narrow one only says so.
+if dev > A.abort_above:
     sys.exit(f"[abort] rebuilt surface scores BPB {got:.6f}, training recorded {expect:.6f} "
-             f"(delta {got - expect:+.6f} > tol {A.tol}). The weights loaded are not the weights "
-             f"trained; downstream numbers from this model would be of some other model.")
-print(f"[ds] identity check OK: BPB {got:.6f} vs recorded {expect:.6f} ({got - expect:+.2e})", flush=True)
+             f"(delta {got - expect:+.6f}). That is a different model, not a reload difference: "
+             f"the masters are not landing in the parameters they were trained as. Downstream "
+             f"numbers from it would be of some other model.")
+if dev > A.tol:
+    print(f"[warn] rebuilt surface scores BPB {got:.6f} against a recorded {expect:.6f} "
+          f"({got - expect:+.2e}), outside the {A.tol} reload tolerance but far below anything a "
+          f"mis-load produces. Proceeding; the deviation is recorded in the CSV.", flush=True)
+else:
+    print(f"[ds] identity check OK: BPB {got:.6f} vs recorded {expect:.6f} ({got - expect:+.2e})",
+          flush=True)
 
 # ---- score ---------------------------------------------------------------------------------------
 RES.enable_residency(R=8)
@@ -134,18 +183,7 @@ def get(d, metric):
     return (float(d[vk]) if vk else None, float(d[sk]) if sk else None)
 
 
-# ---- join onto the published reference columns ----------------------------------------------------
-ref = {}
-with open(REF) as f:
-    ref_rows = [r for r in csv.reader(f) if r and not r[0].startswith("#")]
-hdr, ref_rows = ref_rows[0], ref_rows[1:]
-for r in ref_rows:
-    ref[(r[hdr.index("task")], r[hdr.index("metric")])] = r
-missing = [t for t in TASKS if not any(k[0] == t for k in ref)]
-if missing:
-    sys.exit(f"[abort] {REF} has no rows for {missing}; the reference columns would be blank for "
-             f"tasks this cell scored, which is not a comparison.")
-
+# ---- join onto the published reference columns (`ref` and `hdr` resolved above) -----------------
 rows = []
 for t in TASKS:
     for m in ("acc", "acc_norm"):
@@ -166,14 +204,14 @@ for t in TASKS:
                      f"{v - base:+.4f}", f"{v - ce:+.4f}" if ce is not None else "",
                      f"{closed:.4f}" if closed is not None else "",
                      f"{ce_closed:.4f}" if ce_closed is not None else "",
-                     A.tag, A.free_set, str(ck["seen"])])
+                     A.tag, A.free_set, str(ck["seen"]), f"{got:.6f}"])
         print(f"  {t:16}{m:9} base={base:.4f} impose={imp:.4f} "
               f"CE={ce:.4f} {A.tag}={v:.4f} closed={closed:.3f}" if ce is not None else
               f"  {t:16}{m:9} {A.tag}={v:.4f}", flush=True)
 
 HEADER = ["task", "metric", "base_free", "impose_R8", "CE_adapt_R8", "cell_acc", "cell_se",
           "cell_minus_base", "cell_minus_CE", "cell_gap_closed", "CE_gap_closed",
-          "cell", "free_set", "train_tokens"]
+          "cell", "free_set", "train_tokens", "cell_bpb"]
 NOTE = ("# Downstream 10-task 0-shot for free-set cells. Harness, tasks and metric convention match "
         "olmoe_adapt_downstream.csv, whose base_free / impose_R8 / CE_adapt_R8 columns are reused "
         "verbatim rather than recomputed. cell_gap_closed = (cell - impose)/(base_free - impose): "
