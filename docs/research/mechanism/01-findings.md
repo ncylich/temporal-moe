@@ -42,12 +42,18 @@ Across **34 model arms (16 unconstrained, 18 temporal) at four compute budgets a
 
 | regime | arms | token AUC | context AUC | experts where context wins |
 |---|---|---|---|---|
-| unconstrained | 14 | **0.843 – 0.943** | 0.594 – 0.679 | **0 – 3%** |
-| temporal | 20 | **0.553 – 0.659** | 0.633 – 0.769 | **85 – 97%** |
+| unconstrained | 16 | **0.842 – 0.943** | 0.594 – 0.679 | **0 – 3%** |
+| temporal | 18 | **0.553 – 0.659** | 0.633 – 0.769 | **85 – 97%** |
 
-**The three statistics do not overlap between regimes on a single arm.** Not at 1e16, 1e17, 1e18 or
-1e19; not at granularities from 6-of-64 to 18-of-192; not on any router recipe tried, including
-sigmoid and aux-free controls.
+**Two of the three statistics separate the regimes completely, with no arm overlapping the other
+regime's range.** Token AUC leaves a gap of 0.183 between the lowest unconstrained arm and the highest
+temporal one; the share of experts better predicted by context leaves a gap of 82 points. Neither
+overlaps at any budget, granularity or router recipe, including the sigmoid and aux-free controls.
+
+**Context AUC alone does overlap**, across 0.633–0.679 — four temporal arms sit below the highest
+unconstrained one. That is expected rather than awkward: the context probe finds real signal in both
+regimes, so its *level* was never the discriminator. What separates the regimes is which feature wins
+the comparison, which is why the token probe and the per-expert contrast are the statistics to quote.
 
 **Strength: high.** The largest, most replicated result in the program. Its main untested exposure is
 that each cell is one training seed — see §5.
