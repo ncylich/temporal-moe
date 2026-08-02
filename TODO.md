@@ -400,6 +400,39 @@ analyses it reads checkpoints, so it needs the import path `experiments/run.sh` 
 directly — as the P4 batch did — cannot work. Either give it the same path bootstrap the other entry
 points use, or document that it must be launched through `run.sh`.
 
+### 3l. "Residency constraint reduces seed variance" — **TESTED, NOT SUPPORTED. Closed.**
+
+**The observation.** In T1's 24 cells, arm-level seed sds looked ordered by how much was constrained:
+hard-constrained arms (A5 0.0036, A6 0.0044, A1 0.0047, A4 0.0049) tight, unconstrained A0 at 0.0128
+and partially-constrained A7 (uniform R=76) at 0.0204. I flagged it as a candidate and described it as
+"larger relative to its own noise than any mean effect here". That framing over-weighted it.
+
+**What the tests showed:**
+
+- **Not a mean-variance artefact.** sd against mean CE gives r = −0.025.
+- **The F = 14.8 for the 2-vs-4 split must be dropped.** Of the 420 ways to split 8 arms 2-vs-4, the
+  one chosen is the single most extreme (0.2%), and it was chosen *after* seeing the sds. The p-value
+  does not mean what it appears to.
+- **The defensible version is the ordered one**: sd against number of constrained layers, ρ = −0.857,
+  permutation p = 0.023, on a grouping fixed by design rather than by inspection. Still only 7 arms,
+  each with a 2-dof sd estimate.
+- **The one matched out-of-sample pair contradicts it.** At 1e18, `flame38m_g3_temporal` spans 0.00165
+  across seeds against `flame38m_g3_moe`'s 0.00061 — the *constrained* model is more variable. n = 2
+  each, but it is the only such comparison available and it points the other way.
+- **The "independent echo" I offered from `seed_replicates.csv` was a subset.** Plain temporal is tight
+  at 0.0011, but the temporal variants sit at 0.0028–0.0063, at or above the unconstrained arms.
+
+**Verdict: not supported.** One ordered correlation at p = 0.023 on 2-dof variance estimates, against a
+contradicting out-of-sample pair and a selection-inflated headline statistic. **Prior is low.**
+
+**What would settle it**, if anyone ever wants to: 5–6 seeds on A0 and A1 alone, ~4–6 h, giving (4,4)
+or (5,5) dof for a single pre-registered F-test on the comparison that matters. Nothing else is worth
+running for this.
+
+Recorded so the pattern is not rediscovered and re-costed. The general lesson is the same one T1
+teaches on the mean side: **a quantity that looks striking in a table you have already inspected is
+usually striking because you inspected it.**
+
 ### 3h. T1–T4 — deliberately not started
 
 Out of scope by explicit instruction. Everything they need is in §2.
@@ -410,6 +443,45 @@ Out of scope by explicit instruction. Everything they need is in §2.
 
 Each entry: what was audited, how, what was found, what was fixed. A pass that finds nothing is still
 recorded — it tells the next person that class was checked and when, so it does not get redone.
+
+### 2026-08-01/02 — T1 complete; four one-seed claims, three dead
+
+**T1: 24 cells, 8 arms × 3 seeds at s0/1e16.** All three pre-registered readings resolve negative. One
+result survives — constraining all three MoE layers costs +0.0419 CE (5.3 se) — and the dose curve
+already had it. Written up in `LAYER_LEXICALITY.md` §5.
+
+**What replication destroyed.** Four claims were made from one seed per arm:
+
+| claim | at 1 seed | at 3 seeds |
+|---|---|---|
+| no endpoint spike | asserted | 0.2 se — unmeasurable, not established |
+| interior constraint improves the model | −0.0120, "3.8 se" | **+0.0026, sign reversed, 0.3 se** |
+| costs do not compose | "9 seed sd" | 0.0073 gap, inside noise |
+| exempt-last beats uniform | 2.0 se at n=2 | 0.7 se |
+
+The noise estimate itself moved four times — 0.0011 BPB, 0.0118 CE, 0.0032, then per-arm sds spanning
+0.0036–0.0204 — each time because it was taken from arms other than the one under test. **A two-seed
+spread is not an estimate of anything:** A0 went 0.0040 → 0.0128 and A2 went 0.0036 → 0.0108 when the
+third seed landed.
+
+The two arms whose one-seed results looked most interesting (A3, A7) are the two noisiest. That is
+selection, not coincidence: an arm that lands surprisingly far from its neighbours is disproportionately
+likely to be one that lands far from itself.
+
+**Also this round:**
+
+- **The T1 writer fix stuck.** Its `schedule` field emitted unquoted commas; repairing the rows twice
+  held only until the producer ran again. Moved out of a scratchpad into
+  `scripts/phase0/t1_sweep.sh` with a `_csv_field()` helper that quotes any value containing the
+  delimiter. That is the difference between fixing an artifact and fixing a producer.
+- **The new ragged-row check earned itself twice over.** It caught the T1 file, then two genuine
+  offenders (`olmoe_adapt_bakeoff` 16 rows, `olmoe_adapt_impose` 1) carrying unquoted commas in a
+  free-text note column. It also produced three false positives of its own — a quoted `"#` comment read
+  as a header, and files whose rows are legitimately short because they hold two row types — which is
+  why it now distinguishes SHIFTED (real: columns move) from SHORT (benign: trailing field absent).
+- **§3l closed**: the seed-variance pattern, tested and not supported.
+
+**Nothing outstanding needs a GPU.** See §3.
 
 ### 2026-07-31 (fourth) — the boring item, and why it slipped three times
 
