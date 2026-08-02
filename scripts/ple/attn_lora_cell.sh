@@ -60,10 +60,20 @@ fi
 #
 # GATE: score downstream only if attention actually helped. A null attention result is a complete
 # answer on its own -- it says the constraint price is not attention-shaped -- and does not need
-# ten tasks to characterise it. The threshold is 0.0005 BPB, which is 125x the replicate spread
-# measured on this program (ce_free_0_1_15 vs ce_free_0_1_15_ds1 differ by 0.000004 at 50M on
-# different corpus permutations) and far below the published 0.012 bar, which §6 established is
-# the wrong instrument here because it was estimated from disjoint data subsamples.
+# ten tasks to characterise it.
+#
+# The threshold is 0.0005 BPB, about 2.5x the noise scale. Two estimates of that scale are
+# available and they disagree by two orders of magnitude, so the more conservative one is used.
+# The replicate pair (ce_free_0_1_15 vs ce_free_0_1_15_ds1, different corpus permutations) differs
+# by 0.000004 at 50M -- but that is one pair at one point, and consecutive evals of
+# ce_free_0_1_14_15_250M in its flattened region (120-140M, where training has stopped buying
+# anything) differ by ~0.0002, once moving the wrong way. Treat ~0.0002 as the real precision on a
+# cell's BPB and the 4e-6 agreement as fortunate.
+#
+# Both are far below the published 0.012 bar, which §6 established is the wrong instrument here
+# because it was estimated from disjoint data subsamples while every arm is scored on the same
+# fixed subset. 2.5x is deliberately permissive: a false positive costs half an hour of GPU, a
+# false negative discards a real result.
 GATE=0.0005
 verdict=$("$PY" - "$GATE" <<'PYEOF'
 import json, os, sys

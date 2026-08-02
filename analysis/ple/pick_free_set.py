@@ -22,9 +22,22 @@ comparison and the program knew it: ple_RESULTS.md §6 records that sigma was es
 BASE model on DISJOINT data subsamples, i.e. data-slice noise, while every arm is scored on the same
 fixed 256-pack subset with a bitwise-deterministic eval -- so subsample variance contributes nothing
 to a difference between arms. §6 called it "conservative by roughly 2.4x" and retained it anyway.
-Measured against a same-configuration replicate on a different corpus permutation, the spread is
-0.000004 BPB, about 3000x smaller than the bar. So when replicate pairs exist on disk this uses them
-and reports what it used; the argument passed on the command line is only the fallback.
+
+Two estimators are available on disk and they disagree by two orders of magnitude, so the larger is
+taken:
+
+  replicate spread   ce_free_0_1_15 vs ce_free_0_1_15_ds1, same configuration on different corpus
+                     permutations: 0.000004 at 50M. One pair at one point, and evidently fortunate.
+
+  upward step        the largest INCREASE along any cell's eval curve. Training does not get worse
+                     in expectation, so once a curve has flattened an increase is noise and nothing
+                     else -- it needs no convergence test, no held-out replicate and no assumption
+                     about what the eval slice measures. ce_free_0_1_14_15_250M rises 0.000199
+                     between 130M and 140M, which puts the real precision on a cell's BPB near 2e-4,
+                     roughly 60x below the published bar rather than 3000x.
+
+Both are reported. The argument passed on the command line is only the fallback when neither is
+computable.
 
     pick_free_set.py <data-dir> <fallback-bar-in-bpb>
 """
@@ -51,11 +64,28 @@ def _measured_bar(all_cells, fallback):
             continue
         lo, hi = min(c["bpb"] for c in group), max(c["bpb"] for c in group)
         diffs.append((hi - lo, fs, tok, len(group)))
-    if not diffs:
-        return fallback, f"published 2sigma {fallback} (no replicate pair on disk)"
-    worst = max(diffs)
-    return worst[0], (f"measured {worst[0]:.6f} from {len(diffs)} replicate pair(s), widest at "
-                      f"free={{{worst[1]}}} {worst[2] / 1e6:.0f}M; published bar was {fallback}")
+    rep = max(diffs)[0] if diffs else None
+
+    # Largest increase along any eval curve. A cell's BPB should fall monotonically in expectation,
+    # so an increase is noise -- and unlike the replicate spread this needs no second run, so it is
+    # available for every cell rather than the one pair that happens to exist.
+    up, up_where = 0.0, None
+    for c in all_cells:
+        curve = c.get("curve") or []
+        for prev, nxt in zip(curve, curve[1:]):
+            d = nxt["bpb"] - prev["bpb"]
+            if d > up:
+                up, up_where = d, f"{c['tag']} {prev['tok'] // 10**6}M->{nxt['tok'] // 10**6}M"
+
+    cands = [(v, n) for v, n in ((rep, f"replicate spread ({len(diffs)} pair(s))"),
+                                 (up or None, f"upward step [{up_where}]")) if v]
+    if not cands:
+        return fallback, f"published 2sigma {fallback} (no replicate pair, no curve reversal)"
+    best = max(cands)
+    other = ", ".join(f"{v:.6f} {n}" for v, n in cands if (v, n) != best)
+    return best[0], (f"{best[0]:.6f} from {best[1]}"
+                     + (f"; also saw {other}" if other else "")
+                     + f"; published bar was {fallback}")
 
 
 def main(data, bar):
@@ -78,7 +108,7 @@ def main(data, bar):
         n = len(layers)
         c = {"bpb": r["final_bpb"], "slots": (16 - n) * 8 + n * 64, "tag": r["tag"],
              "free_set": ",".join(layers), "tokens": r["train_tokens"],
-             "data_seed": r.get("data_seed", 0)}
+             "data_seed": r.get("data_seed", 0), "curve": r.get("curve") or []}
         every.append(c)
         # Only seed-0 cells compete; the replicates still count toward the bar below.
         if c["data_seed"] == 0:
