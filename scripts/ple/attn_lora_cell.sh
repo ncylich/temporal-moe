@@ -55,25 +55,59 @@ else
   _gitsafe "$TAG: attention LoRA on the free-{$FS} surface at 50M"
 fi
 
-# The comparison this cell exists for, printed rather than left to be reconstructed later.
-"$PY" - <<'PYEOF'
-import json, os
+# The comparison this cell exists for, printed rather than left to be reconstructed later, and
+# used to decide whether the downstream hour is worth spending.
+#
+# GATE: score downstream only if attention actually helped. A null attention result is a complete
+# answer on its own -- it says the constraint price is not attention-shaped -- and does not need
+# ten tasks to characterise it. The threshold is 0.0005 BPB, which is 125x the replicate spread
+# measured on this program (ce_free_0_1_15 vs ce_free_0_1_15_ds1 differ by 0.000004 at 50M on
+# different corpus permutations) and far below the published 0.012 bar, which §6 established is
+# the wrong instrument here because it was estimated from disjoint data subsamples.
+GATE=0.0005
+verdict=$("$PY" - "$GATE" <<'PYEOF'
+import json, os, sys
 D = "/workspace/olmoe-adapt/data"
-BASE, IMPOSE = 0.6727, 2.7507
-for t in ("ce_free_0_1_14_15", "ce_free_0_1_14_15_attn"):
+BASE, IMPOSE, gate = 0.6727, 2.7507, float(sys.argv[1])
+def load(t):
     p = os.path.join(D, f"ple_{t}.json")
-    if not os.path.exists(p):
-        print(f"  {t:30s} (absent)"); continue
-    r = json.load(open(p))
+    return json.load(open(p)) if os.path.exists(p) else None
+ctrl, attn = load("ce_free_0_1_14_15"), load("ce_free_0_1_14_15_attn")
+for t, r in (("ce_free_0_1_14_15", ctrl), ("ce_free_0_1_14_15_attn", attn)):
+    if r is None:
+        print(f"  {t:30s} (absent)", file=sys.stderr); continue
     b = r["final_bpb"]
     print(f"  {t:30s} BPB={b:.6f}  recovery={(1-(b-BASE)/(IMPOSE-BASE))*100:.2f}%  "
-          f"attn_lora_r={r.get('lora_attn', 0)}")
-a = os.path.join(D, "ple_ce_free_0_1_14_15.json"); b = os.path.join(D, "ple_ce_free_0_1_14_15_attn.json")
-if os.path.exists(a) and os.path.exists(b):
-    d = json.load(open(b))["final_bpb"] - json.load(open(a))["final_bpb"]
-    print(f"  attention LoRA is worth {-d:+.6f} BPB (positive = better). Replicate spread on this "
-          f"program is 0.000004; the published 2-sigma bar of 0.012 is ~3000x that and is the wrong "
-          f"comparison here (ple_RESULTS.md §6).")
+          f"attn_lora_r={r.get('lora_attn', 0)}", file=sys.stderr)
+if ctrl is None or attn is None:
+    print("SKIP"); raise SystemExit
+gain = ctrl["final_bpb"] - attn["final_bpb"]          # positive = attention helped
+print(f"  attention LoRA is worth {gain:+.6f} BPB (positive = better); gate is {gate}",
+      file=sys.stderr)
+print("SCORE" if gain > gate else "SKIP")
 PYEOF
+)
+
+if [ "$verdict" = "SCORE" ]; then
+  ck="csurf_${TAG}_at50M.pt"
+  if [ ! -f "$DATA/$ck" ]; then
+    echo "[FAIL] gate passed but no $ck to score" >&2
+  elif grep -q ",$TAG," results/ablations/layer_freeing_downstream.csv 2>/dev/null; then
+    echo "[skip] downstream $TAG (already scored)"
+  else
+    echo "=== $(date +%H:%M) downstream $TAG (attention helped; scoring)"
+    "$PY" analysis/ple/downstream.py --csurf "$ck" --free-set "$FS" --tag "$TAG" \
+          > "$LOGS/ds_${TAG}.log" 2>&1
+    if [ $? -eq 0 ]; then
+      grep -E "^\[ds\] (attention|identity|warn|mean|wrote)" "$LOGS/ds_${TAG}.log"
+      _gitsafe "downstream 10-task: $TAG"
+    else
+      echo "[FAIL] downstream $TAG; tail:" >&2; tail -20 "$LOGS/ds_${TAG}.log" >&2
+    fi
+  fi
+else
+  echo "=== downstream SKIPPED: attention did not clear the $GATE BPB gate. A null here is the"
+  echo "=== answer -- the constraint price is not attention-shaped -- and needs no task battery."
+fi
 
 echo "=== ATTN CELL COMPLETE $(date +%H:%M) ==="
