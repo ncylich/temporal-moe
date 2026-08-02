@@ -344,7 +344,8 @@ while seen < A.tokens:
         # post-hoc point. Pure I/O; nothing here feeds back into training.
         torch.save({"masters": [m.detach().cpu() for m in masters], "opt": opt.state_dict(),
                     "seen": seen, "step": step, "pos": pos, "hist": hist, "lora": A.lora,
-                    "data_seed": A.data_seed, "free_set": A.free_set},
+                    "data_seed": A.data_seed, "free_set": A.free_set,
+                    "lora_attn": A.lora_attn},
                    f"{OUT}/csurf_{A.tag}_at{seen // 10**6}M.pt")
         if ple_mod is not None:
             torch.save({"rank": str(RANK),

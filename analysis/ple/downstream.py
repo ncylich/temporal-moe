@@ -126,6 +126,22 @@ print(f"[ds] layers {FREE} UNCONSTRAINED, rest R=8; resident slots {_slots} vs 1
 
 RES.freeze_all_but_router(model)
 train_params = RES.router_params(model) + RES.norm_params(model) + RES.add_lora(model, r=32, alpha=64)
+
+# A cell trained with --lora-attn carries 8 more tensors per attention block. Rebuilding without
+# them gives a shorter parameter list, and the abort below would then report a "different recipe"
+# for what is really this script failing to construct the recipe it was handed. Read from the
+# checkpoint; older checkpoints predate the field, so fall back to what the count implies.
+_attn = ck.get("lora_attn")
+if _attn is None:
+    _n_attn_blocks = sum(1 for m in model.modules() if type(m).__name__ == "OlmoeAttention")
+    _attn = 32 if len(ck["masters"]) == len(train_params) + 8 * _n_attn_blocks else 0
+    if _attn:
+        print(f"[ds] checkpoint predates the lora_attn field; its tensor count implies attention "
+              f"LoRA on {_n_attn_blocks} blocks, rebuilding with rank {_attn}", flush=True)
+if _attn:
+    train_params = train_params + RES.add_lora_attn(model, r=_attn, alpha=2 * _attn)
+    print(f"[ds] attention LoRA r={_attn} on q/k/v/o", flush=True)
+
 if len(ck["masters"]) != len(train_params):
     sys.exit(f"[abort] {os.path.basename(CK)} holds {len(ck['masters'])} tensors, this surface has "
              f"{len(train_params)}. The checkpoint was written by a different recipe -- check --lora.")
