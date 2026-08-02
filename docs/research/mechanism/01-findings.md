@@ -37,7 +37,7 @@ excluded. Held-out AUC, documents disjoint between fit and score halves, window 
 lifetime. Measured chance floor 0.500; worst deviation across 1,162 null fits is 0.0030 under iid
 permutation (`mechinterp_floors{,_1e19}.csv`).
 
-Across **34 model arms at four compute budgets and five granularities**
+Across **34 model arms (16 unconstrained, 18 temporal) at four compute budgets and three granularities (6 of 64, 18 of 192, 30 of 320)**
 (`mechinterp_locus{,_1e19}.csv`, median over that arm's experts):
 
 | regime | arms | token AUC | context AUC | experts where context wins |
@@ -142,7 +142,7 @@ distributions does not replicate.
 **Evidence.** Data-weighted logit-lens effective vocabulary, re-measured at full depth on captures
 taken after a layer-keying defect was fixed (`mechinterp_lens_1e19.csv`; the defect and its blast
 radius are in [`02-corrections.md`](02-corrections.md)). At 1e18 the constrained model writes
-*sharper* distributions than the unconstrained one at 6 of 8 layers in the coarse pair, and the fine
+*sharper* distributions than the unconstrained one at 4 of 8 layers in the coarse pair, and the fine
 pair shows no consistent direction. The defensible statement is that **the output-side regime
 difference does not replicate**, not that it reverses.
 
@@ -156,14 +156,16 @@ causal test (§2) are unaffected — they use different fields of the capture.
 **Evidence.** Within the 24-run training sweep, spread falls with the number of constrained layers
 (ρ = −0.857, permutation p = 0.023). But the headline F statistic that suggested it was the single
 most extreme of 420 possible groupings, chosen after seeing the data; and the only matched pair at
-another budget contradicts it — at 1e18 the constrained arm spans 0.00165 BPB across seeds against the
-unconstrained arm's 0.00061.
+another budget contradicts it — at 1e18, over three seeds each, the constrained arm spans **0.0031**
+BPB against the unconstrained arm's **0.0028**, so the constrained model is marginally *more* variable
+there, not less. (Earlier drafts gave 0.00165 against 0.00061; those were computed over two of the
+three seeds, which reversed nothing but overstated the gap as 2.7× where it is 1.1×.)
 
 **Strength: not supported.** Recorded so it is not rediscovered.
 
 ## 5. Confidence, and what cannot be measured
 
-**Replicated.** The regime separation in §1 and §2 holds across four budgets, five granularities and
+**Replicated.** The regime separation in §1 and §2 holds across four budgets, three granularities (6 of 64, 18 of 192, 30 of 320) and
 several router recipes. The training result in §3.2 is three seeds per arm.
 
 **Not replicated.** *Every locus and lens measurement is one training seed per cell.* The bootstrap

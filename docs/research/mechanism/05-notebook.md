@@ -428,9 +428,11 @@ and partially-constrained A7 (uniform R=76) at 0.0204. I flagged it as a candida
 - **The defensible version is the ordered one**: sd against number of constrained layers, ρ = −0.857,
   permutation p = 0.023, on a grouping fixed by design rather than by inspection. Still only 7 arms,
   each with a 2-dof sd estimate.
-- **The one matched out-of-sample pair contradicts it.** At 1e18, `flame38m_g3_temporal` spans 0.00165
-  across seeds against `flame38m_g3_moe`'s 0.00061 — the *constrained* model is more variable. n = 2
-  each, but it is the only such comparison available and it points the other way.
+- **The one matched out-of-sample pair contradicts it, but weakly.** At 1e18, over three seeds each,
+  `flame38m_g3_temporal` spans **0.0031** BPB against `flame38m_g3_moe`'s **0.0028** — constrained is
+  marginally *more* variable, so it points against variance-reduction, but at a ratio of 1.1×. An
+  earlier version of this entry gave 0.00165 against 0.00061, a 2.7× gap; those were computed over two
+  of the three available seeds. A numeric audit caught it.
 - **The "independent echo" I offered from `seed_replicates.csv` was a subset.** Plain temporal is tight
   at 0.0011, but the temporal variants sit at 0.0028–0.0063, at or above the unconstrained arms.
 
@@ -455,6 +457,37 @@ Out of scope by explicit instruction. Everything they need is in §2.
 
 Each entry: what was audited, how, what was found, what was fixed. A pass that finds nothing is still
 recorded — it tells the next person that class was checked and when, so it does not get redone.
+
+### 2026-08-02 — mechanism docs reorganised; two fresh-context audits
+
+Six documents archived; `README`, `01-findings`, `02-corrections`, `03-methods`, `04-coverage` and this
+notebook (moved from `TODO.md`, with its parser, in one commit so the gate never saw a broken state)
+now carry the reading path.
+
+**Migration audit** (archive vs current, one question, no narrative). One genuine miss: ROUND2 §6's
+*"the recommendation survives — exempting the first and last MoE layers is the right engineering call"*
+is overturned by T1 (0.7 se, 0.5 se) and the new set reported the T1 numbers without saying they
+reverse it. Recorded in `02-corrections.md`. Also added A4/A5 to the glossary, which jumped A3→A6.
+Deliberate drops, stated: the E1–E8 engineering decisions (they belong to the serving programme —
+`03-methods.md` now names them and points at the archive), all raw per-layer tables (in the CSVs), and
+superseded numbers measured on less data.
+
+**Numeric audit of `01-findings.md`.** Most numbers reproduced exactly, including the 1,162 iid fits,
+the causal ratio table, the T1 contrasts and the rsweep panel. **Four did not:**
+
+- Arm split given as 14/20; the `regime` column holds 14 `full`, 16 `temporal` and **4 blank**, which
+  split 2/2 by name. Correct: **16 unconstrained, 18 temporal**.
+- "five granularities" — the cited files hold **three** (6 of 64, 18 of 192, 30 of 320).
+- Output lens "sharper at 6 of 8 layers" — reproduces at **4 of 8** weighted, 0 of 8 static. The lower
+  figure supports the does-not-replicate conclusion better than the claimed one did.
+- The 1e18 seed-spread pair, quoted as 0.00165 against 0.00061. Both figures used two of the **three**
+  available seeds. Over all three: **0.0031 constrained against 0.0028 unconstrained** — same
+  direction, but a 1.1× gap rather than 2.7×. The auditor's own recomputation reversed the direction
+  because it also used only two seeds; the three-seed figure is the one to trust.
+
+The last is worth keeping in view: a number was wrong, the audit of it was also wrong, and only
+recomputing from the raw file settled it. **Neither a claim nor its check is authoritative — the data
+is.**
 
 ### 2026-08-01/02 — T1 complete; four one-seed claims, three dead
 
