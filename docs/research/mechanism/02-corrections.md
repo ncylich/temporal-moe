@@ -66,6 +66,24 @@ methodological controls that were measured on the wrong axis. The input-side res
 paper is unaffected by all of them, and has since been extended from 8 arms to 34 and confirmed
 causally.
 
+
+### The exempt-the-endpoints recommendation — **overturned, and this was not recorded**
+
+`archive/LAYER_LEXICALITY_ROUND2.md` §6 concluded: *"**The recommendation survives** — the first and
+last MoE layers are by some margin the most expensive to constrain, so exempting them is the right
+engineering call, and it is cheaper than any schedule we proposed."*
+
+**T1 overturns it.** Trained under the constraint rather than perturbed after the fact, exempting the
+last layer beats a uniform schedule at matched memory by −0.0080 CE at **0.7 se**, and beats exempting
+the first by 0.0017 at **0.5 se**. Neither is distinguishable from zero. `01-findings.md` §3.2 reports
+the T1 result but did not, until now, say that it reverses a recommendation an earlier document had
+issued.
+
+This is the one place the document reorganisation lost a conclusion rather than compressing it: a
+reader of the new set would not know the recommendation had been made, let alone withdrawn. Found by a
+fresh-context audit comparing the archived and current sets.
+
+
 ## 4. Two claims this program made and then withdrew
 
 Listed here so the retraction is as visible as the claim was:

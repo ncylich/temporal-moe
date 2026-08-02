@@ -195,6 +195,8 @@ Identifiers are deliberately absent from `01-findings.md`. This is where they de
 | A1 | locus vs normalised depth | `01-findings.md` §1 |
 | A2 | locus at full depth | §1 |
 | A3 | context-minus-token by layer | §1 |
+| A4 | output lens (per-expert promoted vocabulary) | = C5, `mechinterp_lens*.csv` |
+| A5 | static-lens null control for A4 | archived; no analogous permutation null exists for descriptive gate statistics — there is nothing to permute |
 | A6 | gate selectivity | `04-coverage.md`, structural family |
 | A7 | generalist fraction | structural family |
 | A8 | expert weight geometry | structural family (needs checkpoints) |
@@ -261,3 +263,12 @@ Identifiers are deliberately absent from `01-findings.md`. This is where they de
 
 *The e-family numbers in `archive/probe-replay-e1-e8.md` were computed on runs no longer on disk and
 cannot be reproduced; the metrics have since been recomputed over the 22 preserved router logs.*
+
+**The e-family's engineering decisions live only in the archive and are deliberately not restated
+here** — they belong to the serving/replay programme rather than to the routing mechanism. If you are
+making a caching or eviction decision, read `archive/probe-replay-e1-e8.md` directly: it carries the
+swap-bandwidth feasibility analysis (the shipped cap-1 policy is 1.9–6.4× over budget), the victim-cache
+result (93–97% of swap-ins reload a recently-resident expert), the eviction-policy comparison (learning
+a policy is not where to invest; anticipation is), the pinning verdict (not motivated), demand
+smoothing, and the document-boundary-churn check. Those conclusions are unaffected by anything in this
+document set.
