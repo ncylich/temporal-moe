@@ -55,8 +55,37 @@ OUT_LF = os.path.join(ABLATIONS, "layer_freeing_results.csv")
 rows, lf_rows = [], []
 
 # Cells with no PLE table at all, whose whole content is which layers were left unconstrained.
-LF_CELLS = {"ce_free2", "ce_free_0_1_15", "ce_free_0_1_2"}
+#
+# Discovered from the cells themselves, not listed by name. A hardcoded set silently routes the next
+# free-set cell into ple_results.csv, where it reads as a PLE result and contradicts the scope note
+# at the top of both write-ups -- and nothing fails, so it would be found by someone reading the CSV.
+# The property that decides is in the artifact: a cell belongs here when it relaxes the constraint
+# (non-empty free set) and adds no lookup (rank off).
 LF_GROUPS = {"layer_damage", "free_set"}
+
+
+def _cells_that_free_layers():
+    found = set()
+    for p in glob.glob(os.path.join(DATA_DIR, "ple_*.json")):
+        if os.path.basename(p).startswith(("ple_parity", "ple_heldout")):
+            continue
+        try:
+            r = json.load(open(p))
+        except Exception:
+            continue
+        if "final_bpb" not in r or "tag" not in r:
+            continue
+        frees = bool(r.get("free_set")) or bool(r.get("free_layers"))
+        if frees and str(r.get("rank")) == "off":
+            found.add(r["tag"])
+        elif frees:
+            print(f"[warn] {r['tag']} both frees layers ({r.get('free_set') or r.get('free_layers')}) "
+                  f"and carries a PLE table (rank {r.get('rank')}); it is neither experiment cleanly. "
+                  f"Left in ple_results.csv -- decide where it belongs before citing it.", flush=True)
+    return found
+
+
+LF_CELLS = _cells_that_free_layers()
 
 
 def add(group, name, metric, value, note=""):
@@ -85,6 +114,26 @@ CELL_NOTE = {
     "ce_free_0_1_15": "CE surface, NO PLE, MoE layers 0/1/15 unconstrained, +131.2% resident memory",
     "ce_free_0_1_2":  "CE surface, NO PLE, MoE layers 0/1/2 unconstrained, +131.2% resident memory",
 }
+
+
+def _free_set_note(r):
+    """The note above, written from the cell instead of looked up by name.
+
+    Every entry in CELL_NOTE for a free-set cell states the same three facts -- which surface, which
+    layers, what it costs -- all of which the cell records. Hand-writing them means the next cell has
+    a blank note or, worse, an inherited memory figure from the cell above it. The existing entries
+    stay so their exact wording is preserved.
+    """
+    fs = r.get("free_set") or ""
+    layers = [int(x) for x in fs.split(",") if x.strip() != ""] or list(range(r.get("free_layers", 0)))
+    if not layers:
+        return ""
+    slots = (16 - len(layers)) * 8 + len(layers) * 64
+    surface = "CE surface" if r.get("lora") else "C surface"
+    ple = f"PLE rank {r['rank']}" if str(r.get("rank")) != "off" else "NO PLE"
+    seed = f", data seed {r['data_seed']}" if r.get("data_seed") else ""
+    return (f"{surface}, {ple}, MoE layers {'/'.join(map(str, layers))} unconstrained, "
+            f"+{slots / 128 * 100 - 100:.1f}% resident memory{seed}")
 for p in sorted(glob.glob(os.path.join(DATA_DIR, "ple_*.json"))):
     base = os.path.basename(p)
     if base.startswith(("ple_parity", "ple_heldout")):
@@ -96,7 +145,7 @@ for p in sorted(glob.glob(os.path.join(DATA_DIR, "ple_*.json"))):
     if "final_bpb" not in r:
         continue
     t = r["tag"]
-    note = CELL_NOTE.get(t, "")
+    note = CELL_NOTE.get(t) or _free_set_note(r)
     add("trained_cell", t, "final_bpb", round(r["final_bpb"], 6), note)
     add("trained_cell", t, "recovery_pct", rec(r["final_bpb"]), note)
     add("trained_cell", t, "train_tokens", r["train_tokens"])
@@ -209,8 +258,46 @@ if os.path.exists(hp):
         max(int(x["corpus_count_in_cell"]) for x in hr))
 
 from collections import Counter
+
+
+def _guard(path, rr):
+    """Refuse to replace a complete committed CSV with a partial one.
+
+    This script rebuilds both tracked files from scratch out of intermediates that are GITIGNORED,
+    so a checkout that has the code but not the intermediates produces a valid, well-formed, much
+    smaller CSV and exits 0. Run in a fresh worktree it cut ple_results.csv from 460 rows to 180 and
+    layer_freeing_results.csv from 124 to 46 -- every closed-form calibration, coverage, parity,
+    row-norm, locus and training-free number gone, with nothing in the output saying so. Only a
+    `git status` afterwards showed it.
+
+    Losing rows is legitimate when a measurement is genuinely retired, so --replace allows it. What
+    is not legitimate is losing them because of where the script was run from.
+    """
+    if not os.path.exists(path) or "--replace" in sys.argv:
+        return
+    with open(path) as f:
+        prior = list(csv.DictReader(f))
+    if not prior:
+        return
+    lost = {(r["group"], r["name"], r["metric"]) for r in prior} - {
+        (r["group"], r["name"], r["metric"]) for r in rr}
+    if len(rr) >= len(prior) and not lost:
+        return
+    groups = sorted(Counter(g for g, _, _ in lost).items(), key=lambda kv: -kv[1])
+    sys.exit(
+        f"[abort] refusing to shrink {os.path.basename(path)}: {len(prior)} rows on disk, "
+        f"{len(rr)} rebuilt, {len(lost)} would be dropped\n"
+        + "".join(f"         - {g}: {n} row(s)\n" for g, n in groups)
+        + "         consolidate.py rebuilds from intermediates that are gitignored. If they are\n"
+          "         absent this run cannot see measurements that were made, and writing anyway\n"
+          "         deletes them from the committed file. Copy the intermediate CSVs and\n"
+          "         ple_calib_meta*.json into results/ablations/, or pass --replace if the loss\n"
+          "         is intended.")
+
+
 for path, rr, label in ((OUT_PLE, rows, "per-layer embeddings"),
                         (OUT_LF, lf_rows, "per-layer residency relaxation")):
+    _guard(path, rr)
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["group", "name", "metric", "value", "note"])
         w.writeheader()

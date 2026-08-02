@@ -42,7 +42,15 @@ ap.add_argument("--accum", type=int, default=1,
                 help="gradient accumulation steps. The effective batch is --mb * --accum and must "
                      "be held at 16 to match the C recipe: the full-rank rung needs --mb 4 --accum 4 "
                      "because activations, not the table, dominate memory.")
-ap.add_argument("--seed", type=int, default=1234, help="PLE basis init only; data order is seeded 0")
+ap.add_argument("--seed", type=int, default=1234, help="PLE basis init only; data order is --data-seed")
+ap.add_argument("--data-seed", type=int, default=0,
+                help="seed for the corpus permutation, i.e. WHICH packs a cell trains on and in what "
+                     "order. Default 0 is the bake-off order every published cell used, so leaving it "
+                     "alone reproduces them exactly. Changing it is how a replicate is taken: --seed "
+                     "moves only the PLE basis init, so on a --rank off cell it moves nothing at all, "
+                     "and a rerun would differ only by Flash Attention's non-deterministic backward "
+                     "(~0.0024 BPB). A replicate that varies the data draw is the one that bears on "
+                     "whether a margin against a published number is real.")
 ap.add_argument("--adam8bit", action="store_true", help="8-bit Adam for the PLE table (§2)")
 ap.add_argument("--lora", type=int, default=0,
                 help="add per-expert LoRA of this rank to the trained surface, making the base CE "
@@ -174,7 +182,8 @@ print(f"[ple] tag={A.tag} rank={RANK} lr={A.lr} "
       f"ple={n_ple} tokens={A.tokens} D={D:.7f}", flush=True)
 
 corpus = torch.load(f"{DATA_DIR}/finetune_ids.pt")
-order = torch.randperm(corpus.shape[0], generator=torch.Generator().manual_seed(0))  # same order as the bake-off
+order = torch.randperm(corpus.shape[0],
+                       generator=torch.Generator().manual_seed(A.data_seed))  # 0 = the bake-off order
 bpb_ids = torch.load(f"{DATA_DIR}/bpb_slice_ids.pt")
 eval_sub = bpb_ids[torch.linspace(0, bpb_ids.shape[0] - 1, 256).long()].to("cuda").long()
 E_experts = model.config.num_experts
@@ -214,6 +223,16 @@ if A.resume_c:
         opt.load_state_dict(_ck["opt"])
     else:
         print("[resume] checkpoint carries no optimizer state; starting Adam fresh", flush=True)
+    # `pos` is an index into `order`, which is rebuilt here from --data-seed. Resuming under a
+    # different seed would carry the cursor into a different permutation: the run would silently
+    # re-see packs the first leg already trained on and skip others, with nothing in the output
+    # saying so. Same for the free set -- a checkpoint trained with layers 0,1,15 unconstrained is
+    # not a starting point for a differently-constrained model.
+    for _k, _mine in (("data_seed", A.data_seed), ("free_set", A.free_set)):
+        _theirs = _ck.get(_k)
+        if _theirs is not None and _theirs != _mine:
+            sys.exit(f"[abort] {os.path.basename(A.resume_c)} was written with {_k}={_theirs!r}, "
+                     f"this run has {_k}={_mine!r}. Pass --{_k.replace('_', '-')} {_theirs!r}.")
     seen, step, pos = _ck["seen"], _ck["step"], _ck["pos"]
     hist = list(_ck["hist"])
     print(f"[resume] C surface from {os.path.basename(A.resume_c)}: seen={seen/1e6:.0f}M "
@@ -281,7 +300,8 @@ while seen < A.tokens:
         # Table snapshot at every eval, so rare-row growth is a trajectory rather than one
         # post-hoc point. Pure I/O; nothing here feeds back into training.
         torch.save({"masters": [m.detach().cpu() for m in masters], "opt": opt.state_dict(),
-                    "seen": seen, "step": step, "pos": pos, "hist": hist, "lora": A.lora},
+                    "seen": seen, "step": step, "pos": pos, "hist": hist, "lora": A.lora,
+                    "data_seed": A.data_seed, "free_set": A.free_set},
                    f"{OUT}/csurf_{A.tag}_at{seen // 10**6}M.pt")
         if ple_mod is not None:
             torch.save({"rank": str(RANK),
@@ -294,7 +314,7 @@ fb, fswap, fent = eval_bpb_telem()
 res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
        "ple_start": A.ple_start, "calib_init": A.calib_init, "free_layers": A.free_layers, "free_set": A.free_set,
        "calib_suffix": A.calib_suffix,
-       "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed,
+       "adam8bit": A.adam8bit, "mb": A.mb, "seed": A.seed, "data_seed": A.data_seed,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
        "final_bpb": fb, "final_swap": fswap, "final_entropy": fent,
        "divisor": D, "divisor_source": "bpb_slice_meta.json (ln2 * bytes_per_token)",
