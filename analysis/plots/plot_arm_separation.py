@@ -76,6 +76,33 @@ ax.plot([lo, hi], [lo, hi], color="#999", lw=1.0, ls=":", zorder=1)
 ax.text(0.735, 0.745, "probes tie", color="#777", fontsize=9, rotation=38,
         ha="center", va="center", backgroundcolor="white")
 
+def grain_of(run):
+    """Granularity from the run name. The locus CSVs carry no grain column."""
+    for tag, g in (("_g1", "coarse"), ("_g3", "fine"), ("_g5", "wide"),
+                   ("coarse", "coarse"), ("fine", "fine")):
+        if tag in run:
+            return g
+    return "fine" if "192" in run else "coarse"
+
+
+# Join each series across budgets, so the reader can see which way a configuration moves with scale
+# rather than only where the two clouds sit. One line per (regime, granularity).
+BUD_ORDER = {"1e16": 0, "1e17": 1, "1e18": 2, "1e19": 3}
+cell = defaultdict(list)
+for run, (reg, bud, t, c, dom) in A.items():
+    cell[(reg, grain_of(run), bud)].append((t, c))
+series = defaultdict(list)
+for (reg, g, bud), pts in cell.items():
+    series[(reg, g)].append((BUD_ORDER.get(bud, 9),
+                             st.median([p[0] for p in pts]), st.median([p[1] for p in pts])))
+for (reg, g), pts in series.items():
+    if len(pts) < 2:
+        continue
+    pts.sort()
+    ax.plot([p[1] for p in pts], [p[2] for p in pts],
+            color=TMP if reg == "temporal" else MOE, lw=1.4, alpha=0.55,
+            ls="-" if g == "fine" else "--", zorder=2)
+
 seen = set()
 for run, (reg, bud, t, c, dom) in sorted(A.items()):
     col = TMP if reg == "temporal" else MOE
@@ -110,8 +137,10 @@ else:
              "Regime separation, one point per trained model (34 arms, four budgets, three\n"
              "granularities). x = median token-probe AUC, y = median context-probe AUC, both held out\n"
              "on unseen documents at window w=k; chance is 0.500. Colour = regime, marker = budget.\n"
-             "The token axis separates the arms completely -- the shaded band contains no model of\n"
-             "either regime. The context axis does NOT separate them: several constrained arms sit\n"
+             "Lines join one granularity across budgets (solid fine, dashed coarse), through the\n"
+             "median of the cells sharing a budget, so a line shows where a configuration moves as\n"
+             "it scales. The token axis separates the arms completely: the shaded band holds no model\n"
+             "of either regime. The context axis does NOT separate them: several constrained arms sit\n"
              "below unconstrained ones. What never overlaps is which side of the dotted diagonal an\n"
              "arm falls on, i.e. which of the two features wins.",
              fontsize=8.6, va="bottom", family="monospace", color="#333")

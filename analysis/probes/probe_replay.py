@@ -25,6 +25,8 @@ Convention (matches analysis/plots/plot_probe.py rolling()/overlap()):
   demanded expert is non-resident); the shipped policy then swaps exactly one expert in.
 """
 import os, sys, json
+import textwrap
+
 import numpy as np
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
@@ -904,7 +906,9 @@ def _fig_e4(curves):
 
 def _fig_e5(table):
     order = ["LRU", "min_logit", None, "discounted-oracle(g=0.9)", "Belady", "Belady+prefetch(h=16)"]
-    fig, axes = plt.subplots(1, len(HEADLINERS), figsize=(14, 5.2), sharey=True)
+    # Seven panels across 14 inches gives each title about two inches; the labels are far longer than
+    # that, so they used to overrun into their neighbours. Wrap them and widen the figure.
+    fig, axes = plt.subplots(1, len(HEADLINERS), figsize=(19, 5.6), sharey=True)
     for ax, run in zip(axes, HEADLINERS):
         res = table[run]
         names = list(res.keys()); vals = [res[n]["all"][0] * 100 for n in names]
@@ -914,7 +918,9 @@ def _fig_e5(table):
         ax.barh(np.arange(len(names)), vals, color=colors)
         ax.set_yticks(np.arange(len(names))); ax.set_yticklabels(names, fontsize=7)
         ax.axvline(ml, ls="--", c="C2", lw=1); ax.axvline(be, ls="--", c="C1", lw=1)
-        ax.set_title(label(run), fontsize=9); ax.set_xlabel("set hit-rate (%)")
+        ax.set_title("\n".join(textwrap.wrap(label(run), 26)), fontsize=8, linespacing=1.15)
+        ax.set_xlabel("set hit-rate (%)", fontsize=8)
+        ax.tick_params(axis="x", labelsize=7)
         ax.invert_yaxis(); ax.grid(True, ls=":", alpha=0.3, axis="x")
     fig.suptitle("Offline-optimal (Belady) eviction barely beats the shipped least-logit policy: eviction "
                  "learning has little headroom at K=k", fontsize=11)
@@ -924,7 +930,7 @@ def _fig_e5(table):
               "(evict the resident whose next demand is farthest ahead); discounted-oracle = exact "
               "learned-lookahead bound; +prefetch(h) = allow the swap to fire h tokens early. A small "
               "Belady-minus-min_logit gap means a smarter/learned eviction policy can buy little.")
-    fig.tight_layout(rect=[0, 0.11, 1, 0.95]); path = f"{OUT}/eviction_policy_headroom_belady_bound.png"
+    fig.tight_layout(rect=[0, 0.11, 1, 0.90]); path = f"{OUT}/eviction_policy_headroom_belady_bound.png"
     fig.savefig(path, dpi=140); plt.close(fig); print("wrote", path)
 
 

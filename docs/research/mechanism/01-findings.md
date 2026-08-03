@@ -180,14 +180,20 @@ The demand signal is the lever, and the eviction rule is not.
 
 | eviction policy | set coverage |
 |---|---|
-| discounted oracle, g = 0.5 | 0.510 |
-| discounted oracle, g = 0.9 | 0.492 |
-| Belady with prefetch, h = 1 | 0.439 |
-| Belady | 0.371 |
-| minimum logit | 0.310 |
-| least recently used | 0.251 |
+| discounted oracle, g = 0.5 | 49.5% |
+| discounted oracle, g = 0.9 | 45.8% |
+| Belady with prefetch, h = 1 | 41.7% |
+| Belady, the offline optimum | 33.1% |
+| minimum logit, shipped | 26.2% |
+| least recently used | 21.8% |
 
-Medians over the same 134 measurements. Higher is better. Belady is the offline optimum for a pure eviction rule, so the practical-to-oracle span is 0.251 to 0.371, and everything above it comes from using future demand rather than from evicting better.
+Medians over 66 measurements on the six shipped configurations, excluding the sixteen
+diversity-suppression screens, which distort the expert distribution by design. Higher is better.
+
+Belady is the offline optimum for a pure eviction rule, so the gap from the shipped policy up to it
+bounds what a smarter eviction rule can win: **6.5 to 9.7 points** across the six configurations.
+Everything above that line buys its coverage by seeing future demand, which is a different lever
+entirely.
 
 ![Eviction policy headroom against the Belady bound](../../../results/phase0/figures/eviction_policy_headroom_belady_bound.png)
 
