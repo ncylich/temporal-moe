@@ -407,6 +407,33 @@ Layers 2 and 15 tie on solo damage, 0.1408 against 0.1408. Freeing them is not e
 
 **Do not choose free sets from single-layer damage.**
 
+### What adaptation strategy to use
+
+Seven strategies were run on the same corpus, seed and learning rate. **Recovery** is
+`1 − (adapted − base) / (imposed − base)`, so 1.0 fully closes the residency gap and 0 is the
+untrained mask. Differences under about 0.003 are eval noise.
+
+| what is trained | recovery @250M | verdict |
+|---|---|---|
+| router only | 0.707 | the floor for any adaptation |
+| router, annealing R from 64 to 8 over the first 150M | 0.708 | **null**, indistinguishable from no anneal |
+| router, self-distilled from the frozen free-routing teacher | 0.702 | **null**, if anything slightly worse |
+| router + learnable RMSNorm gains | 0.914 | works |
+| router + per-expert LoRA, r = 32 | 0.914 | works, ties RMSNorm gains |
+| router + LoRA + zone-confined anneal | 0.914 | **null**, the anneal again adds nothing |
+| full fine-tune | 0.934 | ceiling |
+
+- **The jump is capacity, not schedule.** Everything that only trains the router lands at 0.70;
+  everything that adds any trainable capacity beyond it lands at 0.91. Nothing in between.
+- **Annealing the residency limit does nothing**, tried twice, alone and on top of LoRA.
+- **Self-distillation from the free-routing teacher does nothing.** The teacher's routing is exactly
+  what the constraint makes unavailable, so there is no signal to transfer.
+- **Two very different mechanisms tie at 0.914.** RMSNorm gains are a few thousand parameters, LoRA at
+  r = 32 is millions. That they land together suggests the binding constraint is having *any* degree
+  of freedom outside the router, not how many.
+- **Cheap adaptation gets within 0.02 of a full fine-tune.** LoRA rank matters little: r = 8 gives
+  0.893 and r = 64 gives 0.910, against 0.914 at r = 32.
+
 ### What the downstream evaluations say
 
 Bits per byte is one number. Ten-task zero-shot accuracy agrees with it and shows what the constraint
