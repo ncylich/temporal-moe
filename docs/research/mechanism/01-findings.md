@@ -7,9 +7,10 @@ write-up is in [`02-corrections.md`](02-corrections.md), probe construction is i
 
 ## 0. Scope, and how to read the numbers
 
-**Two regimes throughout.** *Unconstrained* is an ordinary mixture-of-experts model, every expert
-available at every token. *Constrained* is the same shape trained under rolling residency. Identical
-floating-point operations.
+**Two regimes throughout.** *Full MoE* is an ordinary mixture-of-experts model, every expert
+available at every token. *Temporal* is the same shape trained under rolling residency. Identical
+floating-point operations, and the names match the `regime` column in every CSV and the legends on
+every figure here.
 
 **Out of scope.** Retrofitting the constraint to a pretrained model, and the per-layer embedding work,
 belong to the adaptation program and are written up in
@@ -17,8 +18,8 @@ belong to the adaptation program and are written up in
 section 5 because they bear on layer choice.
 
 **Cost**, used throughout: test bits per byte with the constraint changed at one layer, minus the
-model in its native regime. Positive is worse. Unmasking a layer for a constrained model, imposing
-residency for an unconstrained one. Everything else is defined where it is used.
+model in its native regime. Positive is worse. Unmasking a layer for a temporal model, imposing
+residency for an full MoE one. Everything else is defined where it is used.
 
 **Eight files cannot be regenerated.** No producer in any commit on any branch, and their runs kept
 neither a router log nor a checkpoint. Claims resting on them say so in the sentence that makes them.
@@ -33,7 +34,7 @@ predict routing better than the token does.
 
 **The constraint destroys the token signal rather than adding a context signal.** Across 34 trained
 models the token axis separates the regimes completely, with an empty band 0.184 wide. The context
-axis does not separate them at all: several constrained models sit *below* unconstrained ones.
+axis does not separate them at all: several temporal models sit *below* full MoE ones.
 
 <img src="../../../results/phase0/figures/arm_separation.png" alt="Token AUC against context AUC, one point per trained model" width="66%">
 
@@ -44,22 +45,22 @@ horizontal only.*
 Three checks that this is routing and not a weak probe:
 
 - **No token signal is left to find.** The linear probe reaches 99.4% of the nonparametric ceiling
-  from token identity alone, unconstrained, and 101.8% constrained.
+  from token identity alone, full MoE, and 101.8% temporal.
 - **Causal, not correlational.** Swapping a frequency-matched token with context held fixed, against
-  the reverse: context-over-token ratio 0.69 unconstrained (0.28 to 0.79) and 1.58 constrained (1.25
+  the reverse: context-over-token ratio 0.69 full MoE (0.28 to 0.79) and 1.58 temporal (1.25
   to 2.18), 29 measurements each, ranges non-overlapping.
 - **Not a rare-token artifact.** Token AUC by corpus-frequency stratum runs 0.813 to 0.891
-  unconstrained and 0.550 to 0.581 constrained. No band concentrates the signal.
+  full MoE and 0.550 to 0.581 temporal. No band concentrates the signal.
 
 Two consequences, here rather than in section 3 because they describe the router:
 
 - **Demand becomes predictable from history alone.** A causal probe given only routing history
-  predicts the next position's demand: 0.981 constrained (0.919 to 0.993, n = 103)
-  against 0.655 unconstrained (0.567 to 0.716, n = 89). Largest clean separation in the program, with
+  predicts the next position's demand: 0.981 temporal (0.919 to 0.993, n = 103)
+  against 0.655 full MoE (0.567 to 0.716, n = 89). Largest clean separation in the program, with
   daylight between the ranges.
 - **The cache hits far above chance.** **Hit rate** is the share of the unconstrained top-k already
-  resident before any swap, on a k/E floor of 0.094. It reaches 0.317 constrained coarse and 0.326
-  fine, against 0.172 unconstrained.
+  resident before any swap, on a k/E floor of 0.094. It reaches 0.317 temporal coarse and 0.326
+  fine, against 0.172 full MoE.
 
 <img src="../../../results/phase0/figures/hitrate_by_layer.png" alt="Cache hit rate by MoE layer" width="66%">
 
@@ -68,16 +69,16 @@ better, so a non-uniform memory budget should favour shallow ones.*
 
 ### Depth
 
-**Routing grows more contextual with depth, but far more so unconstrained.** Per-arm slopes of
+**Routing grows more contextual with depth, but far more so full MoE.** Per-arm slopes of
 context minus token against layer index, bootstrap intervals:
 
 | regime | arms | median slope per layer | interval excludes zero |
 |---|---|---|---|
-| unconstrained | 5 | +0.0139 | 4 of 5 |
-| constrained | 6 | +0.0018 | 3 of 6 |
+| full MoE | 5 | +0.0139 | 4 of 5 |
+| temporal | 6 | +0.0018 | 3 of 6 |
 
 - **The gap narrows with depth**, roughly 0.39 at the shallowest layer down to 0.27 at the deepest.
-  A constrained router is already contextual at layer 2 and has little further to move.
+  A temporal router is already contextual at layer 2 and has little further to move.
 - **Use per-arm slopes, not pooled layers.** Pooling hides it, because the eight-layer arms are flat
   while the thirteen-layer arms rise.
 - **This is learned, not mechanical.** Imposing the constraint without training produces no shift at
@@ -85,8 +86,8 @@ context minus token against layer index, bootstrap intervals:
 
 <img src="../../../results/phase0/figures/locus_by_layer.png" alt="Context minus token AUC against layer" width="66%">
 
-*Broken y-axis: the regime gap of about 0.3 dwarfs the depth effect of about 0.05. Unconstrained
-curves climb; constrained curves start high and stay flat.*
+*Broken y-axis: the regime gap of about 0.3 dwarfs the depth effect of about 0.05. Full MoE
+curves climb; temporal curves start high and stay flat.*
 
 ## 2. What an expert represents
 
@@ -97,28 +98,28 @@ evidence. Full range across models, median over each model's layers.
 
 | | participation ratio | generalist fraction | router entropy |
 |---|---|---|---|
-| unconstrained, 14 models | 0.201 to 0.422 | 0.000 to 0.328 | 0.790 to 0.917 |
-| constrained, 16 models | 0.292 to 0.801 | 0.036 to 0.914 | 0.886 to 0.974 |
+| full MoE, 14 models | 0.201 to 0.422 | 0.000 to 0.328 | 0.790 to 0.917 |
+| temporal, 16 models | 0.292 to 0.801 | 0.036 to 0.914 | 0.886 to 0.974 |
 | zero-layer control | 0.328 | 0.036 | 0.886 |
 
 - **These ranges overlap**, unlike the locus result. A strong tendency, not a separator.
 - **Flattening is strongest early**: generalist fraction falls with depth in both regimes.
-- **The third row is a control.** One arm of the section 4 training sweep runs a constrained schedule
-  that constrains no layers. Built, trained and counted as constrained; only the constraint is missing.
-  It lands at the bottom of the constrained range, with the unconstrained models, as it must if these
-  statistics measure the constraint rather than how constrained runs are configured. Nothing else here
-  would catch a bug that inflated every constrained model equally.
+- **The third row is a control.** One arm of the section 4 training sweep runs a temporal schedule
+  that constrains no layers. Built, trained and counted as temporal; only the constraint is missing.
+  It lands at the bottom of the temporal range, with the full MoE models, as it must if these
+  statistics measure the constraint rather than how temporal runs are configured. Nothing else here
+  would catch a bug that inflated every temporal model equally.
 
 **The inventory is not starved.** Union covers 85 to 100% of the pool on shipped configurations:
 
 | model | budget | regime | experts | union, mean | union, share of E | effective experts |
 |---|---|---|---|---|---|---|
-| `moe_coarse_1e19` | 1e19 | unconstrained | 64 | 63.8 | 0.997 | 59.8 |
-| `g3_tmoe_s2_1e17` | 1e17 | constrained | 192 | 160.8 | 0.837 | 187.8 |
-| `flame38m_g1_temporal` | 1e18 | constrained | 64 | 62.0 | 0.969 | 63.1 |
-| `flame38m_g3_temporal` | 1e18 | constrained | 192 | 163.4 | 0.851 | 187.2 |
-| `g1_tmoe_coarse_1e19` | 1e19 | constrained | 64 | 63.9 | 0.999 | 62.5 |
-| `temporal_fine_g3_1e19` | 1e19 | constrained | 192 | 184.2 | 0.959 | 183.0 |
+| `moe_coarse_1e19` | 1e19 | full MoE | 64 | 63.8 | 0.997 | 59.8 |
+| `g3_tmoe_s2_1e17` | 1e17 | temporal | 192 | 160.8 | 0.837 | 187.8 |
+| `flame38m_g1_temporal` | 1e18 | temporal | 64 | 62.0 | 0.969 | 63.1 |
+| `flame38m_g3_temporal` | 1e18 | temporal | 192 | 163.4 | 0.851 | 187.2 |
+| `g1_tmoe_coarse_1e19` | 1e19 | temporal | 64 | 63.9 | 0.999 | 62.5 |
+| `temporal_fine_g3_1e19` | 1e19 | temporal | 192 | 184.2 | 0.959 | 183.0 |
 
 - **Union** is the mean count of distinct experts a sequence touches. **Effective experts** weights
   that count by how evenly usage is spread, penalising a long tail of barely-used ones. Higher is
@@ -142,7 +143,7 @@ What does not change, and one thing that moves the wrong way:
 **Expert weights come out closer to Gaussian.** Excess kurtosis of the weight matrices, where 0 is
 Gaussian and higher means heavier tails, so more outliers:
 
-| matched pair | unconstrained | constrained |
+| matched pair | full MoE | temporal |
 |---|---|---|
 | coarse @1e18, median | 0.42 | **0.14** |
 | fine @1e18, median | 0.62 | **0.24** |
@@ -157,26 +158,26 @@ is better:
 
 | model | 16-bit | 8-bit | 4-bit | 3-bit | 16 to 3 |
 |---|---|---|---|---|---|
-| coarse unconstrained @1e18 | 1.3158 | 1.3158 | 1.3218 | 1.3520 | +0.0362 |
-| coarse constrained @1e18 | 1.3128 | 1.3128 | 1.3176 | 1.3419 | **+0.0291** |
-| fine unconstrained @1e18 | 1.3462 | 1.3463 | 1.3505 | 1.3705 | +0.0243 |
-| fine constrained @1e18 | 1.3354 | 1.3354 | 1.3390 | 1.3562 | **+0.0208** |
-| coarse unconstrained @1e19 | 1.0510 | 1.0510 | 1.0536 | 1.0662 | +0.0152 |
-| coarse constrained @1e19 | 1.0675 | 1.0675 | 1.0697 | 1.0803 | **+0.0128** |
+| coarse full MoE @1e18 | 1.3158 | 1.3158 | 1.3218 | 1.3520 | +0.0362 |
+| coarse temporal @1e18 | 1.3128 | 1.3128 | 1.3176 | 1.3419 | **+0.0291** |
+| fine full MoE @1e18 | 1.3462 | 1.3463 | 1.3505 | 1.3705 | +0.0243 |
+| fine temporal @1e18 | 1.3354 | 1.3354 | 1.3390 | 1.3562 | **+0.0208** |
+| coarse full MoE @1e19 | 1.0510 | 1.0510 | 1.0536 | 1.0662 | +0.0152 |
+| coarse temporal @1e19 | 1.0675 | 1.0675 | 1.0697 | 1.0803 | **+0.0128** |
 
 - **Nothing moves at 8 bits** in either regime.
-- **The constrained model degrades less in all three matched pairs**, which is the kurtosis result
+- **The temporal model degrades less in all three matched pairs**, which is the kurtosis result
   cashed out: fewer weight outliers, less quantization error.
 - **The two memory levers do not fight.** Rolling residency and low precision compose, which matters
   because they are the obvious things to reach for together.
 - One open flag: gradient norms match on median across regimes, but `temporal_coarse_1e19` records a
-  maximum of 12.47 against the unconstrained 2.52. A single transient or a real interaction, unexamined
+  maximum of 12.47 against the full MoE 2.52. A single transient or a real interaction, unexamined
   either way.
-- **The output side does not replicate.** At 1e18 the constrained model writes sharper distributions
+- **The output side does not replicate.** At 1e18 the temporal model writes sharper distributions
   at 4 of 8 layers on the data-weighted metric, 0 of 8 on the static one, no consistent direction in
   the fine-grained pair.
 - **The router does not fragment; it differentiates.** At layer gaps of four or more the
-  *unconstrained* router is more self-similar, 2.28 times chance against 1.56. Opposite to the
+  *full MoE* router is more self-similar, 2.28 times chance against 1.56. Opposite to the
   intuition. Degenerate on 11 of 26 arms where expert count meets or exceeds hidden width, excluded.
 
 ## 3. Serving
@@ -236,9 +237,9 @@ The resident set, briefly:
   against rolling's 45.76, at 0.12 swaps per token against rolling's ceiling of 1. Worth it if swap
   bandwidth binds. Producerless and unreplayable.
 
-**A bigger cache closes the regime gap**, and the constrained arm leads throughout:
+**A bigger cache closes the regime gap**, and the temporal arm leads throughout:
 
-| cache size, K/k | unconstrained | constrained |
+| cache size, K/k | full MoE | temporal |
 |---|---|---|
 | 1 | 0.169 | 0.236 |
 | 2 | 0.284 | 0.401 |
@@ -252,10 +253,10 @@ Both saturate near ten times k, so the advantage is largest exactly where memory
 
 | active parameters | 1.4M | 8.2M | 12.2M | 184.1M | 185.8M |
 |---|---|---|---|---|---|
-| constrained overlap | 28.4% | 32.9% | 31.2% | 28.3% | 23.5% |
+| temporal overlap | 28.4% | 32.9% | 31.2% | 28.3% | 23.5% |
 
 Near three times the floor across a 130-fold size range rather than growing. The one matched
-unconstrained arm sits at 19.2%.
+full MoE arm sits at 19.2%.
 
 Document boundaries are not a cold start. Over windows of 4, 16 and 64 tokens after a boundary, the
 median hit-rate penalty is 0.9 points and is negative on some models, because routing keys on a
@@ -271,7 +272,7 @@ surrounding window rather than on document identity.
 
 - **The curve is flat where it matters**, steep only as the constraint is fully released. Most of the
   0.0231 arrives in the last doubling.
-- **At 1e18 the constrained model wins outright**, both granularities: 1.3124 against 1.3175 coarse,
+- **At 1e18 the temporal model wins outright**, both granularities: 1.3124 against 1.3175 coarse,
   1.3339 against 1.3478 fine, three to five seeds, seed deviations 0.0011 to 0.0020. Several standard
   errors wide, so not noise. No explanation offered.
 
@@ -296,7 +297,7 @@ surrounding window rather than on document identity.
 ### By layer
 
 **The last layer is the most expensive to change, in seven of seven measurements**, at 1.61 to 3.22
-times the interior mean. The first is elevated in two, both unconstrained models at 1e18.
+times the interior mean. The first is elevated in two, both full MoE models at 1e18.
 
 | model | budget | direction | first / interior | last / interior |
 |---|---|---|---|---|
@@ -428,7 +429,7 @@ costs a model that was never trained under it:
 ## 7. How much of this to believe
 
 - Every locus and lens measurement is one training seed per cell.
-- Only one unconstrained run has a preserved router log, so every regime contrast in section 3, and the
+- Only one full MoE run has a preserved router log, so every regime contrast in section 3, and the
   inventory and consistency comparisons in sections 2 and 3, rest on a single baseline.
 - No per-layer measurement above 13 layers on models we trained. The 16-layer evidence is section 5's
   and comes from a different program on a model we did not train.
