@@ -87,7 +87,7 @@ plausible guess that routers memorise rare tokens.
 **Strength: high.** The largest, most replicated result in the program, and now bounded above as well
 as below. Its main untested exposure is that each cell is one training seed. See §5.
 
-### 1.2 The shift is causal, not an artefact of the probes
+### 1.1 The shift is causal, not an artefact of the probes
 
 **Claim.** Substituting the token a position holds moves the constrained model's expert selection
 *less* than shuffling that position's context does; in the unconstrained model the ordering reverses.
@@ -113,7 +113,7 @@ sensitivity rises ~35%, which no difference of probe AUCs could have separated.
 
 **Strength: high.** This is the claim that makes §1 a mechanism rather than an association.
 
-### 1.3 The same split shows up in what experts are, and in the geometry of the router
+### 1.2 The same split shows up in what experts are, and in the geometry of the router
 
 Two more measurements point the same way as the probes, from different directions.
 
@@ -304,6 +304,30 @@ global dose curve (§3.1 spans 0.023 BPB end to end).
 > and it is the single most valuable missing number in this document. Until it lands, the claim above
 > rests on two cells.
 
+#### At sixteen layers the profile is a clean U
+
+The highest-resolution version of this is a train-free sweep on the adapted OLMoE: impose residency on
+exactly one layer and measure the damage in BPB (`layer_damage.csv`, 16 layers, all-free baseline
+0.6727):
+
+| layer | 0 | 1 | 2 | 5 | 8 | 11 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|
+| damage (BPB) | 0.218 | 0.259 | 0.141 | 0.099 | 0.081 | 0.070 | 0.075 | 0.122 | 0.141 |
+
+The minimum sits at layer 11, about 0.73 of the way down, and both ends rise away from it. The two
+outermost layers at each end average 1.98x the interior mean, and layer 1 alone costs 3.7x the
+cheapest layer. Constraining every layer costs 2.078, which is 1.12x the sum of the individual
+damages, so the layers interact mildly rather than adding.
+
+This is the strongest version of the shape in the program: sixteen layers rather than eight or three,
+on a real pretrained model, and it needs no training at all. It agrees with the free-set ladder above,
+which is its complement (that sweep frees layers and measures the gain; this one constrains them and
+measures the loss), and with the vertex near two thirds depth seen at 1e18.
+
+*Provenance caveat.* No committed script produces `layer_damage.csv`, so the exact protocol behind it
+is not reconstructable from the repository. The shape is consistent with three other measurements, but
+treat the individual values as unaudited until the producer is recovered or rewritten.
+
 #### But lexicality is not the reason
 
 Three separate readings were pre-registered on the lexical explanation and all three failed:
@@ -328,7 +352,7 @@ L9's is four times any other. So "58 to 85% positional" does **not** license ign
 15 to 42% that a generic perturbation fails to reproduce is concentrated exactly where the effect is.
 What that residue is remains unexplained.
 
-#### And it did not survive from-scratch training on a small testbed
+#### From-scratch training on a small testbed agrees, weakly
 
 **Testbed**, shape `s0` at 1e16 (the cheapest cell with a preserved reference): hidden 128,
 **4 transformer layers of which layer 1 is dense, so only 3 MoE layers** (2, 3, 4), 192 experts,
