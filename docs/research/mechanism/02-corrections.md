@@ -67,24 +67,40 @@ paper is unaffected by all of them, and has since been extended from 8 arms to 3
 causally.
 
 
-### The exempt-the-endpoints recommendation — **overturned, and this was not recorded**
+## 3a. A verdict that moved twice
+
+### The exempt-the-endpoints recommendation — **stands, on architectural grounds**
 
 `archive/LAYER_LEXICALITY_ROUND2.md` §6 concluded: *"**The recommendation survives** — the first and
 last MoE layers are by some margin the most expensive to constrain, so exempting them is the right
 engineering call, and it is cheaper than any schedule we proposed."*
 
-**T1 overturns it.** Trained under the constraint rather than perturbed after the fact, exempting the
-last layer beats a uniform schedule at matched memory by −0.0080 CE at **0.7 se**, and beats exempting
-the first by 0.0017 at **0.5 se**. Neither is distinguishable from zero. `01-findings.md` §3.2 reports
-the T1 result but did not, until now, say that it reverses a recommendation an earlier document had
-issued.
+**That conclusion holds.** An intermediate version of this section said T1 overturned it; that reading
+was wrong and is withdrawn. Three points, because this verdict has now moved twice:
 
-This is the one place the document reorganisation lost a conclusion rather than compressing it: a
-reader of the new set would not know the recommendation had been made, let alone withdrawn. Found by a
-fresh-context audit comparing the archived and current sets.
+1. **T1's schedule contrasts are underpowered, not negative.** Both endpoint-exemption schedules beat
+   a uniform schedule at matched memory — exempt-last by −0.0080 CE, exempt-first by −0.0096 — at
+   roughly 0.7 se. The direction favours the recommendation in both arms; the magnitude is not
+   established. "Not distinguishable from zero" is the correct reading of the statistic and the wrong
+   reading of the evidence.
+2. **The ordering supports it.** Among T1's single-layer arms the middle layer is cheapest to
+   constrain and both endpoints cost more, in all three seeds; endpoints against middle is +0.0134 CE
+   at 2.80 se.
+3. **PLE supports it on a model deep enough to test it.** Freeing the first two MoE layers of an
+   adapted 16-layer OLMoE buys 0.0003 BPB; adding the *last* layer to the free set buys **0.0169**
+   (`ple_ladder.csv`).
+
+**What is refuted is the reason, not the recommendation.** The endpoint layers are not the
+token-driven ones — the last MoE layer is the *least* lexical in the stack — and a magnitude-matched
+perturbation carrying no lexical information reproduces 58–85% of the endpoint cost. So exempt the
+endpoints for architectural reasons, and do not claim lexicality as the justification.
+
+Recorded at this length because a fresh-context audit found the recommendation had been dropped
+entirely from the reorganised set, and the entry written to restore it then overturned it on a
+misread contrast.
 
 
-## 4. Two claims this program made and then withdrew
+## 4. Claims this program made and then withdrew
 
 Listed here so the retraction is as visible as the claim was:
 
@@ -96,3 +112,21 @@ Listed here so the retraction is as visible as the claim was:
 
 Both were single-seed results reported before replication, which is the same failure mode as several
 rows in §1.
+
+Three more were asserted in `01-findings.md` during the reorganisation and corrected within days. They
+are listed because they were committed claims, not drafts, and because the third is the most
+instructive error in the program:
+
+- **"The three statistics do not overlap between regimes."** Two of the three separate cleanly; context
+  AUC overlaps across 0.633–0.679. The context probe finds real signal in both regimes, so its level
+  was never the discriminator.
+- **"There is no per-layer structure worth exploiting."** Written without reading `ple_ladder.csv`,
+  which sits in the same directory as every other file the section cites and shows the opposite.
+- **"The endpoint effect does not survive co-adaptation"**, supported by a *first versus last* contrast
+  of +0.0014 at 0.2 se. A U-shape predicts first ≈ last: that contrast is the one the hypothesis says
+  should be null, so its nullity confirms the shape's symmetry rather than refuting its existence. The
+  contrast that tests a U — endpoints against middle — is +0.0134 at 2.80 se, in the predicted
+  direction and consistent across all three seeds.
+
+All three were found by recomputing from the CSVs rather than by rereading the prose, which is the
+only method that has ever caught anything in this document set.
