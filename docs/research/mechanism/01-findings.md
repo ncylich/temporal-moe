@@ -16,35 +16,20 @@ belong to the adaptation program and are written up in
 [`ple_RESULTS.md`](../../../results/ablations/ple_RESULTS.md). Its layer-freeing results appear in
 section 5 because they bear on layer choice.
 
-Every measurement, defined once:
-
-- **Token AUC / context AUC.** Ridge probe asking "does expert *e* fire here?", given either the
-  current token's embedding or the surrounding window with that token excluded. Held out on unseen
-  documents, chance 0.5.
-- **Context minus token.** The difference. Positive means surroundings predict routing better than the
-  token does.
-- **Cost.** Test bits per byte with the constraint changed at one layer, minus the model in its native
-  regime. Positive is worse. Unmasking a layer for a constrained model, imposing residency for an
-  unconstrained one.
-- **Participation ratio.** Inverse Simpson index of an expert's token distribution, on a 0 to 1 scale.
-  Higher means the expert spreads over more of the stream.
-- **Generalist fraction.** Share of experts with participation ratio above 0.5. A threshold on the row
-  above, not separate evidence.
-- **Hit rate.** Share of the unconstrained top-k already resident before any swap. Random floor is
-  k/E, which is 0.094 at both granularities here.
-- **Set coverage.** Same idea, measured against a serving policy rather than a layer.
-- **Retained mass.** Share of the unconstrained top-k *routing mass* the resident set holds. Weights
-  experts by how much the router wanted them.
-- **Demand AUC.** Causal probe predicting the next position's demand from routing history alone.
-- **The sham.** The constraint swapped for a Gaussian perturbation of the router logits, matched in
-  average magnitude, carrying no lexical information. Separates positional effects from token-identity
-  ones.
+**Cost**, used throughout: test bits per byte with the constraint changed at one layer, minus the
+model in its native regime. Positive is worse. Unmasking a layer for a constrained model, imposing
+residency for an unconstrained one. Everything else is defined where it is used.
 
 **Eight files cannot be regenerated.** No producer in any commit on any branch, and their runs kept
 neither a router log nor a checkpoint. Claims resting on them say so in the sentence that makes them.
 List in [`results/ablations/README.md`](../../../results/ablations/README.md).
 
 ## 1. What the router does
+
+A ridge probe asks "does expert *e* fire here?", given either the current token's embedding
+(**token AUC**) or the surrounding window with that token excluded (**context AUC**). Held out on
+unseen documents, chance 0.5. Their difference, **context minus token**, is positive when surroundings
+predict routing better than the token does.
 
 **The constraint destroys the token signal rather than adding a context signal.** Across 34 trained
 models the token axis separates the regimes completely, with an empty band 0.184 wide. The context
@@ -68,11 +53,13 @@ Three checks that this is routing and not a weak probe:
 
 Two consequences, here rather than in section 3 because they describe the router:
 
-- **Demand becomes predictable from history alone.** 0.981 constrained (0.919 to 0.993, n = 103)
+- **Demand becomes predictable from history alone.** A causal probe given only routing history
+  predicts the next position's demand: 0.981 constrained (0.919 to 0.993, n = 103)
   against 0.655 unconstrained (0.567 to 0.716, n = 89). Largest clean separation in the program, with
   daylight between the ranges.
-- **The cache hits far above chance.** 0.317 constrained coarse and 0.326 fine, against 0.172
-  unconstrained, on a 0.094 floor.
+- **The cache hits far above chance.** **Hit rate** is the share of the unconstrained top-k already
+  resident before any swap, on a k/E floor of 0.094. It reaches 0.317 constrained coarse and 0.326
+  fine, against 0.172 unconstrained.
 
 <img src="../../../results/phase0/figures/hitrate_by_layer.png" alt="Cache hit rate by MoE layer" width="66%">
 
@@ -103,8 +90,10 @@ curves climb; constrained curves start high and stay flat.*
 
 ## 2. What an expert represents
 
-**Each expert covers more of the stream, and routing flattens.** Full range across models, median over
-each model's layers. Higher means flatter, less specialised.
+**Each expert covers more of the stream, and routing flattens.** **Participation ratio** is the
+inverse Simpson index of an expert's token distribution on a 0 to 1 scale, higher meaning it spreads
+further; **generalist fraction** is the share above 0.5, a threshold on the first rather than separate
+evidence. Full range across models, median over each model's layers.
 
 | | participation ratio | generalist fraction | router entropy |
 |---|---|---|---|
@@ -159,8 +148,8 @@ What does not change, and one thing that moves the wrong way:
 ## 3. Serving
 
 **The demand signal is the lever. The eviction rule is not.** Both measured by replaying the same
-recorded demand through different policies, so only the cache logic varies. Metric is set coverage,
-floor 9.4%.
+recorded demand through different policies, so only the cache logic varies. Metric is **set coverage**: of the experts a token wants,
+the share the resident set already holds when it arrives. Floor 9.4%.
 
 | eviction policy | set coverage |
 |---|---|
@@ -205,8 +194,8 @@ The resident set, briefly:
 
 - **Mass beats set.** Mass consistency 0.419 against set consistency 0.374: the experts carrying
   routing weight stay put while marginal ones churn.
-- **Hysteresis is not free.** Raising the threshold drives swap rate 1.000 to 0.000, but retained mass
-  falls 0.353 to 0.114.
+- **Hysteresis is not free.** Raising the threshold drives swap rate 1.000 to 0.000, but **retained
+  mass**, the share of top-k routing *weight* the resident set holds, falls 0.353 to 0.114.
 - **Swap rate is a dead statistic**, median 1.000 across 112 records, because at R = k a swap fires
   whenever any demanded expert is missing. Use 95th-percentile burst length.
 - **Block-wise residency is a trade, not a loss.** At block length 72 it holds 28.55 retained mass
@@ -286,8 +275,9 @@ times the interior mean. The first is elevated in two, both unconstrained models
 | coarse temporal | 1e19 | unmask | 1.17 | 3.22 |
 
 - **No vertex claimed.** The seven disagree about where the minimum sits.
-- **The cause is positional, not lexical.** A lexicality-free perturbation of matched average size
-  reproduces 63% of the endpoint excess on the coarse model and 83% on the fine one. Excess is the
+- **The cause is positional, not lexical.** The **sham** swaps the constraint for a Gaussian
+  perturbation of the router logits, matched in average magnitude and carrying no lexical information.
+  It reproduces 63% of the endpoint excess on the coarse model and 83% on the fine one. Excess is the
   endpoint mean minus the interior mean; the noise scale is the calibration matching the real mean
   cost, to 0.2% coarse.
 - **The lexical reading fails on its own terms.** In the three imposition arms the last layer ranks
