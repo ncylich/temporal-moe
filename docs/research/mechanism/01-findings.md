@@ -138,6 +138,40 @@ What does not change, and one thing that moves the wrong way:
 
 - **Weight geometry is untouched.** Centroid distance and pairwise cosine are indistinguishable
   between regimes.
+
+**Expert weights come out closer to Gaussian.** Excess kurtosis of the weight matrices, where 0 is
+Gaussian and higher means heavier tails, so more outliers:
+
+| matched pair | unconstrained | constrained |
+|---|---|---|
+| coarse @1e18, median | 0.42 | **0.14** |
+| fine @1e18, median | 0.62 | **0.24** |
+| coarse @1e19, median | 0.10 | **0.07** |
+| fine @1e18, 99th percentile | 2.79 | **0.77** |
+
+Lower is better if you intend to quantize. The gap is wider in the tail than at the median, which is
+where quantization error is decided.
+
+**And that shows up as quantization robustness.** Test bits per byte under fake quantization, lower
+is better:
+
+| model | 16-bit | 8-bit | 4-bit | 3-bit | 16 to 3 |
+|---|---|---|---|---|---|
+| coarse unconstrained @1e18 | 1.3158 | 1.3158 | 1.3218 | 1.3520 | +0.0362 |
+| coarse constrained @1e18 | 1.3128 | 1.3128 | 1.3176 | 1.3419 | **+0.0291** |
+| fine unconstrained @1e18 | 1.3462 | 1.3463 | 1.3505 | 1.3705 | +0.0243 |
+| fine constrained @1e18 | 1.3354 | 1.3354 | 1.3390 | 1.3562 | **+0.0208** |
+| coarse unconstrained @1e19 | 1.0510 | 1.0510 | 1.0536 | 1.0662 | +0.0152 |
+| coarse constrained @1e19 | 1.0675 | 1.0675 | 1.0697 | 1.0803 | **+0.0128** |
+
+- **Nothing moves at 8 bits** in either regime.
+- **The constrained model degrades less in all three matched pairs**, which is the kurtosis result
+  cashed out: fewer weight outliers, less quantization error.
+- **The two memory levers do not fight.** Rolling residency and low precision compose, which matters
+  because they are the obvious things to reach for together.
+- One open flag: gradient norms match on median across regimes, but `temporal_coarse_1e19` records a
+  maximum of 12.47 against the unconstrained 2.52. A single transient or a real interaction, unexamined
+  either way.
 - **The output side does not replicate.** At 1e18 the constrained model writes sharper distributions
   at 4 of 8 layers on the data-weighted metric, 0 of 8 on the static one, no consistent direction in
   the fine-grained pair.
