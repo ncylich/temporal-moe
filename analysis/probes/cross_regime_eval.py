@@ -110,12 +110,19 @@ def run_cell(spec, keep_going=False):
     label, run, shape, flops, grain, paradigm, R, divisor, note = spec
     it, latest_file, claimed = resolve_iter(run)
 
+    # "Unconstrained" is R=E, NOT R=0. temporal_router.temporal_forward reads
+    #     resid_R = int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) or k
+    # so 0 falls through to k, the MAXIMAL constraint. Passing 0 for the free arm makes both arms
+    # R=k and the delta comes out at 2e-6, which looks like "changing regime is free" and is really
+    # "no regime was changed". The committed CSVs encode E in their own labels -- masked_R18 pairs
+    # with unmasked_R192 and masked_R6 with unmasked_R64 -- which is how this was confirmed.
+    E = 64 * grain
     if paradigm == "temporal":
-        direction, native_tag, cross_tag = "removal", f"masked_R{R}", "unmasked"
-        sweep = f"native:{R} cross:0"
+        direction, native_tag, cross_tag = "removal", f"masked_R{R}", f"unmasked_R{E}"
+        sweep = f"native:{R} cross:{E}"
     else:
-        direction, native_tag, cross_tag = "imposition", "unconstrained", f"imposed_R{R}"
-        sweep = f"native:0 cross:{R}"
+        direction, native_tag, cross_tag = "imposition", f"unconstrained_R{E}", f"imposed_R{R}"
+        sweep = f"native:{E} cross:{R}"
 
     # `experiments/run.sh` REWRITES run.meta on every invocation, including a read-only evaluation
     # like this one, with whatever geometry the caller passed. That silently destroys the record of
