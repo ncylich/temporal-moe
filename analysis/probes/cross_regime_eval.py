@@ -52,6 +52,13 @@ D_16K, D_50K = 2.7568, 2.9780
 CORPUS = {D_16K: "/workspace/FLAME-MoE/data/tok16k_full",
           D_50K: "/workspace/FLAME-MoE/data/dclm_tokenized"}
 
+# Micro-batch, per run, from the geometry each was TRAINED at. run.sh defaults to 32, and at 1e19
+# -- 14 layers, hidden 800, a 50k vocab -- the vocab-parallel cross-entropy allocates 12.28 GiB for
+# the logits and the evaluation dies of CUDA OOM with 1.36 GiB free. Those runs trained at mb=8.
+# Evaluation is not training, but the activation peak scales the same way, so inheriting a default
+# rather than the run's own micro-batch is what turns a 33 GB checkpoint into an OOM.
+MICRO_BATCH = {"g1_tmoe_coarse_1e19": 8, "moe_coarse_1e19": 8, "temporal_fine_g3_1e19": 8}
+
 # label, run_name, shape, flops, grain, paradigm, R, divisor, note
 #
 # GRAIN and R are read from each checkpoint's real geometry, not from run.meta. run.meta is rewritten
@@ -147,6 +154,8 @@ def run_cell(spec, keep_going=False):
         env = dict(os.environ, SWEEPEVAL="1", SWEEP=sweep, TEMPORAL="1",
                    SHAPE=shape, TARGET_FLOPS=flops, GRAIN=str(grain), RUN_NAME=run,
                    DATA_DIR=CORPUS[divisor],
+                   MICRO_BATCH=str(MICRO_BATCH.get(run, 32)),
+                   PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True",
                    CKPT_ROOT=CKPT_ROOT)
         p = subprocess.run(["bash", os.path.join(ROOT, "experiments", "run.sh")],
                            env=env, capture_output=True, text=True, cwd=ROOT)
