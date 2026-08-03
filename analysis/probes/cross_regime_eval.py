@@ -46,6 +46,11 @@ CKPT_ROOT = os.environ.get("CKPT_ROOT", "/workspace/FLAME-MoE/results/phase0/run
 OUT_DEFAULT = os.path.join(ROOT, "results", "ablations", "cross_regime_eval.csv")
 
 D_16K, D_50K = 2.7568, 2.9780
+# The divisor and the corpus are the same fact stated twice: 16k BPE runs trained on tok16k_full,
+# pythia-50k runs on dclm_tokenized. Evaluating a run on the other corpus would produce a number
+# with no relation to anything published, so DATA_DIR is set per cell rather than inherited.
+CORPUS = {D_16K: "/workspace/FLAME-MoE/data/tok16k_full",
+          D_50K: "/workspace/FLAME-MoE/data/dclm_tokenized"}
 
 # label, run_name, shape, flops, grain, paradigm, R, divisor, note
 #
@@ -70,7 +75,7 @@ CELLS = [
      "re-derive unmask_eval_1e19.csv removal cell"),
     ("temporal_fine_1e19",   "temporal_fine_g3_1e19", "s19opt", "1e19", 3, "temporal", 18, D_50K,
      "re-derive unmask_eval_1e19.csv removal cell"),
-    ("flame38m_1e18",        "flame38m_g5_temporal",  "s5",     "1e18", 5, "temporal", 30, D_16K,
+    ("flame38m_1e18",        "flame38m_g5_temporal",  "s5",     "1e18", 5, "temporal", 30, D_50K,
      "re-derive the unmask_eval.csv 1e18 cell, which is recorded in val_CE only"),
     # --- the unconfounded budget comparison: one family, two budgets, both directions ---
     ("g3_moe_s0_1e16",       "g3_moe_s0_1e16",        "s0",     "1e16", 3, "full_moe", 18, D_16K,
@@ -141,6 +146,7 @@ def run_cell(spec, keep_going=False):
     try:
         env = dict(os.environ, SWEEPEVAL="1", SWEEP=sweep, TEMPORAL="1",
                    SHAPE=shape, TARGET_FLOPS=flops, GRAIN=str(grain), RUN_NAME=run,
+                   DATA_DIR=CORPUS[divisor],
                    CKPT_ROOT=CKPT_ROOT)
         p = subprocess.run(["bash", os.path.join(ROOT, "experiments", "run.sh")],
                            env=env, capture_output=True, text=True, cwd=ROOT)
