@@ -19,7 +19,7 @@ section 5 because they bear on layer choice.
 
 **Cost**, used throughout: test bits per byte with the constraint changed at one layer, minus the
 model in its native regime. Positive is worse. Unmasking a layer for a temporal model, imposing
-residency for an full MoE one. Everything else is defined where it is used.
+residency for a full MoE one. Everything else is defined where it is used.
 
 **Eight files cannot be regenerated.** No producer in any commit on any branch, and their runs kept
 neither a router log nor a checkpoint. Claims resting on them say so in the sentence that makes them.
@@ -45,12 +45,11 @@ horizontal only.*
 Three checks that this is routing and not a weak probe:
 
 - **No token signal is left to find.** The linear probe reaches 99.4% of the nonparametric ceiling
-  from token identity alone, full MoE, and 101.8% temporal.
+  from token identity alone in the full MoE regime, and 101.8% in the temporal one.
 - **Causal, not correlational.** Swapping a frequency-matched token with context held fixed, against
-  the reverse: context-over-token ratio 0.69 full MoE (0.28 to 0.79) and 1.58 temporal (1.25
-  to 2.18), 29 measurements each, ranges non-overlapping.
-- **Not a rare-token artifact.** Token AUC by corpus-frequency stratum runs 0.813 to 0.891
-  full MoE and 0.550 to 0.581 temporal. No band concentrates the signal.
+  the reverse: context-over-token ratio 0.69 full MoE (0.28 to 0.79) against 1.58 temporal (1.25 to 2.18), 29 measurements each, ranges non-overlapping.
+- **Not a rare-token artifact.** Token AUC by corpus-frequency stratum runs 0.813 to 0.891 full MoE
+  and 0.550 to 0.581 temporal. No band concentrates the signal.
 
 Two consequences, here rather than in section 3 because they describe the router:
 
@@ -69,7 +68,7 @@ better, so a non-uniform memory budget should favour shallow ones.*
 
 ### Depth
 
-**Routing grows more contextual with depth, but far more so full MoE.** Per-arm slopes of
+**Routing grows more contextual with depth, but far more so in the full MoE regime.** Per-arm slopes of
 context minus token against layer index, bootstrap intervals:
 
 | regime | arms | median slope per layer | interval excludes zero |
