@@ -132,8 +132,10 @@ def _free_set_note(r):
     surface = "CE surface" if r.get("lora") else "C surface"
     ple = f"PLE rank {r['rank']}" if str(r.get("rank")) != "off" else "NO PLE"
     seed = f", data seed {r['data_seed']}" if r.get("data_seed") else ""
+    # Attention adaptation has to appear here or two cells differing only by it read identically.
+    attn = f", attention LoRA r{r['lora_attn']} on q/k/v/o" if r.get("lora_attn") else ""
     return (f"{surface}, {ple}, MoE layers {'/'.join(map(str, layers))} unconstrained, "
-            f"+{slots / 128 * 100 - 100:.1f}% resident memory{seed}")
+            f"+{slots / 128 * 100 - 100:.1f}% resident memory{attn}{seed}")
 for p in sorted(glob.glob(os.path.join(DATA_DIR, "ple_*.json"))):
     base = os.path.basename(p)
     if base.startswith(("ple_parity", "ple_heldout")):

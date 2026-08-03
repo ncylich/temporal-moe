@@ -44,8 +44,8 @@ trained_cell,ce_free_0_1_14_15_250M,final_swap_rate,0.999727,
 trained_cell,ce_free_0_1_14_15_250M,final_usage_entropy,0.998487,
 trained_cell,ce_free_0_1_14_15_250M,bpb_curve,10M:0.801246|20M:0.791596|30M:0.788088|40M:0.786252|50M:0.786275|60M:0.784560|70M:0.784062|80M:0.783782|90M:0.783184|100M:0.783358|110M:0.783233|120M:0.782688|130M:0.782659|140M:0.782858|150M:0.782432|160M:0.781951|170M:0.781992|180M:0.782275|190M:0.782090|200M:0.781871|210M:0.781490|220M:0.781767|230M:0.781671|240M:0.781255|250M:0.781199,
 trained_cell,ce_free_0_1_14_15_250M,train_bpb_curve,10M:0.893532|20M:0.825025|30M:0.813651|40M:0.811012|50M:0.812320|60M:0.807752|70M:0.808844|80M:0.809427|90M:0.811748|100M:0.808863|110M:0.807523|120M:0.808017|130M:0.807038|140M:0.804934|150M:0.809717|160M:0.806007|170M:0.805821|180M:0.806849|190M:0.805229|200M:0.803817|210M:0.807217|220M:0.804474|230M:0.806613|240M:0.806566|250M:0.806443,
-trained_cell,ce_free_0_1_14_15_attn,final_bpb,0.785201,"CE surface, NO PLE, MoE layers 0/1/14/15 unconstrained, +175.0% resident memory"
-trained_cell,ce_free_0_1_14_15_attn,recovery_pct,94.59,"CE surface, NO PLE, MoE layers 0/1/14/15 unconstrained, +175.0% resident memory"
+trained_cell,ce_free_0_1_14_15_attn,final_bpb,0.785201,"CE surface, NO PLE, MoE layers 0/1/14/15 unconstrained, +175.0% resident memory, attention LoRA r32 on q/k/v/o"
+trained_cell,ce_free_0_1_14_15_attn,recovery_pct,94.59,"CE surface, NO PLE, MoE layers 0/1/14/15 unconstrained, +175.0% resident memory, attention LoRA r32 on q/k/v/o"
 trained_cell,ce_free_0_1_14_15_attn,train_tokens,50003968,
 trained_cell,ce_free_0_1_14_15_attn,rank,off,
 trained_cell,ce_free_0_1_14_15_attn,lora_r,32,
