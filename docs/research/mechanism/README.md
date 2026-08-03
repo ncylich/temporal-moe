@@ -23,9 +23,10 @@ of three different quantities, so they live with the quantities they cut:
 
 | the depth result | lives in |
 |---|---|
-| The contextual share of routing rises with depth, in both regimes | `01-findings.md` §1 |
-| Routing demand becomes more cacheable with depth | `01-findings.md` §2 |
-| The first and last MoE layers cost the most to constrain | `01-findings.md` §3.2 |
+| The contextual share of routing rises with depth, clearly unconstrained and weakly constrained, so the regime gap narrows | `01-findings.md` §1 |
+| Routing demand becomes more cacheable with depth | `01-findings.md` §1 |
+| The last MoE layer costs the most to constrain, in seven of seven measurements; the first in two | `01-findings.md` §4 |
+| Single-layer damage does not predict which layers to free | `01-findings.md` §5 |
 | Its hypotheses, what falsified them, and what was withdrawn | `05-notebook.md`; retractions in `02-corrections.md` §4 |
 | Its superseded plan documents | `archive/LAYER_LEXICALITY*.md` |
 
