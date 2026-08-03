@@ -82,7 +82,7 @@ CELLS = [
      "re-derive unmask_eval_1e19.csv removal cell"),
     ("temporal_fine_1e19",   "temporal_fine_g3_1e19", "s19opt", "1e19", 3, "temporal", 18, D_50K,
      "re-derive unmask_eval_1e19.csv removal cell"),
-    ("flame38m_1e18",        "flame38m_g5_temporal",  "s5",     "1e18", 5, "temporal", 30, D_50K,
+    ("flame38m_1e18",        "flame38m_g5_temporal",  "s38m",   "1e18", 5, "temporal", 30, D_50K,
      "re-derive the unmask_eval.csv 1e18 cell, which is recorded in val_CE only"),
     # --- the unconfounded budget comparison: one family, two budgets, both directions ---
     ("g3_moe_s0_1e16",       "g3_moe_s0_1e16",        "s0",     "1e16", 3, "full_moe", 18, D_16K,
