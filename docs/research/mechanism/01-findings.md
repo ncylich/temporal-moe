@@ -358,6 +358,31 @@ Layers 2 and 15 tie on solo damage, 0.1408 against 0.1408. Freeing them is not e
 
 **Do not choose free sets from single-layer damage.**
 
+### What the downstream evaluations say
+
+Bits per byte is one number. Ten-task zero-shot accuracy agrees with it and shows what the constraint
+costs a model that was never trained under it:
+
+| task | constraint imposed, no adaptation | free routing | {0,1,2} | {0,1,15} | {0,1,14,15} |
+|---|---|---|---|---|---|
+| lambada | 0.000 | 0.706 | 0.564 | 0.595 | 0.577 |
+| arc easy | 0.280 | 0.771 | 0.658 | 0.674 | 0.680 |
+| hellaswag | 0.257 | 0.586 | 0.471 | 0.477 | 0.485 |
+| sciq | 0.293 | 0.937 | 0.914 | 0.925 | 0.934 |
+| winogrande | 0.491 | 0.692 | 0.568 | 0.561 | 0.560 |
+
+- **Imposing the constraint untrained is catastrophic, not merely costly.** Lambada goes to zero and
+  arc easy falls to near chance. This is the same fact as section 4's +0.4314 BPB, in a currency that
+  makes its size obvious.
+- **Adaptation recovers about 70% of the gap**, averaged over all ten tasks: 0.675 for {0,1,2}, 0.698
+  for {0,1,15}, 0.699 for {0,1,14,15}. Gap closed is (cell − imposed) / (free − imposed), so 1.0 is
+  free-routing quality and 0.0 is the untrained mask.
+- **The downstream ordering matches the BPB ordering.** Freeing the last layer beats freeing another
+  early one, on the aggregate and on 3 of the 5 tasks above.
+- **Recovery is uneven by task.** Sciq comes back almost entirely, at 0.925 against 0.937 free.
+  Winogrande barely moves off its 0.491 floor, and it is the one task where the free sets do not
+  separate.
+
 ## 6. What to do with it
 
 - Exempt the first and last MoE layers if you exempt any, on the architectural grounds in section 4,
