@@ -4,3 +4,4 @@
 2026-08-03T09:52:47Z | job=ce_free_0_1_14_15_attn_250M        | gpu=81045 MiB, 79 % | uncommitted=0 | 487min to deadline | ce_free_0_1_14_15_attn_250M rank=off tok=210M BPB=0.783081 train_lm=2.513428 train_bpb=0.8
 2026-08-03T10:52:00Z | ENTRY LOST: this hourly write was truncated by the MooseFS quota (see commit bbc3912); 134 NUL bytes removed. The job at the time was ce_free_0_1_14_15_attn_250M, which the quota also killed mid-checkpoint.
 2026-08-03T11:52:52Z | job=ce_free_0_1_14_15_attn_250M        | gpu=81045 MiB, 53 % | uncommitted=0 | 367min to deadline | ce_free_0_1_14_15_attn_250M rank=off tok=250M BPB=0.783079 train_lm=2.511805 train_bpb=0.8
+2026-08-03T12:52:56Z | job=ce_free_0_1_2                      | gpu=22497 MiB, 41 % | uncommitted=0 | 307min to deadline | ce_free_0_1_14_15_attn_250M rank=off tok=250M BPB=0.783079 train_lm=2.511805 train_bpb=0.8
