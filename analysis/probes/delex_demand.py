@@ -18,7 +18,7 @@ Two changes from the version that produced the published numbers:
    the first 70% of a document and scored on its last 30% can exploit that document's base rate.
    delex_locus.split_index provides both; 'sequence' is the default.
 
-Output: results/ablations/mechinterp_demand_1e19.csv, one row per (run, layer).
+Output: --out=PATH, default results/ablations/mechinterp_demand_1e19.csv; one row per (run, layer).
 """
 import csv
 import os
@@ -36,7 +36,22 @@ import safe_csv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS
 
-OUT = os.path.join(ABLATIONS, "mechinterp_demand_1e19.csv")
+DEFAULT_OUT = os.path.join(ABLATIONS, "mechinterp_demand_1e19.csv")
+
+
+def _out_path():
+    """--out=PATH, defaulting to the 1e19 file this probe was written for.
+
+    Without this the destination is hardcoded, so running the probe on any other model either
+    overwrites a committed result or, since the writer is shrink-guarded, aborts because the new
+    rows do not cover the runs already in the file. Neither is a way to measure a second model.
+    Relative paths resolve under results/ablations/.
+    """
+    for a in sys.argv[1:]:
+        if a.startswith("--out="):
+            v = a.split("=", 1)[1]
+            return v if os.path.isabs(v) else os.path.join(ABLATIONS, v)
+    return DEFAULT_OUT
 BF, BS = 0.5, 0.9        # fast / slow EMA decay on demand
 MAX_FIT = 400_000        # cap on fit rows per layer; pooled over experts this is already large
 FEATS = ["gate", "y_t", "y_lag1", "y_lag2", "y_lag3", "ema_fast", "ema_slow"]
@@ -115,7 +130,8 @@ def main():
             print(f"    L{L:<3} demand AUC = {auc:.4f}   (score rows {len(yte)}, "
                   f"base rate {yte.mean():.3f})", flush=True)
 
-    os.makedirs(ABLATIONS, exist_ok=True)
+    OUT = _out_path()
+    os.makedirs(os.path.dirname(OUT) or ABLATIONS, exist_ok=True)
     safe_csv.guard(OUT, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
     with open(OUT, "w", newline="") as f:
         w = csv.writer(f)
