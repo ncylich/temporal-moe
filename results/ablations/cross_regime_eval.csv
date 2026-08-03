@@ -1,0 +1,6 @@
+"# Cross-regime evaluation cost. Both arms scored on identical cached batches (analysis/probes/sweep_eval.py). BPB = CE / divisor; divisor is per tokenizer and recorded per row. ckpt_iter is the highest real iter_* directory, not whatever latest_checkpointed_iteration.txt claimed."
+cell,run_name,ckpt_iter,scale,trained_paradigm,direction,native_regime,native_CE,native_BPB,cross_regime,cross_CE,cross_BPB,delta_CE,delta_BPB,divisor,note
+g3_tmoe_s0_1e16,g3_tmoe_s0_1e16_mom,2232,s0_1e16,temporal,removal,masked_R18,4.2287,1.5339,unmasked_R192,4.5221,1.6404,+0.2934,+0.1064,2.7568,"removal, g3 family at 1e16"
+g3_moe_s0_1e16,g3_moe_s0_1e16,2232,s0_1e16,full_moe,imposition,unconstrained_R192,4.1909,1.5202,imposed_R18,6.6400,2.4086,+2.4491,+0.8884,2.7568,"imposition, g3 family at 1e16"
+g3_moe_s2_1e17,g3_moe_s2_1e17,3861,s2_1e17,full_moe,imposition,unconstrained_R192,3.6029,1.3069,imposed_R18,5.9878,2.1720,+2.3849,+0.8651,2.7568,"imposition, g3 family at 1e17 -- the cell the confound needs"
+g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,3861,s2_1e17,temporal,removal,masked_R18,3.6467,1.3228,unmasked_R192,4.1568,1.5078,+0.5101,+0.1850,2.7568,"removal, g3 family at 1e17"
