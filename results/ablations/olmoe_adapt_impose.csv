@@ -1,6 +1,9 @@
 # OLMoE-1B-7B-0125 Stage-0 zero-shot impose (R=k=8 of 64), NO training. Provisional PUBLIC slice
 # (wikitext-103-raw-v1 validation). BPB divisor is byte-derived for THIS tokenizer+slice:
 # D = ln(2) * bytes/token = 3.1550 (NOT a FLAME divisor). Final numbers will use the Stage-1 audited slice.
+# --- Stage-1 AUDITED slice restatement (final impose number) ---
+# dolmino-mix-1124 dclm (anneal parent, disjoint from OLMoE-mix-0924 pretraining manifest), 256x4096
+# subsample of the 100M-token held-out slice. Byte-derived divisor D=ln2*bytes/tok=3.1089.
 source,R,n_seq_x4096,CE,BPB,divisor,note
 wikitext103_val,64,8,1.8914,0.5995,3.1550,base (residency off)
 wikitext103_val,8,8,9.1604,2.9034,3.1550,base+mask impose gap dCE=+7.269 dBPB=+2.304
@@ -8,9 +11,6 @@ rsweep_wikitext103_val,64,2,1.6145,,,base for R-sweep coherence check
 rsweep_wikitext103_val,48,2,1.7146,,,dCE=+0.100
 rsweep_wikitext103_val,32,2,2.0134,,,dCE=+0.399
 rsweep_wikitext103_val,16,2,4.7862,,,dCE=+3.172
-rsweep_wikitext103_val,8,2,9.1532,,,dCE=+7.539 (smooth monotone R-curve => gap is genuine, not a port bug)
-# --- Stage-1 AUDITED slice restatement (final impose number) ---
-# dolmino-mix-1124 dclm (anneal parent, disjoint from OLMoE-mix-0924 pretraining manifest), 256x4096
-# subsample of the 100M-token held-out slice. Byte-derived divisor D=ln2*bytes/tok=3.1089.
+rsweep_wikitext103_val,8,2,9.1532,,,"dCE=+7.539 (smooth monotone R-curve => gap is genuine, not a port bug)"
 dolmino_dclm_audited,64,256,2.0915,0.6727,3.1089,base (residency off) — audited slice
 dolmino_dclm_audited,8,256,8.5517,2.7507,3.1089,base+mask impose gap dCE=+6.460 dBPB=+2.078 (final)
