@@ -4,3 +4,7 @@ g3_tmoe_s0_1e16,g3_tmoe_s0_1e16_mom,2232,s0_1e16,temporal,removal,masked_R18,4.2
 g3_moe_s0_1e16,g3_moe_s0_1e16,2232,s0_1e16,full_moe,imposition,unconstrained_R192,4.1909,1.5202,imposed_R18,6.6400,2.4086,+2.4491,+0.8884,2.7568,"imposition, g3 family at 1e16"
 g3_moe_s2_1e17,g3_moe_s2_1e17,3861,s2_1e17,full_moe,imposition,unconstrained_R192,3.6029,1.3069,imposed_R18,5.9878,2.1720,+2.3849,+0.8651,2.7568,"imposition, g3 family at 1e17 -- the cell the confound needs"
 g3_tmoe_s2_1e17,g3_tmoe_s2_1e17,3861,s2_1e17,temporal,removal,masked_R18,3.6467,1.3228,unmasked_R192,4.1568,1.5078,+0.5101,+0.1850,2.7568,"removal, g3 family at 1e17"
+moe_coarse_1e19,moe_coarse_1e19,4318,s19opt_1e19,full_moe,imposition,unconstrained_R64,3.1294,1.0508,imposed_R6,4.4139,1.4822,+1.2846,+0.4314,2.9780,re-derive unmask_eval_1e19.csv imposition cell
+temporal_coarse_1e19,g1_tmoe_coarse_1e19,4318,s19opt_1e19,temporal,removal,masked_R6,3.1787,1.0674,unmasked_R64,3.7938,1.2739,+0.6151,+0.2065,2.9780,re-derive unmask_eval_1e19.csv removal cell
+temporal_fine_1e19,temporal_fine_g3_1e19,4278,s19opt_1e19,temporal,removal,masked_R18,3.1712,1.0649,unmasked_R192,3.7686,1.2655,+0.5974,+0.2006,2.9780,re-derive unmask_eval_1e19.csv removal cell
+flame38m_1e18,flame38m_g5_temporal,2121,s38m_1e18,temporal,removal,masked_R30,4.0162,1.3486,unmasked_R320,4.5116,1.5150,+0.4954,+0.1663,2.9780,"re-derive the unmask_eval.csv 1e18 cell, which is recorded in val_CE only"
