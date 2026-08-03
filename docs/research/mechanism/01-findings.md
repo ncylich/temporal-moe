@@ -352,12 +352,6 @@ seven, both unconstrained models at 1e18, and sits at or below the interior mean
 
 Per-layer cost relative to the mean over interior layers. Higher means more expensive to change at
 that layer. The seven measurements also disagree about where the minimum sits, so no vertex is claimed.
-
-<img src="../../../results/phase0/figures/per_layer_routing_locality_ranking.png" alt="Per-layer routing locality ranking" width="66%">
-
-*Layers ranked by how local their routing is. The ordering does not match the cost ordering above,
-which is the point section 4.3 quantifies.*
-
 The reason is positional, not lexical. A magnitude-matched perturbation carrying no lexical information
 reproduces most of the endpoint excess: 63% on the coarse model and 83% on the fine one, where the
 excess is the mean of the two endpoint costs minus the mean over interior layers, and the noise scale
