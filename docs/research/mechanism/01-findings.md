@@ -110,6 +110,39 @@ sensitivity rises ~35%, which no difference of probe AUCs could have separated.
 
 **Strength: high.** This is the claim that makes §1 a mechanism rather than an association.
 
+### 1.3 The same split shows up in what experts are, and in the geometry of the router
+
+Two more measurements point the same way as the probes, from different directions.
+
+**Experts become generalists** (`mechinterp_structural{,_1e19}.csv`, 30 arms; a *generalist* draws its
+usage from more than half the token stream):
+
+| regime | arms | generalist % at first MoE layer | at last | router entropy, first → last |
+|---|---|---|---|---|
+| unconstrained | 14 | 4.7% | 5.0% | 0.890 → 0.881 |
+| temporal | 16 | 75.3% | 65.9% | 0.957 → 0.940 |
+
+A fifteen-fold gap in generalist fraction, roughly stable with depth, on flatter routing throughout.
+*One caveat that matters for §2 of the corrections document*: the matched 1e19 coarse pair is not
+typical here — both its regimes are near-total generalists at layer 2 and diverge only with depth. The
+"indistinguishable through layer 4" statement recorded there is true of that pair and not of the
+population.
+
+**And the router's own geometry differs.** Each layer's token probe spans a subspace of embedding
+directions that layer is sensitive to; comparing those subspaces across layers asks whether routing is
+the same function at every depth (`mechinterp_transfer.csv`). Excluding 11 of 26 arms where the
+statistic is degenerate — when the number of experts meets or exceeds the hidden size the column space
+spans everything and the measure carries no information — cross-layer overlap relative to chance is:
+
+| regime | arms | overlap ÷ chance | IQR |
+|---|---|---|---|
+| unconstrained | 15 non-degenerate | **2.18×** | 1.30 – 3.34 |
+| temporal | | **1.60×** | 1.26 – 2.26 |
+
+The *unconstrained* router is the more self-similar one across depth, which is what a token lookup
+predicts: the same map at every layer points its probes in the same directions. Constrained routing
+uses whatever context is available at each depth, and that differs layer to layer.
+
 ## 2. How routing behaves over time, and what that buys serving
 
 **Claim.** Contextual routing is autocorrelated in time, and that shows up directly as cache
@@ -151,7 +184,25 @@ rather than estimated. Replaying more baselines needs no GPU and would fix it. S
 usable here — at `R = k` it fires whenever any demanded expert is missing, so it saturates at
 0.994–1.000 everywhere and carries no signal.
 
-### 2.1 The constraint does not starve experts
+### 2.1 Next-token demand becomes almost perfectly predictable from history
+
+**Claim.** For a constrained model you can tell which experts the *next* token will want using nothing
+but the recent demand history — no embeddings, no hidden states.
+
+**Evidence** (`mechinterp_demand_1e19.csv`, 192 layer-measurements over 30 arms; a causal
+history-only probe, AUC):
+
+| regime | measurements | demand AUC |
+|---|---|---|
+| unconstrained | 89 | 0.567 – 0.716 (median 0.655) |
+| temporal | 103 | **0.919 – 0.993** (median **0.981**) |
+
+**No overlap, and the ranges are not close.** This is the mechanism behind §2's cache numbers stated
+directly: the constraint does not merely make demand *cacheable*, it makes it *forecastable*, which is
+what a prefetcher needs. It is also a much larger separation than the 0.85-against-0.64 recorded in the
+original write-up, which was a single pooled pair.
+
+### 2.2 The constraint does not starve experts
 
 **Claim.** Restricting each token to a resident set does not collapse expert usage — the model still
 touches nearly all of them, just not simultaneously.
@@ -166,7 +217,7 @@ This is the answer to the obvious worry about a one-swap-per-token cache: it doe
 192-expert model into a 24-expert one. The resident *set* is small; the expert *inventory* in use is
 not.
 
-### 2.2 Eviction policy is nearly exhausted as a lever; demand smoothing is not
+### 2.3 Eviction policy is nearly exhausted as a lever; demand smoothing is not
 
 Two levers on the same cache, and they behave very differently
 (`e5_eviction_policy_headroom.csv`, `e7_demand_smoothing.csv`, set coverage, higher is better):
@@ -194,7 +245,7 @@ for set coverage under a changing demand stream — but that is inference from t
 the implementation, so treat the exact Belady value as unverified. The 20%-headroom conclusion does not
 depend on it: `min_logit` beats LRU and every tau variant above 1.0.
 
-### 2.3 Document boundaries are not a confound
+### 2.4 Document boundaries are not a confound
 
 Hit rate barely changes across an end-of-document token: median deficit **+0.009**, range −0.053 to
 +0.122 over 66 measurements (`e8_document_boundary.csv`). The temporal locality that makes the cache
