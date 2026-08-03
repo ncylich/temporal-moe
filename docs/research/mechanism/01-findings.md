@@ -85,7 +85,32 @@ that routers memorise rare tokens.
 **Strength: high.** The largest, most replicated result in the program, and now bounded above as well
 as below. Its main untested exposure is that each cell is one training seed — see §5.
 
-### 1.1 The serving-side consequence: routing demand becomes cacheable
+### 1.2 The shift is causal, not an artefact of the probes
+
+**Claim.** Substituting the token a position holds moves the constrained model's expert selection
+*less* than shuffling that position's context does; in the unconstrained model the ordering reverses.
+
+**Evidence.** Hold context fixed and substitute a frequency-matched token; then hold the token fixed
+and shuffle the surrounding window. Score position *t* only, so token substitution cannot leak into
+the context arm through its neighbours. The statistic is the ratio of context-driven to token-driven
+change in the selected expert set — above 1 means context dominates (`mechinterp_causal.csv`):
+
+| cell | unconstrained | temporal |
+|---|---|---|
+| 1e18, 6 of 64, layers 2–9 | 0.30 – 0.73 | 1.34 – 1.66 |
+| 1e18, 18 of 192, layers 2–9 | 0.40 – 0.79 | 1.85 – 2.18 |
+| 1e19, 6 of 64, layers 2–14 | 0.28 – 0.79 | 1.25 – 1.71 |
+
+**Every unconstrained layer sits below 1 and every temporal layer above it**, in all three cells —
+and the two populations do not merely straddle the threshold, they are *separated*. Aggregated over
+all 58 layer-measurements: unconstrained spans 0.280–0.794, temporal spans 1.248–2.177, so **the
+closest temporal measurement sits 0.453 above the highest unconstrained one**. There is no overlap
+across two budgets, two granularities and depths of 9 and 14. The effect decomposes: token sensitivity falls ~42% while context
+sensitivity rises ~35%, which no difference of probe AUCs could have separated.
+
+**Strength: high.** This is the claim that makes §1 a mechanism rather than an association.
+
+## 2. How routing behaves over time, and what that buys serving
 
 **Claim.** Contextual routing is autocorrelated in time, and that shows up directly as cache
 behaviour — the resident set matches what the next token wants far more often than chance, and far
@@ -126,30 +151,59 @@ rather than estimated. Replaying more baselines needs no GPU and would fix it. S
 usable here — at `R = k` it fires whenever any demanded expert is missing, so it saturates at
 0.994–1.000 everywhere and carries no signal.
 
-## 2. The shift is causal, not a correlation of probes
+### 2.1 The constraint does not starve experts
 
-**Claim.** Substituting the token a position holds moves the constrained model's expert selection
-*less* than shuffling that position's context does; in the unconstrained model the ordering reverses.
+**Claim.** Restricting each token to a resident set does not collapse expert usage — the model still
+touches nearly all of them, just not simultaneously.
 
-**Evidence.** Hold context fixed and substitute a frequency-matched token; then hold the token fixed
-and shuffle the surrounding window. Score position *t* only, so token substitution cannot leak into
-the context arm through its neighbours. The statistic is the ratio of context-driven to token-driven
-change in the selected expert set — above 1 means context dominates (`mechinterp_causal.csv`):
+**Evidence** (`e2_streamed_diversity.csv`, union of distinct experts touched per sequence): the plain
+constrained recipes reach **85–100% of E** with effective-expert counts of 183–188 out of 192 and
+62–63 out of 64. The low-diversity arms in that file (union 0.13–0.66) are all *selection-shaping*
+variants — anticipatory, bursty and head-gated losses — which are a different experiment and not the
+shipped recipe.
 
-| cell | unconstrained | temporal |
+This is the answer to the obvious worry about a one-swap-per-token cache: it does not turn a
+192-expert model into a 24-expert one. The resident *set* is small; the expert *inventory* in use is
+not.
+
+### 2.2 Eviction policy is nearly exhausted as a lever; demand smoothing is not
+
+Two levers on the same cache, and they behave very differently
+(`e5_eviction_policy_headroom.csv`, `e7_demand_smoothing.csv`, set coverage, higher is better):
+
+| lever | setting | set coverage |
 |---|---|---|
-| 1e18, 6 of 64, layers 2–9 | 0.30 – 0.73 | 1.34 – 1.66 |
-| 1e18, 18 of 192, layers 2–9 | 0.40 – 0.79 | 1.85 – 2.18 |
-| 1e19, 6 of 64, layers 2–14 | 0.28 – 0.79 | 1.25 – 1.71 |
+| eviction rule | LRU | 0.251 |
+| | **`min_logit` (shipped)** | **0.310** |
+| | Belady, offline optimal | 0.371 |
+| demand smoothing | β = 1 (none, shipped) | 0.310 |
+| | β = 0.25 | 0.640 |
+| | **β = 0.1** | **0.854** |
 
-**Every unconstrained layer sits below 1 and every temporal layer above it**, in all three cells —
-and the two populations do not merely straddle the threshold, they are *separated*. Aggregated over
-all 58 layer-measurements: unconstrained spans 0.280–0.794, temporal spans 1.248–2.177, so **the
-closest temporal measurement sits 0.453 above the highest unconstrained one**. There is no overlap
-across two budgets, two granularities and depths of 9 and 14. The effect decomposes: token sensitivity falls ~42% while context
-sensitivity rises ~35%, which no difference of probe AUCs could have separated.
+**Changing which expert you evict is worth at most ~20%** — the shipped heuristic sits within that of
+an offline oracle that can see the future. **Smoothing the demand signal is worth 2.8×**, and it also
+drops swap rate from 1.000 to 0.926, so it costs less bandwidth rather than more.
 
-**Strength: high.** This is the claim that makes §1 a mechanism rather than an association.
+That is the clearest serving-side result in the program, and it points at the demand signal rather
+than the cache policy as the place to spend effort.
+
+*One caveat worth keeping.* The same file reports `discounted-oracle` and `min_logit+tau` variants
+scoring **above** Belady, which should be impossible if Belady were optimal for this objective. The
+likely explanation is that Belady is implemented as evict-farthest-next-*demand*, which is not optimal
+for set coverage under a changing demand stream — but that is inference from the numbers, not a read of
+the implementation, so treat the exact Belady value as unverified. The 20%-headroom conclusion does not
+depend on it: `min_logit` beats LRU and every tau variant above 1.0.
+
+### 2.3 Document boundaries are not a confound
+
+Hit rate barely changes across an end-of-document token: median deficit **+0.009**, range −0.053 to
++0.122 over 66 measurements (`e8_document_boundary.csv`). The temporal locality that makes the cache
+work is not an artefact of documents being concatenated in the eval stream — it survives inside and
+across them.
+
+**Strength of §2 overall: medium-to-high on the constrained side, weak on the comparison.** Every
+statement above is measured on 21–22 arms, but only one unconstrained run has a preserved router log,
+so regime *contrasts* in this section rest on a single baseline. Replaying more baselines needs no GPU.
 
 ## 3. What the constraint costs
 

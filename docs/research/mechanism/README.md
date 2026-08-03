@@ -17,6 +17,22 @@ result, and it is long.
 [`archive/`](archive/) holds the superseded documents and the pre-correction write-up. Nothing there
 should be cited.
 
+## Finding the layer-lexicality work
+
+It ran as its own program for weeks and has no directory, deliberately. Its results are a *depth cut*
+of three different quantities, so they live with the quantities they cut:
+
+| the depth result | lives in |
+|---|---|
+| The contextual share of routing rises with depth — in both regimes | `01-findings.md` §1 |
+| Routing demand becomes more cacheable with depth | `01-findings.md` §2 |
+| The first and last MoE layers cost the most to constrain | `01-findings.md` §3.2 |
+| Its hypotheses, what falsified them, and what was withdrawn | `05-notebook.md`; retractions in `02-corrections.md` §4 |
+| Its superseded plan documents | `archive/LAYER_LEXICALITY*.md` |
+
+Putting it in one directory would mean either splitting the base results it cuts, or holding a second
+copy of them. This repository's every documented drift came from a claim having two homes.
+
 ## Conventions
 
 - **Claims name their evidence.** Every number in 01 says which CSV it came from, and was read from
