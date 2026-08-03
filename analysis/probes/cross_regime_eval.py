@@ -47,7 +47,13 @@ OUT_DEFAULT = os.path.join(ROOT, "results", "ablations", "cross_regime_eval.csv"
 
 D_16K, D_50K = 2.7568, 2.9780
 
-# label, run_name, shape, flops, paradigm, R, divisor, note
+# label, run_name, shape, flops, grain, paradigm, R, divisor, note
+#
+# GRAIN and R are read from each checkpoint's real geometry, not from run.meta. run.meta is rewritten
+# by experiments/run.sh on every invocation and at least two of these files no longer describe the
+# run they sit in. At grain 3 a layer holds 192 experts with top-18, so R must be 18; passing grain 1
+# against a grain-3 checkpoint fails with a router shape mismatch of (192,H) against (64,H), which is
+# how this was found.
 #
 # `R` is the residency the paired regime uses: for a temporal model it is the R it TRAINED under and
 # the cross arm turns residency off; for a full-MoE model it is the R imposed at eval only.
@@ -58,22 +64,22 @@ D_16K, D_50K = 2.7568, 2.9780
 # imposition direction, and g3_tmoe at the same two points gives the removal direction alongside it.
 CELLS = [
     # --- re-derivations of existing committed cells, where the run is unambiguous ---
-    ("moe_coarse_1e19",      "moe_coarse_1e19",       "s19opt", "1e19", "full_moe", 6,  D_50K,
+    ("moe_coarse_1e19",      "moe_coarse_1e19",       "s19opt", "1e19", 1, "full_moe", 6,  D_50K,
      "re-derive unmask_eval_1e19.csv imposition cell"),
-    ("temporal_coarse_1e19", "g1_tmoe_coarse_1e19",   "s19opt", "1e19", "temporal", 6,  D_50K,
+    ("temporal_coarse_1e19", "g1_tmoe_coarse_1e19",   "s19opt", "1e19", 1, "temporal", 6,  D_50K,
      "re-derive unmask_eval_1e19.csv removal cell"),
-    ("temporal_fine_1e19",   "temporal_fine_g3_1e19", "s19opt", "1e19", "temporal", 18, D_50K,
+    ("temporal_fine_1e19",   "temporal_fine_g3_1e19", "s19opt", "1e19", 3, "temporal", 18, D_50K,
      "re-derive unmask_eval_1e19.csv removal cell"),
-    ("flame38m_1e18",        "flame38m_g5_temporal",  "s5",     "1e18", "temporal", 6,  D_16K,
+    ("flame38m_1e18",        "flame38m_g5_temporal",  "s5",     "1e18", 5, "temporal", 30, D_16K,
      "re-derive the unmask_eval.csv 1e18 cell, which is recorded in val_CE only"),
     # --- the unconfounded budget comparison: one family, two budgets, both directions ---
-    ("g3_moe_s0_1e16",       "g3_moe_s0_1e16",        "s0",     "1e16", "full_moe", 18, D_16K,
+    ("g3_moe_s0_1e16",       "g3_moe_s0_1e16",        "s0",     "1e16", 3, "full_moe", 18, D_16K,
      "imposition, g3 family at 1e16"),
-    ("g3_moe_s2_1e17",       "g3_moe_s2_1e17",        "s2",     "1e17", "full_moe", 6,  D_16K,
+    ("g3_moe_s2_1e17",       "g3_moe_s2_1e17",        "s2",     "1e17", 3, "full_moe", 18, D_16K,
      "imposition, g3 family at 1e17 -- the cell the confound needs"),
-    ("g3_tmoe_s0_1e16",      "g3_tmoe_s0_1e16_mom",   "s0",     "1e16", "temporal", 18, D_16K,
+    ("g3_tmoe_s0_1e16",      "g3_tmoe_s0_1e16_mom",   "s0",     "1e16", 3, "temporal", 18, D_16K,
      "removal, g3 family at 1e16"),
-    ("g3_tmoe_s2_1e17",      "g3_tmoe_s2_1e17",       "s2",     "1e17", "temporal", 6,  D_16K,
+    ("g3_tmoe_s2_1e17",      "g3_tmoe_s2_1e17",       "s2",     "1e17", 3, "temporal", 18, D_16K,
      "removal, g3 family at 1e17"),
 ]
 
@@ -101,7 +107,7 @@ def resolve_iter(run):
 
 
 def run_cell(spec, keep_going=False):
-    label, run, shape, flops, paradigm, R, divisor, note = spec
+    label, run, shape, flops, grain, paradigm, R, divisor, note = spec
     it, latest_file, claimed = resolve_iter(run)
 
     if paradigm == "temporal":
@@ -111,20 +117,30 @@ def run_cell(spec, keep_going=False):
         direction, native_tag, cross_tag = "imposition", "unconstrained", f"imposed_R{R}"
         sweep = f"native:0 cross:{R}"
 
-    # Point Megatron at the checkpoint we chose, then put the file back exactly as it was.
-    backup = latest_file + ".crossregime_bak"
-    if claimed is not None:
-        shutil.copy2(latest_file, backup)
+    # `experiments/run.sh` REWRITES run.meta on every invocation, including a read-only evaluation
+    # like this one, with whatever geometry the caller passed. That silently destroys the record of
+    # what the run was actually trained as. It has already happened at least once in this repository
+    # -- g3_tmoe_s2_1e17/run.meta no longer matches its MANIFEST.csv hash and now reads temporal=0
+    # for a run whose name and checkpoint say otherwise -- and it happened again while this script
+    # was being written, to g3_moe_s0_1e16. Both files are restored from `latest` and `run.meta`
+    # backups here so that a failed evaluation cannot cost provenance.
+    guarded = [latest_file, os.path.join(CKPT_ROOT, run, "run.meta")]
+    backups = {}
+    for path in guarded:
+        if os.path.exists(path):
+            backups[path] = path + ".crossregime_bak"
+            shutil.copy2(path, backups[path])
     open(latest_file, "w").write(f"{it}\n")
     try:
         env = dict(os.environ, SWEEPEVAL="1", SWEEP=sweep, TEMPORAL="1",
-                   SHAPE=shape, TARGET_FLOPS=flops, RUN_NAME=run, CKPT_ROOT=CKPT_ROOT)
+                   SHAPE=shape, TARGET_FLOPS=flops, GRAIN=str(grain), RUN_NAME=run,
+                   CKPT_ROOT=CKPT_ROOT)
         p = subprocess.run(["bash", os.path.join(ROOT, "experiments", "run.sh")],
                            env=env, capture_output=True, text=True, cwd=ROOT)
     finally:
-        if claimed is not None:
-            shutil.move(backup, latest_file)
-        else:
+        for path, bak in backups.items():
+            shutil.move(bak, path)
+        if latest_file not in backups and os.path.exists(latest_file):
             os.remove(latest_file)
 
     got = dict(re.findall(r"\[sweep\] (\w+) lm_loss=([0-9.]+)", p.stdout))
@@ -159,10 +175,10 @@ def main():
     a = ap.parse_args()
 
     if a.list:
-        print(f"{'label':24}{'run':26}{'scale':10}{'paradigm':10}{'R':>3}  direction")
-        for label, run, shape, flops, par, R, _d, _n in CELLS:
+        print(f"{'label':24}{'run':26}{'scale':10}{'g':3}{'paradigm':10}{'R':>3}  direction")
+        for label, run, shape, flops, grain, par, R, _d, _n in CELLS:
             d = "removal" if par == "temporal" else "imposition"
-            print(f"{label:24}{run:26}{shape + '_' + flops:10}{par:10}{R:>3}  {d}")
+            print(f"{label:24}{run:26}{shape + '_' + flops:10}g{grain} {par:10}{R:>3}  {d}")
         return
 
     want = [c for c in CELLS if a.all or c[0] in a.cell]
