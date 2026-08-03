@@ -72,20 +72,36 @@ more often than it does for an unconstrained router.
 arrives, measured before the swap. A random resident set scores `k/E` — 0.094 at both 6-of-64 and
 18-of-192, so the two granularities are directly comparable (`e6_per_layer_ranking.csv`):
 
-| regime | arms | first MoE layer | last MoE layer |
-|---|---|---|---|
-| unconstrained (residency imposed at replay) | 1 | 0.117 | 0.250 |
-| temporal | 21 | 0.208 | 0.402 |
+![Cache hit rate by MoE layer](../../../results/phase0/figures/hitrate_by_layer.png)
 
-Two things follow. Hit rate **rises with depth in both regimes** — deeper routing demand is more
-temporally coherent, which is what §1's depth trend predicts. And the constrained model is roughly
-1.6–1.8× more cacheable than an unconstrained one at the same position, which is the whole serving
-case: it is why `R = k` with one swap per token is viable at all.
+*Regenerate with `$PY analysis/plots/plot_hitrate_by_layer.py`.*
 
-**Strength: medium.** The temporal side is 21 arms; the unconstrained comparison is **one** arm, from a
-counterfactual replay that imposes residency on a model never trained under it. Treat the ratio as
-indicative. Swap rate is *not* usable here — at `R = k` it fires whenever any demanded expert is
-missing, so it saturates at 0.994–1.000 everywhere and carries no signal.
+**The comparison is regime-fair, and here is why.** Every arm on that figure is the same measurement:
+take *that model's own* raw router logits, replay the identical rolling-residency policy over them,
+and ask how often a token's demand is already resident. Neither regime is handed residency for free.
+The constrained model's logits happen to come from a model trained under the policy and the
+unconstrained model's from one that was not — that is the difference being measured, and it is the
+only one. A constrained model evaluated *without* the policy has no residency to hit, so there is no
+third arm to add; the two regimes are the whole comparison.
+
+Reading off the matched pair at 1e19 coarse — the one cell where both regimes have a preserved router
+log, 13 MoE layers each:
+
+| regime | first MoE layer | last MoE layer |
+|---|---|---|
+| unconstrained MoE | 0.117 | 0.250 |
+| temporal | 0.114 | 0.424 |
+
+The two start at the same place and diverge with depth: by the last layer the constrained model is
+**1.7×** more cacheable. Hit rate rises with depth in *both* regimes, which is what §1's depth trend
+predicts — deeper demand is more temporally coherent regardless of training — but it rises much
+further under the constraint.
+
+**Strength: medium, limited by sample rather than by method.** Twenty-one constrained arms have a
+preserved router log and exactly **one** unconstrained run does, so the vertical gap is indicative
+rather than estimated. Replaying more baselines needs no GPU and would fix it. Swap rate is *not*
+usable here — at `R = k` it fires whenever any demanded expert is missing, so it saturates at
+0.994–1.000 everywhere and carries no signal.
 
 ## 2. The shift is causal, not a correlation of probes
 
@@ -174,6 +190,10 @@ constrain, which a lexical account predicts backwards.
 excess on one model and **85%** on the model with the largest effect (`sham_magnitude_matched.csv`), so
 most of the endpoint cost is sensitivity to position rather than to what the layer routes on.
 
+![Real versus magnitude-matched sham, and the residual](../../../results/phase0/figures/sham_residual.png)
+
+*Regenerate with `$PY analysis/plots/plot_sham_residual.py`.*
+
 **The residue is not negligible, and it is itself an endpoint effect.** Real minus matched-sham, per
 layer: L2 **+0.022**, L3 −0.069, L4 −0.039, L5 −0.019, L6 +0.013, L7 −0.012, L8 +0.012, L9 **+0.095**.
 The interior residues are near zero or negative; the two positive outliers are the two endpoints, and
@@ -199,27 +219,30 @@ top-18, 16k vocabulary, ~65 min per run. Eight arms × three seeds (1234, 2, 3) 
 | A7 | uniform R=76, matched memory to A5/A6 | 4.0572 | 0.0204 |
 | A1 | {2,3,4} — all | 4.0601 | 0.0047 |
 
-Paired contrasts across the shared seeds:
+**The U survives here too, and an earlier version of this section said otherwise because it tested
+the wrong contrast.** Among the three single-layer arms the middle layer is the cheapest to constrain
+and both endpoints cost more — **in all three seeds**. The contrast a U predicts is endpoints against
+middle: **+0.0134 CE, se 0.0048, t = 2.80**. Not significant at two degrees of freedom (critical value
+4.30), but in the predicted direction and consistent across every seed.
 
-| contrast | Δ test CE | se |
-|---|---|---|
-| all three MoE layers constrained vs none | **+0.0419** | **5.3** |
-| first vs last MoE layer — the endpoint effect | +0.0014 | 0.2 |
-| exempt-last vs uniform schedule at matched memory | −0.0080 | 0.7 |
-| exempt-last vs exempt-first | +0.0017 | 0.5 |
+What the earlier version reported instead was *first versus last* (+0.0014, 0.2 se) and read its
+nullity as evidence against the U. A U-shape predicts first ≈ last. That contrast being null
+**confirms the shape's symmetry**; it says nothing against its existence.
 
-Only the global cost clears 2 se.
+**The testbed is still weak evidence about depth.** Three MoE layers is barely a depth axis — "first",
+"middle" and "last" are layers 2, 3 and 4 of the same small model at the smallest budget in the
+program. What it shows is that the ordering survives from-scratch training in the one cell where that
+was affordable to test.
 
-**This testbed is weak evidence about depth and should not be read as general.** Three MoE layers is
-barely a depth axis; "first", "middle" and "last" are layers 2, 3 and 4 of the same small model, at the
-smallest budget in the program. It rules out a *large* per-layer effect in that cell. It does not
-contradict the PLE result above, which is a 16-layer model with a genuine interior.
+**Strength: the shape is supported three independent ways; the explanation is not.** The endpoint
+structure shows up in the inference-time profile, in the PLE free-set ladder on a 16-layer adapted
+model, and in the ordering of the from-scratch training arms — three settings, three methods, same
+shape. What is refuted is the *lexical* account of it: the endpoint layers are not the token-driven
+ones, and a perturbation carrying no lexical information reproduces most of the effect.
 
-**Strength: mixed, and this section is the least settled in the document.** The endpoint structure is
-supported by two committed PLE cells and by the inference-time profile; the lexical explanation for it
-is refuted three ways; the from-scratch replication is under-powered by construction. What would settle
-it is the missing `{0,1,2}` PLE cell, and a from-scratch sweep on a model deep enough to have an
-interior.
+The two things that would settle what remains: the missing `{0,1,2}` PLE cell, which separates
+"the last layer" from "one more layer" at matched memory, and a from-scratch sweep on a model deep
+enough to have a real interior — the 9-layer 1e18 panel rather than three MoE layers at 1e16.
 
 ## 4. What the constraint does not do
 
