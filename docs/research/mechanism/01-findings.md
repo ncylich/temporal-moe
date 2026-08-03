@@ -183,8 +183,16 @@ is better:
 ## 3. Serving
 
 **The demand signal is the lever. The eviction rule is not.** Both measured by replaying the same
-recorded demand through different policies, so only the cache logic varies. Metric is **set coverage**: of the experts a token wants,
-the share the resident set already holds when it arrives. Floor 9.4%.
+recorded demand through different policies, so only the cache logic varies. Metric is **set
+coverage**: of the experts a token wants, the share the resident set already holds when it arrives.
+Floor 9.4%.
+
+Two of the policies below are bounds rather than deployable rules. **Belady** evicts whichever
+resident expert is next demanded farthest in the future, which is optimal for a pure eviction rule and
+needs the whole future to compute. **Discounted oracle** also sees the future but weights it, scoring
+each expert by its demand over the coming tokens discounted by *g* per step, so *g* = 0.5 looks a step
+or two ahead and *g* = 0.95 looks much further. Both are ceilings: what a rule could achieve given
+knowledge it will not have at serving time.
 
 | eviction policy | set coverage |
 |---|---|
@@ -206,6 +214,11 @@ the share the resident set already holds when it arrives. Floor 9.4%.
 
 *Set coverage by policy, per shipped configuration. Higher is better. The practical-to-optimal gap is
 small next to what a better demand estimate opens.*
+
+**Smoothing** replaces the raw per-token demand estimate with an exponential moving average over
+recent tokens, so a single unusual token cannot evict an expert the stream still wants. Strength is
+the averaging constant: 1.0 is no smoothing, 0.1 averages over roughly the last ten tokens. It cuts
+swaps and raises coverage at the same time, which no eviction rule here manages.
 
 <img src="../../../results/phase0/figures/demand_smoothing_swap_vs_coverage.png" alt="Swap rate against coverage under demand smoothing" width="66%">
 
