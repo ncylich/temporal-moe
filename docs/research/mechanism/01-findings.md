@@ -234,20 +234,19 @@ Two levers on the same cache, and they behave very differently
 | | β = 0.25 | 0.640 |
 | | β = 0.1 | 0.854 |
 
-**Changing which expert you evict is worth at most 20%.** The shipped heuristic sits within that of an
-offline oracle that can see the future. **Smoothing the demand signal is worth 2.8×**, and it also
+Changing which expert you evict is worth at most 20%, and the shipped heuristic already sits within
+that of an offline oracle that can see the future. Smoothing the demand signal is worth 2.8x, and it
 drops swap rate from 1.000 to 0.926, so it costs less bandwidth rather than more.
 
 That is the clearest serving-side result in the program, and it points at the demand signal rather
 than the cache policy as the place to spend effort.
 
 *One caveat worth keeping.* The same file reports `discounted-oracle` and `min_logit+tau` variants
-scoring **above** Belady, which should be impossible if Belady were optimal for this objective. The
+scoring above Belady, which should be impossible if Belady were optimal for this objective. The
 likely explanation is that Belady is implemented as evict-farthest-next-*demand*, which is not optimal
 for set coverage under a changing demand stream. But that is inference from the numbers rather than a
-read of the implementation, so treat the exact Belady value as unverified. The 20%-headroom
-conclusion does not
-depend on it: `min_logit` beats LRU and every tau variant above 1.0.
+read of the implementation, so treat the exact Belady value as unverified. The headroom conclusion
+does not depend on it, since `min_logit` beats LRU and every tau variant above 1.0.
 
 ### 2.4 Document boundaries are not a confound
 
