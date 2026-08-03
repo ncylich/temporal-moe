@@ -299,10 +299,24 @@ Freeing layers from the residency constraint in an adapted OLMoE (`ple_ladder.cs
 That is per-layer structure, it is concentrated at an endpoint, and it is large next to the whole
 global dose curve (§3.1 spans 0.023 BPB end to end).
 
-> **Provenance warning.** Only these two `ce_free_*` cells are committed. A larger ladder exists, > including `{0,1,2}`, `{0,1,14,15}` and 250M-token variants, and **is not in the repository**. The
-> `{0,1,2}` cell is the one that would isolate *last layer* from *one more layer*, at matched memory,
-> and it is the single most valuable missing number in this document. Until it lands, the claim above
-> rests on two cells.
+> **Resolved 2026-08-03, and it confirms the claim.** The `{0,1,2}` cell — called above the single
+> most valuable missing number here, because it isolates *last layer* from merely *one more layer* at
+> matched memory — was run, along with `{0,1,14,15}` and 250M-token variants. All are on
+> `ple-adaptation` in `layer_freeing_results.csv`; see its `layer_freeing_RESULTS.md` §7.
+>
+> | free set | resident memory | BPB | vs `{0,1}` |
+> |---|---|---|---|
+> | `{0,1}` | +87.5% | 0.814440 | — |
+> | `{0,1,2}` — one more *early* layer | +131.2% | 0.808615 | −0.0058 |
+> | `{0,1,15}` — the *last* layer | +131.2% | 0.797810 | −0.0166 |
+> | `{0,1,14,15}` — both endpoints | +175.0% | 0.786275 | −0.0282 |
+>
+> At identical memory the last layer is worth **0.0108 BPB more** than an additional early one, so the
+> gain really is endpoint structure and not just a third freed layer. Freeing both endpoints buys more
+> again. The claim now rests on five cells rather than two.
+>
+> It also refutes the training-free damage profile that predicted the opposite: that profile made
+> layer 2 worth 5.8× layer 15 as the third freed layer. Do not choose free sets from solo damage.
 
 #### At sixteen layers the profile is a clean U
 
@@ -324,9 +338,19 @@ on a real pretrained model, and it needs no training at all. It agrees with the 
 which is its complement (that sweep frees layers and measures the gain; this one constrains them and
 measures the loss), and with the vertex near two thirds depth seen at 1e18.
 
-*Provenance caveat.* No committed script produces `layer_damage.csv`, so the exact protocol behind it
-is not reconstructable from the repository. The shape is consistent with three other measurements, but
-treat the individual values as unaudited until the producer is recovered or rewritten.
+*Provenance, resolved 2026-08-03.* The producer was not missing, it was on another branch:
+`analysis/ple/layer_ablation.py` on `ple-adaptation`, with `analysis/ple/joint_free.py` for
+`joint_free.csv`. Its protocol is documented and audited — the base model evaluated 18 times with no
+training (all sixteen layers free, then layer *i* alone constrained for *i* = 0..15, then all
+constrained), and both anchors reproduce their published references to six decimals (0.672736 against
+0.6727 free, 2.750704 against 2.7507 imposed), which is what licenses the sixteen numbers between
+them. **Treat these values as audited.**
+
+`ple_ladder.csv` is the one exception and the caveat still holds for it: its producer,
+`analysis/ple/ladder_report.py`, was deleted by `ple-adaptation`'s consolidation commit `2a7fc14`
+("one results CSV, 17 scripts from 24"). Its contents are derivable from `ple_results.csv` on that
+branch, which keeps the primitives — per-cell `final_bpb` plus the reference rows — from which every
+gate and verdict column in it was computed.
 
 #### But lexicality is not the reason
 
