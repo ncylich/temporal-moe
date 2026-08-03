@@ -5,7 +5,7 @@
 Rolling residency restricts each token to the currently resident expert set, removing routing
 freedom, yet at 1e18 FLOPs the temporally constrained model achieves *lower* validation loss
 than the unconstrained MoE baseline of identical architecture, data, and compute, at both
-granularities (test CE — coarse: 3.9094 vs 3.9184, fine: 3.9768 vs 4.0087, both far below the dense
+granularities (test CE, coarse: 3.9094 vs 3.9184, fine: 3.9768 vs 4.0087, both far below the dense
 floor of 4.137, with the 1e19 replication complete (`t19_1e19_curves.csv`)). A constraint that improves generalization
 must be suppressing a harmful behavior, and this section identifies it.
 
@@ -61,19 +61,19 @@ granularity; `mechinterp_structural_1e19.csv`):
 
 | MoE layer | 2 | 3 | 4 | 5 | 6 | 9 | 11 | 14 |
 |---|---|---|---|---|---|---|---|---|
-| generalist % — temporal | 100 | 91 | 95 | 97 | 73 | 45 | 59 | 44 |
-| generalist % — baseline | 97 | 100 | 94 | 23 | **0** | 0 | 0 | 0 |
-| median PR — temporal | 0.857 | 0.755 | 0.795 | 0.787 | 0.693 | 0.494 | 0.542 | 0.458 |
-| median PR — baseline | 0.896 | 0.731 | 0.591 | 0.447 | 0.357 | 0.233 | 0.179 | 0.167 |
-| $\bar{H}$ — temporal | 0.986 | 0.971 | 0.973 | 0.972 | 0.950 | 0.933 | 0.936 | 0.925 |
-| $\bar{H}$ — baseline | 0.985 | 0.967 | 0.941 | 0.907 | 0.881 | 0.814 | 0.766 | 0.756 |
+| generalist %, temporal | 100 | 91 | 95 | 97 | 73 | 45 | 59 | 44 |
+| generalist %, baseline | 97 | 100 | 94 | 23 | **0** | 0 | 0 | 0 |
+| median PR, temporal | 0.857 | 0.755 | 0.795 | 0.787 | 0.693 | 0.494 | 0.542 | 0.458 |
+| median PR, baseline | 0.896 | 0.731 | 0.591 | 0.447 | 0.357 | 0.233 | 0.179 | 0.167 |
+| $\bar{H}$, temporal | 0.986 | 0.971 | 0.973 | 0.972 | 0.950 | 0.933 | 0.936 | 0.925 |
+| $\bar{H}$, baseline | 0.985 | 0.967 | 0.941 | 0.907 | 0.881 | 0.814 | 0.766 | 0.756 |
 
 The two regimes are **indistinguishable through layer 4** on all three routing metrics, and the
 baseline is at zero generalists from layer 6 down. "Baseline experts draw usage from a narrow slice,
 temporal experts from most of it" is a statement about layers 5 and deeper; in the first three MoE
 layers both regimes are near-total generalists. A single pooled median averaged a qualitative regime
 change across depth and reported it as a uniform property. The pooled conclusion is not wrong about
-the network as a whole — it is wrong about where in the network the effect lives, which is exactly what
+the network as a whole, it is wrong about where in the network the effect lives, which is exactly what
 [`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) exists to settle. The weight geometry, by contrast,
 is indistinguishable across regimes and seeds: experts remain equally distinct and near
 orthogonal either way. The constraint acts on traffic, not on expert identity, which sharpens
@@ -96,7 +96,7 @@ chance floor: the same classifiers refit on null labels (iid permutations and ci
 at least 1000 tokens, the latter preserving the labels' residency-induced autocorrelation) give
 $0.500 \pm 0.002$ everywhere, so every entry is real signal.
 
-Every number in this table is a median over the experts of **MoE layers 2–6**, pooled: 4 layers for
+Every number in this table is a median over the experts of **MoE layers 2 to 6**, pooled: 4 layers for
 the 192E model (of its 4, so complete) and 5 for the 64E model (of its 6, layer 7 onward absent
 because layer 1 is dense). Depth is not resolved here at all; that is
 [`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md)'s subject.
@@ -114,8 +114,8 @@ $w{=}18$ and sits about 0.02 lower, which brackets what the missing measurement 
 
 Two caveats on the floors, both established after this section was written and neither of which
 changes its conclusions. First, the floors above are the **iid-permutation** nulls; the
-circular-shift null quoted alongside them is inflated — measured at full depth it runs to +0.017,
-scaling with the context window width — because it is applied to the flattened $[S{\cdot}B]$ stream
+circular-shift null quoted alongside them is inflated, measured at full depth it runs to +0.017,
+scaling with the context window width, because it is applied to the flattened $[S{\cdot}B]$ stream
 whose adjacent entries are adjacent *batch elements*, so it never shifted along the token axis. See
 `analysis/probes/delex_null_check.py`. Second, the 70/30 split is a split on sequence *position*, so
 the same documents appear in the fit and score halves; holding out whole documents instead moves
@@ -160,7 +160,7 @@ weighted and within layer.
 | baseline | 14,612 | 9,683 | 15,990 |
 | temporal | 15,932 | 15,342 | 15,990 |
 
-These are medians pooled over MoE layers 2–4, and **they should not be resolved by layer from the
+These are medians pooled over MoE layers 2 to 4, and **they should not be resolved by layer from the
 committed CSVs**: the capture that produced them attributed each layer's expert outputs one layer too
 shallow, so `mechinterp_lens_1e19.csv`'s layer *j* rows were computed from layer *j+1*'s experts and the
 deepest layer was never covered at all. See [`MECHINTERP_RERUN_PLAN.md`](MECHINTERP_RERUN_PLAN.md) §7.4.
@@ -168,7 +168,7 @@ The 1e16 rows above come from an earlier pipeline whose captures were not preser
 share the defect cannot be determined; they are neither confirmed nor cleared.
 
 **Re-measured correctly at 1e18**, on captures taken after the fix, matched pairs at both granularities,
-every MoE layer, and always weighted-versus-static *within* a layer — the static reference is itself
+every MoE layer, and always weighted-versus-static *within* a layer: the static reference is itself
 depth-dependent, so the gap is the only readable quantity:
 
 | gap (weighted − static), 1e18 | L2 | L3 | L4 | L5 | L6 | L7 | L8 | L9 |
@@ -184,15 +184,15 @@ the temporal experts write *sharper* vocabulary distributions than the unconstra
 layers in the coarse pair, most starkly at layer 7 (median effective vocabulary **720** words against
 the baseline's 7,640, a gap of −24.8k against −15.5k). **The fine pair does not replicate this.**
 At layers 5 and 8 the unconstrained arm is the sharper one (L5 −5.7k unconstrained vs −4.3k temporal;
-L8 −1.1k vs −0.5k), so the crossover claimed here does not hold at the fine granularity — the
+L8 −1.1k vs −0.5k), so the crossover claimed here does not hold at the fine granularity, the
 defensible statement is "does not replicate". (Correction identified in `LAYER_LEXICALITY_ROUND2.md`
 §N9 and previously not applied here.)
 
 Two caveats bound this. The published cell is 192 experts at 1e16 and these are 1e18, so this is a new
 measurement at a different budget rather than a direct contradiction of the same cell; and the
 output-side story is the one part of the de-lexicalization argument that now rests on data from a
-different scale than the input-side story. The input side — token AUC 0.902 → 0.659 coarse and
-0.889 → 0.587 fine, context dominating 93% and 97% of experts — replicates at 1e18 cleanly
+different scale than the input-side story. The input side, token AUC 0.902 → 0.659 coarse and
+0.889 → 0.587 fine, context dominating 93% and 97% of experts, replicates at 1e18 cleanly
 ([`LAYER_LEXICALITY.md`](LAYER_LEXICALITY.md) §1). What has not survived is the claim that the
 constraint blunts what experts *write*.
 
@@ -223,7 +223,7 @@ rolling residency on an unconstrained checkpoint), with each pair's native evalu
 | temporal, 64E at 1e17 | 1.2821 (masked) | 1.4063 (unmasked) | +0.12 |
 | temporal, 1e18 (the winning case) | 3.9037 (masked) | 4.3890 (unmasked) | +0.49 |
 
-*Metric note: this table reports **validation** CE, from `unmask_eval.csv`. Elsewhere this document and `LAYER_LEXICALITY.md` quote **test** CE for the same model (native 3.909461, `swap_sweep.csv`). The two are different metrics on the same model, not conflicting measurements of one — do not compare across the two without converting.*
+*Metric note: this table reports **validation** CE, from `unmask_eval.csv`. Elsewhere this document and `LAYER_LEXICALITY.md` quote **test** CE for the same model (native 3.909461, `swap_sweep.csv`). The two are different metrics on the same model, not conflicting measurements of one, do not compare across the two without converting.*
 | unconstrained control (sigmoid, 192E at 1e16) | 1.4499 | 1.6902 (imposed) | +0.24 |
 | baseline (64E at 1e17) | 1.2690 | 1.8789 (imposed) | +0.61 |
 

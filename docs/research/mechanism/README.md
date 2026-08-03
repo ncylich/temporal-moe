@@ -1,4 +1,4 @@
-# Mechanism — what rolling residency does to MoE routing
+# Mechanism, what rolling residency does to MoE routing
 
 Five documents, numbered in reading order. Start at 01 unless you know what you are looking for.
 
@@ -10,8 +10,7 @@ Five documents, numbered in reading order. Start at 01 unless you know what you 
 | [`04-coverage.md`](04-coverage.md) | Which script produces which CSV, over which runs and layers | You are reproducing something, or checking whether a cell exists |
 | [`delexicalization.md`](delexicalization.md) | The narrative write-up | You want the argument in prose rather than as claims |
 
-The chronological record — every defect found, how, and whether the conclusion drawn from it survived
-— is [`05-notebook.md`](05-notebook.md). It is deliberately last on this path: it is a lab notebook, not a
+The chronological record, every defect found, how, and whether the conclusion drawn from it survived, is [`05-notebook.md`](05-notebook.md). It is deliberately last on this path: it is a lab notebook, not a
 result, and it is long.
 
 [`archive/`](archive/) holds the superseded documents and the pre-correction write-up. Nothing there
@@ -24,7 +23,7 @@ of three different quantities, so they live with the quantities they cut:
 
 | the depth result | lives in |
 |---|---|
-| The contextual share of routing rises with depth — in both regimes | `01-findings.md` §1 |
+| The contextual share of routing rises with depth, in both regimes | `01-findings.md` §1 |
 | Routing demand becomes more cacheable with depth | `01-findings.md` §2 |
 | The first and last MoE layers cost the most to constrain | `01-findings.md` §3.2 |
 | Its hypotheses, what falsified them, and what was withdrawn | `05-notebook.md`; retractions in `02-corrections.md` §4 |
@@ -40,7 +39,7 @@ copy of them. This repository's every documented drift came from a claim having 
 - **Superseded text is deleted, not annotated.** Corrections live in 02 and history lives in the
   notebook, so a reader is never asked to diff two versions of a paragraph.
 - **Identifiers stay out of the findings.** The analysis scripts use about forty short labels
-  (`A1`–`A11`, `C1`–`C10`, `N1`–`N9`, `T1`–`T4`, `e1`–`e8`). They are a private language and belong in
+  (`A1` to `A11`, `C1` to `C10`, `N1` to `N9`, `T1` to `T4`, `e1` to `e8`). They are a private language and belong in
   03 and 04.
 - **Generated files say so.** `04-coverage.md` is emitted by `analysis/coverage_table.py`; editing it
   by hand will be overwritten.

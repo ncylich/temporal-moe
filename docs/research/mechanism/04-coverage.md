@@ -1,4 +1,4 @@
-# Coverage — what is measured, over which runs and layers
+# Coverage, what is measured, over which runs and layers
 
 **Generated.** The table below is emitted by
 [`analysis/coverage_table.py`](../../../analysis/coverage_table.py) from the CSVs it describes. Do not
@@ -6,7 +6,7 @@ edit it by hand; run `$PY analysis/coverage_table.py --write`. It is regenerated
 `scripts/reproduce.sh`, so a stale table fails the gate.
 
 Model counts are distinct values of each CSV's own key column, and layer ranges are the min and max of
-its `layer` column — so the numbers describe what is actually in the files rather than what anyone
+its `layer` column, so the numbers describe what is actually in the files rather than what anyone
 believes is in them. This table has drifted from reality twice while it was maintained by hand, which
 is why it is generated.
 
@@ -39,20 +39,20 @@ is why it is generated.
 
 ## What bounds these numbers
 
-**Captures.** The locus, lens and structural families each need a `delex_capture.pt` — one forward
+**Captures.** The locus, lens and structural families each need a `delex_capture.pt`, one forward
 pass over a fixed 64×2048 evaluation batch. Only three captures were originally preserved; every
 checkpoint named in `results/MANIFEST.csv` is on the training machine, so any cell can be captured on
 demand, and the sweep has now done so.
 
-**Replay.** The `e1`–`e8` family needs only a `router_log.pt` and no forward pass. Twenty-two are
+**Replay.** The `e1` to `e8` family needs only a `router_log.pt` and no forward pass. Twenty-two are
 preserved.
 
 **Two gaps no re-run can close.** Four of the five runs behind the *published* 1e16/1e17 locus rows are
-absent from `MANIFEST.csv` and from disk — `g3_tmoe_s0_1e16`, `g3_moe_s0_1e16_sigmoid`,
-`v16k_sweep_s2_1e17`, `tmoe_minlogit_sh1_s2_1e17` — so those cells cannot be extended past layer 6,
+absent from `MANIFEST.csv` and from disk, `g3_tmoe_s0_1e16`, `g3_moe_s0_1e16_sigmoid`,
+`v16k_sweep_s2_1e17`, `tmoe_minlogit_sh1_s2_1e17`, so those cells cannot be extended past layer 6,
 re-split or re-windowed without retraining. `g3_moe_s0_1e16` is the exception: it survives and has been
 re-captured at full depth. The five runs behind the published replay numbers are likewise gone, so the
-current `e1`–`e8` values **replace** them over a different population rather than reproducing them.
+current `e1` to `e8` values **replace** them over a different population rather than reproducing them.
 
 Separately, every 1e16 and 1e17 checkpoint on the machine is grain 3 (18 of 192), so **no coarse 6-of-64
 cell survives at either low budget** and none can be recovered by inference.
@@ -63,5 +63,5 @@ Every documented command is listed in [`scripts/reproduce.sh`](../../../scripts/
 runs them in order, checks the working tree is unchanged afterwards, runs the CSV linter
 ([`analysis/csv_sanity.py`](../../../analysis/csv_sanity.py)), and fails on any warning not on an
 explicit allowlist. If a regenerated artifact differs from the committed one, that is a defect in one
-of them — with the caveat that rendered figures and last-digit float rounding differ across machines,
+of them, with the caveat that rendered figures and last-digit float rounding differ across machines,
 so compare on a like-for-like host.

@@ -41,25 +41,26 @@ permutation (`mechinterp_floors{,_1e19}.csv`).
 
 *Regenerate with `$PY analysis/plots/plot_arm_separation.py`.*
 
-Across **34 model arms (16 unconstrained, 18 temporal) at four compute budgets and three granularities (6 of 64, 18 of 192, 30 of 320)**
-(`mechinterp_locus{,_1e19}.csv`, median over that arm's experts):
+Across 34 model arms, 16 unconstrained and 18 temporal, at four compute budgets and three
+granularities of 6 of 64, 18 of 192 and 30 of 320 (`mechinterp_locus{,_1e19}.csv`, median over each
+arm's experts):
 
 | regime | arms | token AUC | context AUC | experts where context wins |
 |---|---|---|---|---|
-| unconstrained | 16 | **0.842 – 0.943** | 0.594 – 0.679 | **0 – 3%** |
-| temporal | 18 | **0.553 – 0.659** | 0.633 – 0.769 | **85 – 97%** |
+| unconstrained | 16 | 0.842 to 0.943 | 0.594 to 0.679 | 0 to 3% |
+| temporal | 18 | 0.553 to 0.659 | 0.633 to 0.769 | 85 to 97% |
 
-**Two of the three statistics separate the regimes completely, with no arm overlapping the other
-regime's range.** Token AUC leaves a gap of 0.183 between the lowest unconstrained arm and the highest
+Two of the three statistics separate the regimes completely, with no arm overlapping the other
+regime's range. Token AUC leaves a gap of 0.183 between the lowest unconstrained arm and the highest
 temporal one; the share of experts better predicted by context leaves a gap of 82 points. Neither
 overlaps at any budget, granularity or router recipe, including the sigmoid and aux-free controls.
 
-**Context AUC alone does overlap**, across 0.633–0.679 — four temporal arms sit below the highest
-unconstrained one. That is expected rather than awkward: the context probe finds real signal in both
+Context AUC alone does overlap, across 0.633 to 0.679, and four temporal arms sit below the highest
+unconstrained one. That is expected rather than awkward. The context probe finds real signal in both
 regimes, so its *level* was never the discriminator. What separates the regimes is which feature wins
 the comparison, which is why the token probe and the per-expert contrast are the statistics to quote.
 
-**The probe is not underselling lexicality — it saturates the ceiling.** The obvious objection to
+**The probe is not underselling lexicality: it saturates the ceiling.** The obvious objection to
 §1 is that a *linear* probe on embeddings cannot express an arbitrary token-to-expert lookup, so a low
 token AUC might be probe weakness rather than an absent shortcut. The nonparametric ceiling settles it:
 score each expert by the empirical `P(fires | token id)` instead of a probe (`mechinterp_oracle.csv`,
@@ -67,23 +68,24 @@ score each expert by the empirical `P(fires | token id)` instead of a probe (`me
 
 | regime | arms | oracle AUC | probe ÷ oracle |
 |---|---|---|---|
-| unconstrained | 14 | 0.857 – 0.921 | **101.2%** |
-| temporal | 16 | 0.545 – 0.646 | **103.8%** |
+| unconstrained | 14 | 0.857 to 0.921 | 101.2% |
+| temporal | 16 | 0.545 to 0.646 | 103.8% |
 
-The probe reaches the ceiling in both regimes — slightly past it, because the oracle's per-token-id
-rates are estimated on the fit half and generalise a little worse than a fitted direction does. So the
-regime gap is a real difference in how much of routing token identity determines, not a limit of the
+The probe reaches the ceiling in both regimes, slightly past it in fact, because the oracle's
+per-token-id rates are estimated on the fit half and generalise a little worse than a fitted direction
+does. So the regime gap is a real difference in how much of routing token identity determines, not a
+limit of the
 probe. The same thing stated without any classifier: normalised mutual information
-`I(expert ; token id) / H(expert)` is **0.416 – 0.574** unconstrained and **0.095 – 0.153** temporal.
+`I(expert ; token id) / H(expert)` is 0.416 to 0.574 unconstrained and 0.095 to 0.153 temporal.
 
 **And it is not a rare-token effect.** Splitting the token probe by token-frequency stratum
 (`mechinterp_freqstrat.csv`, 26 arms) gives unconstrained AUC of 0.813 in the rarest stratum rising to
-0.891 in the common ones, and temporal flat at 0.550 – 0.581 across all five. The shortcut is a
-whole-vocabulary property, slightly *stronger* on frequent tokens — the opposite of the plausible guess
-that routers memorise rare tokens.
+0.891 in the common ones, and temporal flat at 0.550 to 0.581 across all five. The shortcut is a
+whole-vocabulary property, and slightly stronger on frequent tokens, which is the opposite of the
+plausible guess that routers memorise rare tokens.
 
 **Strength: high.** The largest, most replicated result in the program, and now bounded above as well
-as below. Its main untested exposure is that each cell is one training seed — see §5.
+as below. Its main untested exposure is that each cell is one training seed. See §5.
 
 ### 1.2 The shift is causal, not an artefact of the probes
 
@@ -93,19 +95,20 @@ as below. Its main untested exposure is that each cell is one training seed — 
 **Evidence.** Hold context fixed and substitute a frequency-matched token; then hold the token fixed
 and shuffle the surrounding window. Score position *t* only, so token substitution cannot leak into
 the context arm through its neighbours. The statistic is the ratio of context-driven to token-driven
-change in the selected expert set — above 1 means context dominates (`mechinterp_causal.csv`):
+change in the selected expert set: above 1 means context dominates (`mechinterp_causal.csv`):
 
 | cell | unconstrained | temporal |
 |---|---|---|
-| 1e18, 6 of 64, layers 2–9 | 0.30 – 0.73 | 1.34 – 1.66 |
-| 1e18, 18 of 192, layers 2–9 | 0.40 – 0.79 | 1.85 – 2.18 |
-| 1e19, 6 of 64, layers 2–14 | 0.28 – 0.79 | 1.25 – 1.71 |
+| 1e18, 6 of 64, layers 2 to 9 | 0.30 to 0.73 | 1.34 to 1.66 |
+| 1e18, 18 of 192, layers 2 to 9 | 0.40 to 0.79 | 1.85 to 2.18 |
+| 1e19, 6 of 64, layers 2 to 14 | 0.28 to 0.79 | 1.25 to 1.71 |
 
-**Every unconstrained layer sits below 1 and every temporal layer above it**, in all three cells —
+**Every unconstrained layer sits below 1 and every temporal layer above it**, in all three cells,
 and the two populations do not merely straddle the threshold, they are *separated*. Aggregated over
-all 58 layer-measurements: unconstrained spans 0.280–0.794, temporal spans 1.248–2.177, so **the
+all 58 layer-measurements: unconstrained spans 0.280 to 0.794, temporal spans 1.248 to 2.177, so **the
 closest temporal measurement sits 0.453 above the highest unconstrained one**. There is no overlap
-across two budgets, two granularities and depths of 9 and 14. The effect decomposes: token sensitivity falls ~42% while context
+across two budgets, two granularities and depths of 9 and 14. The effect decomposes: token
+sensitivity falls ~42% while context
 sensitivity rises ~35%, which no difference of probe AUCs could have separated.
 
 **Strength: high.** This is the claim that makes §1 a mechanism rather than an association.
@@ -124,20 +127,20 @@ usage from more than half the token stream):
 
 A fifteen-fold gap in generalist fraction, roughly stable with depth, on flatter routing throughout.
 *One caveat that matters for §2 of the corrections document*: the matched 1e19 coarse pair is not
-typical here — both its regimes are near-total generalists at layer 2 and diverge only with depth. The
+typical here. Both its regimes are near-total generalists at layer 2 and they diverge only with depth. The
 "indistinguishable through layer 4" statement recorded there is true of that pair and not of the
 population.
 
 **And the router's own geometry differs.** Each layer's token probe spans a subspace of embedding
 directions that layer is sensitive to; comparing those subspaces across layers asks whether routing is
 the same function at every depth (`mechinterp_transfer.csv`). Excluding 11 of 26 arms where the
-statistic is degenerate — when the number of experts meets or exceeds the hidden size the column space
-spans everything and the measure carries no information — cross-layer overlap relative to chance is:
+statistic is degenerate (when the number of experts meets or exceeds the hidden size, the column space
+spans everything and the measure carries no information), cross-layer overlap relative to chance is:
 
 | regime | arms | overlap ÷ chance | IQR |
 |---|---|---|---|
-| unconstrained | 15 non-degenerate | **2.18×** | 1.30 – 3.34 |
-| temporal | | **1.60×** | 1.26 – 2.26 |
+| unconstrained | 15 non-degenerate | 2.18× | 1.30 to 3.34 |
+| temporal | | 1.60× | 1.26 to 2.26 |
 
 The *unconstrained* router is the more self-similar one across depth, which is what a token lookup
 predicts: the same map at every layer points its probes in the same directions. Constrained routing
@@ -146,11 +149,11 @@ uses whatever context is available at each depth, and that differs layer to laye
 ## 2. How routing behaves over time, and what that buys serving
 
 **Claim.** Contextual routing is autocorrelated in time, and that shows up directly as cache
-behaviour — the resident set matches what the next token wants far more often than chance, and far
-more often than it does for an unconstrained router.
+behaviour. The resident set matches what the next token wants far more often than chance, and far more
+often than it does for an unconstrained router.
 
 **Evidence.** Hit rate is the fraction of a token's *unconstrained* top-k already resident when it
-arrives, measured before the swap. A random resident set scores `k/E` — 0.094 at both 6-of-64 and
+arrives, measured before the swap. A random resident set scores `k/E`, 0.094 at both 6-of-64 and
 18-of-192, so the two granularities are directly comparable (`e6_per_layer_ranking.csv`):
 
 ![Cache hit rate by MoE layer](../../../results/phase0/figures/hitrate_by_layer.png)
@@ -161,11 +164,11 @@ arrives, measured before the swap. A random resident set scores `k/E` — 0.094 
 take *that model's own* raw router logits, replay the identical rolling-residency policy over them,
 and ask how often a token's demand is already resident. Neither regime is handed residency for free.
 The constrained model's logits happen to come from a model trained under the policy and the
-unconstrained model's from one that was not — that is the difference being measured, and it is the
+unconstrained model's from one that was not: that is the difference being measured, and it is the
 only one. A constrained model evaluated *without* the policy has no residency to hit, so there is no
 third arm to add; the two regimes are the whole comparison.
 
-Reading off the matched pair at 1e19 coarse — the one cell where both regimes have a preserved router
+Reading off the matched pair at 1e19 coarse: the one cell where both regimes have a preserved router
 log, 13 MoE layers each:
 
 | regime | first MoE layer | last MoE layer |
@@ -174,28 +177,28 @@ log, 13 MoE layers each:
 | temporal | 0.114 | 0.424 |
 
 The two start at the same place and diverge with depth: by the last layer the constrained model is
-**1.7×** more cacheable. Hit rate rises with depth in *both* regimes, which is what §1's depth trend
-predicts — deeper demand is more temporally coherent regardless of training — but it rises much
-further under the constraint.
+1.7× more cacheable. Hit rate rises with depth in *both* regimes, which is what §1's depth trend
+predicts, since deeper demand is more temporally coherent regardless of training. It rises much further
+under the constraint.
 
 **Strength: medium, limited by sample rather than by method.** Twenty-one constrained arms have a
 preserved router log and exactly **one** unconstrained run does, so the vertical gap is indicative
 rather than estimated. Replaying more baselines needs no GPU and would fix it. Swap rate is *not*
-usable here — at `R = k` it fires whenever any demanded expert is missing, so it saturates at
-0.994–1.000 everywhere and carries no signal.
+usable here, because at `R = k` it fires whenever any demanded expert is missing, so it saturates at
+0.994 to 1.000 everywhere and carries no signal.
 
 ### 2.1 Next-token demand becomes almost perfectly predictable from history
 
 **Claim.** For a constrained model you can tell which experts the *next* token will want using nothing
-but the recent demand history — no embeddings, no hidden states.
+but the recent demand history, with no embeddings and no hidden states.
 
 **Evidence** (`mechinterp_demand_1e19.csv`, 192 layer-measurements over 30 arms; a causal
 history-only probe, AUC):
 
 | regime | measurements | demand AUC |
 |---|---|---|
-| unconstrained | 89 | 0.567 – 0.716 (median 0.655) |
-| temporal | 103 | **0.919 – 0.993** (median **0.981**) |
+| unconstrained | 89 | 0.567 to 0.716 (median 0.655) |
+| temporal | 103 | 0.919 to 0.993 (median 0.981) |
 
 **No overlap, and the ranges are not close.** This is the mechanism behind §2's cache numbers stated
 directly: the constraint does not merely make demand *cacheable*, it makes it *forecastable*, which is
@@ -204,13 +207,13 @@ original write-up, which was a single pooled pair.
 
 ### 2.2 The constraint does not starve experts
 
-**Claim.** Restricting each token to a resident set does not collapse expert usage — the model still
+**Claim.** Restricting each token to a resident set does not collapse expert usage. The model still
 touches nearly all of them, just not simultaneously.
 
 **Evidence** (`e2_streamed_diversity.csv`, union of distinct experts touched per sequence): the plain
-constrained recipes reach **85–100% of E** with effective-expert counts of 183–188 out of 192 and
-62–63 out of 64. The low-diversity arms in that file (union 0.13–0.66) are all *selection-shaping*
-variants — anticipatory, bursty and head-gated losses — which are a different experiment and not the
+constrained recipes reach 85 to 100% of E with effective-expert counts of 183 to 188 out of 192 and
+62 to 63 out of 64. The low-diversity arms in that file (union 0.13 to 0.66) are all *selection-shaping*
+variants (anticipatory, bursty and head-gated losses), which are a different experiment and not the
 shipped recipe.
 
 This is the answer to the obvious worry about a one-swap-per-token cache: it does not turn a
@@ -225,14 +228,14 @@ Two levers on the same cache, and they behave very differently
 | lever | setting | set coverage |
 |---|---|---|
 | eviction rule | LRU | 0.251 |
-| | **`min_logit` (shipped)** | **0.310** |
+| | `min_logit` (shipped) | 0.310 |
 | | Belady, offline optimal | 0.371 |
 | demand smoothing | β = 1 (none, shipped) | 0.310 |
 | | β = 0.25 | 0.640 |
-| | **β = 0.1** | **0.854** |
+| | β = 0.1 | 0.854 |
 
-**Changing which expert you evict is worth at most ~20%** — the shipped heuristic sits within that of
-an offline oracle that can see the future. **Smoothing the demand signal is worth 2.8×**, and it also
+**Changing which expert you evict is worth at most 20%.** The shipped heuristic sits within that of an
+offline oracle that can see the future. **Smoothing the demand signal is worth 2.8×**, and it also
 drops swap rate from 1.000 to 0.926, so it costs less bandwidth rather than more.
 
 That is the clearest serving-side result in the program, and it points at the demand signal rather
@@ -241,19 +244,20 @@ than the cache policy as the place to spend effort.
 *One caveat worth keeping.* The same file reports `discounted-oracle` and `min_logit+tau` variants
 scoring **above** Belady, which should be impossible if Belady were optimal for this objective. The
 likely explanation is that Belady is implemented as evict-farthest-next-*demand*, which is not optimal
-for set coverage under a changing demand stream — but that is inference from the numbers, not a read of
-the implementation, so treat the exact Belady value as unverified. The 20%-headroom conclusion does not
+for set coverage under a changing demand stream. But that is inference from the numbers rather than a
+read of the implementation, so treat the exact Belady value as unverified. The 20%-headroom
+conclusion does not
 depend on it: `min_logit` beats LRU and every tau variant above 1.0.
 
 ### 2.4 Document boundaries are not a confound
 
 Hit rate barely changes across an end-of-document token: median deficit **+0.009**, range −0.053 to
 +0.122 over 66 measurements (`e8_document_boundary.csv`). The temporal locality that makes the cache
-work is not an artefact of documents being concatenated in the eval stream — it survives inside and
+work is not an artefact of documents being concatenated in the eval stream. It survives inside them and
 across them.
 
 **Strength of §2 overall: medium-to-high on the constrained side, weak on the comparison.** Every
-statement above is measured on 21–22 arms, but only one unconstrained run has a preserved router log,
+statement above is measured on 21 to 22 arms, but only one unconstrained run has a preserved router log,
 so regime *contrasts* in this section rest on a single baseline. Replaying more baselines needs no GPU.
 
 ## 3. What the constraint costs
@@ -270,19 +274,16 @@ a fraction of a percent of bits-per-byte.
 | test BPB | 1.4750 | 1.4736 | 1.4681 | 1.4580 | 1.4519 |
 
 The whole span is 0.023 BPB for a 10.7× change in resident-expert memory. At larger budgets the sign
-flips: at 1e18 the temporal model *beats* its matched baseline at both granularities — 3.9094 against
+flips: at 1e18 the temporal model *beats* its matched baseline at both granularities, 3.9094 against
 3.9184 test CE coarse, 3.9768 against 4.0087 fine (`flame38m_1e18_cells.csv`).
 
-**Strength: high**, and it predates this program — the dose curve is the original result, reproduced.
+**Strength: high**, and it predates this program. The dose curve is the original result, reproduced.
 
 ### 3.2 Per-layer structure exists at the endpoints; *lexicality* does not explain it
 
 **Claim.** Which layer you constrain matters, and the layers that matter are the first and last MoE
-layers. What fails is the *lexical* explanation for why — the endpoint effect is not where routing is
+layers. What fails is the *lexical* explanation for why. The endpoint effect is not where routing is
 most token-driven, and is largely reproduced by a perturbation carrying no lexical information at all.
-
-An earlier version of this section claimed there was **no** per-layer structure worth exploiting. That
-was wrong, and the PLE evidence below contradicts it directly.
 
 #### The endpoint structure is real and is worth memory
 
@@ -291,16 +292,15 @@ Freeing layers from the residency constraint in an adapted OLMoE (`ple_ladder.cs
 
 | free set | resident memory | BPB | vs full residency |
 |---|---|---|---|
-| none (CE-adapted, full residency) | baseline | 0.8147 | — |
+| none (CE-adapted, full residency) | baseline | 0.8147 | n/a |
 | first two MoE layers `{0,1}` | +87.5% | 0.8144 | −0.0003 |
-| `{0,1}` **plus the last layer** | +131.2% | 0.7978 | **−0.0169** |
+| `{0,1}` plus the last layer | +131.2% | 0.7978 | −0.0169 |
 
 **Freeing the first two layers buys essentially nothing. Adding the last layer buys 0.0169 BPB.**
 That is per-layer structure, it is concentrated at an endpoint, and it is large next to the whole
 global dose curve (§3.1 spans 0.023 BPB end to end).
 
-> **Provenance warning.** Only these two `ce_free_*` cells are committed. A larger ladder exists —
-> including `{0,1,2}`, `{0,1,14,15}` and 250M-token variants — and **is not in the repository**. The
+> **Provenance warning.** Only these two `ce_free_*` cells are committed. A larger ladder exists, > including `{0,1,2}`, `{0,1,14,15}` and 250M-token variants, and **is not in the repository**. The
 > `{0,1,2}` cell is the one that would isolate *last layer* from *one more layer*, at matched memory,
 > and it is the single most valuable missing number in this document. Until it lands, the claim above
 > rests on two cells.
@@ -309,13 +309,13 @@ global dose curve (§3.1 spans 0.023 BPB end to end).
 
 Three separate readings were pre-registered on the lexical explanation and all three failed:
 
-*Perturbing a trained checkpoint one layer at a time* gives a U-shaped cost profile — first and last
-MoE layers at 1.4–2.5× the interior mean (`swap_sweep.csv`, `swap_shape.csv`). It is not lexical: the
+*Perturbing a trained checkpoint one layer at a time* gives a U-shaped cost profile: first and last
+MoE layers at 1.4 to 2.5× the interior mean (`swap_sweep.csv`, `swap_shape.csv`). It is not lexical: the
 last MoE layer is the **least** lexical in the stack by the §1 probe while being the most expensive to
 constrain, which a lexical account predicts backwards.
 
-*A magnitude-matched perturbation carrying no lexical information* reproduces **58%** of the endpoint
-excess on one model and **85%** on the model with the largest effect (`sham_magnitude_matched.csv`), so
+*A magnitude-matched perturbation carrying no lexical information* reproduces 58% of the endpoint
+excess on one model and 85% on the model with the largest effect (`sham_magnitude_matched.csv`), so
 most of the endpoint cost is sensitivity to position rather than to what the layer routes on.
 
 ![Real versus magnitude-matched sham, and the residual](../../../results/phase0/figures/sham_residual.png)
@@ -325,52 +325,52 @@ most of the endpoint cost is sensitivity to position rather than to what the lay
 **The residue is not negligible, and it is itself an endpoint effect.** Real minus matched-sham, per
 layer: L2 **+0.022**, L3 −0.069, L4 −0.039, L5 −0.019, L6 +0.013, L7 −0.012, L8 +0.012, L9 **+0.095**.
 The interior residues are near zero or negative; the two positive outliers are the two endpoints, and
-L9's is four times any other. So "58–85% positional" does **not** license ignoring the rest — the
-15–42% that a generic perturbation fails to reproduce is concentrated exactly where the effect is.
+L9's is four times any other. So "58 to 85% positional" does **not** license ignoring the rest, the
+15 to 42% that a generic perturbation fails to reproduce is concentrated exactly where the effect is.
 What that residue is remains unexplained.
 
 #### And it did not survive from-scratch training on a small testbed
 
-**Testbed** — shape `s0` at 1e16 (the cheapest cell with a preserved reference): hidden 128,
+**Testbed**, shape `s0` at 1e16 (the cheapest cell with a preserved reference): hidden 128,
 **4 transformer layers of which layer 1 is dense, so only 3 MoE layers** (2, 3, 4), 192 experts,
 top-18, 16k vocabulary, ~65 min per run. Eight arms × three seeds (1234, 2, 3) = 24 runs,
 `t1_perlayer_training.csv`. Arm means, sorted by loss:
 
-| arm | constrained layers | mean test CE | sd over 3 seeds |
-|---|---|---|---|
-| A0 | none | 4.0182 | 0.0128 |
-| A3 | {3} | 4.0208 | 0.0078 |
-| A4 | {4} | 4.0335 | 0.0049 |
-| A2 | {2} | 4.0349 | 0.0108 |
-| A6 | {3,4} — exempt first | 4.0475 | 0.0044 |
-| A5 | {2,3} — exempt last | 4.0492 | 0.0036 |
-| A7 | uniform R=76, matched memory to A5/A6 | 4.0572 | 0.0204 |
-| A1 | {2,3,4} — all | 4.0601 | 0.0047 |
+| constrained layers | mean test CE | sd over 3 seeds |
+|---|---|---|
+| none | 4.0182 | 0.0128 |
+| {3} | 4.0208 | 0.0078 |
+| {4} | 4.0335 | 0.0049 |
+| {2} | 4.0349 | 0.0108 |
+| {3,4}, exempt first | 4.0475 | 0.0044 |
+| {2,3}, exempt last | 4.0492 | 0.0036 |
+| uniform R=76, matched memory to the two exemption arms | 4.0572 | 0.0204 |
+| {2,3,4}, all | 4.0601 | 0.0047 |
 
-**The U survives here too, and an earlier version of this section said otherwise because it tested
-the wrong contrast.** Among the three single-layer arms the middle layer is the cheapest to constrain
-and both endpoints cost more — **in all three seeds**. The contrast a U predicts is endpoints against
+**The U survives training too.** Among the three single-layer arms the middle layer is the cheapest
+to constrain
+and both endpoints cost more, **in all three seeds**. The contrast a U predicts is endpoints against
 middle: **+0.0134 CE, se 0.0048, t = 2.80**. Not significant at two degrees of freedom (critical value
 4.30), but in the predicted direction and consistent across every seed.
 
-What the earlier version reported instead was *first versus last* (+0.0014, 0.2 se) and read its
-nullity as evidence against the U. A U-shape predicts first ≈ last. That contrast being null
-**confirms the shape's symmetry**; it says nothing against its existence.
+The contrast to avoid here is *first versus last* (+0.0014, 0.2 se). A U-shape predicts that its two
+endpoints match, so that particular null confirms the shape's symmetry and says nothing about whether
+the shape exists.
 
-**The testbed is still weak evidence about depth.** Three MoE layers is barely a depth axis — "first",
+**The testbed is still weak evidence about depth.** Three MoE layers is barely a depth axis, "first",
 "middle" and "last" are layers 2, 3 and 4 of the same small model at the smallest budget in the
 program. What it shows is that the ordering survives from-scratch training in the one cell where that
 was affordable to test.
 
 **Strength: the shape is supported three independent ways; the explanation is not.** The endpoint
 structure shows up in the inference-time profile, in the PLE free-set ladder on a 16-layer adapted
-model, and in the ordering of the from-scratch training arms — three settings, three methods, same
+model, and in the ordering of the from-scratch training arms: three settings, three methods, same
 shape. What is refuted is the *lexical* account of it: the endpoint layers are not the token-driven
 ones, and a perturbation carrying no lexical information reproduces most of the effect.
 
 The two things that would settle what remains: the missing `{0,1,2}` PLE cell, which separates
 "the last layer" from "one more layer" at matched memory, and a from-scratch sweep on a model deep
-enough to have a real interior — the 9-layer 1e18 panel rather than three MoE layers at 1e16.
+enough to have a real interior: the 9-layer 1e18 panel rather than three MoE layers at 1e16.
 
 ## 4. What the constraint does not do
 
@@ -387,7 +387,7 @@ pair shows no consistent direction. The defensible statement is that **the outpu
 difference does not replicate**, not that it reverses.
 
 **Strength: the negative is solid; the original positive is withdrawn.** The input side (§1) and the
-causal test (§2) are unaffected — they use different fields of the capture.
+causal test (§2) are unaffected, they use different fields of the capture.
 
 ### 4.2 It does not reduce seed-to-seed variance
 
@@ -396,8 +396,8 @@ causal test (§2) are unaffected — they use different fields of the capture.
 **Evidence.** Within the 24-run training sweep, spread falls with the number of constrained layers
 (ρ = −0.857, permutation p = 0.023). But the headline F statistic that suggested it was the single
 most extreme of 420 possible groupings, chosen after seeing the data; and the only matched pair at
-another budget contradicts it — at 1e18, over three seeds each, the constrained arm spans **0.0031**
-BPB against the unconstrained arm's **0.0028**, so the constrained model is marginally *more* variable
+another budget contradicts it, at 1e18, over three seeds each, the constrained arm spans 0.0031
+BPB against the unconstrained arm's 0.0028, so the constrained model is marginally *more* variable
 there, not less. (Earlier drafts gave 0.00165 against 0.00061; those were computed over two of the
 three seeds, which reversed nothing but overstated the gap as 2.7× where it is 1.1×.)
 
@@ -405,18 +405,19 @@ three seeds, which reversed nothing but overstated the gap as 2.7× where it is 
 
 ## 5. Confidence, and what cannot be measured
 
-**Replicated.** The regime separation in §1 and §2 holds across four budgets, three granularities (6 of 64, 18 of 192, 30 of 320) and
+**Replicated.** The regime separation in §1 and §2 holds across four budgets, three granularities (6
+of 64, 18 of 192, 30 of 320) and
 several router recipes. The training result in §3.2 is three seeds per arm.
 
 **Not replicated.** *Every locus and lens measurement is one training seed per cell.* The bootstrap
 intervals describe sampling over experts within a model, not variation between training runs. Given
-that §3.2 watched four one-seed claims die — three null, one sign-flipped — this is the program's
+that §3.2 watched four one-seed claims die: three null, one sign-flipped, this is the program's
 main untested exposure. Eight seed-replicate checkpoints exist at 1e18 and have never been captured;
 closing this costs about two hours of forward passes and no training.
 
 **Depth trends are weaker than levels.** The contextual share rises with depth, but it rises in the
 unconstrained baseline too, so part of the trend belongs to the transformer rather than to the
-constraint. Curve *shape* statistics — slopes, curvature, vertices — are fragile: on 3–5 layer models
+constraint. Curve *shape* statistics, slopes, curvature, vertices, are fragile: on 3 to 5 layer models
 the quadratic vertex is unidentified, and a full-range linear slope on a curve that turns over
 reverses the comparison it appears to make.
 
@@ -430,13 +431,14 @@ survives at either 1e16 or 1e17, so that cell type is missing at the low end ent
 1. **The missing PLE cell.** `{0,1,2}` at matched memory against `{0,1,15}` is the one number that
    would separate "freeing the *last* layer helps" from "freeing *one more* layer helps". Nine cells of
    that ladder exist outside the repository; committing them is free and closes §3.2's main gap.
-2. **A from-scratch per-layer sweep on a model with an interior.** T1 ran on three MoE layers. Anything
+2. **A from-scratch per-layer sweep on a model with an interior.** The training sweep ran on three MoE
+   layers. Anything
    about depth needs at least the 9-layer 1e18 panel, where "first", "middle" and "last" are distinct.
-3. **What is the residue the sham does not reproduce?** It is 15–42% of the endpoint cost, concentrated
+3. **What is the residue the sham does not reproduce?** It is 15 to 42% of the endpoint cost, concentrated
    at the last layer (+0.095 against +0.022 at the first, near zero in the interior), and unexplained.
 4. **Does de-lexicalization explain the loss advantage?** §1 shows the constraint changes routing and
    §3.1 shows it eventually helps, and nothing joins them. Across matched pairs, does a model's
-   contextual share predict its advantage over its baseline? Small *n*, correlational, and free —
-   the data is already committed.
+   contextual share predict its advantage over its baseline? Small *n*, correlational, and free: the
+data is already committed.
 5. **Is the depth curve seed-stable?** See §5. Eight capture passes, two hours, no training.
 
