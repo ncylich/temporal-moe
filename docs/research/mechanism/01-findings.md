@@ -46,43 +46,10 @@ the sentence that makes them. The list is in
 Routing changes what it keys on. In the unconstrained regime the current token dominates; under the
 constraint, surroundings do.
 
-| model | budget | regime | token AUC | context AUC | context minus token |
-|---|---|---|---|---|---|
-| `g3_moe_s0_1e16` | 1e16 | unconstrained | 0.927 | 0.643 | -0.277 |
-| `g3_moe_s0_1e16_sigmoid_seed2` | 1e16 | unconstrained | 0.940 | 0.646 | -0.291 |
-| `g3_moe_s1_1e16` | 1e16 | unconstrained | 0.873 | 0.635 | -0.236 |
-| `g3_moe_sm1_1e16` | 1e16 | unconstrained | 0.941 | 0.642 | -0.294 |
-| `g3_moe_s1_1e17` | 1e17 | unconstrained | 0.929 | 0.637 | -0.283 |
-| `g3_moe_s2_1e17` | 1e17 | unconstrained | 0.890 | 0.633 | -0.251 |
-| `g3_moe_s3_1e17` | 1e17 | unconstrained | 0.852 | 0.627 | -0.219 |
-| `flame192_g3_moe` | 1e18 | unconstrained | 0.904 | 0.654 | -0.246 |
-| `flame38m_g1_moe` | 1e18 | unconstrained | 0.902 | 0.679 | -0.221 |
-| `flame38m_g3_moe` | 1e18 | unconstrained | 0.889 | 0.650 | -0.237 |
-| `flame38m_g5_moe` | 1e18 | unconstrained | 0.877 | 0.642 | -0.234 |
-| `flame512_g1_moe` | 1e18 | unconstrained | 0.856 | 0.643 | -0.222 |
-| `flame512_g3_moe` | 1e18 | unconstrained | 0.853 | 0.625 | -0.228 |
-| `moe_coarse_1e19` | 1e19 | unconstrained | 0.843 | 0.625 | -0.222 |
-| `g3_tmoe_s0_1e16_mom` | 1e16 | constrained | 0.622 | 0.753 | +0.130 |
-| `g3_tmoe_sm1_1e16` | 1e16 | constrained | 0.610 | 0.750 | +0.136 |
-| `t1_A0_s0_1e16_seed1234` | 1e16 | constrained | 0.605 | 0.686 | +0.079 |
-| `t1_A1_s0_1e16_seed1234` | 1e16 | constrained | 0.644 | 0.769 | +0.133 |
-| `t1_A5_s0_1e16_seed1234` | 1e16 | constrained | 0.636 | 0.758 | +0.124 |
-| `t1_A7_s0_1e16_seed1234` | 1e16 | constrained | 0.618 | 0.748 | +0.134 |
-| `g3_tmoe_s2_1e17` | 1e17 | constrained | 0.598 | 0.751 | +0.148 |
-| `g3_tmoe_s3_1e17` | 1e17 | constrained | 0.574 | 0.691 | +0.110 |
-| `flame192_g3_temporal` | 1e18 | constrained | 0.597 | 0.735 | +0.132 |
-| `flame38m_g1_temporal` | 1e18 | constrained | 0.659 | 0.750 | +0.098 |
-| `flame38m_g3_temporal` | 1e18 | constrained | 0.587 | 0.719 | +0.125 |
-| `flame38m_g5_temporal` | 1e18 | constrained | 0.562 | 0.680 | +0.107 |
-| `flame512_g1_temporal` | 1e18 | constrained | 0.616 | 0.678 | +0.065 |
-| `flame512_g3_temporal` | 1e18 | constrained | 0.556 | 0.634 | +0.075 |
-| `g1_tmoe_coarse_1e19` | 1e19 | constrained | 0.605 | 0.683 | +0.077 |
-| `temporal_fine_g3_1e19` | 1e19 | constrained | 0.553 | 0.633 | +0.077 |
-
-One row per trained model, median over its per-expert fits at window w = k on document-disjoint
-splits. Higher AUC means more predictable. The last column separates the two regimes **completely**:
-every unconstrained model falls between −0.294 and −0.219, every constrained one between +0.065 and
-+0.148, and the nearest pair is 0.154 apart. No model is ambiguous.
+Across 34 trained models the token axis separates the two regimes completely, with an empty band
+0.184 wide containing no model of either kind. The context axis does not separate them at all:
+several constrained models sit below unconstrained ones. So the constraint does not add context
+sensitivity, it removes the token signal.
 
 The interesting half of that table is the token column, not the context column. Context AUC is similar
 in both regimes, 0.640 against 0.697, so the constraint does not create context sensitivity that was
@@ -150,49 +117,21 @@ one.
 
 Under the constraint each expert covers more of the stream, and the routing distribution flattens.
 
-| model | budget | regime | E/k | participation ratio | generalist fraction | router entropy |
-|---|---|---|---|---|---|---|
-| `g3_moe_s0_1e16` | 1e16 | unconstrained | 192/18 | 0.308 | 0.016 | 0.878 |
-| `g3_moe_s0_1e16_sigmoid_seed2` | 1e16 | unconstrained | 192/18 | 0.278 | 0.047 | 0.863 |
-| `g3_moe_s1_1e16` | 1e16 | unconstrained | 192/18 | 0.375 | 0.135 | 0.907 |
-| `g3_moe_sm1_1e16` | 1e16 | unconstrained | 192/18 | 0.249 | 0.000 | 0.846 |
-| `g3_moe_s1_1e17` | 1e17 | unconstrained | 192/18 | 0.259 | 0.008 | 0.859 |
-| `g3_moe_s2_1e17` | 1e17 | unconstrained | 192/18 | 0.300 | 0.026 | 0.879 |
-| `g3_moe_s3_1e17` | 1e17 | unconstrained | 192/18 | 0.343 | 0.026 | 0.896 |
-| `flame192_g3_moe` | 1e18 | unconstrained | 192/18 | 0.234 | 0.008 | 0.855 |
-| `flame38m_g1_moe` | 1e18 | unconstrained | 64/6 | 0.201 | 0.000 | 0.790 |
-| `flame38m_g3_moe` | 1e18 | unconstrained | 192/18 | 0.259 | 0.010 | 0.867 |
-| `flame38m_g5_moe` | 1e18 | unconstrained | 320/30 | 0.319 | 0.061 | 0.901 |
-| `flame512_g1_moe` | 1e18 | unconstrained | 64/6 | 0.328 | 0.086 | 0.862 |
-| `flame512_g3_moe` | 1e18 | unconstrained | 192/18 | 0.422 | 0.328 | 0.917 |
-| `moe_coarse_1e19` | 1e19 | unconstrained | 64/6 | 0.266 | 0.000 | 0.835 |
-| `g3_tmoe_s0_1e16_mom` | 1e16 | constrained | 192/18 | 0.670 | 0.682 | 0.939 |
-| `g3_tmoe_sm1_1e16` | 1e16 | constrained | 192/18 | 0.516 | 0.510 | 0.924 |
-| `t1_A0_s0_1e16_seed1234` | 1e16 | constrained | 192/18 | 0.328 | 0.036 | 0.886 |
-| `t1_A1_s0_1e16_seed1234` | 1e16 | constrained | 192/18 | 0.507 | 0.521 | 0.936 |
-| `t1_A5_s0_1e16_seed1234` | 1e16 | constrained | 192/18 | 0.427 | 0.385 | 0.928 |
-| `t1_A7_s0_1e16_seed1234` | 1e16 | constrained | 192/18 | 0.292 | 0.172 | 0.891 |
-| `g3_tmoe_s2_1e17` | 1e17 | constrained | 192/18 | 0.549 | 0.521 | 0.916 |
-| `g3_tmoe_s3_1e17` | 1e17 | constrained | 192/18 | 0.731 | 0.776 | 0.962 |
-| `flame192_g3_temporal` | 1e18 | constrained | 192/18 | 0.576 | 0.609 | 0.951 |
-| `flame38m_g1_temporal` | 1e18 | constrained | 64/6 | 0.496 | 0.492 | 0.933 |
-| `flame38m_g3_temporal` | 1e18 | constrained | 192/18 | 0.632 | 0.656 | 0.959 |
-| `flame38m_g5_temporal` | 1e18 | constrained | 320/30 | 0.774 | 0.772 | 0.970 |
-| `flame512_g1_temporal` | 1e18 | constrained | 64/6 | 0.775 | 0.914 | 0.967 |
-| `flame512_g3_temporal` | 1e18 | constrained | 192/18 | 0.801 | 0.885 | 0.974 |
-| `g1_tmoe_coarse_1e19` | 1e19 | constrained | 64/6 | 0.542 | 0.594 | 0.938 |
-| `temporal_fine_g3_1e19` | 1e19 | constrained | 192/18 | 0.509 | 0.516 | 0.951 |
+| | participation ratio | generalist fraction | router entropy |
+|---|---|---|---|
+| unconstrained, 14 models | 0.201 to 0.422 | 0.000 to 0.328 | 0.790 to 0.917 |
+| constrained, 16 models | 0.292 to 0.801 | 0.036 to 0.914 | 0.886 to 0.974 |
+| `t1_A0`, constrained schedule with no layer constrained | 0.328 | 0.036 | 0.886 |
 
-One row per model, median over its layers. Higher means flatter, less specialised routing. Generalist
-fraction is the participation-ratio column thresholded at 0.5, so it is a restatement rather than
-independent evidence.
+Full range across models, median over each model's layers. Higher means flatter, less specialised
+routing. Generalist fraction is the participation-ratio column thresholded at 0.5, so it restates
+rather than adds.
 
-Unlike the locus table in section 1, these ranges **overlap**. Participation ratio runs 0.201 to 0.422
-unconstrained and 0.292 to 0.801 constrained, so the flattening is a strong tendency and not a
-separator. Two rows are worth reading closely. `flame512_g3_moe` is the most generalist unconstrained
-model at 0.422, and `t1_A0_s0_1e16_seed1234` is a constrained-schedule arm with zero layers actually
-constrained, which lands at 0.328 among the unconstrained group exactly as it should. That arm is an
-internal control and it passes.
+Unlike the locus result above, these ranges **overlap**, so the flattening is a strong tendency and
+not a separator. The third row is why the table is worth reading rather than the medians: `t1_A0` runs
+a constrained schedule with zero layers actually constrained, and it lands at the bottom of the
+constrained range, among the unconstrained models, exactly where it should. That arm is an internal
+control and it passes.
 
 - Generalist fraction falls with depth in both regimes, so the flattening is strongest early.
 The inventory is not starved. Across the shipped configurations, the union of experts touched per
