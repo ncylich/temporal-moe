@@ -37,6 +37,10 @@ excluded. Held-out AUC, documents disjoint between fit and score halves, window 
 lifetime. Measured chance floor 0.500; worst deviation across 1,162 null fits is 0.0030 under iid
 permutation (`mechinterp_floors{,_1e19}.csv`).
 
+![Regime separation, one point per trained model](../../../results/phase0/figures/arm_separation.png)
+
+*Regenerate with `$PY analysis/plots/plot_arm_separation.py`.*
+
 Across **34 model arms (16 unconstrained, 18 temporal) at four compute budgets and three granularities (6 of 64, 18 of 192, 30 of 320)**
 (`mechinterp_locus{,_1e19}.csv`, median over that arm's experts):
 
@@ -57,6 +61,31 @@ the comparison, which is why the token probe and the per-expert contrast are the
 
 **Strength: high.** The largest, most replicated result in the program. Its main untested exposure is
 that each cell is one training seed — see §5.
+
+### 1.1 The serving-side consequence: routing demand becomes cacheable
+
+**Claim.** Contextual routing is autocorrelated in time, and that shows up directly as cache
+behaviour — the resident set matches what the next token wants far more often than chance, and far
+more often than it does for an unconstrained router.
+
+**Evidence.** Hit rate is the fraction of a token's *unconstrained* top-k already resident when it
+arrives, measured before the swap. A random resident set scores `k/E` — 0.094 at both 6-of-64 and
+18-of-192, so the two granularities are directly comparable (`e6_per_layer_ranking.csv`):
+
+| regime | arms | first MoE layer | last MoE layer |
+|---|---|---|---|
+| unconstrained (residency imposed at replay) | 1 | 0.117 | 0.250 |
+| temporal | 21 | 0.208 | 0.402 |
+
+Two things follow. Hit rate **rises with depth in both regimes** — deeper routing demand is more
+temporally coherent, which is what §1's depth trend predicts. And the constrained model is roughly
+1.6–1.8× more cacheable than an unconstrained one at the same position, which is the whole serving
+case: it is why `R = k` with one swap per token is viable at all.
+
+**Strength: medium.** The temporal side is 21 arms; the unconstrained comparison is **one** arm, from a
+counterfactual replay that imposes residency on a model never trained under it. Treat the ratio as
+indicative. Swap rate is *not* usable here — at `R = k` it fires whenever any demanded expert is
+missing, so it saturates at 0.994–1.000 everywhere and carries no signal.
 
 ## 2. The shift is causal, not a correlation of probes
 
@@ -102,26 +131,75 @@ flips: at 1e18 the temporal model *beats* its matched baseline at both granulari
 
 **Strength: high**, and it predates this program — the dose curve is the original result, reproduced.
 
-### 3.2 There is no per-layer structure worth exploiting
+### 3.2 Per-layer structure exists at the endpoints; *lexicality* does not explain it
 
-**Claim.** Neither lexicality nor architectural position identifies layers where the constraint is
-cheap enough to justify a per-layer schedule. Three separate hypotheses were pre-registered and all
-three failed.
+**Claim.** Which layer you constrain matters, and the layers that matter are the first and last MoE
+layers. What fails is the *lexical* explanation for why — the endpoint effect is not where routing is
+most token-driven, and is largely reproduced by a perturbation carrying no lexical information at all.
 
-**Evidence, in the order it accumulated:**
+An earlier version of this section claimed there was **no** per-layer structure worth exploiting. That
+was wrong, and the PLE evidence below contradicts it directly.
 
-*Perturbing a trained checkpoint one layer at a time* produces a U-shaped cost profile — the first and
-last MoE layers are 1.4–2.5× the interior mean (`swap_sweep.csv`, `swap_shape.csv`). That profile is
-not about lexicality: the last MoE layer is the **least** lexical layer in the stack by the §1 probe
-and simultaneously the most expensive to constrain, which a lexical account predicts backwards.
+#### The endpoint structure is real and is worth memory
+
+Freeing layers from the residency constraint in an adapted OLMoE (`ple_ladder.csv`, R=8 residency,
+50M adaptation tokens, BPB lower is better):
+
+| free set | resident memory | BPB | vs full residency |
+|---|---|---|---|
+| none (CE-adapted, full residency) | baseline | 0.8147 | — |
+| first two MoE layers `{0,1}` | +87.5% | 0.8144 | −0.0003 |
+| `{0,1}` **plus the last layer** | +131.2% | 0.7978 | **−0.0169** |
+
+**Freeing the first two layers buys essentially nothing. Adding the last layer buys 0.0169 BPB.**
+That is per-layer structure, it is concentrated at an endpoint, and it is large next to the whole
+global dose curve (§3.1 spans 0.023 BPB end to end).
+
+> **Provenance warning.** Only these two `ce_free_*` cells are committed. A larger ladder exists —
+> including `{0,1,2}`, `{0,1,14,15}` and 250M-token variants — and **is not in the repository**. The
+> `{0,1,2}` cell is the one that would isolate *last layer* from *one more layer*, at matched memory,
+> and it is the single most valuable missing number in this document. Until it lands, the claim above
+> rests on two cells.
+
+#### But lexicality is not the reason
+
+Three separate readings were pre-registered on the lexical explanation and all three failed:
+
+*Perturbing a trained checkpoint one layer at a time* gives a U-shaped cost profile — first and last
+MoE layers at 1.4–2.5× the interior mean (`swap_sweep.csv`, `swap_shape.csv`). It is not lexical: the
+last MoE layer is the **least** lexical in the stack by the §1 probe while being the most expensive to
+constrain, which a lexical account predicts backwards.
 
 *A magnitude-matched perturbation carrying no lexical information* reproduces **58%** of the endpoint
-excess on one model and **85%** on the model with the largest effect
-(`sham_magnitude_matched.csv`). So most of it is sensitivity to position in the network, not to what
-the layer routes on.
+excess on one model and **85%** on the model with the largest effect (`sham_magnitude_matched.csv`), so
+most of the endpoint cost is sensitivity to position rather than to what the layer routes on.
 
-*Training eight arms from scratch at three seeds each* — 24 runs, single layers, endpoint exemptions,
-and a uniform schedule at matched memory (`t1_perlayer_training.csv`) — dissolves the rest:
+**The residue is not negligible, and it is itself an endpoint effect.** Real minus matched-sham, per
+layer: L2 **+0.022**, L3 −0.069, L4 −0.039, L5 −0.019, L6 +0.013, L7 −0.012, L8 +0.012, L9 **+0.095**.
+The interior residues are near zero or negative; the two positive outliers are the two endpoints, and
+L9's is four times any other. So "58–85% positional" does **not** license ignoring the rest — the
+15–42% that a generic perturbation fails to reproduce is concentrated exactly where the effect is.
+What that residue is remains unexplained.
+
+#### And it did not survive from-scratch training on a small testbed
+
+**Testbed** — shape `s0` at 1e16 (the cheapest cell with a preserved reference): hidden 128,
+**4 transformer layers of which layer 1 is dense, so only 3 MoE layers** (2, 3, 4), 192 experts,
+top-18, 16k vocabulary, ~65 min per run. Eight arms × three seeds (1234, 2, 3) = 24 runs,
+`t1_perlayer_training.csv`. Arm means, sorted by loss:
+
+| arm | constrained layers | mean test CE | sd over 3 seeds |
+|---|---|---|---|
+| A0 | none | 4.0182 | 0.0128 |
+| A3 | {3} | 4.0208 | 0.0078 |
+| A4 | {4} | 4.0335 | 0.0049 |
+| A2 | {2} | 4.0349 | 0.0108 |
+| A6 | {3,4} — exempt first | 4.0475 | 0.0044 |
+| A5 | {2,3} — exempt last | 4.0492 | 0.0036 |
+| A7 | uniform R=76, matched memory to A5/A6 | 4.0572 | 0.0204 |
+| A1 | {2,3,4} — all | 4.0601 | 0.0047 |
+
+Paired contrasts across the shared seeds:
 
 | contrast | Δ test CE | se |
 |---|---|---|
@@ -130,13 +208,18 @@ and a uniform schedule at matched memory (`t1_perlayer_training.csv`) — dissol
 | exempt-last vs uniform schedule at matched memory | −0.0080 | 0.7 |
 | exempt-last vs exempt-first | +0.0017 | 0.5 |
 
-**Only the global cost survives.** Nothing else clears 2 se.
+Only the global cost clears 2 se.
 
-**The generalisable lesson is larger than the schedule question**: a per-layer cost profile measured by
-perturbing a trained checkpoint does not predict what a model trained under the constraint will do.
-The endpoint effect is real at inference, mostly positional, and absent entirely after co-adaptation.
+**This testbed is weak evidence about depth and should not be read as general.** Three MoE layers is
+barely a depth axis; "first", "middle" and "last" are layers 2, 3 and 4 of the same small model, at the
+smallest budget in the program. It rules out a *large* per-layer effect in that cell. It does not
+contradict the PLE result above, which is a 16-layer model with a genuine interior.
 
-**Strength: high, and negative.** Three pre-registered readings, all resolving against the hypothesis.
+**Strength: mixed, and this section is the least settled in the document.** The endpoint structure is
+supported by two committed PLE cells and by the inference-time profile; the lexical explanation for it
+is refuted three ways; the from-scratch replication is under-powered by construction. What would settle
+it is the missing `{0,1,2}` PLE cell, and a from-scratch sweep on a model deep enough to have an
+interior.
 
 ## 4. What the constraint does not do
 
@@ -193,12 +276,16 @@ survives at either 1e16 or 1e17, so that cell type is missing at the low end ent
 
 ## 6. Open questions
 
-1. **Does de-lexicalization explain the loss advantage?** §1 shows the constraint changes routing and
+1. **The missing PLE cell.** `{0,1,2}` at matched memory against `{0,1,15}` is the one number that
+   would separate "freeing the *last* layer helps" from "freeing *one more* layer helps". Nine cells of
+   that ladder exist outside the repository; committing them is free and closes §3.2's main gap.
+2. **A from-scratch per-layer sweep on a model with an interior.** T1 ran on three MoE layers. Anything
+   about depth needs at least the 9-layer 1e18 panel, where "first", "middle" and "last" are distinct.
+3. **What is the residue the sham does not reproduce?** It is 15–42% of the endpoint cost, concentrated
+   at the last layer (+0.095 against +0.022 at the first, near zero in the interior), and unexplained.
+4. **Does de-lexicalization explain the loss advantage?** §1 shows the constraint changes routing and
    §3.1 shows it eventually helps, and nothing joins them. Across matched pairs, does a model's
    contextual share predict its advantage over its baseline? Small *n*, correlational, and free —
    the data is already committed.
-2. **Is the depth curve seed-stable?** See §5. Two hours, no training.
-3. **What is the ~15–42% of the last MoE layer's inference-time cost that a lexicality-free
-   perturbation does not reproduce?** It is the only part of the per-layer profile specific to this
-   constraint, and it vanishes under training — which may mean it was never important, or may mean
-   co-adaptation routes around it.
+5. **Is the depth curve seed-stable?** See §5. Eight capture passes, two hours, no training.
+
