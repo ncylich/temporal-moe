@@ -57,7 +57,9 @@ absent before. What it does is destroy the token signal, from 0.884 to 0.585.
 
 ![Token AUC against context AUC, one point per trained model](../../../results/phase0/figures/arm_separation.png)
 
-*Each point is one trained model. Horizontal axis is how well the current token predicts firing, vertical axis how well the surrounding context does. The two regimes separate on the horizontal axis, not the vertical one.*
+*Each point is one trained model. Horizontal axis is how well the current token predicts firing,
+vertical axis how well the surrounding context does. The two regimes separate on the horizontal
+axis, not the vertical one.*
 
 Three checks say the low token number is a fact about routing rather than about the probe.
 
@@ -83,7 +85,9 @@ rather than a system design.
 
 ![Cache hit rate by MoE layer](../../../results/phase0/figures/hitrate_by_layer.png)
 
-*Share of the unconstrained top-k already resident, by layer. Higher is better. The dashed line is the k/E random floor at 0.094. Both regimes sit above it and the constrained one roughly doubles it.*
+*Share of the unconstrained top-k already resident, by layer. Higher is better. The dashed line is
+the k/E random floor at 0.094. Both regimes sit above it and the constrained one roughly doubles
+it.*
 
 ### Depth
 
@@ -104,7 +108,9 @@ layer 2 and has little further to move.
 
 ![Context minus token AUC against layer](../../../results/phase0/figures/locus_by_layer.png)
 
-*Positive means routing is better predicted by surroundings than by the current token. The unconstrained curves climb steeply; the constrained ones start high and stay nearly flat, so the vertical gap closes with depth.*
+*Positive means routing is better predicted by surroundings than by the current token. The
+unconstrained curves climb steeply; the constrained ones start high and stay nearly flat, so the
+vertical gap closes with depth.*
 
 Pooling layers across arms of different depths hides this, because the eight-layer arms are flat while
 the thirteen-layer arms rise. Per-arm slopes are the right statistic.
@@ -165,7 +171,9 @@ and momentum families) whose whole purpose is to collapse the expert set. The 13
 
 ![Distribution of per-expert residency share](../../../results/phase0/figures/expert_residency_distribution.png)
 
-*How often each expert is resident, one curve per regime. A flatter, wider distribution means load spread over more experts. The constrained curve is flatter, which is the same fact the table above states as participation ratio.*
+*How often each expert is resident, one curve per regime. A flatter, wider distribution means load
+spread over more experts. The constrained curve is flatter, which is the same fact the table above
+states as participation ratio.*
 
 Two things do not change. Expert weight geometry is indistinguishable between regimes on centroid
 distance and pairwise cosine. The output-side result does not replicate: at 1e18 the constrained model
@@ -207,7 +215,8 @@ entirely.
 
 ![Eviction policy headroom against the Belady bound](../../../results/phase0/figures/eviction_policy_headroom_belady_bound.png)
 
-*Set coverage by policy against the offline optimum. Higher is better. The gap from the best practical policy to the bound is small next to the gap a better demand estimate opens.*
+*Set coverage by policy against the offline optimum. Higher is better. The gap from the best
+practical policy to the bound is small next to the gap a better demand estimate opens.*
 
 Smoothing that estimate is worth more than any eviction rule:
 
@@ -233,7 +242,8 @@ fine, by 2.6 to 11.2 points over fourteen. The split is 20 of 20 by granularity.
 | k = 6 of 64 experts | 6 | +6.6 to +10.1 points |
 | k = 18 of 192 experts | 14 | −2.6 to −11.2 points |
 
-Change in resident-set quality when the demand estimate is replaced by perfect next-token knowledge. Positive is better. No run in either group crosses zero. The natural reading
+Change in resident-set quality when the demand estimate is replaced by perfect next-token knowledge.
+Positive is better. No run in either group crosses zero. The natural reading
 is that chasing instantaneous demand destroys accumulated locality, so foresight without a retention
 objective is a liability. Two caveats belong with the claim: granularity is confounded with expert
 count and model family, since every k = 6 run is a 64-expert model and every k = 18 run a 192-expert
@@ -262,7 +272,9 @@ Enlarging the resident cache closes the regime gap:
 | 3 | 0.386 | 0.497 |
 | 10.5 | 0.990 | 0.993 |
 
-Hit rate against resident-cache size in multiples of k. Higher is better. The constrained arm leads throughout and both saturate around ten times k, so the advantage is largest exactly where memory is scarce.
+Hit rate against resident-cache size in multiples of k. Higher is better. The constrained arm leads
+throughout and both saturate around ten times k, so the advantage is largest exactly where memory is
+scarce.
 
 
 Locality does not grow with scale:
@@ -275,7 +287,9 @@ Locality does not grow with scale:
 | 184.1M | 28.3% | 9.4% |
 | 185.8M | 23.5% | 9.4% |
 
-Share of the expert set shared between neighbouring positions. Higher means more locality to exploit. It holds near three times the random floor across a 130-fold range of model size rather than growing, and the one matched unconstrained arm sits at 19.2%.
+Share of the expert set shared between neighbouring positions. Higher means more locality to
+exploit. It holds near three times the random floor across a 130-fold range of model size rather
+than growing, and the one matched unconstrained arm sits at 19.2%.
 Document boundaries are not a cold start. Over windows of 4, 16 and 64 tokens after an end-of-
 document marker, the median hit-rate penalty is 0.9 points and is negative on some models, because
 routing keys on a surrounding window rather than on document identity.
@@ -293,7 +307,8 @@ moves from 1.4750 at full constraint to 1.4519 unconstrained, a cost of **0.0231
 | 7.1 | 1.4580 |
 | 10.7 | 1.4519 |
 
-Lower is better. Most of the 0.0231 arrives in the last doubling, so the curve is flat where it matters and steep only as the constraint is fully released.
+Lower is better. Most of the 0.0231 arrives in the last doubling, so the curve is flat where it
+matters and steep only as the constraint is fully released.
 
 ![Quality against resident-set size](../../../results/phase0/figures/residency_dose_curve.png)
 
@@ -340,14 +355,20 @@ that layer. The seven measurements also disagree about where the minimum sits, s
 
 ![Per-layer routing locality ranking](../../../results/phase0/figures/per_layer_routing_locality_ranking.png)
 
-*Layers ranked by how local their routing is. The ordering does not match the cost ordering above, which is the point section 4.3 quantifies.*
+*Layers ranked by how local their routing is. The ordering does not match the cost ordering above,
+which is the point section 4.3 quantifies.*
 
 The reason is positional, not lexical. A magnitude-matched perturbation carrying no lexical information
 reproduces most of the endpoint excess: 63% on the coarse model and 83% on the fine one, where the
 excess is the mean of the two endpoint costs minus the mean over interior layers, and the noise scale
-is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. ![Real constraint against magnitude-matched sham, and the residual](../../../results/phase0/figures/sham_residual.png)
+is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. ![Real
+constraint against magnitude-matched sham, and the
+residual](../../../results/phase0/figures/sham_residual.png)
 
-*Top: per-layer cost of imposing the real constraint against a lexicality-free perturbation of matched average size. Bottom: the residual. Lower is better throughout. The residual is near zero across the interior and positive at both ends, so what the sham fails to explain is itself an endpoint effect.* The lexical reading fails on
+*Top: per-layer cost of imposing the real constraint against a lexicality-free perturbation of
+matched average size. Bottom: the residual. Lower is better throughout. The residual is near zero
+across the interior and positive at both ends, so what the sham fails to explain is itself an
+endpoint effect.* The lexical reading fails on
 its own terms as well: in the three imposition arms the last layer ranks most contextual of all,
 8 of 8, 8 of 8 and 13 of 13, which is the opposite of what a token-boundness explanation predicts.
 
@@ -361,7 +382,9 @@ Trained from scratch with individual layers constrained, over three seeds and th
 | layer 2 | 4.0349 | +0.0167 |
 | all three | 4.0601 | +0.0419 |
 
-Lower is better, three seeds per row. The middle layer is cheapest and both ends cost more. Endpoints against middle is +0.0134 CE at 2.4 standard errors. Constraining all three costs +0.0419 at 5.3 standard errors, the only contrast in that sweep comfortably resolved.
+Lower is better, three seeds per row. The middle layer is cheapest and both ends cost more.
+Endpoints against middle is +0.0134 CE at 2.4 standard errors. Constraining all three costs +0.0419
+at 5.3 standard errors, the only contrast in that sweep comfortably resolved.
 
 ### Which profile the cost follows
 
@@ -406,7 +429,9 @@ model is U-shaped, worst at layer 1 and lowest at layer 11, with both ends eleva
 
 ![Per-layer damage across sixteen layers](../../../results/phase0/figures/layer_freeing_damage.png)
 
-*Cost of constraining each layer alone, all sixteen. Lower is better. The shape is the reason freeing the ends looks attractive, and the tables below are why it cannot be read off this curve.* Layers 2 and 15
+*Cost of constraining each layer alone, all sixteen. Lower is better. The shape is the reason
+freeing the ends looks attractive, and the tables below are why it cannot be read off this curve.*
+Layers 2 and 15
 tie on it almost exactly, 0.1408 against 0.1408. Freeing them is not equivalent:
 
 | free set | resident memory | BPB | mean downstream accuracy |
