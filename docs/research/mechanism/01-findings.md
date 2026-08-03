@@ -55,7 +55,7 @@ The interesting half of that table is the token column, not the context column. 
 in both regimes, 0.640 against 0.697, so the constraint does not create context sensitivity that was
 absent before. What it does is destroy the token signal, from 0.884 to 0.585.
 
-![Token AUC against context AUC, one point per trained model](../../../results/phase0/figures/arm_separation.png)
+<img src="../../../results/phase0/figures/arm_separation.png" alt="Token AUC against context AUC, one point per trained model" width="66%">
 
 *Each point is one trained model. Horizontal axis is how well the current token predicts firing,
 vertical axis how well the surrounding context does. The two regimes separate on the horizontal
@@ -83,7 +83,7 @@ rather than a system design.
 - The cache hits far above the 0.094 random floor: 0.317 constrained at coarse granularity and 0.326 at
   fine, against 0.172 unconstrained. 
 
-![Cache hit rate by MoE layer](../../../results/phase0/figures/hitrate_by_layer.png)
+<img src="../../../results/phase0/figures/hitrate_by_layer.png" alt="Cache hit rate by MoE layer" width="66%">
 
 *Share of the unconstrained top-k already resident, by layer. Higher is better. The dashed line is
 the k/E random floor at 0.094. Both regimes sit above it and the constrained one roughly doubles
@@ -106,7 +106,7 @@ constrained one. So the gap between regimes **narrows** with depth rather than w
 0.39 at the shallowest layer and 0.27 at the deepest. A constrained router is already contextual at
 layer 2 and has little further to move.
 
-![Context minus token AUC against layer](../../../results/phase0/figures/locus_by_layer.png)
+<img src="../../../results/phase0/figures/locus_by_layer.png" alt="Context minus token AUC against layer" width="66%">
 
 *Positive means routing is better predicted by surroundings than by the current token. The
 unconstrained curves climb steeply; the constrained ones start high and stay nearly flat, so the
@@ -169,7 +169,7 @@ and momentum families) whose whole purpose is to collapse the expert set. The 13
   same structural band, with generalist fractions from 0.578 to 0.698. The effect belongs to the
   constraint and not to any particular router.
 
-![Distribution of per-expert residency share](../../../results/phase0/figures/expert_residency_distribution.png)
+<img src="../../../results/phase0/figures/expert_residency_distribution.png" alt="Distribution of per-expert residency share" width="66%">
 
 *How often each expert is resident, one curve per regime. A flatter, wider distribution means load
 spread over more experts. The constrained curve is flatter, which is the same fact the table above
@@ -213,7 +213,7 @@ bounds what a smarter eviction rule can win: **6.5 to 9.7 points** across the si
 Everything above that line buys its coverage by seeing future demand, which is a different lever
 entirely.
 
-![Eviction policy headroom against the Belady bound](../../../results/phase0/figures/eviction_policy_headroom_belady_bound.png)
+<img src="../../../results/phase0/figures/eviction_policy_headroom_belady_bound.png" alt="Eviction policy headroom against the Belady bound" width="66%">
 
 *Set coverage by policy against the offline optimum. Higher is better. The gap from the best
 practical policy to the bound is small next to the gap a better demand estimate opens.*
@@ -229,7 +229,7 @@ Smoothing that estimate is worth more than any eviction rule:
 
 A factor of 2.8 across the range, on the same measurements.
 
-![Swap rate against coverage under demand smoothing](../../../results/phase0/figures/demand_smoothing_swap_vs_coverage.png)
+<img src="../../../results/phase0/figures/demand_smoothing_swap_vs_coverage.png" alt="Swap rate against coverage under demand smoothing" width="66%">
 
 *Each point is one smoothing strength. Up and to the left is better: more coverage for fewer swaps.*
 
@@ -310,7 +310,7 @@ moves from 1.4750 at full constraint to 1.4519 unconstrained, a cost of **0.0231
 Lower is better. Most of the 0.0231 arrives in the last doubling, so the curve is flat where it
 matters and steep only as the constraint is fully released.
 
-![Quality against resident-set size](../../../results/phase0/figures/residency_dose_curve.png)
+<img src="../../../results/phase0/figures/residency_dose_curve.png" alt="Quality against resident-set size" width="66%">
 
 *Test bits per byte against resident-set size. Lower is better. The whole range costs 0.0231.*
 
@@ -353,7 +353,7 @@ seven, both unconstrained models at 1e18, and sits at or below the interior mean
 Per-layer cost relative to the mean over interior layers. Higher means more expensive to change at
 that layer. The seven measurements also disagree about where the minimum sits, so no vertex is claimed.
 
-![Per-layer routing locality ranking](../../../results/phase0/figures/per_layer_routing_locality_ranking.png)
+<img src="../../../results/phase0/figures/per_layer_routing_locality_ranking.png" alt="Per-layer routing locality ranking" width="66%">
 
 *Layers ranked by how local their routing is. The ordering does not match the cost ordering above,
 which is the point section 4.3 quantifies.*
@@ -361,9 +361,9 @@ which is the point section 4.3 quantifies.*
 The reason is positional, not lexical. A magnitude-matched perturbation carrying no lexical information
 reproduces most of the endpoint excess: 63% on the coarse model and 83% on the fine one, where the
 excess is the mean of the two endpoint costs minus the mean over interior layers, and the noise scale
-is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. ![Real
+is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. <img src="../../../results/phase0/figures/sham_residual.png" alt="Real
 constraint against magnitude-matched sham, and the
-residual](../../../results/phase0/figures/sham_residual.png)
+residual" width="66%">
 
 *Top: per-layer cost of imposing the real constraint against a lexicality-free perturbation of
 matched average size. Bottom: the residual. Lower is better throughout. The residual is near zero
@@ -427,7 +427,7 @@ constraint imposes.
 The same asymmetry undoes the obvious way to choose which layers to free. Single-layer damage on this
 model is U-shaped, worst at layer 1 and lowest at layer 11, with both ends elevated.
 
-![Per-layer damage across sixteen layers](../../../results/phase0/figures/layer_freeing_damage.png)
+<img src="../../../results/phase0/figures/layer_freeing_damage.png" alt="Per-layer damage across sixteen layers" width="66%">
 
 *Cost of constraining each layer alone, all sixteen. Lower is better. The shape is the reason
 freeing the ends looks attractive, and the tables below are why it cannot be read off this curve.*
