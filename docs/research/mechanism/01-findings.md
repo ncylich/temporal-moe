@@ -121,17 +121,21 @@ Under the constraint each expert covers more of the stream, and the routing dist
 |---|---|---|---|
 | unconstrained, 14 models | 0.201 to 0.422 | 0.000 to 0.328 | 0.790 to 0.917 |
 | constrained, 16 models | 0.292 to 0.801 | 0.036 to 0.914 | 0.886 to 0.974 |
-| `t1_A0`, constrained schedule with no layer constrained | 0.328 | 0.036 | 0.886 |
+| the zero-layer control (see below) | 0.328 | 0.036 | 0.886 |
 
 Full range across models, median over each model's layers. Higher means flatter, less specialised
 routing. Generalist fraction is the participation-ratio column thresholded at 0.5, so it restates
 rather than adds.
 
 Unlike the locus result above, these ranges **overlap**, so the flattening is a strong tendency and
-not a separator. The third row is why the table is worth reading rather than the medians: `t1_A0` runs
-a constrained schedule with zero layers actually constrained, and it lands at the bottom of the
-constrained range, among the unconstrained models, exactly where it should. That arm is an internal
-control and it passes.
+not a separator. The third row is a control worth explaining. It comes from the from-scratch training sweep in
+section 4, which trains the same model under schedules that constrain different subsets of layers.
+One arm in that sweep constrains **no** layers at all. It is built and trained exactly like a
+constrained model, counted as one everywhere in the pipeline, and differs only in that the constraint
+is never applied. If these statistics measure the constraint rather than something incidental to how
+constrained runs are configured, that arm has to land with the unconstrained models. It does, at the
+very bottom of the constrained range. Nothing else in this section would have caught a bug that
+inflated every constrained model equally.
 
 - Generalist fraction falls with depth in both regimes, so the flattening is strongest early.
 The inventory is not starved. Across the shipped configurations, the union of experts touched per
@@ -177,6 +181,12 @@ where the expert count meets or exceeds the hidden width, and those arms are exc
 ## 3. Serving
 
 The demand signal is the lever, and the eviction rule is not.
+
+Both are measured by replaying the same recorded routing demand through different serving policies,
+so the model never changes and only the cache logic does. The metric is **set coverage**: of the
+experts a token actually wants, what share the resident set already holds when the token arrives.
+Higher is better, and the floor is k/E, or 9.4% here. The question is how much of the gap between a
+naive rule and a perfect one is reachable.
 
 | eviction policy | set coverage |
 |---|---|
@@ -236,12 +246,6 @@ Other properties of the resident set:
   single preserved baseline log, 0.186 against 0.168.
 - Hysteresis can eliminate swapping entirely and the price is steep. Raising the threshold drives swap
   rate from 1.000 to 0.000 while retained mass falls from 0.353 to 0.114.
-- A victim cache is cheap and effective. Eight experts recover 16 to 26% of reloads and 32 experts
-  recover 44 to 70%, roughly linear at small sizes. 
-
-![Reload hit rate against victim-cache size](../../../results/phase0/figures/victim_cache_hitrate_vs_size.png)
-
-*Share of expert reloads served from a victim cache, against its size in experts. Higher is better. Roughly linear at small sizes, so the first few slots are the cheapest.*
 - Recomputing residency in blocks instead of rolling it is a tradeoff, not a loss. At a block length of
   72 tokens it holds 28.55 retained mass against rolling's 45.76, but does 0.12 swaps per token against
   rolling's ceiling of 1. Worth considering when swap bandwidth binds rather than routing quality.
@@ -260,9 +264,7 @@ Enlarging the resident cache closes the regime gap:
 
 Hit rate against resident-cache size in multiples of k. Higher is better. The constrained arm leads throughout and both saturate around ten times k, so the advantage is largest exactly where memory is scarce.
 
-![Expert lifetime against resident-cache size](../../../results/phase0/figures/expert_lifetime_vs_resident_cache_size.png)
 
-*How long an expert stays resident, against cache size. Longer is better, and it is why the hit rate above climbs.*
 Locality does not grow with scale:
 
 | active parameters | constrained overlap | random floor |
@@ -274,9 +276,15 @@ Locality does not grow with scale:
 | 185.8M | 23.5% | 9.4% |
 
 Share of the expert set shared between neighbouring positions. Higher means more locality to exploit. It holds near three times the random floor across a 130-fold range of model size rather than growing, and the one matched unconstrained arm sits at 19.2%.
-- Document boundaries are close to a non-issue. Hit rate after an end-of-document token is 0.291
-  against 0.311 within a document, a deficit of 0.009 over 66 measurements. Real, and too small to
-  design around.
+A new document ought to be a cold start: the resident set has been shaped by the previous document,
+and the next one may be about anything. It barely is. Comparing the hit rate in the first few tokens
+after an end-of-document marker against the rate everywhere else, over windows of 4, 16 and 64 tokens
+and 66 measurements, the median penalty is **0.9 percentage points**. On some models it is negative,
+meaning the cache does slightly better just after a boundary than inside a document. Those windows
+also hold only 0.3 to 4.7% of the stream, so even a real penalty would be diluted.
+
+The reason is section 1: routing keys on a window of surrounding tokens, not on document identity, so
+a boundary is not a discontinuity in what the router sees.
 
 ![Routing churn at document boundaries](../../../results/phase0/figures/document_boundary_churn.png)
 
@@ -434,7 +442,6 @@ training-free it looked dominated.
 - Do not pick free sets from single-layer ablation. It is wrong on this model in three cells.
 - Do not invest in a better demand oracle. A perfect one is worse at fine granularity.
 - Spend effort on smoothing the demand estimate, worth 2.8 times, before eviction policy, worth 2.
-- A small victim cache is the cheapest remaining win.
 
 ## 7. How much of this to believe
 
