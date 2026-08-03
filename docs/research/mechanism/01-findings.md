@@ -187,12 +187,13 @@ recorded demand through different policies, so only the cache logic varies. Metr
 coverage**: of the experts a token wants, the share the resident set already holds when it arrives.
 Floor 9.4%.
 
-Two of the policies below are bounds rather than deployable rules. **Belady** evicts whichever
-resident expert is next demanded farthest in the future, which is optimal for a pure eviction rule and
-needs the whole future to compute. **Discounted oracle** also sees the future but weights it, scoring
-each expert by its demand over the coming tokens discounted by *g* per step, so *g* = 0.5 looks a step
-or two ahead and *g* = 0.95 looks much further. Both are ceilings: what a rule could achieve given
-knowledge it will not have at serving time.
+Two rows below are bounds, not deployable rules. Both need the future, so neither is available at
+serving time.
+
+- **Belady.** Evict `argmax_e next(e)`, where `next(e)` is the position of expert *e*'s next demand.
+  Optimal for any pure eviction rule.
+- **Discounted oracle.** Evict `argmin_e s(e)` where `s(e) = Σ_{i>0} g^i · d_e(t+i)`, and `d_e` is 1
+  when *e* is demanded. Small *g* weights the next token or two; `g = 0.95` reaches roughly 20 ahead.
 
 | eviction policy | set coverage |
 |---|---|
@@ -207,18 +208,18 @@ knowledge it will not have at serving time.
   offline optimum for a pure eviction rule. Medians over 66 measurements, six shipped configurations.
 - **Rows above Belady are not eviction rules.** They buy coverage by seeing future demand, a different
   lever.
-- **Smoothing the estimate is worth 2.8x**, from 0.310 at no smoothing to 0.854 at the strongest.
-  Bigger than every eviction rule combined.
+- **Smoothing the demand estimate is worth 2.8x**, 0.310 to 0.854. Bigger than every eviction rule
+  combined, and detailed below.
 
 <img src="../../../results/phase0/figures/eviction_policy_headroom_belady_bound.png" alt="Eviction policy headroom against the Belady bound" width="66%">
 
 *Set coverage by policy, per shipped configuration. Higher is better. The practical-to-optimal gap is
 small next to what a better demand estimate opens.*
 
-**Smoothing** replaces the raw per-token demand estimate with an exponential moving average over
-recent tokens, so a single unusual token cannot evict an expert the stream still wants. Strength is
-the averaging constant: 1.0 is no smoothing, 0.1 averages over roughly the last ten tokens. It cuts
-swaps and raises coverage at the same time, which no eviction rule here manages.
+- **Smoothing** replaces the per-token demand `d_t` with `d̂_t = β·d_t + (1−β)·d̂_{t−1}`, so one odd
+  token cannot evict an expert the stream still wants.
+  - `β = 1` is no smoothing; `β = 0.1` averages over roughly the last 10 tokens.
+  - Cuts swaps and raises coverage at once, which no eviction rule here manages.
 
 <img src="../../../results/phase0/figures/demand_smoothing_swap_vs_coverage.png" alt="Swap rate against coverage under demand smoothing" width="66%">
 
