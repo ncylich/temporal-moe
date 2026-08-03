@@ -1,1 +1,2 @@
 2026-08-03T06:52:37Z | job=ce_free_0_1_14_15_attn_250M        | gpu=81045 MiB, 96 % | uncommitted=0 | 667min to deadline | ce_free_0_1_14_15_attn_250M rank=off tok=100M BPB=0.783684 train_lm=2.516485 train_bpb=0.8
+2026-08-03T07:52:40Z | job=ce_free_0_1_14_15_attn_250M        | gpu=81045 MiB, 78 % | uncommitted=0 | 607min to deadline | ce_free_0_1_14_15_attn_250M rank=off tok=140M BPB=0.783489 train_lm=2.505353 train_bpb=0.8
