@@ -290,9 +290,9 @@ Locality does not grow with scale:
 Share of the expert set shared between neighbouring positions. Higher means more locality to
 exploit. It holds near three times the random floor across a 130-fold range of model size rather
 than growing, and the one matched unconstrained arm sits at 19.2%.
-Document boundaries are not a cold start. Over windows of 4, 16 and 64 tokens after an end-of-
-document marker, the median hit-rate penalty is 0.9 points and is negative on some models, because
-routing keys on a surrounding window rather than on document identity.
+Document boundaries are not a cold start. Over windows of 4, 16 and 64 tokens after a boundary,
+the median hit-rate penalty is 0.9 points and is negative on some models, because routing keys on
+a surrounding window rather than on document identity.
 
 ## 4. What it costs
 
