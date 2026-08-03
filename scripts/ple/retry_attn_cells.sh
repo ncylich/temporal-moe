@@ -67,12 +67,21 @@ for spec in "${CELLS[@]}"; do
   _wait_gpu
   if [ ! -f "$DATA/ple_${tag}.json" ]; then
     l=$(_left)
-    if [ "$l" -lt 130 ]; then echo "=== SKIP $tag: needs ~130min at mb8, ${l}min left"; continue; fi
-    echo "=== $(date -u +%H:%MZ) $tag at --mb 8 --accum 2 (${l}min left)"
-    "$PY" analysis/ple/train_ple.py --tag "$tag" --rank off --lora 32 --lora-attn 32 \
-          --free-set "$fs" --data-seed "$ds" --tokens 50000000 --eval-every 10000000 \
-          --mb 8 --accum 2 > "$LOGS/${tag}.log" 2>&1
-    if [ $? -ne 0 ] || [ ! -f "$DATA/ple_${tag}.json" ]; then
+    if [ "$l" -lt 90 ]; then echo "=== SKIP $tag: needs ~90min, ${l}min left"; continue; fi
+    # mb16 first, WITH expandable_segments. The OOM named fragmentation specifically and this exact
+    # configuration cleared mb16 twice today, so the cheap attempt is likely to work and is ~55min
+    # faster -- the difference between this cell being scored downstream and only having a BPB.
+    # mb8 x accum2 is the fallback; effective batch is 16 either way, so both are the same cell.
+    for split in "16 1" "8 2"; do
+      set -- $split
+      echo "=== $(date -u +%H:%MZ) $tag at --mb $1 --accum $2 ($(_left)min left)"
+      "$PY" analysis/ple/train_ple.py --tag "$tag" --rank off --lora 32 --lora-attn 32 \
+            --free-set "$fs" --data-seed "$ds" --tokens 50000000 --eval-every 10000000 \
+            --mb "$1" --accum "$2" > "$LOGS/${tag}.log" 2>&1
+      [ -f "$DATA/ple_${tag}.json" ] && break
+      echo "[warn] $tag did not complete at mb$1"
+    done
+    if [ ! -f "$DATA/ple_${tag}.json" ]; then
       echo "[FAIL] $tag; tail:" >&2
       tail -c 1200 "$LOGS/${tag}.log" | tr '\r' '\n' | grep -avE "^Loading|^$" | tail -8 >&2
       continue
