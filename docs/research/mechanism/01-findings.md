@@ -56,8 +56,11 @@ predictable; the last column is the one that separates the regimes.
 
 The interesting half of that table is the token column, not the context column. Context AUC is similar
 in both regimes, 0.640 against 0.697, so the constraint does not create context sensitivity that was
-absent before. What it does is destroy the token signal, from 0.884 to 0.585. Figure:
-[`arm_separation.png`](../../../results/phase0/figures/arm_separation.png).
+absent before. What it does is destroy the token signal, from 0.884 to 0.585.
+
+![Token AUC against context AUC, one point per trained model](../../../results/phase0/figures/arm_separation.png)
+
+*Each point is one trained model. Horizontal axis is how well the current token predicts firing, vertical axis how well the surrounding context does. The two regimes separate on the horizontal axis, not the vertical one.*
 
 Three checks say the low token number is a fact about routing rather than about the probe.
 
@@ -79,8 +82,11 @@ rather than a system design.
   0.655 unconstrained (0.567 to 0.716, n = 89). This is the largest clean separation in the program and
   the two ranges are nowhere near each other.
 - The cache hits far above the 0.094 random floor: 0.317 constrained at coarse granularity and 0.326 at
-  fine, against 0.172 unconstrained. Figure:
-  [`hitrate_by_layer.png`](../../../results/phase0/figures/hitrate_by_layer.png).
+  fine, against 0.172 unconstrained. 
+
+![Cache hit rate by MoE layer](../../../results/phase0/figures/hitrate_by_layer.png)
+
+*Share of the unconstrained top-k already resident, by layer. Higher is better. The dashed line is the k/E random floor at 0.094. Both regimes sit above it and the constrained one roughly doubles it.*
 
 ### Depth
 
@@ -97,8 +103,11 @@ Positive means routing grows more contextual deeper in the stack.
 The rise is solid in the unconstrained regime and about eight times smaller and inconsistent in the
 constrained one. So the gap between regimes **narrows** with depth rather than widening: it is roughly
 0.39 at the shallowest layer and 0.27 at the deepest. A constrained router is already contextual at
-layer 2 and has little further to move. Figure:
-[`locus_by_layer.png`](../../../results/phase0/figures/locus_by_layer.png).
+layer 2 and has little further to move.
+
+![Context minus token AUC against layer](../../../results/phase0/figures/locus_by_layer.png)
+
+*Positive means routing is better predicted by surroundings than by the current token. The unconstrained curves climb steeply; the constrained ones start high and stay nearly flat, so the vertical gap closes with depth.*
 
 Pooling layers across arms of different depths hides this, because the eight-layer arms are flat while
 the thirteen-layer arms rise. Per-arm slopes are the right statistic.
@@ -129,6 +138,10 @@ less specialised routing.
   same structural band, with generalist fractions from 0.578 to 0.698. The effect belongs to the
   constraint and not to any particular router.
 
+![Distribution of per-expert residency share](../../../results/phase0/figures/expert_residency_distribution.png)
+
+*How often each expert is resident, one curve per regime. A flatter, wider distribution means load spread over more experts. The constrained curve is flatter, which is the same fact the table above states as participation ratio.*
+
 Two things do not change. Expert weight geometry is indistinguishable between regimes on centroid
 distance and pairwise cosine. The output-side result does not replicate: at 1e18 the constrained model
 writes sharper output distributions at 4 of 8 layers on the data-weighted metric and 0 of 8 on the
@@ -144,15 +157,46 @@ where the expert count meets or exceeds the hidden width, and those arms are exc
 
 The demand signal is the lever, and the eviction rule is not.
 
-- Across a matched population of 134 measurements, eviction policies span 0.251 set coverage for
-  least-recently-used to 0.510 for a discounted oracle. Two times, from the worst practical policy to
-  an oracle.
-- Smoothing the demand estimate is worth more. Set coverage goes from 0.310 at no smoothing to 0.854 at
-  the strongest, a factor of 2.8 on the same measurements.
+| eviction policy | set coverage |
+|---|---|
+| discounted oracle, g = 0.5 | 0.510 |
+| discounted oracle, g = 0.9 | 0.492 |
+| Belady with prefetch, h = 1 | 0.439 |
+| Belady | 0.371 |
+| minimum logit | 0.310 |
+| least recently used | 0.251 |
+
+Medians over the same 134 measurements. Higher is better. Belady is the offline optimum for a pure eviction rule, so the practical-to-oracle span is 0.251 to 0.371, and everything above it comes from using future demand rather than from evicting better.
+
+![Eviction policy headroom against the Belady bound](../../../results/phase0/figures/eviction_policy_headroom_belady_bound.png)
+
+*Set coverage by policy against the offline optimum. Higher is better. The gap from the best practical policy to the bound is small next to the gap a better demand estimate opens.*
+
+Smoothing that estimate is worth more than any eviction rule:
+
+| smoothing strength | set coverage |
+|---|---|
+| none | 0.310 |
+| 0.5 | 0.463 |
+| 0.25 | 0.640 |
+| 0.1 | 0.854 |
+
+A factor of 2.8 across the range, on the same measurements.
+
+![Swap rate against coverage under demand smoothing](../../../results/phase0/figures/demand_smoothing_swap_vs_coverage.png)
+
+*Each point is one smoothing strength. Up and to the left is better: more coverage for fewer swaps.*
 
 A better demand signal is not the same as a perfect one. Replacing the estimate with perfect
 next-token foresight helps at coarse granularity, by 6.6 to 10.1 points over six runs, and hurts at
-fine, by 2.6 to 11.2 points over fourteen. The split is 20 of 20 by granularity. The natural reading
+fine, by 2.6 to 11.2 points over fourteen. The split is 20 of 20 by granularity.
+
+| granularity | runs | effect of perfect foresight |
+|---|---|---|
+| k = 6 of 64 experts | 6 | +6.6 to +10.1 points |
+| k = 18 of 192 experts | 14 | −2.6 to −11.2 points |
+
+Change in resident-set quality when the demand estimate is replaced by perfect next-token knowledge. Positive is better. No run in either group crosses zero. The natural reading
 is that chasing instantaneous demand destroys accumulated locality, so foresight without a retention
 objective is a liability. Two caveats belong with the claim: granularity is confounded with expert
 count and model family, since every k = 6 run is a 64-expert model and every k = 18 run a 192-expert
@@ -166,8 +210,11 @@ Other properties of the resident set:
 - Hysteresis can eliminate swapping entirely and the price is steep. Raising the threshold drives swap
   rate from 1.000 to 0.000 while retained mass falls from 0.353 to 0.114.
 - A victim cache is cheap and effective. Eight experts recover 16 to 26% of reloads and 32 experts
-  recover 44 to 70%, roughly linear at small sizes. Figure:
-  [`victim_cache_hitrate_vs_size.png`](../../../results/phase0/figures/victim_cache_hitrate_vs_size.png).
+  recover 44 to 70%, roughly linear at small sizes. 
+
+![Reload hit rate against victim-cache size](../../../results/phase0/figures/victim_cache_hitrate_vs_size.png)
+
+*Share of expert reloads served from a victim cache, against its size in experts. Higher is better. Roughly linear at small sizes, so the first few slots are the cheapest.*
 - Recomputing residency in blocks instead of rolling it is a tradeoff, not a loss. At a block length of
   72 tokens it holds 28.55 retained mass against rolling's 45.76, but does 0.12 swaps per token against
   rolling's ceiling of 1. Worth considering when swap bandwidth binds rather than routing quality.
@@ -175,19 +222,57 @@ Other properties of the resident set:
 - Swap rate is not a useful statistic. It sits at a median of 1.000 across 112 per-layer records, range
   0.987 to 1.000, because at R = k a swap fires whenever any demanded expert is missing. Use the 95th
   percentile burst length instead.
-- Enlarging the resident cache closes the regime gap. At K = k the constrained arm hits 0.236 against
-  0.169 unconstrained, and both reach 0.99 by K = 10.5k.
-- Locality does not grow with scale. Expert-set overlap runs 19.2% to 32.9% from 1.4M to 186M active
-  parameters against a 9.4% random floor, roughly flat, with the one matched unconstrained arm at
-  19.2%.
+Enlarging the resident cache closes the regime gap:
+
+| cache size, K/k | unconstrained | constrained |
+|---|---|---|
+| 1 | 0.169 | 0.236 |
+| 2 | 0.284 | 0.401 |
+| 3 | 0.386 | 0.497 |
+| 10.5 | 0.990 | 0.993 |
+
+Hit rate against resident-cache size in multiples of k. Higher is better. The constrained arm leads throughout and both saturate around ten times k, so the advantage is largest exactly where memory is scarce.
+
+![Expert lifetime against resident-cache size](../../../results/phase0/figures/expert_lifetime_vs_resident_cache_size.png)
+
+*How long an expert stays resident, against cache size. Longer is better, and it is why the hit rate above climbs.*
+Locality does not grow with scale:
+
+| active parameters | constrained overlap | random floor |
+|---|---|---|
+| 1.4M | 28.4% | 9.4% |
+| 8.2M | 32.9% | 9.4% |
+| 12.2M | 31.2% | 9.4% |
+| 184.1M | 28.3% | 9.4% |
+| 185.8M | 23.5% | 9.4% |
+
+Share of the expert set shared between neighbouring positions. Higher means more locality to exploit. It holds near three times the random floor across a 130-fold range of model size rather than growing, and the one matched unconstrained arm sits at 19.2%.
 - Document boundaries are close to a non-issue. Hit rate after an end-of-document token is 0.291
   against 0.311 within a document, a deficit of 0.009 over 66 measurements. Real, and too small to
   design around.
+
+![Routing churn at document boundaries](../../../results/phase0/figures/document_boundary_churn.png)
+
+*Hit rate in the tokens after an end-of-document marker against the within-document baseline. Recovery is fast enough that boundaries do not need special handling.*
 
 ## 4. What it costs
 
 Globally the constraint is cheap. Across a 10.7-fold range of resident-set size, test bits per byte
 moves from 1.4750 at full constraint to 1.4519 unconstrained, a cost of **0.0231 BPB**.
+
+| resident set, R/k | test BPB |
+|---|---|
+| 1 | 1.4750 |
+| 2 | 1.4736 |
+| 4 | 1.4681 |
+| 7.1 | 1.4580 |
+| 10.7 | 1.4519 |
+
+Lower is better. Most of the 0.0231 arrives in the last doubling, so the curve is flat where it matters and steep only as the constraint is fully released.
+
+![Quality against resident-set size](../../../results/phase0/figures/residency_dose_curve.png)
+
+*Test bits per byte against resident-set size. Lower is better. The whole range costs 0.0231.*
 
 At 1e18 the sign reverses and the constrained model wins outright, at both granularities: 1.3124
 against 1.3175 coarse and 1.3339 against 1.3478 fine, over three to five seeds per cell with seed
@@ -228,18 +313,30 @@ seven, both unconstrained models at 1e18, and sits at or below the interior mean
 Per-layer cost relative to the mean over interior layers. Higher means more expensive to change at
 that layer. The seven measurements also disagree about where the minimum sits, so no vertex is claimed.
 
+![Per-layer routing locality ranking](../../../results/phase0/figures/per_layer_routing_locality_ranking.png)
+
+*Layers ranked by how local their routing is. The ordering does not match the cost ordering above, which is the point section 4.3 quantifies.*
+
 The reason is positional, not lexical. A magnitude-matched perturbation carrying no lexical information
 reproduces most of the endpoint excess: 63% on the coarse model and 83% on the fine one, where the
 excess is the mean of the two endpoint costs minus the mean over interior layers, and the noise scale
-is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. Figure:
-[`sham_residual.png`](../../../results/phase0/figures/sham_residual.png). The lexical reading fails on
+is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. ![Real constraint against magnitude-matched sham, and the residual](../../../results/phase0/figures/sham_residual.png)
+
+*Top: per-layer cost of imposing the real constraint against a lexicality-free perturbation of matched average size. Bottom: the residual. Lower is better throughout. The residual is near zero across the interior and positive at both ends, so what the sham fails to explain is itself an endpoint effect.* The lexical reading fails on
 its own terms as well: in the three imposition arms the last layer ranks most contextual of all,
 8 of 8, 8 of 8 and 13 of 13, which is the opposite of what a token-boundness explanation predicts.
 
-Trained from scratch with individual layers constrained, over three seeds and three MoE layers, the
-middle layer is cheapest and both ends cost more. Endpoints against middle is +0.0134 CE at 2.4
-standard errors. Constraining all three costs +0.0419 CE at 5.3 standard errors, the only contrast in
-that sweep that is comfortably resolved.
+Trained from scratch with individual layers constrained, over three seeds and three MoE layers:
+
+| constrained layers | test CE | against none |
+|---|---|---|
+| none | 4.0182 | 0 |
+| layer 3, the middle | 4.0208 | +0.0026 |
+| layer 4 | 4.0335 | +0.0153 |
+| layer 2 | 4.0349 | +0.0167 |
+| all three | 4.0601 | +0.0419 |
+
+Lower is better, three seeds per row. The middle layer is cheapest and both ends cost more. Endpoints against middle is +0.0134 CE at 2.4 standard errors. Constraining all three costs +0.0419 at 5.3 standard errors, the only contrast in that sweep comfortably resolved.
 
 ### Which profile the cost follows
 
@@ -280,7 +377,11 @@ and grows with more adaptation. Section 1 describes something the model learns, 
 constraint imposes.
 
 The same asymmetry undoes the obvious way to choose which layers to free. Single-layer damage on this
-model is U-shaped, worst at layer 1 and lowest at layer 11, with both ends elevated. Layers 2 and 15
+model is U-shaped, worst at layer 1 and lowest at layer 11, with both ends elevated.
+
+![Per-layer damage across sixteen layers](../../../results/phase0/figures/layer_freeing_damage.png)
+
+*Cost of constraining each layer alone, all sixteen. Lower is better. The shape is the reason freeing the ends looks attractive, and the tables below are why it cannot be read off this curve.* Layers 2 and 15
 tie on it almost exactly, 0.1408 against 0.1408. Freeing them is not equivalent:
 
 | free set | resident memory | BPB | mean downstream accuracy |
