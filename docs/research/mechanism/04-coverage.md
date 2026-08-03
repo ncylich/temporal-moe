@@ -35,6 +35,28 @@ is why it is generated.
 | free-rider / tokens-per-expert (A11) | `mechinterp_freerider.csv` | n/a | — | **22** | 22 |
 | per-layer cost vs churn (N7) | `n7_cost_vs_churn.csv` | yes | 2–14 | **7** | 66 |
 
+### Files that are not current
+
+*Also generated. Archived files are read from `results/ablations/superseded/`; the rest sit in `results/ablations/` because each is the sole surviving record of at least one run. Verdicts and run lists are in that directory's `README.md`.*
+
+| file | where | why it is not current |
+|---|---|---|
+| `mechinterp_logitlens.csv` | `superseded/` | every run it holds is covered by its replacement |
+| `mechinterp_structural.csv` | `results/ablations/` | superseded method (pooled across layers), but the sole record of 6 runs the per-layer replacement never held, 4 of them unrecoverable; also pooled effective rank |
+| `mechinterp_lens.csv` | `results/ablations/` | superseded method, but the sole record of 2 runs whose checkpoints are gone |
+| `specialization_summary.csv` | `results/ablations/` | sole structural record of 5 router variants absent from mechinterp_structural.csv |
+| `specialization_m3.csv` | `results/ablations/` | sole geometry record of the same 5 router variants |
+| `specialization_probe.csv` | `results/ablations/` | per-expert detail behind the two above, same 5 variants |
+| `oracle_a3.csv` | `results/ablations/` | no producer was ever committed; 0 of 20 runs have a preserved router log |
+| `oracle_horizon_map.csv` | `results/ablations/` | no producer; 0 of 4 runs preserved |
+| `block_replay.csv` | `results/ablations/` | no producer; 0 of 11 runs preserved |
+| `anomaly_pred.csv` | `results/ablations/` | no producer; 0 of 5 runs preserved |
+| `karen_center_replay.csv` | `results/ablations/` | no producer; neither run preserved |
+| `karen_promotion_s2_1e17.csv` | `results/ablations/` | no producer; eval-only and the checkpoint is gone |
+| `unmask_eval.csv` | `results/ablations/` | no producer; eval-only, most 1e16/1e17 checkpoints gone |
+| `unmask_eval_1e19.csv` | `results/ablations/` | no producer, but eval-only and its 1e19 checkpoints survive |
+| `momr_replay.csv` | `results/ablations/` | no producer, but both runs have preserved logs — reconstructible |
+
 <!-- COVERAGE:END -->
 
 ## What bounds these numbers

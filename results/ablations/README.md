@@ -39,7 +39,6 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `mechinterp_freerider.csv` | 'Free-rider' expert stats — distinct experts per sequence, tokens per expert. | a6000@1f416ef5 |
 | `mechinterp_lens.csv` | Logit-lens effective-vocab & semantic dispersion per (layer,expert), static+weighted variants, incl. softmax baseline. | a6000@3ce9b63e/6a4d7bf0 |
 | `mechinterp_locus.csv` | Token-AUC vs context-AUC 'locus' of expert specialization per (layer,expert); variant col = base/kfull/kwin k-config. | a6000@29c500ab/3ce9b63e/41c8d18a/804e10b6/dd4e900e |
-| `mechinterp_logitlens.csv` | Unweighted logit-lens effective-vocab + semantic dispersion per (layer,expert). | a6000@53c381bd |
 | `mechinterp_structural.csv` | Structural routing stats (PR, generalist frac, router entropy, eff-rank, centroid dist) per model. | a6000@3ce9b63e |
 | `mechinterp_structural_1e19.csv` | Structural stats replicated at 1e19 (3 cells, same schema + budget col). | h100@8aef6c4c |
 | `mechinterp_locus_1e19.csv` | Token-vs-context locus probes at 1e19 (per layer/expert AUCs; iid null 0.500-0.502, shift null 0.502-0.505 = residency autocorrelation). | h100@696da366 |
@@ -163,3 +162,53 @@ tested and rejected.
 | `mechinterp_null_battery.csv` | Six nulls per feature, each preserving or destroying one structure, establishing which null actually floors the probe. |
 | `mechinterp_locus_slopes.csv` | Per-arm depth slope of the median context-minus-token, in both units (per unit `l/L` and per layer index), with bootstrap intervals. |
 | `mechinterp_oracle.csv` | C7 nonparametric token-identity oracle: best achievable AUC from token id alone, and `I(expert; token id)/H(expert)`, per (layer, expert). The ceiling the linear token probe is measured against. |
+
+## Files that are not current
+
+Everything above is a result someone may cite. These rows are the exceptions, and each one is listed
+because silence about a file is indistinguishable from the file not existing.
+
+[`superseded/`](superseded/) holds files whose replacement covers **every run they contain**, so that
+archiving them loses nothing. It holds one file. Everything below stayed in this directory because it
+is the only surviving record of at least one run.
+
+### Superseded method, sole record of runs the replacement lacks
+
+Cite the replacement for any run both files share. Cite these only for the runs listed.
+
+| file | replacement | what only this file has |
+|---|---|---|
+| `mechinterp_structural.csv` | `mechinterp_structural_1e19.csv` | Six runs the replacement never contained: `g3_moe_s0_1e16_auxfree`, `g3_moe_s0_1e16_sigmoid`, `g3_tmoe_s0_1e16`, `g3_tmoe_s0_1e16_seed3`, `tmoe_minlogit_sh1_s2_1e17`, `v16k_sweep_s2_1e17`. Four of those checkpoints are absent from `MANIFEST.csv` and from disk. Also pooled effective rank, computed on a matrix stacked across layers and so not recoverable from per-layer values — it differs from the per-layer median by a factor of about 2.2. Its other five columns do pool back to within 0.005 and carry nothing new. |
+| `mechinterp_lens.csv` | `mechinterp_lens_1e19.csv` | Two of its three runs, `g3_moe_s0_1e16_sigmoid` and `g3_tmoe_s0_1e16`, whose checkpoints no longer exist. |
+| `specialization_summary.csv`, `specialization_m3.csv`, `specialization_probe.csv` | `mechinterp_structural.csv` for two cells only | Five router variants structural has never contained: aux-free, Karen, Karen-soft at two seeds, and log-ratio momentum. These three files are the only structural measurement of those variants. |
+
+Note that both replacements are misnamed. `mechinterp_structural_1e19.csv` and `mechinterp_lens_1e19.csv`
+span every budget from 1e16 to 1e19 — the suffix names the largest budget in the file, not its contents.
+
+### Sole record, and no longer reproducible
+
+No producer for these was ever committed. The index above gives each one a provenance commit on a
+training box, and eight of those nine commits are not objects in this repository: they were written in
+pod-local clones that were never pushed, which is what "comms + code excluded" in the consolidation
+commits means in practice.
+
+Re-running is not a fallback either. The replay analyses need a preserved router log, and of the runs
+these files cover, only `momr_replay.csv`'s two have one — the twenty-two preserved logs are a
+different population of runs entirely. The eval analyses need checkpoints, and most are gone.
+
+| file | reproducible? |
+|---|---|
+| `oracle_a3.csv` | No. Twenty runs, none with a preserved router log |
+| `oracle_horizon_map.csv` | No. Four runs, none preserved |
+| `block_replay.csv` | No. Eleven runs, none preserved |
+| `anomaly_pred.csv` | No. Five runs, none preserved |
+| `karen_center_replay.csv` | No. Two runs, neither preserved |
+| `karen_promotion_s2_1e17.csv` | No. Eval-only, and the checkpoint is gone |
+| `unmask_eval.csv` | No. Eval-only over 1e16 and 1e17 runs, most of whose checkpoints are gone |
+| `unmask_eval_1e19.csv` | Probably. Eval-only, and its 1e19 checkpoints are in `MANIFEST.csv`. Its producer is the one genuine omission rather than a policy: the sibling commits from the same batch each shipped a script |
+| `momr_replay.csv` | Yes. Both runs have preserved logs |
+
+A claim resting on any row marked "No" can never be checked against its source. That is not a reason to
+ignore these files, which is the failure the working rules in
+`docs/research/mechanism/README.md` exist to prevent, but it is a reason not to let one carry a section
+on its own.
