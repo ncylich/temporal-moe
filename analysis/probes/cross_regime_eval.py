@@ -143,7 +143,10 @@ def run_cell(spec, keep_going=False):
     # for a run whose name and checkpoint say otherwise -- and it happened again while this script
     # was being written, to g3_moe_s0_1e16. Both files are restored from `latest` and `run.meta`
     # backups here so that a failed evaluation cannot cost provenance.
-    guarded = [latest_file, os.path.join(CKPT_ROOT, run, "run.meta")]
+    # sweep_eval.py writes results/ablations/sweep_eval.csv on every invocation, so running this
+    # producer would otherwise leave an unrelated committed file modified and the gate red.
+    guarded = [latest_file, os.path.join(CKPT_ROOT, run, "run.meta"),
+               os.path.join(ROOT, "results", "ablations", "sweep_eval.csv")]
     backups = {}
     for path in guarded:
         if os.path.exists(path):
@@ -219,7 +222,10 @@ def main():
             done = {r["cell"] for r in rows}
             prior = [r for r in pr[1:] if r[0] not in done]
     with open(a.out, "w", newline="") as f:
-        w = csv.writer(f)
+        # LF, not csv.writer's default CRLF: csv_sanity counts CRLF differently across its two
+        # read paths and reports a phantom shrink, the false positive already on record for
+        # layer_freeing_downstream.csv. Matching the rest of results/ablations/ avoids it.
+        w = csv.writer(f, lineterminator="\n")
         w.writerow([f"# Cross-regime evaluation cost. Both arms scored on identical cached batches "
                     f"(analysis/probes/sweep_eval.py). BPB = CE / divisor; divisor is per tokenizer "
                     f"and recorded per row. ckpt_iter is the highest real iter_* directory, not "
