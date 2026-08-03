@@ -12,3 +12,4 @@
 2026-08-03T17:53:12Z | job=NONE                               | gpu=0 MiB, 0 %     | uncommitted=0 | 6min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=50M BPB=0.784325 train_lm=2.520437 train_bpb=0.810
 2026-08-03T18:53:16Z | job=NONE                               | gpu=0 MiB, 0 %     | uncommitted=0 | -53min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=50M BPB=0.784325 train_lm=2.520437 train_bpb=0.810
 2026-08-03T19:53:20Z | job=NONE                               | gpu=0 MiB, 0 %     | uncommitted=0 | -113min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=50M BPB=0.784325 train_lm=2.520437 train_bpb=0.810
+2026-08-03T19:53:24Z | watchdog exiting, past deadline
