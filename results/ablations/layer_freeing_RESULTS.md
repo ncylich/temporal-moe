@@ -31,6 +31,8 @@ the temporal-MoE thesis claims to save.
 
 ## 1. Headline
 
+**Superseded by §7 (2026-08-03): `{0,1,14,15}` at 250M reaches 0.781199 / 94.78%, and the best downstream score is `{0,1,14,15}`+attention. This section records the state as of the first round.**
+
 **Freeing MoE layers 0, 1 and 15 beats the full finetune.** The CE recipe (router + norm gains +
 LoRA r32, no PLE) at 50M tokens reaches **0.797810 (93.98%)**, beating F′ = 0.8106 — a finetune of
 all 6.92B parameters — by 1.07σ. It is the strongest quality in the adaptation line. The price is
@@ -112,11 +114,24 @@ So adaptation compresses the first two layers' large training-free advantage alm
 *amplifies* the third layer's small one. I have no explanation for the asymmetry and will not
 construct one from a single cell.
 
-**Unresolved.** The controlled `{0,1,2}` cell — identical recipe, budget and memory, differing only
-in whether the third freed layer is 2 or 15 — was cancelled before completing. Without it I cannot
-say whether the damage profile is a useful design tool or a misleading one. On present evidence it
-does **not** predict trained outcomes, and configurations should not be chosen from solo damage
-alone.
+**Resolved, 2026-08-03: the damage profile is not a design tool.** The controlled `{0,1,2}` cell was
+run — identical recipe, budget and memory to `{0,1,15}`, differing only in whether the third freed
+layer is 2 or 15. Training-free, layer 2 was worth 0.198 of recovery against layer 15's 0.034, a
+factor of 5.8 at identical cost. Trained, it is **worse**:
+
+| third freed layer | training-free recovery | trained BPB | mean downstream acc |
+|---|---|---|---|
+| 15 (`ce_free_0_1_15`) | 0.034 | **0.797810** | **0.5959** |
+| 2 (`ce_free_0_1_2`) | 0.198 | 0.808615 | 0.5855 |
+
+The profile predicted a large win for layer 2 and delivered a 0.0108 BPB loss and the worst
+downstream score of any free-set cell. Together with the `{0,1}`→`{0,1,15}` reversal above, that is
+two independent contradictions, one of them controlled. **Do not choose free sets from solo damage.**
+
+A third arrangement was also run: `{0,1,14,15}`, freeing both ends. Training-free it was *dominated*
+by `{0,1,2}` — less recovery (0.495 vs 0.573) at more memory (+175.0% vs +131.2%) — and the write-up
+above says `{0,1,2}` "dominates it outright". Trained, `{0,1,14,15}` is the best cell in the program
+by a wide margin (§7). That is the third contradiction.
 
 ## 5. Diminishing returns
 
@@ -129,6 +144,87 @@ remaining gap to 95%.
 This is a genuine quality/memory frontier point and the strongest quality the adaptation line has
 produced — F′-level from a 235M-parameter LoRA recipe at 50M tokens. But it concedes the paper's
 central claim that serving memory tracks active parameters, and by a large factor.
+
+## 7. 2026-08-03: nine more cells, and the first downstream evaluation
+
+**All figures below.** BPB lower is better; `rec` is the share of the constraint's BPB damage undone
+(0% = imposed untrained 2.7507, 100% = base free routing 0.6727). `acc` is mean accuracy over the
+same ten 0-shot tasks as `olmoe_adapt_downstream.csv`, higher better (base free routing 0.6823,
+imposed untrained 0.3164). `attn` is the rank of LoRA on the attention projections q/k/v/o, which no
+previous arm of this program has ever trained; `sd` is the corpus permutation seed.
+
+| cell | free set | memory | tokens | attn | sd | BPB | rec | acc |
+|---|---|---|---|---|---|---|---|---|
+| ce_free_0_1_14_15_250M | 0,1,14,15 | +175.0% | 250M | 0 | 0 | **0.781199** | 94.78% | 0.6073 |
+| ce_free_0_1_14_15_attn_250M | 0,1,14,15 | +175.0% | 250M | 32 | 0 | 0.783079 | 94.69% | **0.6097** |
+| ce_free_0_1_14_15_attn_ds1 | 0,1,14,15 | +175.0% | 50M | 32 | 1 | 0.784325 | 94.65% | 0.6081 |
+| ce_free_0_1_14_15_attn | 0,1,14,15 | +175.0% | 50M | 32 | 0 | 0.785201 | 94.59% | 0.6081 |
+| ce_free_0_1_14_15 | 0,1,14,15 | +175.0% | 50M | 0 | 0 | 0.786275 | 94.53% | 0.5958 |
+| ce_free_0_1_15_250M | 0,1,15 | +131.2% | 250M | 0 | 0 | 0.790846 | 94.31% | 0.6013 |
+| ce_free_0_1_15_200M | 0,1,15 | +131.2% | 200M | 0 | 0 | 0.791767 | 94.27% | 0.6008 |
+| ce_free_0_1_15_attn | 0,1,15 | +131.2% | 50M | 32 | 0 | 0.796195 | 94.06% | 0.5982 |
+| ce_free_0_1_15 | 0,1,15 | +131.2% | 50M | 0 | 0 | 0.797810 | 93.98% | 0.5959 |
+| ce_free_0_1_15_ds1 | 0,1,15 | +131.2% | 50M | 0 | 1 | 0.797814 | 93.98% | — |
+| ce_free_0_1_2 | 0,1,2 | +131.2% | 50M | 0 | 0 | 0.808615 | 93.46% | 0.5855 |
+| ce_free2 | 0,1 | +87.5% | 50M | 0 | 0 | 0.814440 | 93.18% | 0.5883 |
+| *F′ full 6.92B finetune* | — | baseline | 250M | — | — | *0.810600* | *93.36%* | — |
+| *CE-adapted, full residency* | — | baseline | 250M | — | — | *0.814700* | *93.17%* | *0.5888* |
+
+**95% is not reachable this way.** `{0,1,14,15}` at 250M reaches 94.78%, and its curve is flat from
+120M — the last 130M tokens bought 0.0015. The 95% bar (0.7766) is 0.0046 further. Freeing layers
+and adding tokens does not get there; §6's suggestion that R, not layer count, is the remaining
+lever is untested and now the obvious next thing.
+
+**BPB overstates recovery.** The best model is 94.8% recovered on BPB and **79.5%** on downstream
+accuracy. Any "we recovered N% of the constraint's cost" claim in this line is a BPB-space claim and
+does not survive translation to task accuracy.
+
+**BPB ranks coarse differences and not fine ones.** Across the nine scored cells, Pearson r between
+BPB and mean accuracy is **−0.90** and Spearman ρ is **+0.83**, so BPB is a sound coarse instrument.
+Every inversion, however, sits below ~0.012 BPB: the 0.0115 gap between `{0,1,14,15}` and `{0,1,15}`
+at 50M produces a 0.0001 accuracy difference, and `ce_free_0_1_2` beats `ce_free2` by 0.0058 BPB
+while losing to it on accuracy. That threshold is, ironically, this program's own pre-registered
+2σ = 0.012 bar, which is far too wide as a statement about measurement precision and about right as
+a statement about what transfers.
+
+**Replicate spread is not one number.** Two same-configuration pairs on different corpus draws:
+`ce_free_0_1_15` vs `_ds1` agree to **0.000004** BPB, `ce_free_0_1_14_15_attn` vs `_ds1` to
+**0.000876**. Anything quoted as a noise floor should use the larger. On mean downstream accuracy the
+second pair agrees to **0.000030**, because both models are scored on identical items.
+
+## 8. Attention adaptation, and what it exposes about the metric
+
+Every arm of this program adapts the router, the RMSNorm gains and the expert MLPs, and freezes
+attention — including every cell above. F′ unfroze all 6.92B parameters, so attention was trainable
+there, but no efficient arm had ever asked whether a small attention adapter contributes. Rank-32
+LoRA on q/k/v/o is 8.4M parameters and costs **zero** resident expert memory, the currency this whole
+line spends.
+
+| free set | control | + attention | ΔBPB | Δacc |
+|---|---|---|---|---|
+| 0,1,14,15 | 0.786275 / 0.595840 | 0.785201 / 0.608130 | +0.0011 | **+0.01229** |
+| 0,1,14,15 (seed 1) | 0.786275 / 0.595840 | 0.784325 / 0.608100 | +0.0020 | **+0.01226** |
+| 0,1,15 | 0.797810 / 0.595880 | 0.796195 / 0.598240 | +0.0016 | +0.00236 |
+
+**The `{0,1,14,15}` result replicates to 3e-5 on a different corpus draw.** Two independently trained
+models agreeing that closely on a 0.0123 effect is not a fluctuation.
+
+**And the intervention is nearly invisible to BPB.** Its BPB movement, 0.0011, is *inside* the
+0.000876 replicate spread of that very cell — not an established effect — while its accuracy movement
+is 400× its own spread. The metric this line selects on cannot see the intervention that most
+improves what the line is for.
+
+The benefit is free-set-dependent — 5× larger on `{0,1,14,15}` than on `{0,1,15}` — which is not
+explained here and should not be explained from two free sets.
+
+At 250M the picture changes again: attention ends 0.0019 **worse** on BPB (0.783079 vs 0.781199) and
+0.0024 better on accuracy, inside noise. Attention front-loads: `{0,1,14,15}`+attention at **50M**
+scores 0.6081, statistically level with the same configuration without attention at **250M**
+(0.6073). Read as a token-efficiency result it is a 5× saving; read as a quality result at matched
+budget it is a tie.
+
+**Not done.** Attention with the expert LoRA switched off — 8.4M parameters against 235M — did not
+fit before the session deadline. It asks whether the expensive adapter is the one doing the work.
 
 **If a 95% target is real, R is the likelier lever than layer count.** The residency-dose curve is
 smooth in R, whereas free-versus-constrained is an all-or-nothing jump to R=64 on a layer — the most
