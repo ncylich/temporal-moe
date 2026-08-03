@@ -59,8 +59,31 @@ unconstrained one. That is expected rather than awkward: the context probe finds
 regimes, so its *level* was never the discriminator. What separates the regimes is which feature wins
 the comparison, which is why the token probe and the per-expert contrast are the statistics to quote.
 
-**Strength: high.** The largest, most replicated result in the program. Its main untested exposure is
-that each cell is one training seed — see §5.
+**The probe is not underselling lexicality — it saturates the ceiling.** The obvious objection to
+§1 is that a *linear* probe on embeddings cannot express an arbitrary token-to-expert lookup, so a low
+token AUC might be probe weakness rather than an absent shortcut. The nonparametric ceiling settles it:
+score each expert by the empirical `P(fires | token id)` instead of a probe (`mechinterp_oracle.csv`,
+30 arms). Median linear-probe AUC as a fraction of that oracle:
+
+| regime | arms | oracle AUC | probe ÷ oracle |
+|---|---|---|---|
+| unconstrained | 14 | 0.857 – 0.921 | **101.2%** |
+| temporal | 16 | 0.545 – 0.646 | **103.8%** |
+
+The probe reaches the ceiling in both regimes — slightly past it, because the oracle's per-token-id
+rates are estimated on the fit half and generalise a little worse than a fitted direction does. So the
+regime gap is a real difference in how much of routing token identity determines, not a limit of the
+probe. The same thing stated without any classifier: normalised mutual information
+`I(expert ; token id) / H(expert)` is **0.416 – 0.574** unconstrained and **0.095 – 0.153** temporal.
+
+**And it is not a rare-token effect.** Splitting the token probe by token-frequency stratum
+(`mechinterp_freqstrat.csv`, 26 arms) gives unconstrained AUC of 0.813 in the rarest stratum rising to
+0.891 in the common ones, and temporal flat at 0.550 – 0.581 across all five. The shortcut is a
+whole-vocabulary property, slightly *stronger* on frequent tokens — the opposite of the plausible guess
+that routers memorise rare tokens.
+
+**Strength: high.** The largest, most replicated result in the program, and now bounded above as well
+as below. Its main untested exposure is that each cell is one training seed — see §5.
 
 ### 1.1 The serving-side consequence: routing demand becomes cacheable
 
