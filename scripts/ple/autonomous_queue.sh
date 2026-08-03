@@ -61,6 +61,37 @@ _gitsafe() {
 
 _wait_gpu() { while pgrep -f "analysis/ple/(train_ple|downstream)\.py" > /dev/null; do sleep 60; done; }
 
+# Keep the volume under its quota. This is not housekeeping, it is the failure that cost two runs:
+# the MooseFS volume enforces a quota that `df` does not report -- df showed 240 TB free while a
+# plain write returned "Disk quota exceeded" -- and a checkpoint write hitting it killed the trainer
+# mid-file twice, at byte 469762048 both times, with no traceback. Each LoRA-bearing cell writes five
+# 2.95 GB checkpoints, so four queued cells are ~60 GB. Every number a finished cell produced lives
+# in its result JSON; only its LAST checkpoint is needed, to score downstream.
+_prune() {
+  local freed
+  freed=$("$PY" - <<'PYEOF2'
+import os, re, glob
+os.chdir("/workspace/olmoe-adapt/data")
+KEEP = {"csurf_ce_free_0_1_14_15_attn_250M_at240M.pt", "csurf_ce_free_0_1_2_at50M.pt",
+        "csurf_ce_free2_at50M.pt", "csurf_ce_free_0_1_14_15_at50M.pt",
+        "csurf_ce_free_0_1_14_15_attn_at50M.pt"}
+cells = {}
+for p in glob.glob("csurf_*_at*M.pt"):
+    m = re.match(r"csurf_(.+)_at(\d+)M\.pt$", p)
+    if m:
+        cells.setdefault(m.group(1), []).append((int(m.group(2)), p))
+n = b = 0
+for fs in cells.values():
+    mx = max(f[0] for f in fs)
+    for tok, p in fs:
+        if tok != mx and p not in KEEP:
+            b += os.path.getsize(p); os.remove(p); n += 1
+print(f"{n} file(s), {b / 2**30:.0f} GiB")
+PYEOF2
+)
+  echo "[prune] removed $freed of intermediate checkpoints"
+}
+
 _downstream() {  # tag, free-set, checkpoint
   local tag=$1 fs=$2 ck=$3
   [ -f "$DATA/$ck" ] || { echo "[skip] downstream $tag (no $ck)"; return 0; }
@@ -105,14 +136,17 @@ _downstream ce_free_0_1_2 "0,1,2"  csurf_ce_free_0_1_2_at50M.pt
 _downstream ce_free2      "0,1"    csurf_ce_free2_at50M.pt
 
 # ---- B: replicate the attention result --------------------------------------------------------------
+_prune
 _cell ce_free_0_1_14_15_attn_ds1 "0,1,14,15" 1 32 32 \
   && _downstream ce_free_0_1_14_15_attn_ds1 "0,1,14,15" csurf_ce_free_0_1_14_15_attn_ds1_at50M.pt
 
 # ---- C: does attention substitute for the fourth freed layer? ---------------------------------------
+_prune
 _cell ce_free_0_1_15_attn "0,1,15" 0 32 32 \
   && _downstream ce_free_0_1_15_attn "0,1,15" csurf_ce_free_0_1_15_attn_at50M.pt
 
 # ---- D: does attention substitute for the expert adapter? -------------------------------------------
+_prune
 _cell c_free_0_1_14_15_attnonly "0,1,14,15" 0 0 32 \
   && _downstream c_free_0_1_14_15_attnonly "0,1,14,15" csurf_c_free_0_1_14_15_attnonly_at50M.pt
 
