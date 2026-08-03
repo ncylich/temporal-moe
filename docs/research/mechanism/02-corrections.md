@@ -91,7 +91,7 @@ was wrong and is withdrawn. Three points, because this verdict has now moved twi
 
 **What is refuted is the reason, not the recommendation.** The endpoint layers are not the
 token-driven ones: the last MoE layer is the *least* lexical in the stack, and a magnitude-matched
-perturbation carrying no lexical information reproduces 58 to 85% of the endpoint cost. So exempt the
+perturbation carrying no lexical information reproduces 63 to 83% of the endpoint cost. So exempt the
 endpoints for architectural reasons, and do not claim lexicality as the justification.
 
 Recorded at this length because a fresh-context audit found the recommendation had been dropped

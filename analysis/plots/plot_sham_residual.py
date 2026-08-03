@@ -6,7 +6,7 @@ checkpoint, against a sham of matched mean magnitude that carries no lexical inf
 noise, sigma calibrated so the mean cost matches to 0.2%).
 
 Bottom: the residual, real minus sham. This is the panel that matters. Reporting only "the sham
-reproduces 58% of the endpoint excess" invites the reading that the remaining 42% is diffuse noise.
+reproduces 63% of the endpoint excess" invites the reading that the remaining 37% is diffuse noise.
 It is not: the residual is near zero or negative across the interior and positive at both ends, and
 the last layer's is four times any other. Whatever the sham fails to explain is itself an endpoint
 effect.
@@ -86,7 +86,7 @@ else:
              "A lexicality-free perturbation of matched average size reproduces most of the endpoint\n"
              "cost, but not all of it, and the part it misses is not spread across the network. The\n"
              "residual is near zero or negative at every interior layer and positive at both ends, with\n"
-             "the last layer's four times any other. So the 58-85% positional figure does not license\n"
+             "the last layer's four times any other. So the 63-83% positional figure does not license\n"
              "ignoring the remainder: what a generic perturbation fails to explain is itself an\n"
              "endpoint effect, and it is unexplained.",
              fontsize=8.6, va="bottom", family="monospace", color="#333")

@@ -221,7 +221,7 @@ Identifiers are deliberately absent from `01-findings.md`. This is where they de
 
 | id | what | result |
 |---|---|---|
-| N1 | sham-perturbation control | done; endpoint effect **58 to 85% positional** across two models |
+| N1 | sham-perturbation control | done; endpoint effect **63 to 83% positional** across two models |
 | N2 | multi-layer schedule and additivity | done; with `impose_all`, exempting endpoints buys 31.9% for 25% of layers |
 | N3 | C3 on a second seed at 1e18 | done; endpoint replicates at inference |
 | N4 | C3 on fine granularity at 1e18 | done |
@@ -238,7 +238,7 @@ Identifiers are deliberately absent from `01-findings.md`. This is where they de
 | **T1** | per-layer constraint sweep with co-adaptation | **done, 24 cells, all three readings negative** |
 | T2 | shallow vs deep half at 1e18 | **not run.** Design mis-specified (splits the U at its minimum) and its premise is dead |
 | T3 | full per-layer resolution at 1e18 | not run; same premise |
-| T4 | dense-final-block at 1e18 | not run; the endpoint effect it targets is 58 to 85% positional |
+| T4 | dense-final-block at 1e18 | not run; the endpoint effect it targets is 63 to 83% positional |
 
 ### X, cross-regime sweeps
 

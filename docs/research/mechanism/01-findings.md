@@ -229,8 +229,9 @@ Per-layer cost relative to the mean over interior layers. Higher means more expe
 that layer. The seven measurements also disagree about where the minimum sits, so no vertex is claimed.
 
 The reason is positional, not lexical. A magnitude-matched perturbation carrying no lexical information
-reproduces most of the endpoint excess, 56 to 63% on the coarse model depending on which of its two
-noise calibrations is used and 83% on the fine one. Figure:
+reproduces most of the endpoint excess: 63% on the coarse model and 83% on the fine one, where the
+excess is the mean of the two endpoint costs minus the mean over interior layers, and the noise scale
+is the calibration whose mean cost matches the real one, to 0.2% on the coarse model. Figure:
 [`sham_residual.png`](../../../results/phase0/figures/sham_residual.png). The lexical reading fails on
 its own terms as well: in the three imposition arms the last layer ranks most contextual of all,
 8 of 8, 8 of 8 and 13 of 13, which is the opposite of what a token-boundness explanation predicts.
