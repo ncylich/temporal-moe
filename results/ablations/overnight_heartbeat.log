@@ -10,3 +10,4 @@
 2026-08-03T15:53:06Z | job=ce_free_0_1_14_15_attn_ds1         | gpu=78881 MiB, 100 % | uncommitted=0 | 126min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=10M BPB=0.794426 train_lm=2.704597 train_bpb=0.869
 2026-08-03T16:53:09Z | job=ce_free_0_1_14_15_attn_ds1         | gpu=16961 MiB, 40 % | uncommitted=0 | 66min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=50M BPB=0.784325 train_lm=2.520437 train_bpb=0.810
 2026-08-03T17:53:12Z | job=NONE                               | gpu=0 MiB, 0 %     | uncommitted=0 | 6min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=50M BPB=0.784325 train_lm=2.520437 train_bpb=0.810
+2026-08-03T18:53:16Z | job=NONE                               | gpu=0 MiB, 0 %     | uncommitted=0 | -53min to deadline | ce_free_0_1_14_15_attn_ds1 rank=off tok=50M BPB=0.784325 train_lm=2.520437 train_bpb=0.810
