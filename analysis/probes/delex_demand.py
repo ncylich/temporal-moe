@@ -36,7 +36,23 @@ import safe_csv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS
 
-OUT = os.path.join(ABLATIONS, "mechinterp_demand_1e19.csv")
+DEFAULT_OUT = os.path.join(ABLATIONS, "mechinterp_demand_1e19.csv")
+
+
+def out_path():
+    """Destination CSV; pass --out=PATH to write elsewhere.
+
+    Third of the three producers whose default name encodes a scope rather than a measurement. The
+    other two were repointed from an unsuffixed name to the 1e19 one, silently orphaning files that
+    are now the only record of eight runs and cannot be regenerated. Nothing has been orphaned here
+    yet; the flag is what keeps it that way, since the temptation arrives with the next budget.
+
+    The name says 1e19 but the file spans every budget from 1e16 up; the suffix is historical.
+    """
+    for a in sys.argv[1:]:
+        if a.startswith("--out="):
+            return a.split("=", 1)[1]
+    return DEFAULT_OUT
 BF, BS = 0.5, 0.9        # fast / slow EMA decay on demand
 MAX_FIT = 400_000        # cap on fit rows per layer; pooled over experts this is already large
 FEATS = ["gate", "y_t", "y_lag1", "y_lag2", "y_lag3", "ema_fast", "ema_slow"]
@@ -115,13 +131,14 @@ def main():
             print(f"    L{L:<3} demand AUC = {auc:.4f}   (score rows {len(yte)}, "
                   f"base rate {yte.mean():.3f})", flush=True)
 
-    os.makedirs(ABLATIONS, exist_ok=True)
-    safe_csv.guard(OUT, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
-    with open(OUT, "w", newline="") as f:
+    out = out_path()
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    safe_csv.guard(out, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
+    with open(out, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(HEADER)
         w.writerows(rows)
-    print(f"\n[write] {OUT}: {len(rows)} rows")
+    print(f"\n[write] {out}: {len(rows)} rows")
     print("\nper-layer demand AUC (higher = demand more predictable from its own history):")
     runs = sorted({x[1] for x in rows})
     layers = sorted({x[4] for x in rows})

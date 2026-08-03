@@ -24,6 +24,9 @@ the reason recorded, rather than failing the whole run.
 
     . scripts/env.sh
     PYTHONPATH="$ROOT/Megatron-LM:$ROOT" "$PY" analysis/probes/delex_structural.py
+
+Bare positional arguments restrict the run to named cells. `--out=PATH` sends the table somewhere
+other than the default; see `out_path` for why that is a flag rather than a constant.
 """
 import csv
 import os
@@ -38,7 +41,24 @@ import safe_csv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS
 
-OUT = os.path.join(ABLATIONS, "mechinterp_structural_1e19.csv")
+DEFAULT_OUT = os.path.join(ABLATIONS, "mechinterp_structural_1e19.csv")
+
+
+def out_path():
+    """Destination CSV; pass --out=PATH to write elsewhere.
+
+    This was a module-level constant that someone repointed from `mechinterp_structural.csv` to the
+    1e19 name. That silently orphaned the earlier file, which remains the only record of six runs —
+    four of whose checkpoints are gone — and of pooled effective rank, a statistic the per-layer
+    schema cannot express. Naming the destination on the command line makes overwriting one output by
+    retargeting another impossible to do by accident.
+
+    The default name says 1e19 but the file spans every budget from 1e16 up; the suffix is historical.
+    """
+    for a in sys.argv[1:]:
+        if a.startswith("--out="):
+            return a.split("=", 1)[1]
+    return DEFAULT_OUT
 HEADER = ["label", "run", "budget", "regime", "grain", "layer", "E", "k",
           "PR_median", "generalist_frac", "router_entropy", "eff_rank", "strong_corr_pairs",
           "dist2centroid_mean", "pairwise_cos_med", "pairwise_cos_p99", "geometry_note"]
@@ -147,13 +167,14 @@ def main():
                   + (f"  d2c={g[0]:.3f} cos_med={g[1]:.4f}" if g else "  [geometry: n/a]"),
                   flush=True)
 
-    os.makedirs(ABLATIONS, exist_ok=True)
-    safe_csv.guard(OUT, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
-    with open(OUT, "w", newline="") as f:
+    out = out_path()
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    safe_csv.guard(out, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
+    with open(out, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(HEADER)
         w.writerows(rows)
-    print(f"\n[write] {OUT}: {len(rows)} rows")
+    print(f"\n[write] {out}: {len(rows)} rows")
     nogeom = sum(1 for x in rows if x[-1])
     if nogeom:
         print(f"note: {nogeom}/{len(rows)} rows have no weight-geometry (A8) columns; the reason is "

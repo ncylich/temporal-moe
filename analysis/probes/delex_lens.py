@@ -27,6 +27,9 @@ Needs the run's checkpoint for the unembedding and expert weights, so `megatron`
 
     . scripts/env.sh
     PYTHONPATH="$ROOT/Megatron-LM:$ROOT" "$PY" analysis/probes/delex_lens.py
+
+Bare positional arguments restrict the run to named cells. `--out=PATH` sends the table somewhere
+other than the default; see `out_path` for why that is a flag rather than a constant.
 """
 import csv
 import os
@@ -42,8 +45,24 @@ import safe_csv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS
 
-OUT = os.path.join(ABLATIONS, "mechinterp_lens_1e19.csv")
+DEFAULT_OUT = os.path.join(ABLATIONS, "mechinterp_lens_1e19.csv")
 EPS = 1e-6
+
+
+def out_path():
+    """Destination CSV; pass --out=PATH to write elsewhere.
+
+    This was a module-level constant that someone repointed from `mechinterp_lens.csv` to the 1e19
+    name. That silently orphaned the earlier file, which is still the only record of two runs whose
+    checkpoints no longer exist, so nothing can regenerate it. Naming the destination on the command
+    line makes overwriting one output by retargeting another impossible to do by accident.
+
+    The default name says 1e19 but the file spans every budget from 1e16 up; the suffix is historical.
+    """
+    for a in sys.argv[1:]:
+        if a.startswith("--out="):
+            return a.split("=", 1)[1]
+    return DEFAULT_OUT
 HEADER = ["label", "run", "budget", "regime", "layer", "expert", "variant", "n_tokens",
           "eff_vocab", "dispersion"]
 
@@ -123,13 +142,14 @@ def main():
             print(f"    L{L:<3} weighted median eff_vocab={mw:8.0f}  static reference={ms:8.0f}  "
                   f"gap={mw - ms:+9.0f}", flush=True)
 
-    os.makedirs(ABLATIONS, exist_ok=True)
-    safe_csv.guard(OUT, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
-    with open(OUT, "w", newline="") as f:
+    out = out_path()
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    safe_csv.guard(out, rows, key_index=HEADER.index("run") if "run" in HEADER else None)
+    with open(out, "w", newline="") as f:
         wr = csv.writer(f)
         wr.writerow(HEADER)
         wr.writerows(rows)
-    print(f"\n[write] {OUT}: {len(rows)} rows")
+    print(f"\n[write] {out}: {len(rows)} rows")
     for s in skipped:
         print(f"omitted — {s}")
 
