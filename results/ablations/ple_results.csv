@@ -1,0 +1,460 @@
+group,name,metric,value,note
+trained_cell,cal_full,final_bpb,0.857931,"calibrated PLE init, base norms"
+trained_cell,cal_full,recovery_pct,91.09,"calibrated PLE init, base norms"
+trained_cell,cal_full,train_tokens,50003968,
+trained_cell,cal_full,rank,full,
+trained_cell,cal_full,lora_r,0,
+trained_cell,cal_full,free_set,,
+trained_cell,cal_full,ple_params,1648361488,
+trained_cell,cal_full,mb_x_accum,4x4,
+trained_cell,cal_full,table_wd,0.0,
+trained_cell,cal_full,calib_init,True,
+trained_cell,cal_full,ple_start_tokens,0,
+trained_cell,cal_full,final_swap_rate,0.999735,
+trained_cell,cal_full,final_usage_entropy,0.998454,
+trained_cell,cal_full,bpb_curve,10M:0.910548|20M:0.883521|30M:0.873572|40M:0.866314|50M:0.857931,
+trained_cell,cal_full,train_bpb_curve,10M:1.043260|20M:0.929261|30M:0.905507|40M:0.895470|50M:0.891542,
+trained_cell,cal_r512,final_bpb,0.854536,"calibrated PLE init, base norms"
+trained_cell,cal_r512,recovery_pct,91.25,"calibrated PLE init, base norms"
+trained_cell,cal_r512,train_tokens,50003968,
+trained_cell,cal_r512,rank,512,
+trained_cell,cal_r512,lora_r,0,
+trained_cell,cal_r512,free_set,,
+trained_cell,cal_r512,ple_params,42532880,
+trained_cell,cal_r512,mb_x_accum,16x1,
+trained_cell,cal_r512,table_wd,0.0,
+trained_cell,cal_r512,calib_init,True,
+trained_cell,cal_r512,ple_start_tokens,0,
+trained_cell,cal_r512,final_swap_rate,0.99973,
+trained_cell,cal_r512,final_usage_entropy,0.998093,
+trained_cell,cal_r512,bpb_curve,10M:0.902648|20M:0.876085|30M:0.866914|40M:0.859288|50M:0.854536,
+trained_cell,cal_r512,train_bpb_curve,10M:1.013990|20M:0.922338|30M:0.899679|40M:0.892243|50M:0.889285,
+trained_cell,cal_seq_512,final_bpb,0.850227,"calibrated PLE init at 50M, delta captured vs the 50M surface"
+trained_cell,cal_seq_512,recovery_pct,91.46,"calibrated PLE init at 50M, delta captured vs the 50M surface"
+trained_cell,cal_seq_512,train_tokens,100007936,
+trained_cell,cal_seq_512,rank,512,
+trained_cell,cal_seq_512,lora_r,0,
+trained_cell,cal_seq_512,free_set,,
+trained_cell,cal_seq_512,ple_params,42532880,
+trained_cell,cal_seq_512,mb_x_accum,16x1,
+trained_cell,cal_seq_512,table_wd,0.0,
+trained_cell,cal_seq_512,calib_init,True,
+trained_cell,cal_seq_512,ple_start_tokens,0,
+trained_cell,cal_seq_512,final_swap_rate,0.999773,
+trained_cell,cal_seq_512,final_usage_entropy,0.998507,
+trained_cell,cal_seq_512,bpb_curve,10M:0.985355|20M:0.922313|30M:0.897830|40M:0.886032|50M:0.877859|60M:0.893191|70M:0.868809|80M:0.859919|90M:0.853555|100M:0.850227,
+trained_cell,cal_seq_512,train_bpb_curve,10M:1.305084|20M:0.986447|30M:0.939970|40M:0.922987|50M:0.915179|60M:0.957757|70M:0.907186|80M:0.894093|90M:0.891514|100M:0.884308,
+trained_cell,calstack_full,final_bpb,0.873675,init from the PLE-then-norms training-free stack (53.13%)
+trained_cell,calstack_full,recovery_pct,90.33,init from the PLE-then-norms training-free stack (53.13%)
+trained_cell,calstack_full,train_tokens,50003968,
+trained_cell,calstack_full,rank,full,
+trained_cell,calstack_full,lora_r,0,
+trained_cell,calstack_full,free_set,,
+trained_cell,calstack_full,ple_params,1648361488,
+trained_cell,calstack_full,mb_x_accum,4x4,
+trained_cell,calstack_full,table_wd,0.0,
+trained_cell,calstack_full,calib_init,True,
+trained_cell,calstack_full,ple_start_tokens,0,
+trained_cell,calstack_full,final_swap_rate,0.999736,
+trained_cell,calstack_full,final_usage_entropy,0.998689,
+trained_cell,calstack_full,bpb_curve,10M:0.926625|20M:0.902901|30M:0.889798|40M:0.880575|50M:0.873675,
+trained_cell,calstack_full,train_bpb_curve,10M:1.010653|20M:0.949190|30M:0.925456|40M:0.914519|50M:0.908187,
+trained_cell,ce_ple_128,final_bpb,0.83273,CE surface: PLE + router + norms + LoRA r32
+trained_cell,ce_ple_128,recovery_pct,92.3,CE surface: PLE + router + norms + LoRA r32
+trained_cell,ce_ple_128,train_tokens,50003968,
+trained_cell,ce_ple_128,rank,128,
+trained_cell,ce_ple_128,lora_r,32,
+trained_cell,ce_ple_128,free_set,,
+trained_cell,ce_ple_128,ple_params,10633232,
+trained_cell,ce_ple_128,mb_x_accum,16x1,
+trained_cell,ce_ple_128,table_wd,0.0,
+trained_cell,ce_ple_128,calib_init,False,
+trained_cell,ce_ple_128,ple_start_tokens,0,
+trained_cell,ce_ple_128,final_swap_rate,0.999712,
+trained_cell,ce_ple_128,final_usage_entropy,0.998261,
+trained_cell,ce_ple_128,bpb_curve,10M:0.864294|20M:0.847120|30M:0.839963|40M:0.835348|50M:0.832730,
+trained_cell,ce_ple_128,train_bpb_curve,10M:0.996393|20M:0.886551|30M:0.869846|40M:0.864235|50M:0.863176,
+trained_cell,ce_ple_512,final_bpb,0.833799,CE surface: PLE + router + norms + LoRA r32
+trained_cell,ce_ple_512,recovery_pct,92.25,CE surface: PLE + router + norms + LoRA r32
+trained_cell,ce_ple_512,train_tokens,50003968,
+trained_cell,ce_ple_512,rank,512,
+trained_cell,ce_ple_512,lora_r,32,
+trained_cell,ce_ple_512,free_set,,
+trained_cell,ce_ple_512,ple_params,42532880,
+trained_cell,ce_ple_512,mb_x_accum,16x1,
+trained_cell,ce_ple_512,table_wd,0.0,
+trained_cell,ce_ple_512,calib_init,False,
+trained_cell,ce_ple_512,ple_start_tokens,0,
+trained_cell,ce_ple_512,final_swap_rate,0.999723,
+trained_cell,ce_ple_512,final_usage_entropy,0.998522,
+trained_cell,ce_ple_512,bpb_curve,10M:0.865135|20M:0.847575|30M:0.841084|40M:0.836860|50M:0.833799,
+trained_cell,ce_ple_512,train_bpb_curve,10M:0.989003|20M:0.887934|30M:0.871060|40M:0.865031|50M:0.864196,
+trained_cell,ladder_full,final_bpb,0.858867,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_full,recovery_pct,91.04,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_full,train_tokens,50003968,
+trained_cell,ladder_full,rank,full,
+trained_cell,ladder_full,lora_r,0,
+trained_cell,ladder_full,free_set,,
+trained_cell,ladder_full,ple_params,1648361488,
+trained_cell,ladder_full,mb_x_accum,4x4,
+trained_cell,ladder_full,table_wd,0.0,
+trained_cell,ladder_full,calib_init,False,
+trained_cell,ladder_full,ple_start_tokens,0,
+trained_cell,ladder_full,final_swap_rate,0.999728,
+trained_cell,ladder_full,final_usage_entropy,0.998432,
+trained_cell,ladder_full,bpb_curve,10M:0.914016|20M:0.884746|30M:0.872327|40M:0.865310|50M:0.858867,
+trained_cell,ladder_r128,final_bpb,0.854388,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_r128,recovery_pct,91.26,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_r128,train_tokens,50003968,
+trained_cell,ladder_r128,rank,128,
+trained_cell,ladder_r128,lora_r,0,
+trained_cell,ladder_r128,free_set,,
+trained_cell,ladder_r128,ple_params,10633232,
+trained_cell,ladder_r128,mb_x_accum,16x1,
+trained_cell,ladder_r128,table_wd,0.0,
+trained_cell,ladder_r128,calib_init,False,
+trained_cell,ladder_r128,ple_start_tokens,0,
+trained_cell,ladder_r128,final_swap_rate,0.999767,
+trained_cell,ladder_r128,final_usage_entropy,0.998361,
+trained_cell,ladder_r128,bpb_curve,10M:0.911643|20M:0.880207|30M:0.865968|40M:0.859990|50M:0.854388,
+trained_cell,ladder_r128,train_bpb_curve,10M:1.158640|20M:0.927512|30M:0.901510|40M:0.891732|50M:0.888397,
+trained_cell,ladder_r32,final_bpb,0.864538,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_r32,recovery_pct,90.77,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_r32,train_tokens,50003968,
+trained_cell,ladder_r32,rank,32,
+trained_cell,ladder_r32,lora_r,0,
+trained_cell,ladder_r32,free_set,,
+trained_cell,ladder_r32,ple_params,2658320,
+trained_cell,ladder_r32,mb_x_accum,16x1,
+trained_cell,ladder_r32,table_wd,0.0,
+trained_cell,ladder_r32,calib_init,False,
+trained_cell,ladder_r32,ple_start_tokens,0,
+trained_cell,ladder_r32,final_swap_rate,0.999789,
+trained_cell,ladder_r32,final_usage_entropy,0.997912,
+trained_cell,ladder_r32,bpb_curve,10M:0.941262|20M:0.895522|30M:0.879195|40M:0.870500|50M:0.864538,
+trained_cell,ladder_r32,train_bpb_curve,10M:1.237314|20M:0.951307|30M:0.916994|40M:0.904564|50M:0.900679,
+trained_cell,ladder_r512,final_bpb,0.848854,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_r512,recovery_pct,91.52,"Phase 1 rank ladder, zero-init PLE"
+trained_cell,ladder_r512,train_tokens,50003968,
+trained_cell,ladder_r512,rank,512,
+trained_cell,ladder_r512,lora_r,0,
+trained_cell,ladder_r512,free_set,,
+trained_cell,ladder_r512,ple_params,42532880,
+trained_cell,ladder_r512,mb_x_accum,16x1,
+trained_cell,ladder_r512,table_wd,0.0,
+trained_cell,ladder_r512,calib_init,False,
+trained_cell,ladder_r512,ple_start_tokens,0,
+trained_cell,ladder_r512,final_swap_rate,0.999746,
+trained_cell,ladder_r512,final_usage_entropy,0.998251,
+trained_cell,ladder_r512,bpb_curve,10M:0.895900|20M:0.870204|30M:0.859641|40M:0.853399|50M:0.848854,
+trained_cell,ladder_r512,train_bpb_curve,10M:1.095685|20M:0.916073|30M:0.893235|40M:0.884747|50M:0.882004,
+trained_cell,seq_ple_512,final_bpb,0.843163,Phase 3 sequential: PLE introduced at 50M of 100M
+trained_cell,seq_ple_512,recovery_pct,91.8,Phase 3 sequential: PLE introduced at 50M of 100M
+trained_cell,seq_ple_512,train_tokens,100007936,
+trained_cell,seq_ple_512,rank,512,
+trained_cell,seq_ple_512,lora_r,0,
+trained_cell,seq_ple_512,free_set,,
+trained_cell,seq_ple_512,ple_params,42532880,
+trained_cell,seq_ple_512,mb_x_accum,16x1,
+trained_cell,seq_ple_512,table_wd,0.0,
+trained_cell,seq_ple_512,calib_init,False,
+trained_cell,seq_ple_512,ple_start_tokens,50000000,
+trained_cell,seq_ple_512,final_swap_rate,0.999796,
+trained_cell,seq_ple_512,final_usage_entropy,0.998359,
+trained_cell,seq_ple_512,bpb_curve,10M:0.985355|20M:0.922313|30M:0.897830|40M:0.886032|50M:0.877859|60M:0.864519|70M:0.856386|80M:0.850499|90M:0.847099|100M:0.843163,
+trained_cell,seq_ple_512,train_bpb_curve,10M:1.305084|20M:0.986447|30M:0.939970|40M:0.922987|50M:0.915179|60M:0.899199|70M:0.889185|80M:0.882810|90M:0.880876|100M:0.874195,
+reference,base_free_routing,bpb,0.6727,unconstrained ceiling
+reference,base_free_routing,recovery_pct,100.0,unconstrained ceiling
+reference,impose_R8_untrained,bpb,2.7507,the gap being recovered
+reference,impose_R8_untrained,recovery_pct,0.0,the gap being recovered
+reference,A_router_only,bpb,1.2825,bake-off arm A
+reference,A_router_only,recovery_pct,70.65,bake-off arm A
+reference,C_router_norms_50M,bpb,0.8791,matched-budget comparator for 50M cells
+reference,C_router_norms_50M,recovery_pct,90.07,matched-budget comparator for 50M cells
+reference,C_router_norms_250M,bpb,0.8505,5x token-efficiency comparator
+reference,C_router_norms_250M,recovery_pct,91.44,5x token-efficiency comparator
+reference,CE_router_norms_lora_50M,bpb,0.8269,LoRA as the third mechanism
+reference,CE_router_norms_lora_50M,recovery_pct,92.58,LoRA as the third mechanism
+reference,Fprime_full_finetune_6.92B,bpb,0.8106,the constraint price
+reference,Fprime_full_finetune_6.92B,recovery_pct,93.36,the constraint price
+reference,two_sigma_bar,bpb,0.012,differences below this are noise (PLE_PLAN.md §3)
+reference,divisor_D,value,3.1089070924799973,"ln2 x bytes_per_token, audited slice"
+parity,A1,bpb,0.981639,"new trainer, PLE flag off"
+parity,A1,swap,0.999672,"new trainer, PLE flag off"
+parity,A1,entropy,0.995378,"new trainer, PLE flag off"
+parity,A1,tokens,10027008,"new trainer, PLE flag off"
+parity,A2,bpb,0.980822,"new trainer, PLE flag off, identical to A1"
+parity,A2,swap,0.999666,"new trainer, PLE flag off, identical to A1"
+parity,A2,entropy,0.995213,"new trainer, PLE flag off, identical to A1"
+parity,A2,tokens,10027008,"new trainer, PLE flag off, identical to A1"
+parity,B1,bpb,0.983215,"adaptation program arm C, unmodified"
+parity,B1,swap,0.999660,"adaptation program arm C, unmodified"
+parity,B1,entropy,0.994807,"adaptation program arm C, unmodified"
+parity,B1,tokens,10027008,"adaptation program arm C, unmodified"
+parity,B2,bpb,0.985913,"adaptation program arm C, second replicate"
+parity,B2,swap,0.999650,"adaptation program arm C, second replicate"
+parity,B2,entropy,0.995058,"adaptation program arm C, second replicate"
+parity,B2,tokens,10027008,"adaptation program arm C, second replicate"
+parity,floor_new,bpb,0.000817,|A1 - A2| new trainer's own run-to-run spread
+parity,floor_ref,bpb,0.002698,|B1 - B2| reference's own run-to-run spread
+parity,delta,bpb,0.003333,|mean(A) - mean(B)| new-code-off vs reference
+accounting,32,total_params,2658304,"U[50304,32] + V[32,16,2048]"
+accounting,32,flash_fetch_bytes_per_token,64,"U[50304,32] + V[32,16,2048]"
+accounting,32,resident_basis_bytes,2097152,"U[50304,32] + V[32,16,2048]"
+accounting,32,expert_swap_bytes,12582912,"U[50304,32] + V[32,16,2048]"
+accounting,32,fetch_vs_expert_swap,5e-06,"U[50304,32] + V[32,16,2048]"
+accounting,32,train_param_plus_grad_GiB,0.02,"U[50304,32] + V[32,16,2048]"
+accounting,32,train_adam8bit_GiB,0.005,"U[50304,32] + V[32,16,2048]"
+accounting,32,train_total_adam8bit_GiB,0.025,"U[50304,32] + V[32,16,2048]"
+accounting,128,total_params,10633216,"U[50304,128] + V[128,16,2048]"
+accounting,128,flash_fetch_bytes_per_token,256,"U[50304,128] + V[128,16,2048]"
+accounting,128,resident_basis_bytes,8388608,"U[50304,128] + V[128,16,2048]"
+accounting,128,expert_swap_bytes,12582912,"U[50304,128] + V[128,16,2048]"
+accounting,128,fetch_vs_expert_swap,2e-05,"U[50304,128] + V[128,16,2048]"
+accounting,128,train_param_plus_grad_GiB,0.079,"U[50304,128] + V[128,16,2048]"
+accounting,128,train_adam8bit_GiB,0.02,"U[50304,128] + V[128,16,2048]"
+accounting,128,train_total_adam8bit_GiB,0.099,"U[50304,128] + V[128,16,2048]"
+accounting,512,total_params,42532864,"U[50304,512] + V[512,16,2048]"
+accounting,512,flash_fetch_bytes_per_token,1024,"U[50304,512] + V[512,16,2048]"
+accounting,512,resident_basis_bytes,33554432,"U[50304,512] + V[512,16,2048]"
+accounting,512,expert_swap_bytes,12582912,"U[50304,512] + V[512,16,2048]"
+accounting,512,fetch_vs_expert_swap,8.1e-05,"U[50304,512] + V[512,16,2048]"
+accounting,512,train_param_plus_grad_GiB,0.317,"U[50304,512] + V[512,16,2048]"
+accounting,512,train_adam8bit_GiB,0.079,"U[50304,512] + V[512,16,2048]"
+accounting,512,train_total_adam8bit_GiB,0.396,"U[50304,512] + V[512,16,2048]"
+accounting,full,total_params,1648361472,"unfactored table [vocab, layers, hidden]"
+accounting,full,flash_fetch_bytes_per_token,65536,"unfactored table [vocab, layers, hidden]"
+accounting,full,resident_basis_bytes,0,"unfactored table [vocab, layers, hidden]"
+accounting,full,expert_swap_bytes,12582912,"unfactored table [vocab, layers, hidden]"
+accounting,full,fetch_vs_expert_swap,0.005208,"unfactored table [vocab, layers, hidden]"
+accounting,full,train_param_plus_grad_GiB,12.281,"unfactored table [vocab, layers, hidden]"
+accounting,full,train_adam8bit_GiB,3.07,"unfactored table [vocab, layers, hidden]"
+accounting,full,train_total_adam8bit_GiB,15.352,"unfactored table [vocab, layers, hidden]"
+locus,p4_ce_ple_128,token_AUC_median,0.650022,
+locus,p4_ce_ple_128,context_AUC_median,0.738506,
+locus,p4_ce_ple_128,context_minus_token_median,0.094917,
+locus,p4_ce_ple_128,n_experts_probed,320,
+locus,p4_seq_ple_512,token_AUC_median,0.650654,
+locus,p4_seq_ple_512,context_AUC_median,0.737467,
+locus,p4_seq_ple_512,context_minus_token_median,0.096374,
+locus,p4_seq_ple_512,n_experts_probed,320,
+locus,p4_csurf_only,token_AUC_median,0.653762,
+locus,p4_csurf_only,context_AUC_median,0.734122,
+locus,p4_csurf_only,context_minus_token_median,0.093237,
+locus,p4_csurf_only,n_experts_probed,318,
+cal_stack,"base norms, base router, R=8",bpb,2.750704,no
+cal_stack,"base norms, base router, R=8",recovery_pct,-0.0,no
+cal_stack,"Cal-0 calibrated norms (clip 0.5-2.0), base router, R=8",bpb,2.096512,no
+cal_stack,"Cal-0 calibrated norms (clip 0.5-2.0), base router, R=8",recovery_pct,31.48,no
+cal_stack,"base norms, base router, R=8 + PLE calib_table_rfull.pt",bpb,1.973545,no
+cal_stack,"base norms, base router, R=8 + PLE calib_table_rfull.pt",recovery_pct,37.4,no
+cal_stack,"calibrated norms (clip 0.5-2.0), base router, R=8 + PLE calib_table_rfull.pt",bpb,1.646688,no
+cal_stack,"calibrated norms (clip 0.5-2.0), base router, R=8 + PLE calib_table_rfull.pt",recovery_pct,53.13,no
+cal_stack,"base norms, base router, R=8 + PLE calib_table_r512.pt",bpb,2.088235,no
+cal_stack,"base norms, base router, R=8 + PLE calib_table_r512.pt",recovery_pct,31.88,no
+cal_stack,"calibrated norms (clip 0.5-2.0), base router, R=8 + PLE calib_table_r512.pt",bpb,1.767139,no
+cal_stack,"calibrated norms (clip 0.5-2.0), base router, R=8 + PLE calib_table_r512.pt",recovery_pct,47.33,no
+row_norms,0,n_rows,1113,ladder_full
+row_norms,0,mean_row_norm,0.0,ladder_full
+row_norms,0,mean_contrib_rms,0.0,ladder_full
+row_norms,0,frac_rows_exactly_zero,1.0,ladder_full
+row_norms,1,n_rows,391,ladder_full
+row_norms,1,mean_row_norm,0.28232345,ladder_full
+row_norms,1,mean_contrib_rms,0.0012334216,ladder_full
+row_norms,1,frac_rows_exactly_zero,0.0,ladder_full
+row_norms,2-9,n_rows,2442,ladder_full
+row_norms,2-9,mean_row_norm,0.50604761,ladder_full
+row_norms,2-9,mean_contrib_rms,0.0022111256,ladder_full
+row_norms,2-9,frac_rows_exactly_zero,0.004914,ladder_full
+row_norms,10-99,n_rows,16536,ladder_full
+row_norms,10-99,mean_row_norm,0.928078,ladder_full
+row_norms,10-99,mean_contrib_rms,0.004057006,ladder_full
+row_norms,10-99,frac_rows_exactly_zero,0.002782,ladder_full
+row_norms,100-999,n_rows,24778,ladder_full
+row_norms,100-999,mean_row_norm,1.16074014,ladder_full
+row_norms,100-999,mean_contrib_rms,0.0050762384,ladder_full
+row_norms,100-999,frac_rows_exactly_zero,0.003995,ladder_full
+row_norms,1000-9999,n_rows,4550,ladder_full
+row_norms,1000-9999,mean_row_norm,1.23522925,ladder_full
+row_norms,1000-9999,mean_contrib_rms,0.00540624,ladder_full
+row_norms,1000-9999,frac_rows_exactly_zero,0.000659,ladder_full
+row_norms,10000-99999,n_rows,450,ladder_full
+row_norms,10000-99999,mean_row_norm,1.25731552,ladder_full
+row_norms,10000-99999,mean_contrib_rms,0.0055144704,ladder_full
+row_norms,10000-99999,frac_rows_exactly_zero,0.0,ladder_full
+row_norms,100000+,n_rows,44,ladder_full
+row_norms,100000+,mean_row_norm,1.44851124,ladder_full
+row_norms,100000+,mean_contrib_rms,0.0063829795,ladder_full
+row_norms,100000+,frac_rows_exactly_zero,0.0,ladder_full
+coverage,audited_slice,vocab,50304,
+coverage,audited_slice,corpus_tokens,1000001536,
+coverage,audited_slice,slice_tokens,99999744,
+coverage,audited_slice,eval_subset_seqs,256,
+coverage,audited_slice,eval_subset_target_tokens,1048320,
+coverage,audited_slice,coverage_by_type,0.990955,
+coverage,audited_slice,n_types_covered,49849,
+coverage,audited_slice,n_types_uncovered,455,
+coverage,audited_slice,coverage_by_token_full_slice,0.99999982,
+coverage,audited_slice,coverage_by_token_eval_subset,0.99999905,
+coverage,audited_slice,coverage_by_loss,0.99999785,
+coverage,audited_slice,uncovered_target_tokens_eval_subset,1,
+coverage,audited_slice,eval_tokens_with_corpus_count_ge_1,0.999999,
+coverage,audited_slice,eval_tokens_with_corpus_count_ge_10,0.999997,
+coverage,audited_slice,eval_tokens_with_corpus_count_ge_100,0.999922,
+coverage,audited_slice,eval_tokens_with_corpus_count_ge_1000,0.993943,
+coverage,audited_slice,eval_tokens_with_corpus_count_ge_10000,0.885496,
+coverage,audited_slice,median_corpus_count_of_eval_token,429893,
+coverage,audited_slice,loss_model,C (router + norm gains),
+coverage,audited_slice,eval_bpb_of_scored_model,0.850511,
+coverage,audited_slice,divisor,3.1089070924799973,
+trainfree,trainfree_r512_init,bpb,2.088235,calib_table_r512.pt
+trainfree,trainfree_r512_init,recovery_pct,31.88,calib_table_r512.pt
+trainfree,trainfree_r512_init,n_eval_tokens,1048320,
+trainfree,trainfree_full_init,bpb,1.973545,calib_table_rfull.pt
+trainfree,trainfree_full_init,recovery_pct,37.4,calib_table_rfull.pt
+trainfree,trainfree_full_init,n_eval_tokens,1048320,
+trainfree,trainfree_r512_at50M,bpb,2.214171,calib_table_r512_at50M.pt
+trainfree,trainfree_r512_at50M,recovery_pct,25.82,calib_table_r512_at50M.pt
+trainfree,trainfree_r512_at50M,n_eval_tokens,1048320,
+trainfree,trainfree_r512_at50M_fixed,bpb,1.639911,calib_table_r512_at50M.pt
+trainfree,trainfree_r512_at50M_fixed,recovery_pct,53.45,calib_table_r512_at50M.pt
+trainfree,trainfree_r512_at50M_fixed,n_eval_tokens,1048320,
+trainfree,p4_ce_ple_128,bpb,0.83273,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128,recovery_pct,92.3,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128,n_eval_tokens,1048320,
+trainfree,p4_ce_ple_128/occ_0,bpb,2.484513,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_0,recovery_pct,12.81,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_0,n_eval_tokens,1,
+trainfree,p4_ce_ple_128/occ_1-9,bpb,1.323893,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_1-9,recovery_pct,68.66,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_1-9,n_eval_tokens,2,
+trainfree,p4_ce_ple_128/occ_10-99,bpb,1.434389,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_10-99,recovery_pct,63.35,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_10-99,n_eval_tokens,79,
+trainfree,p4_ce_ple_128/occ_100-999,bpb,1.123972,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_100-999,recovery_pct,78.28,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_100-999,n_eval_tokens,6268,
+trainfree,p4_ce_ple_128/occ_1000-9999,bpb,1.258027,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_1000-9999,recovery_pct,71.83,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_1000-9999,n_eval_tokens,113687,
+trainfree,p4_ce_ple_128/occ_10000-99999,bpb,1.11541,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_10000-99999,recovery_pct,78.7,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_10000-99999,n_eval_tokens,243363,
+trainfree,p4_ce_ple_128/occ_100000+,bpb,0.658958,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_100000+,recovery_pct,100.66,ple_table_ce_ple_128.pt
+trainfree,p4_ce_ple_128/occ_100000+,n_eval_tokens,684920,
+trainfree,p4_seq_ple_512,bpb,0.843163,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512,recovery_pct,91.8,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512,n_eval_tokens,1048320,
+trainfree,p4_seq_ple_512/occ_0,bpb,2.400888,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_0,recovery_pct,16.83,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_0,n_eval_tokens,1,
+trainfree,p4_seq_ple_512/occ_1-9,bpb,1.214399,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_1-9,recovery_pct,73.93,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_1-9,n_eval_tokens,2,
+trainfree,p4_seq_ple_512/occ_10-99,bpb,1.398838,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_10-99,recovery_pct,65.06,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_10-99,n_eval_tokens,79,
+trainfree,p4_seq_ple_512/occ_100-999,bpb,1.134324,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_100-999,recovery_pct,77.79,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_100-999,n_eval_tokens,6268,
+trainfree,p4_seq_ple_512/occ_1000-9999,bpb,1.274183,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_1000-9999,recovery_pct,71.05,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_1000-9999,n_eval_tokens,113687,
+trainfree,p4_seq_ple_512/occ_10000-99999,bpb,1.128199,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_10000-99999,recovery_pct,78.08,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_10000-99999,n_eval_tokens,243363,
+trainfree,p4_seq_ple_512/occ_100000+,bpb,0.66761,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_100000+,recovery_pct,100.24,ple_table_seq_ple_512.pt
+trainfree,p4_seq_ple_512/occ_100000+,n_eval_tokens,684920,
+trainfree,calstack_norms_plus_ple_rfull,bpb,2.844982,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull,recovery_pct,-4.54,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull,n_eval_tokens,1048320,
+trainfree,calstack_norms_plus_ple_rfull/occ_0,bpb,6.012263,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_0,recovery_pct,-156.96,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_0,n_eval_tokens,1,
+trainfree,calstack_norms_plus_ple_rfull/occ_1-9,bpb,1.482137,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_1-9,recovery_pct,61.05,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_1-9,n_eval_tokens,2,
+trainfree,calstack_norms_plus_ple_rfull/occ_10-99,bpb,4.24683,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_10-99,recovery_pct,-72.0,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_10-99,n_eval_tokens,79,
+trainfree,calstack_norms_plus_ple_rfull/occ_100-999,bpb,4.141479,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_100-999,recovery_pct,-66.93,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_100-999,n_eval_tokens,6268,
+trainfree,calstack_norms_plus_ple_rfull/occ_1000-9999,bpb,3.773463,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_1000-9999,recovery_pct,-49.22,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_1000-9999,n_eval_tokens,113687,
+trainfree,calstack_norms_plus_ple_rfull/occ_10000-99999,bpb,3.398561,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_10000-99999,recovery_pct,-31.18,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_10000-99999,n_eval_tokens,243363,
+trainfree,calstack_norms_plus_ple_rfull/occ_100000+,bpb,2.482145,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_100000+,recovery_pct,12.92,calib_table_rfull_cal0.pt
+trainfree,calstack_norms_plus_ple_rfull/occ_100000+,n_eval_tokens,684920,
+trainfree,calstack_norms_plus_ple_r512,bpb,2.767039,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512,recovery_pct,-0.79,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512,n_eval_tokens,1048320,
+trainfree,calstack_norms_plus_ple_r512/occ_0,bpb,3.391767,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_0,recovery_pct,-30.85,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_0,n_eval_tokens,1,
+trainfree,calstack_norms_plus_ple_r512/occ_1-9,bpb,3.52056,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_1-9,recovery_pct,-37.05,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_1-9,n_eval_tokens,2,
+trainfree,calstack_norms_plus_ple_r512/occ_10-99,bpb,4.306995,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_10-99,recovery_pct,-74.89,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_10-99,n_eval_tokens,79,
+trainfree,calstack_norms_plus_ple_r512/occ_100-999,bpb,3.861039,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_100-999,recovery_pct,-53.43,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_100-999,n_eval_tokens,6268,
+trainfree,calstack_norms_plus_ple_r512/occ_1000-9999,bpb,3.643706,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_1000-9999,recovery_pct,-42.97,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_1000-9999,n_eval_tokens,113687,
+trainfree,calstack_norms_plus_ple_r512/occ_10000-99999,bpb,3.303207,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_10000-99999,recovery_pct,-26.59,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_10000-99999,n_eval_tokens,243363,
+trainfree,calstack_norms_plus_ple_r512/occ_100000+,bpb,2.420823,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_100000+,recovery_pct,15.87,calib_table_r512_cal0.pt
+trainfree,calstack_norms_plus_ple_r512/occ_100000+,n_eval_tokens,684920,
+trainfree,A_normcal_then_ple_samescale_rfull,bpb,3.236982,calib_table_rfull_same.pt
+trainfree,A_normcal_then_ple_samescale_rfull,recovery_pct,-23.4,calib_table_rfull_same.pt
+trainfree,A_normcal_then_ple_samescale_rfull,n_eval_tokens,1048320,
+trainfree,A_normcal_then_ple_samescale_r512,bpb,3.087772,calib_table_r512_same.pt
+trainfree,A_normcal_then_ple_samescale_r512,recovery_pct,-16.22,calib_table_r512_same.pt
+trainfree,A_normcal_then_ple_samescale_r512,n_eval_tokens,1048320,
+calibration,untrained_base,lambda_star,5.106922,
+calibration,untrained_base,within,80.04487,
+calibration,untrained_base,between,15.6738,
+calibration,untrained_base,tokens_seen,44842,
+calibration,untrained_base,tokens,4194304,
+calibration,untrained_base,rel_recon_err_r512,0.544175,
+calibration,untrained_base,reference,untrained base,
+calibration,untrained_base,delta,MoE_free - MoE_residency on the UNTRAINED base model,
+calibration,at50M,lambda_star,3.802433,
+calibration,at50M,within,53.834465,
+calibration,at50M,between,14.157898,
+calibration,at50M,tokens_seen,44842,
+calibration,at50M,tokens,4194304,
+calibration,at50M,rel_recon_err_r512,0.450591,
+calibration,at50M,reference,/workspace/olmoe-adapt/data/csurf_seq_ple_512_at50M.pt,
+calibration,at50M,delta,MoE_free - MoE_residency on the C surface at /workspace/olmoe-adapt/data/csurf_seq_ple_512_at50M.pt,
+calibration,cal0,lambda_star,2.970797,
+calibration,cal0,within,189.358296,
+calibration,cal0,between,63.73989,
+calibration,cal0,tokens_seen,44842,
+calibration,cal0,tokens,4194304,
+calibration,cal0,rel_recon_err_r512,0.347818,
+calibration,cal0,reference,/workspace/olmoe-adapt/data/csurf_cal0norms.pt,
+calibration,cal0,delta,MoE_free - MoE_residency on the C surface at /workspace/olmoe-adapt/data/csurf_cal0norms.pt,
+calibration,same,lambda_star,4.231453,
+calibration,same,within,172.148531,
+calibration,same,between,40.683075,
+calibration,same,tokens_seen,44842,
+calibration,same,tokens,4194304,
+calibration,same,rel_recon_err_r512,0.397401,
+calibration,same,reference,/workspace/olmoe-adapt/data/csurf_cal0norms.pt,
+calibration,same,free_side,target surface (--free-same),
+calibration,same,delta,MoE_free - MoE_residency on the C surface at /workspace/olmoe-adapt/data/csurf_cal0norms.pt,
+heldout,zero_property_set,n_tokens,160,stratified across occurrence deciles; ids regenerable with heldout.py
+heldout,zero_property_set,eval_loss_share,0.00099611,
+heldout,zero_property_set,corpus_count_min,2,
+heldout,zero_property_set,corpus_count_max,1018,
