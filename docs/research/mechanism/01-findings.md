@@ -276,19 +276,9 @@ Locality does not grow with scale:
 | 185.8M | 23.5% | 9.4% |
 
 Share of the expert set shared between neighbouring positions. Higher means more locality to exploit. It holds near three times the random floor across a 130-fold range of model size rather than growing, and the one matched unconstrained arm sits at 19.2%.
-A new document ought to be a cold start: the resident set has been shaped by the previous document,
-and the next one may be about anything. It barely is. Comparing the hit rate in the first few tokens
-after an end-of-document marker against the rate everywhere else, over windows of 4, 16 and 64 tokens
-and 66 measurements, the median penalty is **0.9 percentage points**. On some models it is negative,
-meaning the cache does slightly better just after a boundary than inside a document. Those windows
-also hold only 0.3 to 4.7% of the stream, so even a real penalty would be diluted.
-
-The reason is section 1: routing keys on a window of surrounding tokens, not on document identity, so
-a boundary is not a discontinuity in what the router sees.
-
-![Routing churn at document boundaries](../../../results/phase0/figures/document_boundary_churn.png)
-
-*Hit rate in the tokens after an end-of-document marker against the within-document baseline. Recovery is fast enough that boundaries do not need special handling.*
+Document boundaries are not a cold start. Over windows of 4, 16 and 64 tokens after an end-of-
+document marker, the median hit-rate penalty is 0.9 points and is negative on some models, because
+routing keys on a surrounding window rather than on document identity.
 
 ## 4. What it costs
 
