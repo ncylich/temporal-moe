@@ -1,0 +1,10 @@
+# Expert-kernel comparison, Qwen3-30B-A3B-Base, batch 16 x seq 512, bf16, one H100, one process.
+# tok/s measured side by side in a single process; correctness measured against the untouched stock
+# path on the audited slice. Producer: analysis/ple/bench_experts.py + check_grouped_mm.py
+implementation,tok_per_s,vs_stock,max_abs_dlogit,bpb_delta,top1_agreement,verdict
+stock_untouched,18011,1.000,0.0,0.0,1.000,in use
+grouped_mm,18086,1.004,3.391,-0.000493,0.9316,REJECTED: no speedup and numerically wrong
+explicitly_set_None,6770,0.376,,,,harness artefact: warns per expert call per layer
+batched_mm,,,,,,unavailable: tried to allocate 384 GiB
+deepgemm,,,,,,unavailable: needs the kernels package
+sonicmoe,,,,,,unavailable: needs kernels-community

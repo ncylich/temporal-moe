@@ -67,7 +67,12 @@ def main():
     # either wastes memory on the short tasks or OOMs on the long ones. "auto:4" re-probes every 4
     # tasks. The expert loop's overhead is per forward call, so batch size is the main lever on
     # throughput -- at batch 4 the GPU sat at 64% with 17 GB idle.
-    ap.add_argument("--batch-size", default="auto:4")
+    # "auto" and not a fixed size. The binding constraint is not the forward pass -- it is lm_eval's
+    # log_softmax over the full vocabulary in fp32, which costs batch x seq x vocab x 4 bytes. At
+    # batch 32, seq 512 on Qwen3's 152k vocab that single tensor is 9.96 GB and OOMs; Qwen3.5's 248k
+    # vocab is ~1 MB per token, so the safe batch differs between the two models AND between tasks,
+    # since copa is a sentence and lambada is a paragraph. A constant cannot be right for all of them.
+    ap.add_argument("--batch-size", default="auto")
     # Subsample per task. The full ten-task set is 26.7k documents / 78.5k scored continuations,
     # which at this model's ~4700 tok/s is ~56 minutes PER ARM -- and we are not chasing a
     # one-point difference. The question is whether accuracy collapses the way it does on OLMoE
@@ -95,6 +100,9 @@ def main():
         RES._CFG.update(on=True, R=R, evict="min_logit", collect_telem=False)
         RES.set_free_layers(fs)
         bpbs[arm] = score(model, bl, D, fs, R)[0]
+        # Release the BPB pass's cached blocks: lm_eval's auto batch probe measures free memory, and
+        # would otherwise size every batch against a cache we are not using.
+        torch.cuda.empty_cache()
         print(f"\n[ds] arm={arm}  R={R}  resident={'100%' if fs else f'{100*R/E:.2f}%'}  "
               f"BPB={bpbs[arm]:.6f}   scoring {len(TASKS)} tasks 0-shot ...", flush=True)
         t0 = time.time()

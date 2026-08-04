@@ -321,3 +321,50 @@ baseline that had never been established. Two rounds of tuning were spent before
 measurement.
 
 Producer: `analysis/ple/bench_inference.py`. Data: `qwen_inference_bench.csv`.
+
+
+## 9. Expert kernels: no win available, and two self-inflicted measurement errors
+
+transformers ships an `ExpertsInterface` registry (`grouped_mm`, `batched_mm`, `deepgemm`,
+`sonicmoe`) chosen by `config._experts_implementation`, which Qwen leaves unset. That looked like a
+free 14x: at batch 64 the expert path reaches ~7% of the H100's bf16 peak. It is not.
+
+| implementation | tok/s | vs stock | max abs delta-logit | BPB delta | top-1 agreement |
+|---|---|---|---|---|---|
+| stock (untouched) | 18,011 | 1.000 | — | — | — |
+| grouped_mm | 18,086 | **1.004** | 3.391 | **-0.000493** | **93.16%** |
+| batched_mm | — | — | — | — | tried to allocate 384 GiB |
+| deepgemm / sonicmoe | — | — | — | — | packages not installed |
+
+**`grouped_mm` is rejected twice over.** It is 1.004x -- no speedup at all -- and it changes what the
+model computes: the top-1 token differs at 7% of positions and BPB moves by 4.93e-04. That last
+figure is the reason this matters rather than being a footnote. The aux-loss correction in section 4
+was 4.85e-04 and free-set differences in section 5B are ~2.5e-03, so this kernel's error is the same
+size as the effects the program measures. Adopting it for speed would have silently corrupted every
+subsequent number.
+
+The harness was validated before the candidate was judged: stock against stock gives max abs
+delta-logit exactly 0.000e+00 and identical BPB to six decimals, so the disagreement is the kernel.
+
+### Two measurement errors, both the same mistake
+
+**A 3x regression.** `_experts_forward_fast` hoists the expert hit-list to host to remove ~6k
+per-forward device-to-host stalls. It measures 0.35x stock: the `.tolist()` is a pipeline barrier, so
+the CPU cannot run ahead, whereas stock's syncs land after kernels are already in flight.
+
+**A phantom 2.69x speedup.** Setting `_experts_implementation = None` explicitly -- intended as "use
+eager" -- drops throughput from 18,011 to 6,770 tok/s, because `ExpertsInterface.get_interface`
+warns on every expert module call, 48 times per forward. Measured against that crippled baseline,
+`grouped_mm` appeared to be 2.69x. Against stock it is 1.004x.
+
+Both errors have the same shape: numbers compared across two harnesses instead of variants measured
+side by side in one process. The fix is procedural rather than technical, and both are recorded here
+because the speedups were reported before they were checked.
+
+**What actually made things faster** was unglamorous: batch size (2,847 -> 23,540 tok/s from batch 1
+to 64, 8.3x) and staging weights in RAM rather than network storage (11 min -> 54 s per load). No
+kernel-level win is available in this stack without installing deepgemm/sonicmoe or writing a correct
+grouped GEMM.
+
+Producer: `analysis/ple/bench_experts.py`, `analysis/ple/check_grouped_mm.py`.
+Data: `qwen_expert_kernels.csv`.
