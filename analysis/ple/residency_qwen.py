@@ -113,11 +113,58 @@ def _router_forward(self, hidden_states):
     return router_logits, router_top_value, router_indices
 
 
-def install(family="qwen3_5"):
+def _experts_forward_fast(self, hidden_states, top_k_index, top_k_weights):
+    """MEASURED SLOWER THAN STOCK -- kept only as a documented negative result, default OFF.
+
+    The reasoning was that `for expert_idx in expert_hit:` over a CUDA tensor costs a device->host
+    copy per expert per layer, ~6k stalls per forward, and that hoisting the list to host once would
+    remove them. Benchmarked against stock on Qwen3-30B it is 0.35x at batch 1-4 and 0.51x at batch
+    16 -- i.e. three times SLOWER. The `.tolist()` is a full pipeline barrier: nothing can be queued
+    until one_hot/sum/nonzero have all completed, so the CPU cannot run ahead. Stock's per-iteration
+    syncs happen after kernels are already in flight, which costs far less than serialising the
+    launch stream.
+
+    Left in the tree because the negative result is worth more than the deletion: the obvious fix to
+    an obvious-looking bottleneck is a 3x regression, and anyone reading the loop will have the same
+    idea.
+
+    The shipped forward does `for expert_idx in expert_hit:` where `expert_hit` is a CUDA tensor, so
+    every iteration copies a scalar device->host, and the `expert_idx == self.num_experts` guard
+    copies another. With 128-256 experts over 40-48 layers that is roughly 6-12k synchronisations per
+    forward at ~50-100us each -- the GPU stalls on Python for most of the pass, which is why
+    utilisation sat at 64% with a batch that should have saturated it.
+
+    Moving the hit list to host ONCE and iterating Python ints removes every one of those syncs. The
+    per-expert computation below is byte-for-byte the shipped code; only the loop bookkeeping changes,
+    so outputs are identical rather than approximately equal -- checked by the suite's preflight,
+    which compares against the stock forward bitwise.
+    """
+    final_hidden_states = torch.zeros_like(hidden_states)
+    with torch.no_grad():
+        expert_mask = F.one_hot(top_k_index, num_classes=self.num_experts).permute(2, 1, 0)
+        hit = torch.greater(expert_mask.sum(dim=(-1, -2)), 0).nonzero().flatten().tolist()
+    for e in hit:                                   # Python ints: no device->host per iteration
+        if e == self.num_experts:
+            continue
+        top_k_pos, token_idx = torch.where(expert_mask[e])
+        current_state = hidden_states[token_idx]
+        gate, up = F.linear(current_state, self.gate_up_proj[e]).chunk(2, dim=-1)
+        h = self.act_fn(gate) * up
+        h = F.linear(h, self.down_proj[e])
+        h = h * top_k_weights[token_idx, top_k_pos, None]
+        final_hidden_states.index_add_(0, token_idx, h.to(final_hidden_states.dtype))
+    return final_hidden_states
+
+
+def install(family="qwen3_5", fast_experts=False):
     ACTIVE["name"] = family
     blk, rtr = FAMILIES[family]
     blk.forward = _block_forward
     rtr.forward = _router_forward
+    if fast_experts:
+        for mod, cls in (("qwen3_5_moe", "Qwen3_5MoeExperts"), ("qwen3_moe", "Qwen3MoeExperts")):
+            m = __import__(f"transformers.models.{mod}.modeling_{mod}", fromlist=[cls])
+            getattr(m, cls).forward = _experts_forward_fast
 
 
 def tag_layers(model):

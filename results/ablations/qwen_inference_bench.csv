@@ -1,0 +1,10 @@
+# Qwen3-30B-A3B-Base forward throughput, tokens/sec, seq 512, bf16, one H100 80GB, one model load.
+# stock = HuggingFace forwards as shipped. hook_free = our router hook installed with every layer
+# free, so residency is inert and any gap is pure machinery. hook_R8 = residency active at R=8 of
+# 128. Producer: analysis/ple/bench_inference.py
+variant,bs8,bs16,bs32,bs64
+stock,13369,17770,21495,23540
+hook_free,13241,17962,21469,23541
+hook_R8,14155,18567,21660,23603
+ratio_hook_free_vs_stock,0.99,1.01,1.00,1.00
+ratio_hook_R8_vs_stock,1.06,1.04,1.01,1.00

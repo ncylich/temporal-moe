@@ -62,7 +62,20 @@ def main():
     ap.add_argument("--tag", default="qwen35")
     ap.add_argument("--arms", default="free,R8,R32")
     ap.add_argument("--bpb-seq", type=int, default=8)
-    ap.add_argument("--batch-size", type=int, default=4)
+    # str, not int: lm_eval accepts "auto" / "auto:N" and sizes the batch per task by trial. Task
+    # lengths here span copa (a sentence) to lambada and hellaswag (paragraphs), so one fixed value
+    # either wastes memory on the short tasks or OOMs on the long ones. "auto:4" re-probes every 4
+    # tasks. The expert loop's overhead is per forward call, so batch size is the main lever on
+    # throughput -- at batch 4 the GPU sat at 64% with 17 GB idle.
+    ap.add_argument("--batch-size", default="auto:4")
+    # Subsample per task. The full ten-task set is 26.7k documents / 78.5k scored continuations,
+    # which at this model's ~4700 tok/s is ~56 minutes PER ARM -- and we are not chasing a
+    # one-point difference. The question is whether accuracy collapses the way it does on OLMoE
+    # (arc_easy 0.7715 -> 0.2799). At 500 documents the standard error on an accuracy near 0.5 is
+    # ~0.022, so a collapse of that size is a ~20 sigma effect and even a 5-point drop shows at
+    # ~2 sigma. Every number's stderr goes into the CSV, so the precision is visible rather than
+    # implied, and 0 restores the full set for a final publication-grade run.
+    ap.add_argument("--limit", type=int, default=500)
     A = ap.parse_args()
     os.makedirs(A.out, exist_ok=True)
 
@@ -87,9 +100,12 @@ def main():
         t0 = time.time()
         # HFLM wraps the already-configured model; the residency hook is global state on the module,
         # so the arm in force during generation is the one set immediately above.
-        lm = HFLM(pretrained=model, tokenizer=tok, batch_size=A.batch_size)
+        bs = A.batch_size
+        if isinstance(bs, str) and bs.isdigit():
+            bs = int(bs)
+        lm = HFLM(pretrained=model, tokenizer=tok, batch_size=bs)
         results[arm] = simple_evaluate(model=lm, tasks=TASKS, num_fewshot=0,
-                                       bootstrap_iters=1000)["results"]
+                                       limit=(A.limit or None), bootstrap_iters=1000)["results"]
         print(f"[ds] arm={arm} done in {(time.time()-t0)/60:.1f} min", flush=True)
 
     path = os.path.join(A.out, f"{A.tag}_downstream_naive.csv")
@@ -99,7 +115,8 @@ def main():
                     f"residency with NO adaptation. Ten 0-shot tasks, same harness and metric "
                     f"convention as olmoe_adapt_downstream.csv. 'free' is the published model; R8/R32 "
                     f"switch the constraint on at eval time only. BPB on the audited slice is "
-                    f"recomputed per arm from the same configuration. Producer: "
+                    f"recomputed per arm from the same configuration. Each task subsampled to {A.limit} "
+                    f"documents (0 = full); the stderr columns give the resulting precision. Producer: "
                     f"analysis/ple/qwen_downstream.py"])
         w.writerow(["task", "metric"] + [f"{a}" for a in want] +
                    [f"{a}_stderr" for a in want] +

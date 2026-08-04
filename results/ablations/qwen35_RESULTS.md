@@ -276,3 +276,48 @@ suggestive and not yet established to the same standard; it needs the same treat
 picks a free set from it.
 
 Producer: `analysis/ple/qwen_cost_curve.py --family qwen3`. Data: `qwen3_30b_cost_curve.csv`.
+
+
+## 8. Residency is free at inference -- and the slowness was never residency
+
+Every throughput number reported earlier in this program was measured with the hook installed at
+batch 1, with no stock reference, so none of them could distinguish HuggingFace's MoE implementation
+from our machinery. Measured properly on Qwen3-30B (seq 512, bf16, one H100, one model load):
+
+| variant | bs=8 | bs=16 | bs=32 | bs=64 |
+|---|---|---|---|---|
+| stock (HF as shipped) | 13,369 | 17,770 | 21,495 | **23,540 tok/s** |
+| hook, all layers free | 0.99x | 1.01x | 1.00x | **1.00x** |
+| hook, residency R=8 | **1.06x** | 1.04x | 1.01x | **1.00x** |
+
+> **Rolling residency costs nothing in throughput.** The machinery is 1.00x when inert, and running
+> the constraint is 1.00-1.06x -- at smaller batches it is *faster*, because with 8 of 128 experts
+> resident the union of experts touched across a batch is smaller and the expert loop runs fewer
+> iterations. The technique buys serving memory at no speed cost, which is a stronger claim than the
+> memory result alone.
+
+What was actually slow, in order of magnitude:
+
+| cause | cost |
+|---|---|
+| running at batch 1-4 instead of 32-64 | **8.3x** (2,847 -> 23,540 tok/s) |
+| an "optimisation" of ours that was a regression | **3x** (see below) |
+| loading weights over network storage rather than RAM | 11 min -> 54 s per load |
+
+### A documented negative result
+
+`_experts_forward_fast` hoists the expert hit-list to host once, on the reasoning that
+`for expert_idx in expert_hit:` over a CUDA tensor costs a device-to-host copy per expert per layer
+-- roughly 6,000 stalls per forward at 128 experts over 48 layers. It benchmarks at **0.35x stock**
+at batch 1-4 and 0.51x at batch 16: three times *slower*. The `.tolist()` is a pipeline barrier,
+since nothing can be queued until one_hot/sum/nonzero have completed, so the CPU cannot run ahead;
+stock's per-iteration syncs happen after kernels are already in flight and cost far less than
+serialising the launch stream. It is kept in the tree, defaulted off and labelled, because it is the
+obvious fix to an obvious-looking bottleneck and the next reader will have the same idea.
+
+The general lesson is the one this section exists to record: the hypothesis was formed by reading
+code, the fix was written and deployed into running jobs, and it was never measured against a
+baseline that had never been established. Two rounds of tuning were spent before the first
+measurement.
+
+Producer: `analysis/ple/bench_inference.py`. Data: `qwen_inference_bench.csv`.
