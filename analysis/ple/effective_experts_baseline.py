@@ -71,11 +71,26 @@ def main():
         else:
             RES.enable_residency(R=k)
             RES.set_free_layers(None)
-        out = model(ids, output_router_logits=True)
-        for r in RES.effective_experts(out.router_logits, ids.shape[0], ids.shape[1], k):
+        # One sequence per forward, under no_grad. This scored all four sequences in a single
+        # forward with autograd live, which built a backward graph for a measurement that takes no
+        # gradients and OOMed at 79 GiB. Router logits are tiny (N x E), so the per-sequence tensors
+        # concatenate to exactly the batch the single forward would have produced -- b-major, which
+        # is what the residency scan's view(B, S, E) expects. The scan is per sequence either way.
+        per_layer = None
+        with torch.no_grad():
+            for b in range(ids.shape[0]):
+                out = model(ids[b:b + 1], output_router_logits=True)
+                rl = [t.float() for t in out.router_logits]
+                per_layer = rl if per_layer is None else [torch.cat([a, c], 0)
+                                                          for a, c in zip(per_layer, rl)]
+                del out
+        torch.cuda.empty_cache()
+        eff = RES.effective_experts(tuple(per_layer), ids.shape[0], ids.shape[1], k)
+        del per_layer
+        for r in eff:
             rows.append([regime, r["layer"], E, k, f"{r['eff_load']:.3f}",
                          f"{r['eff_load'] / E:.4f}", f"{r['eff_tok']:.3f}", n_tok])
-        got = [r["eff_load"] for r in RES.effective_experts(out.router_logits, ids.shape[0], ids.shape[1], k)]
+        got = [r["eff_load"] for r in eff]
         print(f"  {regime:8} eff_load per layer: min {min(got):.1f}  median "
               f"{sorted(got)[len(got) // 2]:.1f}  max {max(got):.1f}   (E={E}, k={k})", flush=True)
 

@@ -260,3 +260,36 @@ fit before the session deadline. It asks whether the expensive adapter is the on
 smooth in R, whereas free-versus-constrained is an all-or-nothing jump to R=64 on a layer — the most
 expensive point on that curve. R=16 on layers 0–1 would cost roughly +9% resident memory against
 +87.5%; whether it captures a useful share of the gain is untested.
+
+## Effective expert count: what residency does to routing, and what adaptation gives back
+
+`eff_load = 1 / sum_e p_e^2` over the dispatch distribution, per layer, range 1..64. It counts how
+many experts actually carry the corpus: 1 is total collapse onto one expert, 64 is perfect balance.
+It is the quantity the auxiliary load-balancing loss exists to hold up, so it is the honest place to
+look for damage when the aux changes. All four rows below score the **same** audited held-out slice
+(4 x 4096 = 16384 tokens), so they differ only in the model state, not in the input.
+
+| model state | median | min | max |
+|---|---|---|---|
+| stock OLMoE, no residency — the ceiling | 57.1 | 50.2 | 62.0 |
+| stock OLMoE, residency R=k imposed, untrained | 20.5 | 13.6 | 52.5 |
+| adapted 50M, full residency (`ce_auxfix_50M`) | 48.6 | 39.4 | 55.4 |
+| adapted 50M, free {0,1,14,15} + attention LoRA | 50.9 | 45.6 | 61.8 |
+
+Read top to bottom, this is the mechanism the BPB numbers only imply. Imposing residency on an
+untrained model **collapses routing**: the median layer falls from 57 experts to 20, and the worst
+layer to 13.6, because the resident set is chosen by a scan the router was never trained to satisfy.
+Adaptation recovers most of it — 20.5 back to 48.6, about 78% of the way to the free ceiling — which
+is what 50M tokens of training the router under the constraint buys. Freeing four layers recovers a
+further 2.3 and lifts the worst layer from 39.4 to 45.6, consistent with those layers being the ones
+the constraint hurt most.
+
+No layer in any adapted state is anywhere near collapse, so the unified aux is doing its job; this
+was the check that could have invalidated the run and did not.
+
+**The first version of this measurement was wrong and is withdrawn.** It scored `torch.randint`
+token ids rather than the audited slice. Effective expert count is a property of the *routing*, and
+a router fed uniform-random ids routes nothing like one fed text: that version read a free-regime
+median of 16.3 against the 57.1 above, a 3.5x error, and would have made adaptation look like it
+*tripled* balance rather than restoring it. The producer now loads `bpb_slice_ids.pt`, the same
+tokens the training-time log scores.

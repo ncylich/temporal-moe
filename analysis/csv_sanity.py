@@ -42,6 +42,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #   (flag substring, reason)
 VERDICTS = (
     ("CONSTANT COLUMN seed", "training seed, fixed at 1234 by design"),
+    ("CONSTANT COLUMN n_tokens", "every row scores the SAME audited held-out slice; that it is\n     constant is the point -- a varying value here would mean the regimes were not matched"),
     ("CONSTANT COLUMN budget", "one file per compute budget; constant is the file's definition"),
     ("CONSTANT COLUMN k ", "top-k is an architectural constant within a grain"),
     ("CONSTANT COLUMN topk_k", "as above"),

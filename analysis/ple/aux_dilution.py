@@ -111,9 +111,13 @@ def main():
 
     with open(A.out, "w", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
-        w.writerow([f"# Aux-loss dilution by free-set size. Freed layers use E*sum(P^2), constrained "
-                    f"layers E*sum(f*P); the returned aux is the mean over all layers, so freed "
-                    f"layers dilute it. Produced by analysis/ple/aux_dilution.py."])
+        w.writerow(["# Aux-loss strength by free-set size, measured by calling the live "
+                    "aux_z_from_router_logits one layer at a time. Every layer now uses E*sum(f*P) "
+                    "with f the dispatch fraction, so freed and constrained layers are on one scale "
+                    "and pct_vs_full_residency should sit near zero. It did NOT before: freed layers "
+                    "used the importance loss E*sum(P^2), ~k times weaker, diluting the all-layer "
+                    "mean monotonically in free-set size (-6.4% at {0,1} to -18.9% at {0,1,14,15}) "
+                    "along the exact axis the ladder varies. Producer: analysis/ple/aux_dilution.py"])
         w.writerow(HEADER)
         w.writerows(rows)
     print(f"\n[write] {A.out}: {len(rows)} row(s)", flush=True)
