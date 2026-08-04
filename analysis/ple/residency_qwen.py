@@ -156,6 +156,23 @@ def _experts_forward_fast(self, hidden_states, top_k_index, top_k_weights):
     return final_hidden_states
 
 
+def assert_valid_R(R, k):
+    """R < k is not a weaker constraint, it is a different (broken) model.
+
+    The router selects top-k from the resident set. With R < k only R experts carry non-zero
+    probability, but top-k still returns k indices, so the extra slots are dispatched with weight
+    zero: compute is paid for k experts while R contribute. That is top-R routing with waste, not
+    residency at a smaller budget, and reporting it as "R/E resident" implies a serving trade-off
+    that is not what was measured. R = k is the tightest meaningful setting -- the one the OLMoE
+    runs used.
+    """
+    if R < k:
+        raise ValueError(
+            f"R={R} is below top-k={k}. Only {R} experts could carry weight while the router still "
+            f"dispatches {k}; this measures degraded top-{R} routing, not residency at R={R}. "
+            f"R={k} is the tightest valid constraint.")
+
+
 def install(family="qwen3_5", fast_experts=False):
     ACTIVE["name"] = family
     blk, rtr = FAMILIES[family]

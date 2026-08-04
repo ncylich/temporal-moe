@@ -1,7 +1,7 @@
 "# Qwen3.5-35B-A3B-Base test-time residency cost, one model load, all cells on identical cached batches. E=256 layers=40, BPB divisor 3.1642666 on the audited slice re-tokenized to byte-identical text. Part A: price vs resident budget. Part B: joint value of free sets (solo damage is known not to predict this). Part C: shared-expert ablation, damage measured with it live and zeroed. free_baseline BPB 0.648087. Producer: analysis/ple/qwen_cost_curve.py"
 part,cell,R,resident_routed_pct,shared_expert,bpb,n_seq,secs,damage_vs_free
 A,free_baseline,8,3.12,on,0.648087,24,19.8,-0.000000
-A,all_constrained_R4,4,1.56,on,0.764537,24,20.9,+0.116450
+A,all_constrained_R4,4,1.56,on,0.764537,24,20.9,+0.116450   # INVALID: R=4 < top-k=8; only 4 experts carry weight while 8 are dispatched. Degraded top-4 routing, not residency at R=4. Excluded.
 A,all_constrained_R8,8,3.12,on,0.703758,24,21.0,+0.055671
 A,all_constrained_R16,16,6.25,on,0.686977,24,21.3,+0.038890
 A,all_constrained_R32,32,12.50,on,0.678965,24,21.6,+0.030878

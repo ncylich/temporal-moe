@@ -126,7 +126,6 @@ are internally matched).
 
 | R | resident (routed) | BPB | damage |
 |---|---|---|---|
-| 4 | 1.56% | 0.764537 | +0.116450 |
 | 8 | 3.12% | 0.703758 | +0.055671 |
 | 16 | 6.25% | 0.686977 | +0.038890 |
 | 32 | 12.50% | 0.678965 | +0.030878 |
@@ -247,7 +246,6 @@ section 5C could not establish on its own.
 
 | R | resident | damage |
 |---|---|---|
-| 4 | 3.12% | +0.265620 |
 | 8 | 6.25% | +0.104836 |
 | 16 | 12.50% | +0.046964 |
 | 32 | 25.00% | +0.019537 |
@@ -415,3 +413,25 @@ the survival is a property of this model, and that expert count is the variable 
 associated with it across the three models measured.
 
 Producer: `analysis/ple/qwen_downstream.py`. Data: `qwen3_30b_downstream_naive.csv`.
+
+
+## 11. Correction: R < k is not a valid operating point
+
+Sections 5A and 7 reported an R=4 row in each cost curve, labelled "1.56% resident" and "3.12%
+resident". Those rows are withdrawn. Both models use top-k=8, and the router selects k experts from
+the resident set: with R=4 only four experts carry non-zero probability, while `topk` still returns
+eight indices and the model dispatches eight. Verified directly -- at E=128, k=8, R=4 the top-k
+weights come back as `[0.4796, 0.2155, 0.1774, 0.1275, 0, 0, 0, 0]`.
+
+So that configuration measures **degraded top-4 routing with four slots of wasted compute**, not
+residency at a smaller budget. Reporting it as "R/E resident" implied a serving trade-off that was
+not what ran.
+
+**R = k is the tightest meaningful constraint** -- the setting the OLMoE runs used throughout, and
+the one this program should have carried over. Every other row in both curves (R = 8, 16, 32, 64,
+128) is at or above k and stands unchanged; the withdrawn rows were the extreme point of each curve,
+so the R^-0.59 fit in section 5A is refitted on the valid points only.
+
+`residency_qwen.assert_valid_R` now raises on R < k, and `qwen_cost_curve.py` skips those points, so
+the configuration cannot be measured again by accident. The rows are annotated in the CSVs rather
+than deleted, since a silently shorter table invites the same experiment a second time.

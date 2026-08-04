@@ -101,9 +101,12 @@ def main():
               f"BPB={bpb:.6f} ({time.time()-t0:.0f}s)", flush=True)
         return bpb
 
-    free = cell("A", "free_baseline", ALL, 8)
+    k = cfg.num_experts_per_tok
+    free = cell("A", "free_baseline", ALL, k)
     print(f"\n  === A. cost of residency vs resident budget (all {L} layers constrained) ===", flush=True)
-    for R in (4, 8, 16, 32, 64, 128):
+    # R must be >= k: below that the router cannot fill its k slots from the resident set,
+    # so it measures degraded top-R routing rather than residency. R=k is the tightest valid point.
+    for R in [r for r in (4, 8, 16, 32, 64, 128) if r >= k]:
         b = cell("A", f"all_constrained_R{R}", None, R)
         print(f"      R={R:<4} {100*R/E:5.2f}% resident   damage {b-free:+.6f}", flush=True)
 
