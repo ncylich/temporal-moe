@@ -48,8 +48,8 @@ DATA = "/workspace/qwen35-adapt/data"
 OUT = "/workspace/qwen35-adapt/results"
 
 
-def batches(n_seq, mb):
-    ids = torch.load(os.path.join(DATA, "bpb_slice_ids_qwen.pt"), weights_only=False)[:n_seq]
+def batches(n_seq, mb, data=None, name="qwen"):
+    ids = torch.load(os.path.join(data or DATA, f"bpb_slice_ids_{name}.pt"), weights_only=False)[:n_seq]
     return [ids[i:i + mb].long() for i in range(0, len(ids), mb)]
 
 
@@ -142,15 +142,22 @@ def main():
     ap.add_argument("--max-layers", type=int, default=0,
                     help="limit the per-layer sweep (smoke runs); 0 = every layer")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--family", default="qwen3_5", choices=("qwen3_5", "qwen3"))
+    ap.add_argument("--model", default="/workspace/qwen35-adapt/model")
+    ap.add_argument("--data", default="/workspace/qwen35-adapt/data")
+    ap.add_argument("--slice-name", default="qwen")
+    ap.add_argument("--out", default="/workspace/qwen35-adapt/results")
     A = ap.parse_args()
+    global DATA, OUT
+    DATA, OUT = A.data, A.out
     os.makedirs(OUT, exist_ok=True)
 
-    meta = json.load(open(os.path.join(DATA, "bpb_slice_meta_qwen.json")))
+    meta = json.load(open(os.path.join(DATA, f"bpb_slice_meta_{A.slice_name}.json")))
     D = meta["divisor_D"]
-    model, tok = RQ.load_model()
+    model, tok = RQ.load_model(path=A.model, family=A.family)
     cfg = model.config
     E, k, L = cfg.num_experts, cfg.num_experts_per_tok, cfg.num_hidden_layers
-    bl = batches(A.n_seq, A.mb)
+    bl = batches(A.n_seq, A.mb, A.data, A.slice_name)
     print(f"  slice: {A.n_seq} seq x {meta['seq']} tok, divisor {D:.7f}", flush=True)
 
     preflight(model, bl, {"E": E, "n_layers": L})

@@ -39,14 +39,21 @@ def main():
     ap.add_argument("--block", type=int, default=32)
     ap.add_argument("--blocks", type=int, default=3)
     ap.add_argument("--R", type=int, default=8)
+    ap.add_argument("--family", default="qwen3_5", choices=("qwen3_5", "qwen3"))
+    ap.add_argument("--model", default="/workspace/qwen35-adapt/model")
+    ap.add_argument("--data", default="/workspace/qwen35-adapt/data")
+    ap.add_argument("--slice-name", default="qwen")
+    ap.add_argument("--out", default="/workspace/qwen35-adapt/results")
     A = ap.parse_args()
-    meta = json.load(open(f"{DATA}/bpb_slice_meta_qwen.json"))
+    global DATA, OUT
+    DATA, OUT = A.data, A.out
+    meta = json.load(open(f"{DATA}/bpb_slice_meta_{A.slice_name}.json"))
     D = meta["divisor_D"]
-    model, tok = RQ.load_model()
+    model, tok = RQ.load_model(path=A.model, family=A.family)
     L = model.config.num_hidden_layers
     ALL = list(range(L))
 
-    ids = torch.load(f"{DATA}/bpb_slice_ids_qwen.pt", weights_only=False)
+    ids = torch.load(f"{DATA}/bpb_slice_ids_{A.slice_name}.pt", weights_only=False)
     blocks = [[ids[i:i + 1].long() for i in range(b * A.block, (b + 1) * A.block)]
               for b in range(A.blocks)]
     print(f"  {A.blocks} disjoint blocks x {A.block} sequences, R={A.R}", flush=True)
@@ -84,11 +91,12 @@ def main():
               f"{'' if allsame else '  (INCONSISTENT -- do not rely on this)'}")
         verdicts.append((lbl, a, b, m, sd, allsame))
 
-    path = os.path.join(OUT, "qwen35_freeset_precision.csv")
+    path = os.path.join(OUT, f"{A.slice_name}_freeset_precision.csv")
     with open(path, "w", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow([f"# Free-set damage on {A.blocks} disjoint blocks of {A.block} sequences each, "
-                    f"R={A.R}, Qwen3.5-35B-A3B-Base. Damage is measured against a per-block free "
+                    f"R={A.R}, family={A.family} ({os.path.basename(A.model.rstrip(chr(47)))}). Damage is "
+                    f"measured against a per-block free "
                     f"baseline, so block difficulty cancels. The paired rows are the test that "
                     f"matters: block-to-block difficulty is common to both arms, so the per-block "
                     f"difference is far more sensitive than comparing two means. "
