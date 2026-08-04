@@ -54,25 +54,33 @@ Per-layer damage, constraining exactly one layer and leaving the other 39 free (
 | **20-29** | 15 | 28 | 48 | 68 | 37 | 22 | 3 | 43 | 62 | 68 |
 | **30-39** | 72 | 82 | **246** | **315** | **335** | 123 | **183** | **201** | **328** | **970** |
 
-OLMoE's profile is **U-shaped**: layers 0-2 and 14-15 both elevated, layer 1 the single worst at 1.99x
-uniform, middle third at 0.54-0.64x. Qwen3.5's is not U-shaped. It is **late-heavy**: layers 0-2
-(78, 114, 77) are indistinguishable from the middle third (mean 45), while layers 32-39 rise steeply
-and layer 39 alone is **970** — 12x the first layer and 21x the middle.
+OLMoE's profile is U-shaped: both ends elevated relative to the middle. Qwen3.5's is **also**
+U-shaped -- but the weight has moved to the tail. Measured against each model's central half:
 
-| | first 2 + last 2 | middle third | ratio |
-|---|---|---|---|
-| R=8 | +0.00373 | +0.00045 | 8.25x |
-| R=32 | +0.00243 | +0.00016 | 14.75x |
+| | middle-half mean | first 2 layers | last 2 layers | front/back |
+|---|---|---|---|---|
+| OLMoE (16 layers) | 0.08971 | **2.66x** | 1.47x | 1.81 — front-heavy |
+| Qwen3.5 (40 layers) | 0.00044 | **2.21x** | **14.87x** | 0.15 — back-heavy |
 
-That ratio is carried almost entirely by the last two layers. **The `{0,1,L-2,L-1}` recipe inherited
-from OLMoE spends half its budget on layers that cost nothing here** — freeing L0 and L1 buys
-0.00078 + 0.00114 while L38 and L39 buy 0.00328 + 0.00970. A Qwen-shaped recipe would free the tail,
-not both ends.
+So the *direction* transfers and the *balance* inverts. Freeing the ends is right for both models;
+on OLMoE most of the value is at the input end, on Qwen3.5 it is overwhelmingly at the output end,
+where layer 39 alone costs 970e-5 against a middle-half mean of 44e-5.
 
-The caution from the OLMoE work applies unchanged and is the reason this is not stated as a
+> **Correction.** An earlier version of this section claimed Qwen's first layers were
+> "indistinguishable from the middle third" and that the `{0,1,L-2,L-1}` recipe therefore "spends
+> half its budget on layers that cost nothing here". That was wrong, and wrong for a specific
+> reason: the middle window used was layers 8-31, which includes the tail's rise from layer 32
+> onward and so inflated the baseline the front was compared against. Against a clean central half
+> the first two layers are 2.21x the middle -- close to OLMoE's 2.66x. The recipe transfers; it is
+> simply unbalanced at this scale, not half-wasted.
+
+Figure: [`results/phase0/figures/residency_profile_transfer.png`](../phase0/figures/residency_profile_transfer.png),
+both profiles normalised by their own mean against relative depth, since the absolute damages differ
+by ~70x and the question is shape.
+
+The caution from the OLMoE work applies unchanged and is why none of this is stated as a
 prescription: **solo damage does not predict joint value** (section 3 of the layer-freeing results
-records three independent contradictions, one of them controlled). What transfers is the *finding
-that the profile is not flat*; the specific shape does not.
+records three independent contradictions, one of them controlled).
 
 ## 3. Damage is superadditive, mildly
 
