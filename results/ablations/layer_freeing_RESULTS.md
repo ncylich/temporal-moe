@@ -140,9 +140,17 @@ downstream score of any free-set cell.
 > exactly HF's `load_balancing_loss_func` to 1.9e-06, and at R=k the change is provably a no-op
 > (`checks.py auxparity`, difference 0.00e+00) so nothing *already* trained moves for that reason.
 >
-> **But every cell in this document was trained under the old formula.** They remain internally
-> comparable to each other and are not comparable to anything trained after the fix. Whether the
-> 0.0108 BPB gap this section rests on survives is untested; the controlled pair has to be re-run. Together with the `{0,1}`→`{0,1,15}` reversal above, that is
+> **Tested 2026-08-04, and the conclusions survive.** Two 50M cells were run under the unified aux.
+> `ce_auxfix_50M` (full residency, no freed layers, so the aux is provably unchanged) reproduces the
+> published CE curve to 8e-4 at all five checkpoints, ending 0.827549 against 0.8269 — the refactor
+> left the untouched path untouched. `ce_auxfix_free_attn_50M` is the identical configuration to
+> `ce_free_0_1_14_15_attn`, differing only in the aux formula, and lands **0.784717 against 0.785201,
+> a shift of 4.85e-4**. The freed layers' regularisation rose ~15x and moved the cell by less than
+> five ten-thousandths of a BPB, against a ladder spread of 0.028165 — **58x larger**.
+>
+> So the dilution was real, monotone in free-set size, and immaterial to every conclusion drawn from
+> these cells. The cells remain trained under the old formula and are not bit-comparable to new ones,
+> but the 0.0108 BPB gap this section rests on is not in doubt from this cause. Together with the `{0,1}`→`{0,1,15}` reversal above, that is
 two independent contradictions, one of them controlled. **Do not choose free sets from solo damage.**
 
 A third arrangement was also run: `{0,1,14,15}`, freeing both ends. Training-free it was *dominated*
