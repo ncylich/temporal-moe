@@ -111,10 +111,30 @@ Slide 18 shows four bars and reads as a ladder anyone would have guessed. The nu
 | router + LoRA + zone-confined anneal | 0.914 | null |
 | full fine-tune | 0.934 | ceiling |
 
+That is the bake-off. The embedding program ran six more, all null against the noise scale of their
+own comparison:
+
+| technique | result |
+|---|---|
+| per-layer embeddings, mechanism claim | **refuted**: locus moves 0.0031 against a spread of 0.0031, in the wrong direction |
+| per-layer embeddings stacked on LoRA | 0.49σ, wrong side, at both ranks |
+| calibrated initialisation, three variants | tie, and the strongest is **1.23σ worse** |
+| sequential against joint training | 0.47σ |
+| LoRA rank above 128 | not binding; r = 32 is 1.31σ worse |
+
 Two lines worth saying aloud. **The jump is capacity, not schedule**: everything router-only lands at
 0.70, everything with a degree of freedom outside the router lands at 0.91, nothing in between. And
 **self-distillation fails for a reason you can state**: the teacher's free routing is exactly what the
 constraint removes, so there is no signal to transfer.
+
+Eight nulls is too many for one slide. Suggested split: the four-bar recovery chart plus the capacity
+line on the main slide, and the null table in the appendix. The audience needs to know the recipe
+survived a search, not what every arm of the search was.
+
+**One trap to avoid on this slide.** The published locus figure for the cross-entropy surface is
+0.0493 and the embedding cells read 0.093 to 0.096. Those come from different probes. Pairing them
+shows an embedding effect that does not exist, and the findings document made exactly that error until
+today. Measured with one probe: −0.0041 imposed, +0.0932 adapted, +0.0964 with embeddings.
 
 ### B3. "A perfect cache oracle is worse than a good one"
 
