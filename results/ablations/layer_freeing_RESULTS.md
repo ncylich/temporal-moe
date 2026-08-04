@@ -297,3 +297,38 @@ a router fed uniform-random ids routes nothing like one fed text: that version r
 median of 16.3 against the 57.1 above, a 3.5x error, and would have made adaptation look like it
 *tripled* balance rather than restoring it. The producer now loads `bpb_slice_ids.pt`, the same
 tokens the training-time log scores.
+
+
+## The unconstrained null: 20% of the apparent gap was the recipe, not the constraint
+
+Every recovery percentage in this document is computed against 0.6727, the untrained base model,
+which silently assumes that continual training on this corpus is *neutral* -- that a model trained on
+these tokens with this adapter and no residency constraint would stay where it started. That had
+never been tested. `ce_freeall_50M` tests it: every one of the 16 MoE layers free, so the residency
+machinery is provably inert (`swap=0.0000`, `eff_load` median 58.5 against the stock 57.1), with the
+tokens, LoRA rank, optimiser, schedule and data order identical to the constrained arms.
+
+It does not stay where it started. It gets monotonically worse:
+
+| tokens | 10M | 20M | 30M | 40M | 50M |
+|---|---|---|---|---|---|
+| BPB | 0.683090 | 0.687481 | 0.690524 | 0.692876 | **0.695064** |
+
+So 50M tokens of this corpus, with no constraint at all, costs the base model **0.0224 BPB**. The
+ceiling actually reachable under this recipe is 0.695064, not 0.6727.
+
+That changes the arithmetic in the direction that *favours* the technique:
+
+| reference ceiling | BPB | best cell's recovery |
+|---|---|---|
+| stock OLMoE (as published) | 0.672700 | 94.61% |
+| null arm, same tokens and adapter, no constraint | 0.695064 | **95.64%** |
+
+The best cell's gap to stock is 0.112017; its gap to the achievable ceiling is 0.089653. **Twenty
+percent of the gap we have been attributing to the residency constraint is caused by the adaptation
+recipe itself** and would be paid by an unconstrained model too.
+
+Two cautions. This does not rescale the *differences between* free sets -- every cell paid the same
+recipe cost, so the ladder's internal ordering is untouched. And the degradation is monotone in
+tokens, so a longer run would widen it; the 250M cells are measured against a ceiling that has moved
+further than this table shows, and their recovery percentages are correspondingly more understated.

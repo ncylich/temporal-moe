@@ -194,6 +194,21 @@ trained_cell,ce_free_0_1_2,final_swap_rate,0.999656,
 trained_cell,ce_free_0_1_2,final_usage_entropy,0.997697,
 trained_cell,ce_free_0_1_2,bpb_curve,10M:0.829971|20M:0.819598|30M:0.813813|40M:0.810309|50M:0.808615,
 trained_cell,ce_free_0_1_2,train_bpb_curve,10M:0.917399|20M:0.852930|30M:0.840012|40M:0.835792|50M:0.836299,
+trained_cell,ce_freeall_50M,final_bpb,0.695064,"CE surface, NO PLE, MoE layers 0/1/2/3/4/5/6/7/8/9/10/11/12/13/14/15 unconstrained, +700.0% resident memory"
+trained_cell,ce_freeall_50M,recovery_pct,98.92,"CE surface, NO PLE, MoE layers 0/1/2/3/4/5/6/7/8/9/10/11/12/13/14/15 unconstrained, +700.0% resident memory"
+trained_cell,ce_freeall_50M,train_tokens,50003968,
+trained_cell,ce_freeall_50M,rank,off,
+trained_cell,ce_freeall_50M,lora_r,32,
+trained_cell,ce_freeall_50M,free_set,"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+trained_cell,ce_freeall_50M,ple_params,0,
+trained_cell,ce_freeall_50M,mb_x_accum,16x1,
+trained_cell,ce_freeall_50M,table_wd,0.0,
+trained_cell,ce_freeall_50M,calib_init,False,
+trained_cell,ce_freeall_50M,ple_start_tokens,0,
+trained_cell,ce_freeall_50M,final_swap_rate,0.0,
+trained_cell,ce_freeall_50M,final_usage_entropy,nan,
+trained_cell,ce_freeall_50M,bpb_curve,10M:0.683090|20M:0.687481|30M:0.690524|40M:0.692876|50M:0.695064,
+trained_cell,ce_freeall_50M,train_bpb_curve,10M:0.694848|20M:0.707471|30M:0.706034|40M:0.710208|50M:0.714236,
 reference,base_free_routing,bpb,0.6727,unconstrained ceiling
 reference,base_free_routing,recovery_pct,100.0,unconstrained ceiling
 reference,impose_R8_untrained,bpb,2.7507,the gap being recovered
