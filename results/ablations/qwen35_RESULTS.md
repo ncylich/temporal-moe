@@ -368,3 +368,50 @@ grouped GEMM.
 
 Producer: `analysis/ple/bench_experts.py`, `analysis/ple/check_grouped_mm.py`.
 Data: `qwen_expert_kernels.csv`.
+
+
+## 10. Naive imposition survives on a 128-expert model -- the deployability result
+
+BPB is a likelihood and can look healthy while a model has lost the ability to answer anything. The
+question that decides whether residency is usable is what happens to tasks when the constraint is
+switched on with **no adaptation at all**. On OLMoE the answer is catastrophic, which is why the
+whole adaptation programme exists. On Qwen3-30B it is not.
+
+Ten 0-shot tasks, full sets (78,459 scored continuations per arm), same harness and metric convention
+as `olmoe_adapt_downstream.csv`. Retention is imposed/free within each model, so it controls for
+Qwen simply being the stronger model.
+
+| task | metric | OLMoE 64e @12.5% resident | Qwen3-30B 128e @6.25% resident |
+|---|---|---|---|
+| arc_easy | acc | 0.7715 -> 0.2799 (**36.3%**) | 0.7980 -> 0.7088 (**88.8%**) |
+| arc_challenge | acc | 0.4701 -> 0.2150 (45.7%) | 0.5444 -> 0.4411 (81.0%) |
+| hellaswag | acc_norm | 0.7822 -> 0.2657 (34.0%) | 0.8131 -> 0.7508 (92.3%) |
+| piqa | acc | 0.7873 -> 0.5180 (65.8%) | 0.8145 -> 0.7388 (90.7%) |
+| winogrande | acc | 0.6922 -> 0.4909 (70.9%) | 0.7238 -> 0.6140 (84.8%) |
+| boolq | acc | 0.7018 -> 0.4037 (57.5%) | 0.8141 -> 0.6590 (80.9%) |
+| sciq | acc | 0.9370 -> 0.2930 (31.3%) | 0.9630 -> 0.9210 (**95.6%**) |
+| openbookqa | acc | 0.3220 -> 0.1460 (45.3%) | 0.3400 -> 0.2680 (78.8%) |
+| lambada_openai | acc | 0.7056 -> **0.0000** (0.0%) | 0.7475 -> 0.5979 (80.0%) |
+| copa | acc | 0.8500 -> 0.5600 (65.9%) | 0.9000 -> 0.8100 (90.0%) |
+| **mean over 16 metrics** | | **45.8%** | **87.0%** |
+
+> **A 128-expert model keeps 87% of its zero-shot capability with 6.25% of experts resident and no
+> training whatsoever, where a 64-expert model keeps 45.8% at twice that residency budget.** OLMoE's
+> `lambada_openai` goes to exactly zero -- it cannot predict a final word at all -- while Qwen3-30B
+> retains 80% of it.
+
+This is the claim that changes what can be deployed. The adaptation programme exists because
+imposing residency on OLMoE destroys the model; on a model with more experts, most of the serving
+win is available with no training run at all. Adaptation would then be an optimisation rather than a
+prerequisite.
+
+BPB moved 0.582025 -> 0.686861 (+0.1048) on the same arms, so the likelihood and the task numbers
+agree in direction and were computed from the same forward configuration.
+
+**What this does not establish.** OLMoE and Qwen3-30B differ in pretraining data, depth, parameter
+count and quality as well as expert count, so "more experts causes the survival" is supported by the
+cost-curve evidence in section 7 but not isolated by this table alone. The honest statement is that
+the survival is a property of this model, and that expert count is the variable most strongly
+associated with it across the three models measured.
+
+Producer: `analysis/ple/qwen_downstream.py`. Data: `qwen3_30b_downstream_naive.csv`.
