@@ -461,3 +461,74 @@ joint free-set value, after the three recorded in the OLMoE work.
 
 Figure: [`results/phase0/figures/residency_profile_transfer.png`](../phase0/figures/residency_profile_transfer.png).
 Producer: `analysis/ple/plot_profile_transfer.py`.
+
+
+## 13. CORRECTION — the cross-model comparison is confounded; ratios were ~10x too large
+
+An independent audit of this codebase found a defect that invalidates the load-bearing comparison in
+sections 1, 7, 10 and 12. It is recorded here in full because those sections were committed and
+quoted before the check was made.
+
+### The defect
+
+Residency is imposed by masking non-resident experts to `-inf` before the router's softmax. Whether
+that is a *clean* intervention depends on a per-model config flag:
+
+| model | `norm_topk_prob` | what masking does |
+|---|---|---|
+| Qwen3-30B / Qwen3.5 | **True** | top-k weights are renormalised to sum to 1 in **both** arms, so masking only restricts *which* experts are eligible. Clean. |
+| OLMoE-1B-7B | **False** | gate weights are the **raw** softmax-over-64 probabilities, which sum to ~0.40 for the top-8. After masking, the softmax is over the 8 residents and sums to **1.0**. |
+
+So on OLMoE the constraint does not only change which experts serve -- it multiplies every MoE
+block's output by roughly 2.5x, compounded across 16 layers. That is an activation-scale blow-up, not
+a routing constraint, and Qwen structurally cannot suffer it.
+
+### Magnitude, measured on BPB (OLMoE, R=8 of 64, no adaptation)
+
+| arm | BPB | damage vs free |
+|---|---|---|
+| free | 0.7875 | — |
+| residency **as implemented** (mask -> softmax over residents) | 2.8318 | **+2.0443** |
+| residency, same resident sets, **stock gate values** | 0.9786 | **+0.1910** |
+
+The as-implemented arm reproduces the published +2.078 to within 2%, confirming it is the same
+intervention this program has been running. **About 91% of OLMoE's residency damage is the gate-mass
+artifact, not residency.**
+
+### What this changes
+
+| claim as published | corrected |
+|---|---|
+| Qwen3.5 is **69x** cheaper than OLMoE at matched 12.5% resident | ~**4x** (0.0299 vs 0.191) |
+| Qwen3-30B is **44x** cheaper at matched 12.5% resident | ~**4x** (0.0470 vs 0.191) |
+| OLMoE retains ~0% of above-chance skill under naive imposition | **withdrawn** -- that collapse is the signature of an activation blow-up, and has not been re-measured with gate mass preserved |
+| "expert count is the mechanism" (section 7) | **weakened, not refuted.** A 4x gap across 64 -> 128 -> 256 experts is still monotone and still favours more experts, but it is an ordinary effect rather than the order-of-magnitude one claimed |
+
+**Qwen's own numbers are unaffected** -- its intervention is clean, so the cost curves, per-layer
+profiles, free-set orderings and the 78.9% retention under naive imposition all stand. What is wrong
+is every *cross-model ratio*, because the OLMoE comparator is inflated ~10x.
+
+### Two further findings from the same audit
+
+**Throughput (section 8) does not measure residency.** All experts remain in HBM in every arm, so the
+benchmark measures the masking machinery, not the swap traffic that is the entire point -- at a
+measured swap rate of 1.0 expert/token/layer that is ~450 MB/token of expert weight movement on
+Qwen3-30B, which the benchmark never pays. Separately, the benchmark feeds uniform-random token ids,
+and residency *reduces* the number of distinct experts hit per forward (64.0 -> 57.3 on real text,
+56.1 -> 45.2 on random ids), which is why the constrained arm appeared 1.06x *faster*. The "0%
+throughput cost" claim is withdrawn.
+
+**Downstream is measured where the constraint is weakest.** The resident set cold-fills at position 0
+with the exact top-R and holds no state across forward calls, so damage grows with position: on
+OLMoE, +1.256 BPB at positions 0-8 rising to +2.118 at 512-1023. Zero-shot contexts here are ~20-150
+tokens, so the task numbers run at roughly 55-75% of the long-context constraint strength. This
+inflates retention for *both* models, so it affects the absolute 78.9% more than the comparison.
+A corollary worth recording: with per-call state, **incremental decoding would impose no constraint
+at all**, since every single-token step re-cold-fills to the exact top-R.
+
+### The fix
+
+Residency should change *which* experts serve, not how much they contribute. For a
+`norm_topk_prob=False` model the mask must select the resident top-k while the gate values are taken
+from the **unmasked** softmax. Until that is implemented and OLMoE re-measured, no cross-model ratio
+from this program should be quoted.
