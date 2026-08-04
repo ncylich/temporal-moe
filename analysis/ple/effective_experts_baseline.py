@@ -41,7 +41,7 @@ HEADER = ["regime", "layer", "E", "k", "eff_load", "eff_load_frac_of_E", "eff_to
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seq", type=int, default=1024)
+    ap.add_argument("--seq", type=int, default=4096)
     ap.add_argument("--batch", type=int, default=4)
     ap.add_argument("--out", default=OUT)
     A = ap.parse_args()
@@ -50,9 +50,17 @@ def main():
     E = model.config.num_experts
     k = model.config.num_experts_per_tok
     os.environ["OLMOE_TOPK"] = str(k)
-    torch.manual_seed(0)
-    ids = torch.randint(0, model.config.vocab_size, (A.batch, A.seq), device="cuda")
-    n_tok = A.batch * A.seq
+    # The SAME audited held-out slice the training-time log scores on. This first used random token
+    # ids, which made the baseline incomparable to every number it exists to be compared against: a
+    # router fed uniform-random tokens routes nothing like one fed text, and the effective expert
+    # count is a property of the routing, not of the architecture.
+    from olmoe_paths import DATA_DIR
+    bpb_ids = torch.load(os.path.join(DATA_DIR, "bpb_slice_ids.pt"))
+    ids = bpb_ids[torch.linspace(0, bpb_ids.shape[0] - 1, A.batch).long()].to("cuda").long()
+    if ids.shape[1] > A.seq:
+        ids = ids[:, :A.seq]
+    n_tok = ids.shape[0] * ids.shape[1]
+    print(f"  scoring the audited slice: {ids.shape[0]} x {ids.shape[1]} = {n_tok} tokens", flush=True)
 
     rows = []
     for regime in ("free", "imposed"):
@@ -64,16 +72,16 @@ def main():
             RES.enable_residency(R=k)
             RES.set_free_layers(None)
         out = model(ids, output_router_logits=True)
-        for r in RES.effective_experts(out.router_logits, A.batch, A.seq, k):
+        for r in RES.effective_experts(out.router_logits, ids.shape[0], ids.shape[1], k):
             rows.append([regime, r["layer"], E, k, f"{r['eff_load']:.3f}",
                          f"{r['eff_load'] / E:.4f}", f"{r['eff_tok']:.3f}", n_tok])
-        got = [r["eff_load"] for r in RES.effective_experts(out.router_logits, A.batch, A.seq, k)]
+        got = [r["eff_load"] for r in RES.effective_experts(out.router_logits, ids.shape[0], ids.shape[1], k)]
         print(f"  {regime:8} eff_load per layer: min {min(got):.1f}  median "
               f"{sorted(got)[len(got) // 2]:.1f}  max {max(got):.1f}   (E={E}, k={k})", flush=True)
 
     with open(A.out, "w", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
-        w.writerow(["# Per-layer effective expert count of the UNTRAINED OLMoE. regime=free is the "
+        w.writerow(["# Per-layer effective expert count of the UNTRAINED OLMoE, on the audited held-out slice (the same tokens the training-time log scores). regime=free is the "
                     "released model with no residency; regime=imposed is residency R=k applied at "
                     "eval only, untrained. eff_load = 1/sum(p^2) over dispatch, range 1..E, higher "
                     "is more balanced. eff_tok = exp(mean token routing entropy). Producer: "
