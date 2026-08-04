@@ -303,6 +303,7 @@ while seen < A.tokens:
         lm = torch.nn.functional.cross_entropy(logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels)
         aux, z = RES.aux_z_from_router_logits(out.router_logits, batch.shape[0], batch.shape[1],
                                               RES._CFG["R"])
+        RES.assert_aux_live(out, aux, AUX_C)
         loss = (lm + AUX_C * aux + Z_C * z) / A.accum
         if not torch.isfinite(loss):
             print(f"[ABORT] non-finite loss step {step} micro {_micro}", flush=True); sys.exit(3)

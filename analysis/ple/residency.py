@@ -157,6 +157,50 @@ def enable_residency(R=8, evict="min_logit", free_layers=None):
         _CFG["free_layers"] = free_layers
 
 
+def assert_aux_live(out, aux, aux_c, _done=[]):
+    """Fail loudly if the load-balancing term is not actually reaching the loss.
+
+    Every way this can go wrong is silent. The run trains, the curve looks ordinary, and the router
+    is simply unregularised:
+
+      * `output_router_logits=True` not passed -> `out.router_logits` is None and there is nothing to
+        compute an aux from. This is the flag that defaults to False in OlmoeForCausalLM.
+      * `labels` passed to the model as well -> HF adds `router_aux_loss_coef * aux_loss` internally
+        (modeling_olmoe.py, gated on `labels is not None`), on top of ours. Two load-balancing losses
+        over different quantities: HF's over top-k selection, ours over residency. Not an error the
+        loss curve would show.
+      * `aux` detached from the router weights -> added to the loss, contributes no gradient.
+      * the coefficient set to 0.
+
+    Checked once per process, on the first step, because the failure is configuration and not data.
+    """
+    if _done:
+        return
+    _done.append(True)
+    rl = getattr(out, "router_logits", None)
+    if not rl:
+        raise RuntimeError(
+            "[aux] out.router_logits is empty: the forward was called without "
+            "output_router_logits=True, so no load-balancing loss can be computed. That argument "
+            "defaults to False in OlmoeForCausalLM.")
+    if getattr(out, "loss", None) is not None:
+        raise RuntimeError(
+            "[aux] the model returned a loss, which means `labels` was passed. HF then already "
+            "added router_aux_loss_coef * aux_loss internally, and the trainer's own AUX_C term "
+            "would double-count it -- over a different quantity, HF balancing top-k selection and "
+            "this code balancing residency. Compute the LM loss outside the model, or drop AUX_C.")
+    if not aux_c:
+        raise RuntimeError(f"[aux] AUX_C is {aux_c!r}: the router is unregularised.")
+    if not torch.isfinite(aux):
+        raise RuntimeError(f"[aux] aux is {aux.item()}, not finite.")
+    if not aux.requires_grad:
+        raise RuntimeError(
+            "[aux] aux does not require grad, so adding it to the loss changes no weights. The "
+            "router logits were detached somewhere between the forward and here.")
+    print(f"[aux] live: {len(rl)} router-logit tensors, aux={aux.item():.4f} x {aux_c}, "
+          f"grad reaches the router, model added none of its own", flush=True)
+
+
 def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
     """Compute Switch aux + router z-loss on the MASKED distribution from a forward's raw per-layer
     router_logits (output_router_logits=True). Differentiable in the router weights; computed once

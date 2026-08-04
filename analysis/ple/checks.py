@@ -26,6 +26,44 @@ from olmoe_paths import DATA_DIR
 
 
 # ------------------------------------------------------------------ init (CPU, no model)
+def cmd_aux(A):
+    """Smoke test: is the load-balancing loss actually reaching the router?
+
+    Runs one forward under the real recipe and asserts the guard passes, then deliberately breaks
+    each way it can fail and asserts the guard catches it. A guard that has never been seen to fire
+    is not evidence of anything.
+    """
+    import residency as RES
+    model, tok = RES.load_model()
+    RES.enable_residency(R=8)
+    ids = torch.randint(0, 50000, (2, 512), device="cuda")
+
+    out = model(ids, output_router_logits=True)
+    aux, z = RES.aux_z_from_router_logits(out.router_logits, ids.shape[0], ids.shape[1], 8)
+    RES.assert_aux_live(out, aux, 0.01)
+    print(f"  [1/4] real recipe: PASS   aux={aux.item():.4f} z={z.item():.4f}")
+
+    def expect(label, fn):
+        RES.assert_aux_live.__defaults__[0].clear()          # re-arm the once-per-process guard
+        try:
+            fn(); print(f"  {label}: NOT CAUGHT -- the guard is useless"); raise SystemExit(1)
+        except RuntimeError as e:
+            print(f"  {label}: caught -- {str(e).splitlines()[0][:78]}")
+        RES.assert_aux_live.__defaults__[0].clear()
+
+    bare = model(ids)                                        # output_router_logits defaults False
+    expect("[2/4] flag off        ", lambda: RES.assert_aux_live(bare, aux, 0.01))
+    expect("[3/4] coefficient 0   ", lambda: RES.assert_aux_live(out, aux, 0.0))
+    expect("[4/5] aux detached    ", lambda: RES.assert_aux_live(out, aux.detach(), 0.01))
+    # The subtle one: pass labels and HF adds router_aux_loss_coef * aux_loss itself, so the
+    # trainer's AUX_C term double-counts -- over a different quantity, HF balancing top-k selection
+    # and this code balancing residency. Nothing about the loss curve would show it.
+    withlab = model(ids, labels=ids, output_router_logits=True)
+    expect("[5/5] labels -> HF aux", lambda: RES.assert_aux_live(withlab, aux, 0.01))
+    RES.assert_aux_live.__defaults__[0].clear()
+    print("\nall five: the guard passes the real recipe and fires on every way it can break")
+
+
 def cmd_init(A):
     for r in (32, 128, "full"):
         t = PLE.FactoredPLE(50304, 16, 2048, r, device="cpu")
@@ -227,6 +265,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest="cmd", required=True)
     sp.add_parser("init")
+    sp.add_parser("aux")
     sp.add_parser("placement")
     sp.add_parser("grad")
     z = sp.add_parser("zero"); z.add_argument("--trained", required=True)
@@ -235,5 +274,5 @@ if __name__ == "__main__":
     b.add_argument("--out"); b.add_argument("--compare", nargs=2)
     b.add_argument("--seq", type=int, default=512); b.add_argument("--no-flash", action="store_true")
     A = ap.parse_args()
-    {"init": cmd_init, "placement": cmd_placement, "grad": cmd_grad,
+    {"init": cmd_init, "aux": cmd_aux, "placement": cmd_placement, "grad": cmd_grad,
      "zero": cmd_zero, "bitwise": cmd_bitwise}[A.cmd](A)
