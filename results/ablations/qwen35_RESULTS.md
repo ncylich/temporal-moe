@@ -435,3 +435,29 @@ so the R^-0.59 fit in section 5A is refitted on the valid points only.
 `residency_qwen.assert_valid_R` now raises on R < k, and `qwen_cost_curve.py` skips those points, so
 the configuration cannot be measured again by accident. The rows are annotated in the CSVs rather
 than deleted, since a silently shorter table invites the same experiment a second time.
+
+
+## 12. Three-model profile: a stable head, a wildly variable tail
+
+With Qwen3-30B added, the per-layer damage profiles can be compared across 64, 128 and 256 experts.
+Each is normalised by its own central-half mean, since absolute damages differ by ~70x.
+
+| model | experts | first 2 / middle | last 2 / middle |
+|---|---|---|---|
+| OLMoE 1B-7B | 64 | **2.69x** | 1.49x |
+| Qwen3-30B-A3B | 128 | **2.60x** | **28.08x** |
+| Qwen3.5-35B-A3B | 256 | **2.89x** | 19.46x |
+
+The input end is remarkably stable: 2.6-2.9x the middle on all three models, across a 4x range of
+expert count and 16-to-48 layers. The output end is not stable at all -- 1.5x, 28x, 19x. So the
+earlier framing of "both ends are elevated" understates the asymmetry. What generalises is a modest,
+consistent premium on the first two layers; what varies by model is whether the tail dominates.
+
+This also does **not** explain the free-set flip in section 7. Qwen3-30B has the most extreme tail of
+the three (28x) and yet `{first2, last2}` beats `{last4}` there, while Qwen3.5 with a milder tail
+(19x) prefers tail-only. A profile that says "the tail is 28x the middle" would predict the opposite.
+That is the third independent instance in this program of solo per-layer damage failing to predict
+joint free-set value, after the three recorded in the OLMoE work.
+
+Figure: [`results/phase0/figures/residency_profile_transfer.png`](../phase0/figures/residency_profile_transfer.png).
+Producer: `analysis/ple/plot_profile_transfer.py`.

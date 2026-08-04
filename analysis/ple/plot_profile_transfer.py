@@ -32,8 +32,8 @@ OLMOE = [0.2178, 0.2588, 0.1408, 0.1153, 0.1168, 0.0986, 0.1064, 0.0792,
          0.0810, 0.0822, 0.0837, 0.0698, 0.0729, 0.0748, 0.1225, 0.1408]
 
 
-def qwen_profile(R=8):
-    p = os.path.join(ABLATIONS, "qwen35_residency_suite.csv")
+def qwen_profile(R=8, fname="qwen35_residency_suite.csv"):
+    p = os.path.join(ABLATIONS, fname)
     rows = list(csv.DictReader([l for l in open(p) if not l.lstrip().lstrip('"').startswith("#")]))
     d = {r["cell"]: float(r["bpb"]) for r in rows}
     free = d["free_baseline"]
@@ -44,10 +44,13 @@ def qwen_profile(R=8):
 
 def main():
     q8, q32 = qwen_profile(8), qwen_profile(32)
+    q3 = qwen_profile(8, "qwen35_residency_suite_q3.csv")   # Qwen3-30B, 128 experts, no shared expert
     fig, ax = plt.subplots(figsize=(9, 5))
-    for prof, lbl, style in ((OLMOE, "OLMoE 1B-7B — 16 layers, 64 experts, R=8 (12.5% resident)", "-o"),
-                             (q8, "Qwen3.5-35B-A3B — 40 layers, 256 experts, R=8 (3.1% resident)", "-s"),
-                             (q32, "Qwen3.5-35B-A3B — R=32 (12.5% resident, matched fraction)", "--^")):
+    for prof, lbl, style in (
+            (OLMOE, "OLMoE 1B-7B — 16 layers, 64 experts, R=8 (12.5% resident)", "-o"),
+            (q3, "Qwen3-30B-A3B — 48 layers, 128 experts, no shared expert, R=8", "-D"),
+            (q8, "Qwen3.5-35B-A3B — 40 layers, 256 experts, R=8 (3.1% resident)", "-s"),
+            (q32, "Qwen3.5-35B-A3B — R=32 (12.5% resident, matched fraction)", "--^")):
         n = len(prof)
         mean = sum(prof) / n
         x = [i / (n - 1) for i in range(n)]
@@ -64,6 +67,8 @@ def main():
     fig.tight_layout()
     fig.savefig(out, dpi=150)
     print(f"  OLMoE   ends/middle {(OLMOE[0]+OLMOE[1]+OLMOE[-2]+OLMOE[-1])/4 / (sum(OLMOE[5:11])/6):.2f}x")
+    n3=len(q3); m3=sum(q3[n3//4:3*n3//4])/len(q3[n3//4:3*n3//4])
+    print(f"  Qwen3-30B first2/middle {(q3[0]+q3[1])/2/m3:.2f}x  last2/middle {(q3[-2]+q3[-1])/2/m3:.2f}x")
     print(f"  Qwen R8 ends/middle {(q8[0]+q8[1]+q8[-2]+q8[-1])/4 / (sum(q8[13:27])/14):.2f}x")
     print(f"  Qwen R8 first2/middle {(q8[0]+q8[1])/2 / (sum(q8[13:27])/14):.2f}x  "
           f"last2/middle {(q8[-2]+q8[-1])/2 / (sum(q8[13:27])/14):.2f}x")
