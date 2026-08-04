@@ -385,21 +385,11 @@ a pretrained 16-layer model separates what the constraint *does* from what train
   a different probe on the same surface, so pairing it with the 0.096 would manufacture a shift that
   is not there. `ple_RESULTS.md` flags this trap directly.
 
-**Other adaptation techniques that changed nothing**, each measured against the noise scale of its
-own comparison:
-
-| technique | result |
-|---|---|
-| annealing the residency limit, alone and stacked on LoRA | null, twice |
-| self-distillation from the free-routing teacher | null, slightly worse |
-| per-layer embeddings stacked on LoRA | 0.49σ, wrong side |
-| calibrated initialisation, three variants | ties, and the strongest is 1.23σ **worse** |
-| sequential against joint training | 0.47σ |
-| LoRA rank above 128 | not binding; r = 32 is 1.31σ worse |
-
-Nothing in that list is a small win being reported as a null. The pattern is that adaptation needs
-trainable capacity outside the router and is indifferent to almost everything else about how it gets
-there.
+- **Five further techniques were tried and none moved anything**: stacking per-layer embeddings on
+  LoRA (0.49σ, wrong side), calibrated initialisation in three variants (the strongest is 1.23σ
+  *worse*), sequential against joint training (0.47σ), and LoRA rank, which stops binding above 128
+  (r = 32 is 1.31σ worse). Together with the two nulls above, eight attempts found one thing that
+  matters.
 
 **Single-layer damage is U-shaped**, worst at layer 1, lowest at layer 11, both ends elevated. It is
 also the wrong tool for choosing which layers to free.
