@@ -21,7 +21,7 @@ from temporal.temporal_router import compute_resident_mask, compute_resident_mas
 
 from transformers.models.olmoe.modeling_olmoe import OlmoeTopKRouter, OlmoeSparseMoeBlock
 
-_CFG = {"on": False, "R": 8, "evict": "min_logit", "accel": True, "collect_aux": False,
+_CFG = {"on": False, "R": 8, "gate_mass": "preserve", "evict": "min_logit", "accel": True, "collect_aux": False,
         "collect_telem": False, "free_layers": 0, "free_set": None}
 # free_layers: leave the first N MoE layers UNCONSTRAINED (ordinary free routing) while the rest run
 # under rolling residency. This relaxes the constraint rather than adapting to it, so a cell using it
@@ -117,9 +117,25 @@ def _router_forward(self, hidden_states):
     used = router_logits.masked_fill(~mask_flat, float("-inf"))
     if _CFG["collect_aux"] and self.training:
         _accum_aux(used.float(), E, R)                  # aux+z on masked dist (keeps router grad)
-    # existing softmax/top-k, unchanged
+    # Residency must change WHICH experts serve, not HOW MUCH they contribute.
+    #
+    # Selecting and weighting both from the masked softmax is only safe when norm_topk_prob is True,
+    # because renormalising cancels the change of denominator. OLMoE sets it False and uses the raw
+    # softmax-over-E probabilities as gate weights: those sum to ~0.40 over the top-8 unmasked, and
+    # to exactly 1.0 once the softmax is taken over the R residents. That silently multiplies every
+    # MoE block's output by ~2.5x, compounded over 16 layers -- an activation-scale blow-up on top of
+    # the routing change, and it accounted for ~91% of OLMoE's measured residency damage
+    # (+2.0443 BPB as implemented vs +0.1910 with gate mass preserved).
+    #
+    # So: pick the top-k from the MASKED distribution, take their weights from the UNMASKED one.
+    # For norm_topk_prob=True models this is provably a no-op (the masked and unmasked probabilities
+    # differ by a constant factor over any fixed set, which renormalisation divides out), so Qwen
+    # results are unaffected either way.
     router_probs = torch.nn.functional.softmax(used, dtype=torch.float, dim=-1)
     router_top_value, router_indices = torch.topk(router_probs, self.top_k, dim=-1)
+    if _CFG.get("gate_mass", "preserve") == "preserve" and not self.norm_topk_prob:
+        full = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)
+        router_top_value = full.gather(-1, router_indices)
     if self.norm_topk_prob:
         router_top_value /= router_top_value.sum(dim=-1, keepdim=True)
     router_top_value = router_top_value.to(router_logits.dtype)
