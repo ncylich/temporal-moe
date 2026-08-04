@@ -532,3 +532,65 @@ Residency should change *which* experts serve, not how much they contribute. For
 `norm_topk_prob=False` model the mask must select the resident top-k while the gate values are taken
 from the **unmasked** softmax. Until that is implemented and OLMoE re-measured, no cross-model ratio
 from this program should be quoted.
+
+
+## 14. Re-measurement under the fix: the artifact was 91.6%, and OLMoE's profile INVERTS
+
+`olmoe_remeasure.py`, one model load, gate mass preserved. The `renorm` arm reproduces the published
++2.078 to within 4%, confirming it is the same intervention the program has been running.
+
+### The artifact
+
+| arm | BPB | damage |
+|---|---|---|
+| free | 0.670290 | — |
+| constrained R=8, **as published** (`renorm`) | 2.671729 | **+2.001439** |
+| constrained R=8, **gate mass preserved** | 0.839290 | **+0.169000** |
+
+**91.6% of OLMoE's measured residency damage was the gate-mass artifact.**
+
+### Corrected cross-model comparison, matched 12.5% resident
+
+| model | experts | damage | published claim | corrected |
+|---|---|---|---|---|
+| OLMoE 1B-7B | 64 | +0.169000 | — | — |
+| Qwen3-30B-A3B | 128 | +0.046964 | 44x cheaper | **3.6x** |
+| Qwen3.5-35B-A3B | 256 | +0.029928 | 69x cheaper | **5.6x** |
+
+The direction survives and is still monotone in expert count (0.169 -> 0.047 -> 0.030 across
+64 -> 128 -> 256), so "residency gets cheaper with more experts" stands. Its magnitude was overstated
+by roughly an order of magnitude.
+
+OLMoE also now has a proper cost curve rather than one point: R=8 (12.5%) +0.169000, R=16 (25%)
++0.098104, R=32 (50%) +0.042913, R=64 (100%) +0.000000. The last row is the R=E no-op verified at
+full measurement scale.
+
+### The per-layer profile inverts
+
+Section 2's U-shape was produced under the artifact. Re-run with gate mass preserved (damage x1e-3):
+
+| layer | 0 | 1 | 2 | 5 | 9 | 10 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| published | 217.8 | **258.8** | 140.8 | 98.6 | 82.2 | 83.7 | 72.9 | 74.8 | 122.5 | 140.8 |
+| corrected | 6.4 | 5.9 | 4.8 | 3.8 | 8.0 | 9.6 | 9.3 | 8.2 | 11.4 | **22.3** |
+
+| | published | corrected |
+|---|---|---|
+| first 2 / middle | **2.66x** | **1.00x** |
+| last 2 / middle | 1.47x | **2.71x** |
+| most damaging | **L1, L0, L2**, L15, L14 | **L15, L14, L10, L12, L13** |
+
+> **The profile flips from front-heavy to back-heavy.** Corrected, layers 0 and 1 sit exactly at the
+> middle (1.04x and 0.96x) -- no premium at all -- while damage rises monotonically from L5 to L15,
+> which alone is 3.6x the middle.
+
+This matters beyond bookkeeping. **`{0,1,14,15}` was chosen partly because L0 and L1 measured as the
+two most damaging layers.** On corrected data they are unremarkable, and a tail-weighted set --
+`{12,13,14,15}` or `{14,15}` -- is what the profile now supports.
+
+It also reconciles OLMoE with the Qwen models for the first time. Section 12 reported a "stable head
+premium" of 2.6-2.9x across all three; that was 2.66x for OLMoE **only under the artifact**, and is
+1.00x corrected. All three models are back-heavy; OLMoE simply has no head premium, where Qwen has a
+modest one. The earlier framing was an artifact masquerading as a cross-model regularity.
+
+Producer: `analysis/ple/olmoe_remeasure.py`. Data: `olmoe_gatemass_remeasure.csv`.
