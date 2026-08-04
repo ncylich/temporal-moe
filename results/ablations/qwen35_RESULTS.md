@@ -114,3 +114,73 @@ over the hit set rather than a Python loop), which is a real piece of engineerin
 to attempt against a deadline. What the night bought instead is the test-time characterisation above
 and in section 5, which is what the scaling question actually asked and which does not depend on this
 checkpoint being base or instruct.
+
+
+## 5. The price of residency, the right free set, and where the advantage comes from
+
+One model load, 30 cells, identical cached batches. Free baseline on this slice is 0.648087 BPB
+(24 sequences; section 1 used 16, hence the different absolute anchor -- damages within each table
+are internally matched).
+
+### A. Price as a function of resident budget
+
+| R | resident (routed) | BPB | damage |
+|---|---|---|---|
+| 4 | 1.56% | 0.764537 | +0.116450 |
+| 8 | 3.12% | 0.703758 | +0.055671 |
+| 16 | 6.25% | 0.686977 | +0.038890 |
+| 32 | 12.50% | 0.678965 | +0.030878 |
+| 64 | 25.00% | 0.670946 | +0.022859 |
+| 128 | 50.00% | 0.663396 | +0.015309 |
+
+Damage falls roughly as R^-0.59 -- a 32x increase in resident budget buys only a 7.6x reduction in
+damage, and even holding **half** the experts resident still costs 0.0153. The knee is early: R=8 is
+already within 3.6x of R=128 while holding a sixteenth as much. For serving, that is the useful
+shape -- most of the recoverable loss is recovered by the first few resident slots.
+
+### B. Which layers to free, measured jointly at matched budget
+
+| free set | layers freed | damage (R=8) | of the constraint recovered |
+|---|---|---|---|
+| none | 0 | +0.055671 | — |
+| first 2 | 2 | +0.052592 | 5.5% |
+| **last 2** | **2** | **+0.038181** | **31.4%** |
+| first2 + last2 (OLMoE recipe) | 4 | +0.035294 | 36.6% |
+| **last 4** | **4** | **+0.032781** | **41.1%** |
+| first2 + last4 | 6 | +0.030022 | 46.1% |
+| last 8 | 8 | +0.019903 | 64.2% |
+
+> **At matched budget the tail-only set beats the recipe inherited from OLMoE.** Four freed layers:
+> last-4 recovers 41.1% against the {0,1,38,39} recipe's 36.6%. Two freed layers: last-2 recovers
+> 31.4% against first-2's 5.5% -- nearly six times as much for the same serving cost. Freeing the
+> input end, which is where most of OLMoE's value sat, is close to worthless here.
+
+The same ordering holds at R=32 (last-4 +0.016147 vs first2+last2 +0.017180), so it is not an artefact
+of the harsher budget.
+
+This is worth flagging as a methodological exception. On OLMoE, solo damage **did not** predict joint
+value -- three contradictions, one controlled (section 3 of the layer-freeing results). Here it does:
+the per-layer profile said back-heavy, and the jointly-measured free sets agree. Solo damage is not
+reliable in general; it happened to be right on this model, and the joint measurement is what
+establishes that, not the profile.
+
+### C. Where the 70x advantage comes from — mostly not the shared expert
+
+| shared expert | free | constrained (R=8) | damage |
+|---|---|---|---|
+| live | 0.648087 | 0.703758 | +0.055671 |
+| zeroed | 1.161288 | 1.344755 | +0.183467 |
+
+**Ratio 3.30x.** Removing Qwen's always-resident shared expert makes residency 3.3x more damaging, so
+it genuinely does absorb part of the constraint -- but only part. With the shared expert gone
+entirely, Qwen still pays **0.183** where OLMoE pays **2.078**, and it pays it at 3.12% resident
+against OLMoE's 12.5%. That is still an **11x** advantage at a 4x harsher budget.
+
+So the answer is mixed, and the mixture is the interesting part: roughly a factor of 3 of Qwen's
+robustness is architecture-specific and would not transfer to a model without a shared expert, while
+the remaining order of magnitude is not, and is most plausibly expert redundancy -- 256 experts at
+top-8 leaves far more substitutable capacity than 64 at top-8. The prediction that follows is that
+residency keeps getting cheaper as expert count grows, with or without a shared expert. Kimi K3's
+896 experts would be the test.
+
+Producer: `analysis/ple/qwen_cost_curve.py`. Data: `qwen35_cost_curve.csv` (30 cells).
