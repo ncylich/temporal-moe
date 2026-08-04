@@ -374,11 +374,32 @@ a pretrained 16-layer model separates what the constraint *does* from what train
 | condition | context minus token |
 |---|---|
 | base model, constraint imposed, no training | −0.0041 |
-| adapted on cross-entropy | +0.0493 |
-| adapted with per-layer embeddings | +0.093 to +0.096 |
+| adapted on cross-entropy | +0.0932 |
+| adapted on cross-entropy, plus per-layer embeddings | +0.0964 |
 
-Impose the constraint and nothing shifts. Train under it and the shift appears, growing with more
-adaptation. Section 1 describes something the model learns.
+- **Imposing the constraint moves nothing.** Training under it produces the whole shift.
+- **Per-layer embeddings add nothing on top**, 0.0031 against a spread of 0.0031, and in the opposite
+  direction to the one pre-registered. That refuted the premise of the embedding program, which had
+  argued it works by restoring token information the constraint strips out.
+- **All three rows come from one probe.** The published cross-entropy figure of 0.0493 was measured by
+  a different probe on the same surface, so pairing it with the 0.096 would manufacture a shift that
+  is not there. `ple_RESULTS.md` flags this trap directly.
+
+**Other adaptation techniques that changed nothing**, each measured against the noise scale of its
+own comparison:
+
+| technique | result |
+|---|---|
+| annealing the residency limit, alone and stacked on LoRA | null, twice |
+| self-distillation from the free-routing teacher | null, slightly worse |
+| per-layer embeddings stacked on LoRA | 0.49σ, wrong side |
+| calibrated initialisation, three variants | ties, and the strongest is 1.23σ **worse** |
+| sequential against joint training | 0.47σ |
+| LoRA rank above 128 | not binding; r = 32 is 1.31σ worse |
+
+Nothing in that list is a small win being reported as a null. The pattern is that adaptation needs
+trainable capacity outside the router and is indifferent to almost everything else about how it gets
+there.
 
 **Single-layer damage is U-shaped**, worst at layer 1, lowest at layer 11, both ends elevated. It is
 also the wrong tool for choosing which layers to free.
