@@ -133,9 +133,13 @@ def evaluate(model, ids, divisor, mb=1):
     tot = ntok = 0
     for i in range(0, len(ids), mb):
         b = ids[i:i + mb].to("cuda").long()
-        lg = model(b).logits[:, :-1].float()
+        lg = model(b).logits[:, :-1]
         tg = b[:, 1:]
-        tot += float(F.cross_entropy(lg.reshape(-1, lg.shape[-1]), tg.reshape(-1), reduction="sum"))
+        for i0 in range(0, lg.shape[1], 512):
+            sl = lg[:, i0:i0 + 512].float()
+            tot += float(F.cross_entropy(sl.reshape(-1, sl.shape[-1]),
+                                         tg[:, i0:i0 + 512].reshape(-1), reduction="sum"))
+            del sl
         ntok += tg.numel()
         del lg
     model.train()
@@ -148,8 +152,9 @@ def main():
     ap.add_argument("--tag", required=True)
     ap.add_argument("--tokens", type=int, default=30_000_000)
     ap.add_argument("--free-set", default="", help="comma list; 'all' = unconstrained null")
-    ap.add_argument("--lora", type=int, default=32)
+    ap.add_argument("--lora", type=int, default=8)
     ap.add_argument("--lora-attn", type=int, default=0)
+    ap.add_argument("--seq", type=int, default=2048)
     ap.add_argument("--R", type=int, default=8)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--mb", type=int, default=1)
@@ -189,11 +194,17 @@ def main():
 
     corpus = torch.load(f"{DATA}/finetune_ids_qwen.pt", weights_only=False)
     bpb_ids = torch.load(f"{DATA}/bpb_slice_ids_qwen.pt", weights_only=False)[: A.eval_seq]
-    opt = torch.optim.AdamW(params, lr=A.lr, weight_decay=0.0, betas=(0.9, 0.95))
+    try:
+        import bitsandbytes as bnb
+        opt = bnb.optim.AdamW8bit(params, lr=A.lr, weight_decay=0.0, betas=(0.9, 0.95))
+        print("  [opt] AdamW8bit (fp32 moments would cost 4x the state on 461M LoRA params)", flush=True)
+    except Exception as e:
+        opt = torch.optim.AdamW(params, lr=A.lr, weight_decay=0.0, betas=(0.9, 0.95))
+        print(f"  [opt] AdamW fp32 fallback ({e})", flush=True)
     model.gradient_checkpointing_enable()
     model.train()
 
-    tok_per_step = A.mb * A.accum * SEQ
+    tok_per_step = A.mb * A.accum * A.seq
     steps = A.tokens // tok_per_step
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=A.lr, total_steps=max(1, steps),
                                                 pct_start=0.02, anneal_strategy="cos")
@@ -202,7 +213,7 @@ def main():
     for step in range(steps):
         opt.zero_grad(set_to_none=True)
         for _ in range(A.accum):
-            b = corpus[ptr:ptr + A.mb].to("cuda").long(); ptr += A.mb
+            b = corpus[ptr:ptr + A.mb, :A.seq].to("cuda").long(); ptr += A.mb
             if ptr + A.mb > len(corpus):
                 ptr = 0
             RQ.capture(True)

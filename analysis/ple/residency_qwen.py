@@ -136,6 +136,22 @@ def load_model(path="/workspace/qwen35-adapt/model", device="cuda", dtype=torch.
     model = AutoModelForCausalLM.from_pretrained(path, **kw)
     if device_map is None:
         model = model.to(device)
+
+    # Drop the multi-token-prediction head (1.69 GB) and the vision tower (0.89 GB). Neither
+    # participates in a text BPB measurement or in expert adaptation, and on an 80 GB card against a
+    # 69.3 GB text model, 2.6 GB is the difference between fitting and not. Done after load rather
+    # than by filtering the state dict so the checkpoint is read exactly as published.
+    freed = []
+    for owner, attr in ((model, "mtp"), (getattr(model, "model", model), "visual"),
+                        (getattr(model, "model", model), "vision_tower")):
+        if hasattr(owner, attr) and getattr(owner, attr) is not None:
+            n = sum(p.numel() for p in getattr(owner, attr).parameters())
+            setattr(owner, attr, None)
+            freed.append(f"{attr} ({n/1e9:.2f}B params)")
+    if freed:
+        torch.cuda.empty_cache()
+        print(f"  [qwen] dropped {', '.join(freed)}", flush=True)
+
     model.eval()
     install()
     n = tag_layers(model)

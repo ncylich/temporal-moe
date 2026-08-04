@@ -71,11 +71,16 @@ def score(model, bl, divisor, free_set, R, want_eff=False):
         if want_eff:
             RQ.capture(True)
         out = model(b)
-        lg = out.logits[:, :-1].float()
+        lg = out.logits[:, :-1]
         tg = b[:, 1:]
-        ce = torch.nn.functional.cross_entropy(
-            lg.reshape(-1, lg.shape[-1]), tg.reshape(-1), reduction="sum")
-        tot += float(ce)
+        # Chunked: Qwen's vocab is 248320, so one float copy of a 4096-token logit tensor is 4.07 GB
+        # on top of 70 GB of weights. Casting a slice at a time keeps the peak near 0.5 GB and does
+        # not change the result -- reduction='sum' is exactly additive over a partition of the tokens.
+        for i0 in range(0, lg.shape[1], 512):
+            sl = lg[:, i0:i0 + 512].float()
+            tot += float(torch.nn.functional.cross_entropy(
+                sl.reshape(-1, sl.shape[-1]), tg[:, i0:i0 + 512].reshape(-1), reduction="sum"))
+            del sl
         ntok += tg.numel()
         if want_eff:
             e = RES.effective_experts(RQ.captured(), b.shape[0], b.shape[1], R)
@@ -92,9 +97,17 @@ def score(model, bl, divisor, free_set, R, want_eff=False):
     return ce_nats / divisor, ce_nats, swap, ent, eff_acc
 
 
+@torch.no_grad()
 def preflight(model, bl, R_all):
-    """Three asserts that must hold before any number is worth recording."""
-    b = bl[0][:1].to("cuda")
+    """Three asserts that must hold before any number is worth recording.
+
+    no_grad is not an optimisation here. Without it these three forwards retain an autograd graph
+    across 40 layers and 256 experts for a comparison that takes no gradients, which alone was enough
+    to exhaust an 80 GB card on top of a 69 GB model.
+    """
+    # 512 tokens, not 4096: this holds a reference logits tensor for an exact comparison, and at
+    # full length that copy alone is 2 GB in bf16. Parity is a property of the hook, not of length.
+    b = bl[0][:1, :512].to("cuda")
     RES._CFG.update(on=False, collect_telem=False)
     ref = model(b).logits.float().clone()
 
