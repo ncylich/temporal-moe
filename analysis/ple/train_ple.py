@@ -218,9 +218,15 @@ def eval_bpb_telem():
             l = torch.nn.functional.cross_entropy(out[:, :-1].reshape(-1, out.size(-1)),
                                                   x[:, 1:].reshape(-1), reduction="sum")
             tot += l.item(); n += x[:, 1:].numel()
+    # Per-layer effective expert count, on the first eval batch, in whatever regime this cell runs.
+    # One extra forward with router logits: cheap next to the eval itself, and it is the quantity the
+    # aux loss exists to hold up, so a cell that silently collapses its routing is visible here and
+    # nowhere else in the recorded output.
+    eff = RES.effective_experts(
+        model(eval_sub[0:1], output_router_logits=True).router_logits, 1, eval_sub.shape[1], 8)
     RES._CFG["collect_telem"] = False; model.train()
     swap, ent = RES.telem_summary(E_experts)
-    return (tot / n) / D, swap, ent
+    return (tot / n) / D, swap, ent, eff
 
 
 seen = step = pos = 0
@@ -333,14 +339,19 @@ while seen < A.tokens:
         print(f"[step {step}] tok={seen/1e6:.1f}M lm={lm.item():.4f} "
               f"{seen/(time.time()-t0)/1e3:.1f}k tok/s", flush=True)
     if seen // A.eval_every > len(hist):
-        b, swap, ent = eval_bpb_telem()
+        b, swap, ent, eff = eval_bpb_telem()
         train_lm = float(torch.stack(lm_acc).mean()) if lm_acc else float("nan")
         lm_acc = []
         hist.append({"tok": seen, "bpb": b, "swap_rate": swap, "usage_entropy": ent,
+                     "eff_load": [e["eff_load"] for e in eff],
+                     "eff_tok": [e["eff_tok"] for e in eff],
                      "train_lm": train_lm, "train_bpb": train_lm / D})
         print(f"[eval] {A.tag} rank={RANK} tok={seen/1e6:.0f}M BPB={b:.6f} "
               f"train_lm={train_lm:.6f} train_bpb={train_lm/D:.6f} gap={train_lm/D - b:+.6f} "
-              f"swap={swap:.4f} ent={ent:.4f}", flush=True)
+              f"swap={swap:.4f} ent={ent:.4f} "
+              f"eff_load[min/med/max]={min(e['eff_load'] for e in eff):.1f}/"
+              f"{sorted(e['eff_load'] for e in eff)[len(eff)//2]:.1f}/"
+              f"{max(e['eff_load'] for e in eff):.1f}", flush=True)
         # Table snapshot at every eval, so rare-row growth is a trajectory rather than one
         # post-hoc point. Pure I/O; nothing here feeds back into training.
         torch.save({"masters": [m.detach().cpu() for m in masters], "opt": opt.state_dict(),
@@ -355,7 +366,7 @@ while seen < A.tokens:
         if b > IMPOSE_BPB:
             print(f"[ABORT] BPB {b:.4f} > impose {IMPOSE_BPB}", flush=True); sys.exit(4)
 
-fb, fswap, fent = eval_bpb_telem()
+fb, fswap, fent, feff = eval_bpb_telem()
 res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lora": A.lora,
        "ple_start": A.ple_start, "calib_init": A.calib_init, "free_layers": A.free_layers, "free_set": A.free_set,
        "calib_suffix": A.calib_suffix,
@@ -363,6 +374,9 @@ res = {"tag": A.tag, "rank": str(RANK), "lr": A.lr, "table_wd": A.table_wd, "lor
        "lora_attn": A.lora_attn,
        "train_tokens": seen, "steps": step, "ple_params": n_ple,
        "final_bpb": fb, "final_swap": fswap, "final_entropy": fent,
+       "final_eff_load": [e["eff_load"] for e in feff],
+       "final_eff_tok": [e["eff_tok"] for e in feff],
+       "final_eff_freed": [e["freed"] for e in feff],
        "divisor": D, "divisor_source": "bpb_slice_meta.json (ln2 * bytes_per_token)",
        "curve": hist}
 json.dump(res, open(f"{OUT}/ple_{A.tag}.json", "w"), indent=1)

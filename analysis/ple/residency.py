@@ -208,6 +208,50 @@ def k_for_aux(rl, _k=[]):
     return _k[0]
 
 
+def effective_experts(router_logits_tuple, B, S, R, evict="min_logit"):
+    """Per-layer effective expert count, two senses, on the distribution each layer actually sees.
+
+    eff_load  1 / sum_e p_e^2 with p the DISPATCH distribution (top-k counts, normalised). How many
+              experts actually carry the corpus. Ranges 1 (one expert takes everything) to E
+              (perfectly balanced). This is the load-collapse detector -- it is the quantity the aux
+              loss exists to hold up, so it is the one to watch when the aux changes.
+    eff_tok   exp(mean token-wise routing entropy). How many experts a single token spreads over.
+              Bounded by E and, for a top-k router, effectively by k once routing sharpens.
+
+    The two answer different questions and can move in opposite directions: routing can sharpen per
+    token (eff_tok falls) while spreading evenly across the corpus (eff_load rises). Reported
+    separately for that reason.
+
+    Constrained layers are measured on the masked distribution, freed layers on the unmasked one --
+    the same rule the aux uses, so the numbers describe what the loss saw.
+    """
+    _free = _CFG.get("free_layers", 0)
+    _fset = _CFG.get("free_set")
+    k = k_for_aux(None)
+    out = []
+    with torch.no_grad():
+        for _li, rl in enumerate(router_logits_tuple):
+            N, E = rl.shape
+            freed = (_li in _fset) if _fset is not None else (_li < _free)
+            if freed:
+                used = rl.float()
+            else:
+                lg = rl.view(B, S, E).transpose(0, 1).contiguous()
+                scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
+                mask = scan(lg.float(), R, evict=evict).transpose(0, 1).reshape(N, E)
+                used = rl.masked_fill(~mask, float("-inf")).float()
+            probs = torch.softmax(used, dim=-1)
+            idx = probs.topk(k, dim=-1).indices
+            cnt = torch.zeros(E, device=rl.device, dtype=probs.dtype).scatter_add_(
+                0, idx.reshape(-1), torch.ones(idx.numel(), device=rl.device, dtype=probs.dtype))
+            p = cnt / cnt.sum().clamp(min=1e-12)
+            eff_load = float(1.0 / (p * p).sum().clamp(min=1e-12))
+            H = -(probs * probs.clamp(min=1e-12).log()).sum(-1).mean()
+            out.append({"layer": _li, "freed": bool(freed), "E": E,
+                        "eff_load": round(eff_load, 3), "eff_tok": round(float(H.exp()), 3)})
+    return out
+
+
 def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
     """Switch aux + router z-loss, ONE formula for every layer, matching temporal-moe.
 
