@@ -125,7 +125,17 @@ factor of 5.8 at identical cost. Trained, it is **worse**:
 | 2 (`ce_free_0_1_2`) | 0.198 | 0.808615 | 0.5855 |
 
 The profile predicted a large win for layer 2 and delivered a 0.0108 BPB loss and the worst
-downstream score of any free-set cell. Together with the `{0,1}`→`{0,1,15}` reversal above, that is
+downstream score of any free-set cell.
+
+> **Caveat on this comparison, 2026-08-04.** The two cells are not matched on load-balancing
+> strength. A freed layer takes a different aux branch — `E·Σ(P²)` instead of `E·Σ(f·P)`, because
+> with no mask the load term degenerates — and the returned aux is the mean over all sixteen layers,
+> so freed layers dilute it. Measured (`analysis/ple/aux_dilution.py`, `aux_dilution.csv`): effective
+> aux is 30.41 for `{0,1,2}` and 29.43 for `{0,1,15}`, so the winning cell trained under 3.2% weaker
+> regularisation despite freeing the same number of layers. At coefficient 0.01 that is ~0.010 in
+> loss units, roughly 0.003 BPB-equivalent against the 0.0108 BPB gap being claimed. It is not
+> obviously decisive and it is not nothing. The control is one 50M run of `{0,1,15}` with `AUX_C`
+> scaled to match `{0,1,2}`'s effective aux; it has not been run. Together with the `{0,1}`→`{0,1,15}` reversal above, that is
 two independent contradictions, one of them controlled. **Do not choose free sets from solo damage.**
 
 A third arrangement was also run: `{0,1,14,15}`, freeing both ends. Training-free it was *dominated*
