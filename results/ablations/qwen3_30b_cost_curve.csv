@@ -1,0 +1,25 @@
+"# qwen3_30b (qwen3) test-time residency cost, one model load, all cells on identical cached batches. E=128 layers=48, BPB divisor 3.1998611 on the audited slice re-tokenized to byte-identical text. Part A: price vs resident budget. Part B: joint value of free sets (solo damage is known not to predict this). Part C: shared-expert ablation, damage measured with it live and zeroed. free_baseline BPB 0.582025. Producer: analysis/ple/qwen_cost_curve.py"
+part,cell,R,resident_routed_pct,shared_expert,bpb,n_seq,secs,damage_vs_free
+A,free_baseline,8,6.25,on,0.582025,8,2.8,+0.000000
+A,all_constrained_R4,4,3.12,on,0.847645,8,3.2,+0.265620
+A,all_constrained_R8,8,6.25,on,0.686861,8,3.2,+0.104836
+A,all_constrained_R16,16,12.50,on,0.628989,8,3.3,+0.046964
+A,all_constrained_R32,32,25.00,on,0.601562,8,3.3,+0.019537
+A,all_constrained_R64,64,50.00,on,0.587399,8,3.4,+0.005374
+A,all_constrained_R128,128,100.00,on,0.582025,8,3.4,+0.000000
+B,free_none_R8,8,6.25,on,0.686861,8,3.2,+0.104836
+B,free_last1_R8,8,6.25,on,0.654517,8,3.2,+0.072492
+B,free_last2_R8,8,6.25,on,0.649103,8,3.2,+0.067078
+B,free_last4_R8,8,6.25,on,0.643046,8,3.2,+0.061021
+B,free_last8_R8,8,6.25,on,0.626149,8,3.1,+0.044124
+B,free_first2_R8,8,6.25,on,0.678145,8,3.2,+0.096120
+B,free_first2_last2_R8,8,6.25,on,0.638713,8,3.2,+0.056688
+B,free_first2_last4_R8,8,6.25,on,0.632948,8,3.2,+0.050923
+B,free_none_R32,32,25.00,on,0.601562,8,3.3,+0.019537
+B,free_last1_R32,32,25.00,on,0.596749,8,3.3,+0.014724
+B,free_last2_R32,32,25.00,on,0.596023,8,3.3,+0.013998
+B,free_last4_R32,32,25.00,on,0.595208,8,3.3,+0.013183
+B,free_last8_R32,32,25.00,on,0.591792,8,3.2,+0.009767
+B,free_first2_R32,32,25.00,on,0.600013,8,3.3,+0.017988
+B,free_first2_last2_R32,32,25.00,on,0.594397,8,3.3,+0.012372
+B,free_first2_last4_R32,32,25.00,on,0.593766,8,3.2,+0.011741

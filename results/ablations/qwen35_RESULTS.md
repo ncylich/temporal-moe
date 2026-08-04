@@ -215,3 +215,64 @@ every block. **The tail-only free set is genuinely better than the recipe inheri
 matched budget, and it is not close for the two-layer case.**
 
 Producer: `analysis/ple/qwen_freeset_precision.py`. Data: `qwen35_freeset_precision.csv`.
+
+
+## 7. Qwen3-30B-A3B-Base: the redundancy control settles the mechanism
+
+Qwen3.5 pays ~70x less than OLMoE for the same residency rule, and zeroing its always-resident shared
+expert accounted for only 3.3x of that. Qwen3-30B-A3B-Base decides the rest: **128 experts, top-8
+(identical), no shared expert at all, standard attention**. Preflight passed on this family
+independently -- residency-off and R=E both 0.000e+00 against stock, exactly 8 resident per token.
+
+### Damage at matched resident fraction (12.5%)
+
+| model | experts | shared expert | damage |
+|---|---|---|---|
+| OLMoE 1B-7B | 64 | no | **+2.078** |
+| Qwen3-30B-A3B | 128 | **no** | **+0.046964** |
+| Qwen3.5-35B-A3B | 256 | yes | **+0.029928** |
+
+> **The shared expert is not the explanation.** Qwen3-30B has none and is still ~44x cheaper than
+> OLMoE. Damage falls monotonically as expert count doubles -- 64 -> 128 -> 256 gives 2.078 -> 0.047
+> -> 0.030 -- which is what expert redundancy predicts and what an architecture-specific buffer does
+> not. The prediction that residency keeps getting cheaper with expert count now has two points
+> supporting it and one confound removed.
+
+The caveat that keeps this honest: OLMoE and the Qwen models differ in far more than expert count --
+pretraining data, depth, total parameters, overall quality. The clean part of the comparison is that
+a model with **no** shared expert reproduces most of the advantage, which is what the ablation in
+section 5C could not establish on its own.
+
+### Cost curve, and an internal check
+
+| R | resident | damage |
+|---|---|---|
+| 4 | 3.12% | +0.265620 |
+| 8 | 6.25% | +0.104836 |
+| 16 | 12.50% | +0.046964 |
+| 32 | 25.00% | +0.019537 |
+| 64 | 50.00% | +0.005374 |
+| 128 | 100.00% | **+0.000000** |
+
+R=128 is every expert resident, and damage is exactly zero to six decimals. That is the R=E no-op
+verified at full measurement scale rather than only in the preflight's single forward.
+
+### The free-set recipe does NOT transfer between the two Qwen models
+
+| free set (4-layer budget) | Qwen3-30B | Qwen3.5-35B |
+|---|---|---|
+| first2 + last2 | **45.9%** | 36.6% |
+| last 4 | 41.8% | **41.1%** |
+
+**Section 5B's conclusion is model-specific.** On Qwen3.5 the tail-only set wins; on Qwen3-30B the
+OLMoE-style both-ends set wins. What survives across all three models is weaker and more robust: the
+last layers are worth far more than the first (last2 vs first2 is 36.0% vs 8.3% here, 31.4% vs 5.5%
+on Qwen3.5). What does not survive is the stronger claim that extending the tail beats adding the
+head.
+
+This run used 8 sequences, cut down to fit a deadline, where the Qwen3.5 free-set ordering was
+verified on three disjoint 32-sequence blocks with paired differences. The flip is therefore
+suggestive and not yet established to the same standard; it needs the same treatment before anyone
+picks a free set from it.
+
+Producer: `analysis/ple/qwen_cost_curve.py --family qwen3`. Data: `qwen3_30b_cost_curve.csv`.
