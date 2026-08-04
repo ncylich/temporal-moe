@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rolling-residency for Qwen3.5-MoE, sharing every audited part of the OLMoE path.
+"""Rolling-residency for the Qwen MoE families, sharing every audited part of the OLMoE path.
 
 Why a separate module rather than a branch inside `residency.py`: that file is imported by runs
 currently in flight, and the two model families differ in enough small ways (see below) that an
@@ -16,8 +16,13 @@ Differences from OLMoE that this file exists to absorb:
                      permanently resident, which is the architecturally correct reading: a shared
                      expert is not a swap candidate. It does mean "R resident" understates true
                      resident memory by one expert, and `resident_fraction()` reports both.
-    normalisation    OlmoeTopKRouter honours a `norm_topk_prob` flag; Qwen3_5MoeTopKRouter always
-                     renormalises the top-k probabilities. Referencing the flag here would raise.
+    normalisation    Qwen3_5MoeTopKRouter always renormalises the top-k probabilities; OLMoE and
+                     Qwen3-MoE honour a `norm_topk_prob` flag. Defaulting the missing attribute to
+                     True reproduces each family's stock arithmetic exactly.
+    families         `install(family)` selects which block/router pair to patch: "qwen3_5" (256
+                     experts, shared expert, DeltaNet hybrid) or "qwen3" (128 experts, NO shared
+                     expert, standard attention). The second exists to separate expert redundancy
+                     from the shared expert as explanations for Qwen's cheap residency.
     hybrid attention 3 Gated-DeltaNet layers per 1 full-attention layer. Irrelevant to residency,
                      which touches only the MoE path, but it is why attention LoRA does not port.
 
@@ -34,13 +39,25 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import residency as RES                                            # noqa: E402
 
 from transformers.models.qwen3_5_moe.modeling_qwen3_5_moe import (  # noqa: E402
-    Qwen3_5MoeSparseMoeBlock,
-    Qwen3_5MoeTopKRouter,
+    Qwen3_5MoeSparseMoeBlock, Qwen3_5MoeTopKRouter,
+)
+from transformers.models.qwen3_moe.modeling_qwen3_moe import (     # noqa: E402
+    Qwen3MoeSparseMoeBlock, Qwen3MoeTopKRouter,
 )
 
+# Two families, one hook. They differ in exactly two ways that matter here: Qwen3.5 runs an
+# always-on shared expert inside the block (outside the router, so masking leaves it resident),
+# and Qwen3-MoE honours a norm_topk_prob flag where Qwen3.5 always renormalises. Everything else --
+# router signature, attribute names, the 3-tuple return -- is identical, so a second copy of this
+# file would have been a copy of the parts that decide numbers.
+FAMILIES = {
+    "qwen3_5": (Qwen3_5MoeSparseMoeBlock, Qwen3_5MoeTopKRouter),
+    "qwen3":   (Qwen3MoeSparseMoeBlock, Qwen3MoeTopKRouter),
+}
+ACTIVE = {"name": "qwen3_5"}
+
 _CFG = RES._CFG                       # one config object, so free_set/R/evict cannot drift apart
-_orig_block_forward = Qwen3_5MoeSparseMoeBlock.forward
-_orig_router_forward = Qwen3_5MoeTopKRouter.forward
+_ORIG = {k: (b.forward, r.forward) for k, (b, r) in FAMILIES.items()}
 
 # Router logits captured per forward. Qwen's block does return them through the model's
 # output_router_logits path, but capturing here as well means the aux and effective-expert
@@ -52,7 +69,7 @@ def _block_forward(self, hidden_states):
     """Record the pack shape; the router sees flattened [B*S, E] and cannot recover S alone."""
     b, s, _ = hidden_states.shape
     self.gate._resid_shape = (b, s)
-    return _orig_block_forward(self, hidden_states)
+    return _ORIG[ACTIVE["name"]][0](self, hidden_states)
 
 
 def _router_forward(self, hidden_states):
@@ -85,25 +102,30 @@ def _router_forward(self, hidden_states):
             RES._accum_telem(mask)
         used = router_logits.masked_fill(~mask.transpose(0, 1).reshape(N, E), float("-inf"))
 
-    # Stock Qwen3_5MoeTopKRouter arithmetic below, unchanged. Qwen always renormalises the top-k
-    # probabilities -- there is no norm_topk_prob flag on this family, unlike OLMoE.
+    # Stock router arithmetic below, unchanged for whichever family is installed.
     router_probs = torch.softmax(used, dtype=torch.float, dim=-1)
     router_top_value, router_indices = torch.topk(router_probs, self.top_k, dim=-1)
-    router_top_value = router_top_value / router_top_value.sum(dim=-1, keepdim=True)
+    # Qwen3.5 always renormalises; Qwen3-MoE only when norm_topk_prob is set. Defaulting the
+    # missing attribute to True reproduces each family's stock arithmetic exactly.
+    if getattr(self, "norm_topk_prob", True):
+        router_top_value = router_top_value / router_top_value.sum(dim=-1, keepdim=True)
     router_top_value = router_top_value.to(router_logits.dtype)
     return router_logits, router_top_value, router_indices
 
 
-def install():
-    Qwen3_5MoeSparseMoeBlock.forward = _block_forward
-    Qwen3_5MoeTopKRouter.forward = _router_forward
+def install(family="qwen3_5"):
+    ACTIVE["name"] = family
+    blk, rtr = FAMILIES[family]
+    blk.forward = _block_forward
+    rtr.forward = _router_forward
 
 
 def tag_layers(model):
     """Index the routers in depth order so free_set/{layer} selection means what it says."""
     n = 0
+    rtr = FAMILIES[ACTIVE["name"]][1]
     for m in model.modules():
-        if isinstance(m, Qwen3_5MoeTopKRouter):
+        if isinstance(m, rtr):
             m._layer_idx = n
             n += 1
     return n
@@ -127,7 +149,7 @@ def resident_fraction(cfg, R):
 
 
 def load_model(path="/workspace/qwen35-adapt/model", device="cuda", dtype=torch.bfloat16,
-               device_map=None):
+               device_map=None, family="qwen3_5"):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(path)
     kw = {"dtype": dtype, "trust_remote_code": False}
@@ -153,7 +175,7 @@ def load_model(path="/workspace/qwen35-adapt/model", device="cuda", dtype=torch.
         print(f"  [qwen] dropped {', '.join(freed)}", flush=True)
 
     model.eval()
-    install()
+    install(family)
     n = tag_layers(model)
     print(f"  [qwen] {n} MoE routers tagged, E={model.config.num_experts} "
           f"k={model.config.num_experts_per_tok} layers={model.config.num_hidden_layers}", flush=True)

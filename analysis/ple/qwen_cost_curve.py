@@ -39,9 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import residency as RES                                            # noqa: E402
 import residency_qwen as RQ                                        # noqa: E402
 from qwen_sweep import batches, score, preflight                   # noqa: E402
-from transformers.models.qwen3_5_moe.modeling_qwen3_5_moe import (  # noqa: E402
-    Qwen3_5MoeSparseMoeBlock,
-)
+
 
 DATA = "/workspace/qwen35-adapt/data"
 OUT = "/workspace/qwen35-adapt/results"
@@ -64,17 +62,32 @@ def _block(self, hidden_states):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n-seq", type=int, default=24)
+    ap.add_argument("--family", default="qwen3_5", choices=("qwen3_5", "qwen3"))
+    ap.add_argument("--model", default="/workspace/qwen35-adapt/model")
+    ap.add_argument("--data", default="/workspace/qwen35-adapt/data")
+    ap.add_argument("--slice-name", default="qwen")
+    ap.add_argument("--out", default="/workspace/qwen35-adapt/results")
+    ap.add_argument("--tag", default="qwen35")
     A = ap.parse_args()
+    global DATA, OUT
+    DATA, OUT = A.data, A.out
     os.makedirs(OUT, exist_ok=True)
-    meta = json.load(open(f"{DATA}/bpb_slice_meta_qwen.json"))
+    meta = json.load(open(f"{DATA}/bpb_slice_meta_{A.slice_name}.json"))
     D = meta["divisor_D"]
-    model, tok = RQ.load_model()
+    model, tok = RQ.load_model(path=A.model, family=A.family)
     cfg = model.config
     E, L = cfg.num_experts, cfg.num_hidden_layers
-    bl = batches(A.n_seq, 1)
+    import qwen_sweep as QS
+    QS.DATA = A.data                     # batches() reads the slice from here
+    bl = [torch.load(f"{A.data}/bpb_slice_ids_{A.slice_name}.pt", weights_only=False)[i:i+1].long()
+          for i in range(A.n_seq)]
     ALL = list(range(L))
     preflight(model, bl, {"E": E, "n_layers": L})
-    Qwen3_5MoeSparseMoeBlock.forward = _block          # after preflight, which checks the stock path
+    has_shared = hasattr(cfg, "shared_expert_intermediate_size")
+    if has_shared:
+        RQ.FAMILIES[A.family][0].forward = _block   # after preflight, which checks the stock path
+    else:
+        print("  [note] no shared expert on this family; part C is not applicable", flush=True)
 
     rows = []
     def cell(part, name, free_set, R, shared=True):
@@ -104,6 +117,9 @@ def main():
             b = cell("B", f"{name}_R{R}", fs if fs else None, R)
             print(f"      {name:20} R={R:<3} {len(fs):>2} freed  damage {b-free:+.6f}", flush=True)
 
+    if not has_shared:
+        print("\n  === C. skipped: this family has no shared expert ===", flush=True)
+        _write(rows, free, OUT, A, E, L, D); return
     print(f"\n  === C. is the shared expert what makes this cheap? ===", flush=True)
     res = {}
     for sh in (True, False):
@@ -118,10 +134,14 @@ def main():
     print("      ratio >> 1 => architecture-specific; ratio ~ 1 => redundancy, should generalise",
           flush=True)
 
-    path = os.path.join(OUT, "qwen35_cost_curve.csv")
+    _write(rows, free, OUT, A, E, L, D)
+
+
+def _write(rows, free, OUT, A, E, L, D):
+    path = os.path.join(OUT, f"{A.tag}_cost_curve.csv")
     with open(path, "w", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
-        w.writerow([f"# Qwen3.5-35B-A3B-Base test-time residency cost, one model load, all cells on "
+        w.writerow([f"# {A.tag} ({A.family}) test-time residency cost, one model load, all cells on "
                     f"identical cached batches. E={E} layers={L}, BPB divisor {D:.7f} on the audited "
                     f"slice re-tokenized to byte-identical text. Part A: price vs resident budget. "
                     f"Part B: joint value of free sets (solo damage is known not to predict this). "

@@ -28,16 +28,18 @@ import torch
 from transformers import AutoTokenizer
 
 OLMOE = "/workspace/olmoe-adapt/model"
-QWEN = "/workspace/qwen35-adapt/model"
 SRC = "/workspace/olmoe-adapt/data/bpb_slice_ids.pt"
-OUT_DIR = "/workspace/qwen35-adapt/data"
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n-seq", type=int, default=2048, help="OLMoE sequences to decode (4096 tok each)")
     ap.add_argument("--seq", type=int, default=4096)
+    ap.add_argument("--model", default="/workspace/qwen35-adapt/model")
+    ap.add_argument("--out-dir", default="/workspace/qwen35-adapt/data")
+    ap.add_argument("--name", default="qwen")
     A = ap.parse_args()
+    QWEN, OUT_DIR = A.model, A.out_dir
     os.makedirs(OUT_DIR, exist_ok=True)
 
     ids = torch.load(SRC, weights_only=False)[: A.n_seq]
@@ -70,18 +72,18 @@ def main():
     bytes_per_tok = n_bytes / len(qids)
     divisor = math.log(2) * bytes_per_tok
 
-    torch.save(packed, os.path.join(OUT_DIR, "bpb_slice_ids_qwen.pt"))
+    torch.save(packed, os.path.join(OUT_DIR, f"bpb_slice_ids_{A.name}.pt"))
     meta = {
         "n_seq": int(n_full), "seq": A.seq, "n_tokens_packed": int(n_packed),
         "n_tokens_raw": len(qids), "n_bytes": n_bytes,
         "bytes_per_token": bytes_per_tok, "divisor_D": divisor,
-        "tokenizer": "Qwen3.5-35B-A3B-Base", "vocab_size": tok_q.vocab_size,
+        "tokenizer": os.path.basename(QWEN.rstrip("/")), "vocab_size": tok_q.vocab_size,
         "source": ("byte-identical to OLMoE bpb_slice_ids.pt (dolmino-mix-1124 dclm, disjoint from "
                    "OLMoE-mix-0924 pretraining manifest), decoded and re-tokenized; decode verified "
                    "exact by re-encoding"),
         "olmoe_seqs_consumed": int(A.n_seq),
     }
-    with open(os.path.join(OUT_DIR, "bpb_slice_meta_qwen.json"), "w") as f:
+    with open(os.path.join(OUT_DIR, f"bpb_slice_meta_{A.name}.json"), "w") as f:
         json.dump(meta, f, indent=2)
 
     o = json.load(open("/workspace/olmoe-adapt/data/bpb_slice_meta.json"))
@@ -89,7 +91,7 @@ def main():
     print(f"  Qwen tokens      {len(qids):,}   packed {n_packed:,} into {n_full} x {A.seq}")
     print(f"  bytes/token      Qwen {bytes_per_tok:.4f}   vs OLMoE {o['bytes_per_token']:.4f}")
     print(f"  divisor_D        Qwen {divisor:.7f}   vs OLMoE {o['divisor_D']:.7f}")
-    print(f"\n[write] {OUT_DIR}/bpb_slice_ids_qwen.pt + bpb_slice_meta_qwen.json", flush=True)
+    print(f"\n[write] {OUT_DIR}/bpb_slice_ids_{A.name}.pt + meta", flush=True)
 
 
 if __name__ == "__main__":
