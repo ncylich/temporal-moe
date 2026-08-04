@@ -42,6 +42,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #   (flag substring, reason)
 VERDICTS = (
     ("CONSTANT COLUMN seed", "training seed, fixed at 1234 by design"),
+    ("CONSTANT COLUMN n_tokens", "every row scores the SAME audited held-out slice; that it is\n     constant is the point -- a varying value here would mean the regimes were not matched"),
     ("CONSTANT COLUMN budget", "one file per compute budget; constant is the file's definition"),
     ("CONSTANT COLUMN k ", "top-k is an architectural constant within a grain"),
     ("CONSTANT COLUMN topk_k", "as above"),
@@ -87,8 +88,13 @@ def committed(rel):
                              text=True, check=True).stdout
         # Same comment filter as the working-file read. Filtering one side and not the other makes
         # every commented file look like it shrank -- which it did, on this linter's own output.
+        # .lstrip('"') as well: a comment row containing commas is quoted by csv.writer, so a bare
+        # startswith("#") misses it here while the working-file read strips the quote and skips it.
+        # That one-character asymmetry is itself the failure this docstring warns about, and it was
+        # fixed on one side only -- it is the real cause of the standing phantom shrink on
+        # layer_freeing_downstream.csv, which had been attributed to CRLF line endings.
         return list(csv.DictReader([ln for ln in out.splitlines()
-                                    if not ln.lstrip().startswith("#")]))
+                                    if not ln.lstrip().lstrip('"').startswith("#")]))
     except subprocess.CalledProcessError:
         return None
 

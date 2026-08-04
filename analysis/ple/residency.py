@@ -157,32 +157,154 @@ def enable_residency(R=8, evict="min_logit", free_layers=None):
         _CFG["free_layers"] = free_layers
 
 
+def assert_aux_live(out, aux, aux_c, _done=[]):
+    """Fail loudly if the load-balancing term is not actually reaching the loss.
+
+    Every way this can go wrong is silent. The run trains, the curve looks ordinary, and the router
+    is simply unregularised:
+
+      * `output_router_logits=True` not passed -> `out.router_logits` is None and there is nothing to
+        compute an aux from. This is the flag that defaults to False in OlmoeForCausalLM.
+      * `labels` passed to the model as well -> HF adds `router_aux_loss_coef * aux_loss` internally
+        (modeling_olmoe.py, gated on `labels is not None`), on top of ours. Two load-balancing losses
+        over different quantities: HF's over top-k selection, ours over residency. Not an error the
+        loss curve would show.
+      * `aux` detached from the router weights -> added to the loss, contributes no gradient.
+      * the coefficient set to 0.
+
+    Checked once per process, on the first step, because the failure is configuration and not data.
+    """
+    if _done:
+        return
+    _done.append(True)
+    rl = getattr(out, "router_logits", None)
+    if not rl:
+        raise RuntimeError(
+            "[aux] out.router_logits is empty: the forward was called without "
+            "output_router_logits=True, so no load-balancing loss can be computed. That argument "
+            "defaults to False in OlmoeForCausalLM.")
+    if getattr(out, "loss", None) is not None:
+        raise RuntimeError(
+            "[aux] the model returned a loss, which means `labels` was passed. HF then already "
+            "added router_aux_loss_coef * aux_loss internally, and the trainer's own AUX_C term "
+            "would double-count it -- over a different quantity, HF balancing top-k selection and "
+            "this code balancing residency. Compute the LM loss outside the model, or drop AUX_C.")
+    if not aux_c:
+        raise RuntimeError(f"[aux] AUX_C is {aux_c!r}: the router is unregularised.")
+    if not torch.isfinite(aux):
+        raise RuntimeError(f"[aux] aux is {aux.item()}, not finite.")
+    if not aux.requires_grad:
+        raise RuntimeError(
+            "[aux] aux does not require grad, so adding it to the loss changes no weights. The "
+            "router logits were detached somewhere between the forward and here.")
+    print(f"[aux] live: {len(rl)} router-logit tensors, aux={aux.item():.4f} x {aux_c}, "
+          f"grad reaches the router, model added none of its own", flush=True)
+
+
+def k_for_aux(rl, _k=[]):
+    """top-k for the aux dispatch fraction. Read from the loaded config, not assumed."""
+    if not _k:
+        _k.append(int(os.environ.get("OLMOE_TOPK", "8")))
+    return _k[0]
+
+
+def effective_experts(router_logits_tuple, B, S, R, evict="min_logit"):
+    """Per-layer effective expert count, two senses, on the distribution each layer actually sees.
+
+    eff_load  1 / sum_e p_e^2 with p the DISPATCH distribution (top-k counts, normalised). How many
+              experts actually carry the corpus. Ranges 1 (one expert takes everything) to E
+              (perfectly balanced). This is the load-collapse detector -- it is the quantity the aux
+              loss exists to hold up, so it is the one to watch when the aux changes.
+    eff_tok   exp(mean token-wise routing entropy). How many experts a single token spreads over.
+              Bounded by E and, for a top-k router, effectively by k once routing sharpens.
+
+    The two answer different questions and can move in opposite directions: routing can sharpen per
+    token (eff_tok falls) while spreading evenly across the corpus (eff_load rises). Reported
+    separately for that reason.
+
+    Constrained layers are measured on the masked distribution, freed layers on the unmasked one --
+    the same rule the aux uses, so the numbers describe what the loss saw.
+    """
+    _free = _CFG.get("free_layers", 0)
+    _fset = _CFG.get("free_set")
+    k = k_for_aux(None)
+    out = []
+    with torch.no_grad():
+        for _li, rl in enumerate(router_logits_tuple):
+            N, E = rl.shape
+            freed = (_li in _fset) if _fset is not None else (_li < _free)
+            if freed:
+                used = rl.float()
+            else:
+                lg = rl.view(B, S, E).transpose(0, 1).contiguous()
+                scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
+                mask = scan(lg.float(), R, evict=evict).transpose(0, 1).reshape(N, E)
+                used = rl.masked_fill(~mask, float("-inf")).float()
+            probs = torch.softmax(used, dim=-1)
+            idx = probs.topk(k, dim=-1).indices
+            cnt = torch.zeros(E, device=rl.device, dtype=probs.dtype).scatter_add_(
+                0, idx.reshape(-1), torch.ones(idx.numel(), device=rl.device, dtype=probs.dtype))
+            p = cnt / cnt.sum().clamp(min=1e-12)
+            eff_load = float(1.0 / (p * p).sum().clamp(min=1e-12))
+            H = -(probs * probs.clamp(min=1e-12).log()).sum(-1).mean()
+            out.append({"layer": _li, "freed": bool(freed), "E": E,
+                        "eff_load": round(eff_load, 3), "eff_tok": round(float(H.exp()), 3)})
+    return out
+
+
 def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
-    """Compute Switch aux + router z-loss on the MASKED distribution from a forward's raw per-layer
-    router_logits (output_router_logits=True). Differentiable in the router weights; computed once
-    post-forward so it is gradient-checkpointing safe. Each rl: [B*S, E]."""
+    """Switch aux + router z-loss, ONE formula for every layer, matching temporal-moe.
+
+    FLAME does not branch. `temporal_forward` masks non-resident experts to -inf and calls the
+    UNMODIFIED `routing()`, so Megatron computes the same Switch aux everywhere and residency changes
+    only the distribution it sees. This mirrors that exactly:
+
+        P    = softmax(logits), masked to the resident set iff the layer is constrained
+        f    = fraction of tokens whose top-k includes e, taken from that same distribution
+        aux  = E * sum(f * P)
+
+    A constrained layer therefore balances dispatch among its residents; a freed layer balances
+    dispatch among all experts, which is precisely HF's `load_balancing_loss_func` for that layer --
+    so a freed layer's aux is the stock OLMoE aux. `checks.py auxparity` asserts it.
+
+    Two earlier forms are gone. Freed layers used the importance loss E*sum(P^2), which is a
+    different objective on a different scale: at the uniform optimum it is 1 where this is k, so
+    freed layers were regularised ~k times more weakly and diluted the mean over layers in
+    proportion to the size of the free set (analysis/ple/aux_dilution.py). Constrained layers used
+    the RESIDENCY fraction rather than the dispatch fraction; at R=k those are the same number by
+    construction, since every resident is selected, so no run trained to date changes -- but they
+    diverge at R>k and only dispatch matches temporal-moe.
+
+    Aggregation is per layer, then averaged, as Megatron does. HF instead pools every layer into one
+    global statistic, which washes out per-layer imbalance and gives a materially different total
+    (8.46 against 16.08 on one forward here). Per-layer is deliberate.
+
+    Differentiable in the router weights; computed post-forward so it is checkpointing-safe.
+    Each rl: [B*S, E].
+    """
     aux_t = z_t = None; n = 0
     _free = _CFG.get("free_layers", 0)
     _fset = _CFG.get("free_set")
+    k = k_for_aux(None)
     for _li, rl in enumerate(router_logits_tuple):
         N, E = rl.shape
-        if (_li in _fset) if _fset is not None else (_li < _free):
-            # unconstrained layer: ordinary Switch aux/z on the UNMASKED distribution
-            probs = torch.softmax(rl.float(), dim=-1)
-            P = probs.mean(0)
-            aux = E * (P * P).sum()          # importance loss; uniform P minimises it
-            z = (torch.logsumexp(rl.float(), dim=-1) ** 2).mean()
-            aux_t = aux if aux_t is None else aux_t + aux
-            z_t = z if z_t is None else z_t + z; n += 1
-            continue
-        lg = rl.view(B, S, E).transpose(0, 1).contiguous()          # [S,B,E]
-        with torch.no_grad():
-            scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
-            mask = scan(lg.float(), R, evict=evict).transpose(0, 1).reshape(N, E)
-        used = rl.masked_fill(~mask, float("-inf")).float()
+        freed = (_li in _fset) if _fset is not None else (_li < _free)
+        if freed:
+            used = rl.float()
+        else:
+            lg = rl.view(B, S, E).transpose(0, 1).contiguous()          # [S,B,E]
+            with torch.no_grad():
+                scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
+                mask = scan(lg.float(), R, evict=evict).transpose(0, 1).reshape(N, E)
+            used = rl.masked_fill(~mask, float("-inf")).float()
         probs = torch.softmax(used, dim=-1)
-        f = torch.isfinite(used).float().mean(0)
-        aux = E * (f * probs.mean(0)).sum()
+        P = probs.mean(0)
+        # Dispatch fraction: how often each expert is actually selected. Counted with multiplicity
+        # across the k slots, which is what Switch and HF both do.
+        idx = probs.topk(k, dim=-1).indices
+        f = torch.zeros_like(P).scatter_add_(
+            0, idx.reshape(-1), torch.ones(idx.numel(), device=rl.device, dtype=P.dtype)) / N
+        aux = E * (f * P).sum()
         z = (torch.logsumexp(used, dim=-1) ** 2).mean()
         aux_t = aux if aux_t is None else aux_t + aux
         z_t = z if z_t is None else z_t + z; n += 1

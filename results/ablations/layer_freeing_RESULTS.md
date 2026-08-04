@@ -133,6 +133,33 @@ by `{0,1,2}` — less recovery (0.495 vs 0.573) at more memory (+175.0% vs +131.
 above says `{0,1,2}` "dominates it outright". Trained, `{0,1,14,15}` is the best cell in the program
 by a wide margin (§7). That is the third contradiction.
 
+> **Caveat on this comparison, 2026-08-04 — the defect is fixed, these cells predate the fix.**
+> Freed layers used a different aux formula from constrained ones, `E·Σ(P²)` against `E·Σ(f·P)`,
+> which at the uniform optimum are 1 and *k*. Since the returned aux is the mean over all layers,
+> freed layers diluted it in proportion to free-set size: 33.86 with none freed, 30.41 for `{0,1,2}`,
+> 29.43 for `{0,1,15}`, 27.46 for `{0,1,14,15}`. Monotone along the axis the ladder varies, with the
+> best-BPB rung least regularised, so free-set size and regularisation strength were confounded.
+> `{0,1,2}` and `{0,1,15}` free the same *number* of layers and still differed by 2.9 points.
+>
+> `aux_z_from_router_logits` now uses one formula everywhere, matching this repo's own convention:
+> mask the distribution, never the loss. Dilution is gone (+1.1% to +1.3% across the ladder), a freed
+> layer is exactly HF's `load_balancing_loss_func` to 1.9e-06, and at R=k the change is provably a
+> no-op (`checks.py auxparity`, difference 0.00e+00), so nothing *already* trained moves for that
+> reason.
+>
+> **Tested 2026-08-04, and the conclusions survive.** Two 50M cells were run under the unified aux.
+> `ce_auxfix_50M` (full residency, no freed layers, so the aux is provably unchanged) reproduces the
+> published CE curve to 8e-4 at all five checkpoints, ending 0.827549 against 0.8269 — the refactor
+> left the untouched path untouched. `ce_auxfix_free_attn_50M` is the identical configuration to
+> `ce_free_0_1_14_15_attn`, differing only in the aux formula, and lands **0.784717 against 0.785201,
+> a shift of 4.85e-4**. The freed layers' regularisation rose ~15x and moved the cell by less than
+> five ten-thousandths of a BPB, against a ladder spread of 0.028165 — **58x larger**. The two
+> data-seed twins in this document bound seed noise at 8.8e-4, so the shift sits below that floor.
+>
+> So the dilution was real, monotone in free-set size, and immaterial to every conclusion drawn from
+> these cells. They remain trained under the old formula and are not bit-comparable to newer ones,
+> but the 0.0108 BPB gap this section rests on is not in doubt from this cause.
+
 ## 5. Diminishing returns
 
 `ce_free_0_1_15` per 10M: −0.0114, −0.0035, −0.0032, −0.0014. `ce_free2`: −0.0139, −0.0063, −0.0029,
@@ -235,3 +262,38 @@ fit before the session deadline. It asks whether the expensive adapter is the on
 smooth in R, whereas free-versus-constrained is an all-or-nothing jump to R=64 on a layer — the most
 expensive point on that curve. R=16 on layers 0–1 would cost roughly +9% resident memory against
 +87.5%; whether it captures a useful share of the gain is untested.
+
+
+## Effective expert count: what residency does to routing, and what adaptation gives back
+
+`eff_load = 1 / sum_e p_e^2` over the dispatch distribution, per layer, range 1..64. It counts how
+many experts actually carry the corpus: 1 is total collapse onto one expert, 64 is perfect balance.
+It is the quantity the auxiliary load-balancing loss exists to hold up, so it is the honest place to
+look for damage when the aux changes. All four rows below score the **same** audited held-out slice
+(4 x 4096 = 16384 tokens), so they differ only in the model state, not in the input.
+
+| model state | median | min | max |
+|---|---|---|---|
+| stock OLMoE, no residency — the ceiling | 57.1 | 50.2 | 62.0 |
+| stock OLMoE, residency R=k imposed, untrained | 20.5 | 13.6 | 52.5 |
+| adapted 50M, full residency (`ce_auxfix_50M`) | 48.6 | 39.4 | 55.4 |
+| adapted 50M, free {0,1,14,15} + attention LoRA | 50.9 | 45.6 | 61.8 |
+
+Read top to bottom, this is the mechanism the BPB numbers only imply. Imposing residency on an
+untrained model **collapses routing**: the median layer falls from 57 experts to 20, and the worst
+layer to 13.6, because the resident set is chosen by a scan the router was never trained to satisfy.
+Adaptation recovers most of it — 20.5 back to 48.6, about 78% of the way to the free ceiling — which
+is what 50M tokens of training the router under the constraint buys. Freeing four layers recovers a
+further 2.3 and lifts the worst layer from 39.4 to 45.6, consistent with those layers being the ones
+the constraint hurt most, and with §4's finding that *which* layers you free matters more than how
+many.
+
+No layer in any adapted state is anywhere near collapse, so the unified aux is doing its job; this
+was the check that could have invalidated the run and did not.
+
+**The first version of this measurement was wrong and is withdrawn.** It scored `torch.randint`
+token ids rather than the audited slice. Effective expert count is a property of the *routing*, and
+a router fed uniform-random ids routes nothing like one fed text: that version read a free-regime
+median of 16.3 against the 57.1 above, a 3.5x error, and would have made adaptation look like it
+*tripled* balance rather than restoring it. The producer now loads `bpb_slice_ids.pt`, the same
+tokens the training-time log scores.
