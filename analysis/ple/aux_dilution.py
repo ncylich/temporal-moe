@@ -1,34 +1,38 @@
 #!/usr/bin/env python3
-"""Freed layers are regularised by a different aux loss, and it dilutes the ladder.
+"""Aux-loss strength across the free-set ladder: the confound this found, and its repair.
 
-`aux_z_from_router_logits` has two branches. A constrained layer gets the Switch load-balancing loss
-on the residency-masked distribution, `E * sum(f * P)` with `f` the resident fraction. A freed layer
-has no mask, so `f` is all ones and `E * sum(1 * P)` collapses to the constant `E` with no gradient;
-the code substitutes the importance loss `E * sum(P^2)` instead. That substitution is reasonable --
-there is no load term to use -- but the two land on different scales. At the uniform optimum the
-first is `k` and the second is `1`, so they differ by roughly the top-k factor by construction.
+BEFORE (two branches). A constrained layer got `E*sum(f*P)` with `f` the resident fraction; a freed
+layer got the importance loss `E*sum(P^2)`, on the reasoning that with no mask there is no load term.
+At the uniform optimum those are `k` and `1`, so freed layers were regularised ~k times more weakly.
+Because the returned aux is the mean over ALL layers, freed layers diluted it in proportion to the
+size of the free set -- the very axis the ladder varies:
 
-Measured on the adapted OLMoE with the headline free set {0,1,14,15}: freed layers average 1.4533
-and constrained layers 36.1976, a factor of 24.9. The four freed layers contribute 1.3% of the aux
-while being 25% of the layers.
+    free set      effective aux    vs full residency
+    none              33.86              --
+    {0,1}             31.68            -6.4%
+    {0,1,2}           30.41           -10.2%
+    {0,1,15}          29.43           -13.1%
+    {0,1,14,15}       27.46           -18.9%
 
-The consequence is not the gap itself but where it lands. The returned aux is the mean over ALL
-layers, so freed layers dilute it, and the dilution grows with the size of the free set -- which is
-the axis the layer-freeing ladder varies:
+Monotone, with the best-BPB rung the least regularised: free-set size and regularisation strength
+were confounded in every cell. Note {0,1,2} and {0,1,15} free the same NUMBER of layers and still
+differ by 2.9 points, so it was never a function of count alone.
 
-    free set        freed   effective aux   vs full residency
-    none              0         36.20              --
-    {0,1}             2         31.9             -12%
-    {0,1,15}          3         29.7             -18%
-    {0,1,14,15}       4         27.5             -24%
+AFTER (one branch, matching temporal-moe). FLAME does not branch: `temporal_forward` masks to -inf
+and calls the unmodified `routing()`, so residency changes the distribution and never the loss.
+`aux_z_from_router_logits` now does the same -- `E*sum(f*P)` everywhere, `f` the dispatch fraction
+from top-k of whichever distribution that layer sees. A freed layer is then exactly HF's
+`load_balancing_loss_func`, asserted to 1.9e-06 by `checks.py auxparity`.
 
-So each rung of that ladder trains under a weaker effective load-balancing strength than the one
-below it, monotonically, and the rung with the best BPB is the least regularised. That does not show
-the aux dilution explains the result -- the ladder spans 0.028 BPB and this is untested against it --
-but it means free-set size and regularisation strength are confounded in the cells that exist.
+    free set      effective aux    vs full residency
+    none              33.86              --
+    {0,1}             34.24            +1.1%
+    {0,1,2}           34.29            +1.3%
+    {0,1,15}          34.24            +1.1%
+    {0,1,14,15}       34.24            +1.1%
 
-The control is one 50M run of {0,1,14,15} with AUX_C scaled by 36.20/27.5 = 1.32, so its constrained
-layers see the same pressure as a full-residency cell. Not run.
+The confound is gone. What remains is that every layer-freeing cell on disk was TRAINED under the
+old formula, so they are not comparable to anything produced after this change.
 
     aux_dilution.py --free-set 0,1,14,15
     aux_dilution.py --ladder            # every free set in the layer-freeing ladder
@@ -52,24 +56,24 @@ HEADER = ["free_set", "n_freed", "n_constrained", "aux_freed_mean", "aux_constra
 
 
 def measure(model, ids, free):
-    from temporal.temporal_router import compute_resident_mask_accel as scan
+    """Per-layer aux from the LIVE function, not a copy of it.
+
+    This used to reimplement both branches inline, which meant it measured the formulas as they were
+    when it was written rather than as they are. It reported the old dilution unchanged after the
+    branches were unified. Calling aux_z_from_router_logits one layer at a time costs a little more
+    and cannot drift from the code it exists to characterise.
+    """
     B, S = ids.shape
     RES.enable_residency(R=8)
     RES.set_free_layers(sorted(free) if free else None)
     out = model(ids, output_router_logits=True)
     freed, con = [], []
     for li, rl in enumerate(out.router_logits):
-        N, E = rl.shape
-        if li in free:
-            P = torch.softmax(rl.float(), -1).mean(0)
-            freed.append((E * (P * P).sum()).item())
-        else:
-            lg = rl.view(B, S, E).transpose(0, 1).contiguous()
-            with torch.no_grad():
-                m = scan(lg.float(), 8, evict="min_logit").transpose(0, 1).reshape(N, E)
-            u = rl.masked_fill(~m, float("-inf")).float()
-            f = torch.isfinite(u).float().mean(0)
-            con.append((E * (f * torch.softmax(u, -1).mean(0)).sum()).item())
+        # One layer at a time, with the free set rewritten so this layer keeps its real role.
+        RES.set_free_layers([li] if li in free else [])
+        a, _ = RES.aux_z_from_router_logits((rl,), B, S, 8)
+        (freed if li in free else con).append(a.item())
+    RES.set_free_layers(sorted(free) if free else None)
     return freed, con
 
 

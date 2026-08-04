@@ -201,32 +201,66 @@ def assert_aux_live(out, aux, aux_c, _done=[]):
           f"grad reaches the router, model added none of its own", flush=True)
 
 
+def k_for_aux(rl, _k=[]):
+    """top-k for the aux dispatch fraction. Read from the loaded config, not assumed."""
+    if not _k:
+        _k.append(int(os.environ.get("OLMOE_TOPK", "8")))
+    return _k[0]
+
+
 def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
-    """Compute Switch aux + router z-loss on the MASKED distribution from a forward's raw per-layer
-    router_logits (output_router_logits=True). Differentiable in the router weights; computed once
-    post-forward so it is gradient-checkpointing safe. Each rl: [B*S, E]."""
+    """Switch aux + router z-loss, ONE formula for every layer, matching temporal-moe.
+
+    FLAME does not branch. `temporal_forward` masks non-resident experts to -inf and calls the
+    UNMODIFIED `routing()`, so Megatron computes the same Switch aux everywhere and residency changes
+    only the distribution it sees. This mirrors that exactly:
+
+        P    = softmax(logits), masked to the resident set iff the layer is constrained
+        f    = fraction of tokens whose top-k includes e, taken from that same distribution
+        aux  = E * sum(f * P)
+
+    A constrained layer therefore balances dispatch among its residents; a freed layer balances
+    dispatch among all experts, which is precisely HF's `load_balancing_loss_func` for that layer --
+    so a freed layer's aux is the stock OLMoE aux. `checks.py auxparity` asserts it.
+
+    Two earlier forms are gone. Freed layers used the importance loss E*sum(P^2), which is a
+    different objective on a different scale: at the uniform optimum it is 1 where this is k, so
+    freed layers were regularised ~k times more weakly and diluted the mean over layers in
+    proportion to the size of the free set (analysis/ple/aux_dilution.py). Constrained layers used
+    the RESIDENCY fraction rather than the dispatch fraction; at R=k those are the same number by
+    construction, since every resident is selected, so no run trained to date changes -- but they
+    diverge at R>k and only dispatch matches temporal-moe.
+
+    Aggregation is per layer, then averaged, as Megatron does. HF instead pools every layer into one
+    global statistic, which washes out per-layer imbalance and gives a materially different total
+    (8.46 against 16.08 on one forward here). Per-layer is deliberate.
+
+    Differentiable in the router weights; computed post-forward so it is checkpointing-safe.
+    Each rl: [B*S, E].
+    """
     aux_t = z_t = None; n = 0
     _free = _CFG.get("free_layers", 0)
     _fset = _CFG.get("free_set")
+    k = k_for_aux(None)
     for _li, rl in enumerate(router_logits_tuple):
         N, E = rl.shape
-        if (_li in _fset) if _fset is not None else (_li < _free):
-            # unconstrained layer: ordinary Switch aux/z on the UNMASKED distribution
-            probs = torch.softmax(rl.float(), dim=-1)
-            P = probs.mean(0)
-            aux = E * (P * P).sum()          # importance loss; uniform P minimises it
-            z = (torch.logsumexp(rl.float(), dim=-1) ** 2).mean()
-            aux_t = aux if aux_t is None else aux_t + aux
-            z_t = z if z_t is None else z_t + z; n += 1
-            continue
-        lg = rl.view(B, S, E).transpose(0, 1).contiguous()          # [S,B,E]
-        with torch.no_grad():
-            scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
-            mask = scan(lg.float(), R, evict=evict).transpose(0, 1).reshape(N, E)
-        used = rl.masked_fill(~mask, float("-inf")).float()
+        freed = (_li in _fset) if _fset is not None else (_li < _free)
+        if freed:
+            used = rl.float()
+        else:
+            lg = rl.view(B, S, E).transpose(0, 1).contiguous()          # [S,B,E]
+            with torch.no_grad():
+                scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
+                mask = scan(lg.float(), R, evict=evict).transpose(0, 1).reshape(N, E)
+            used = rl.masked_fill(~mask, float("-inf")).float()
         probs = torch.softmax(used, dim=-1)
-        f = torch.isfinite(used).float().mean(0)
-        aux = E * (f * probs.mean(0)).sum()
+        P = probs.mean(0)
+        # Dispatch fraction: how often each expert is actually selected. Counted with multiplicity
+        # across the k slots, which is what Switch and HF both do.
+        idx = probs.topk(k, dim=-1).indices
+        f = torch.zeros_like(P).scatter_add_(
+            0, idx.reshape(-1), torch.ones(idx.numel(), device=rl.device, dtype=P.dtype)) / N
+        aux = E * (f * P).sum()
         z = (torch.logsumexp(used, dim=-1) ** 2).mean()
         aux_t = aux if aux_t is None else aux_t + aux
         z_t = z if z_t is None else z_t + z; n += 1

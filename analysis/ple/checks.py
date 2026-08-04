@@ -64,6 +64,81 @@ def cmd_aux(A):
     print("\nall five: the guard passes the real recipe and fires on every way it can break")
 
 
+def cmd_auxparity(A):
+    """A freed layer's aux must be EXACTLY the stock OLMoE aux for that layer.
+
+    This is the invariant the port exists to establish. temporal-moe never changes the aux formula:
+    it masks non-resident experts to -inf and calls the unmodified routing(), so a layer at R=E gets
+    plain Switch aux. Porting that convention here means a freed layer must reproduce HF's
+    load_balancing_loss_func on the same logits, not merely resemble it.
+
+    Also asserts the two branches are on the same SCALE, which is what the old importance-loss
+    substitution broke: at the uniform optimum both forms are k, not k and 1.
+    """
+    import residency as RES
+    from transformers.models.olmoe.modeling_olmoe import load_balancing_loss_func as hf_aux
+    model, tok = RES.load_model()
+    E = model.config.num_experts
+    k = model.config.num_experts_per_tok
+    os.environ["OLMOE_TOPK"] = str(k)
+    ids = torch.randint(0, 50000, (2, 512), device="cuda")
+
+    # every layer freed -> every layer must match stock OLMoE
+    RES.enable_residency(R=8); RES.set_free_layers(list(range(model.config.num_hidden_layers)))
+    out = model(ids, output_router_logits=True)
+    ours, _ = RES.aux_z_from_router_logits(out.router_logits, ids.shape[0], ids.shape[1], 8)
+    theirs = hf_aux(out.router_logits, E, k, None)
+    # PER LAYER a freed layer must be exactly HF's formula. HF's TOTAL differs because it pools
+    # every layer into one global statistic while Megatron, temporal-moe and this code compute per
+    # layer and average; that divergence is deliberate and is checked separately below.
+    worst = 0.0
+    for li, rl in enumerate(out.router_logits):
+        o, _ = RES.aux_z_from_router_logits((rl,), ids.shape[0], ids.shape[1], 8)
+        h = hf_aux((rl.float(),), E, k, None)                 # fp32 both sides: HF softmaxes in the
+        worst = max(worst, abs(o.item() - h.item()))          # logits' dtype, which is bf16 here
+    print(f"  freed layer vs stock OLMoE, worst of {len(out.router_logits)} layers: {worst:.2e}")
+    assert worst < 1e-3, f"a freed layer must reproduce the stock aux formula, off by {worst}"
+
+    print(f"  totals differ by aggregation only: ours(per-layer) {ours.item():.4f} vs "
+          f"HF(global pool) {theirs.item():.4f} -- expected, Megatron computes per layer")
+
+    # uniform-logit scale check: both branches must land on k, not k and 1
+    N = 4096
+    flat = torch.zeros(N, E, device="cuda")
+    P = torch.softmax(flat, -1).mean(0)
+    tk = torch.softmax(flat, -1).topk(k, -1).indices
+    f = torch.zeros_like(P).scatter_add_(
+        0, tk.reshape(-1), torch.ones(tk.numel(), device="cuda", dtype=P.dtype)) / N
+    load_form = (E * (f * P).sum()).item()
+    imp_form = (E * (P * P).sum()).item()
+    print(f"  at uniform routing: load form {load_form:.4f} (= k = {k})   "
+          f"old importance form {imp_form:.4f}   ratio {load_form / imp_form:.1f}x")
+    assert abs(load_form - k) < 1e-3, "the load form should equal k at uniform routing"
+    # The constrained branch changed too: residency fraction -> dispatch fraction. At R=k every
+    # resident is selected, so the two are the same number and no run trained to date moves. That is
+    # the claim that makes this change safe to apply retroactively, so it is asserted, not assumed.
+    from temporal.temporal_router import compute_resident_mask_accel as scan
+    RES.set_free_layers(None); RES.enable_residency(R=k)
+    o2 = model(ids, output_router_logits=True)
+    worst_rk = 0.0
+    for rl in o2.router_logits:
+        N, E2 = rl.shape
+        lg = rl.view(ids.shape[0], ids.shape[1], E2).transpose(0, 1).contiguous()
+        with torch.no_grad():
+            m = scan(lg.float(), k, evict="min_logit").transpose(0, 1).reshape(N, E2)
+        u = rl.masked_fill(~m, float("-inf")).float()
+        pr = torch.softmax(u, -1); P2 = pr.mean(0)
+        f_res = torch.isfinite(u).float().mean(0)                          # the old convention
+        ix = pr.topk(k, -1).indices
+        f_dis = torch.zeros_like(P2).scatter_add_(
+            0, ix.reshape(-1), torch.ones(ix.numel(), device=rl.device, dtype=P2.dtype)) / N
+        worst_rk = max(worst_rk, abs((E2*(f_res*P2).sum()).item() - (E2*(f_dis*P2).sum()).item()))
+    print(f"  at R=k={k}, residency vs dispatch fraction: worst |diff| {worst_rk:.2e}")
+    assert worst_rk < 1e-4, f"R=k invariance broken, off by {worst_rk}: existing runs would move"
+
+    print("\n  PASS: freed layer == stock OLMoE aux; one scale; R=k leaves trained cells unchanged")
+
+
 def cmd_init(A):
     for r in (32, 128, "full"):
         t = PLE.FactoredPLE(50304, 16, 2048, r, device="cpu")
@@ -266,6 +341,7 @@ if __name__ == "__main__":
     sp = ap.add_subparsers(dest="cmd", required=True)
     sp.add_parser("init")
     sp.add_parser("aux")
+    sp.add_parser("auxparity")
     sp.add_parser("placement")
     sp.add_parser("grad")
     z = sp.add_parser("zero"); z.add_argument("--trained", required=True)
@@ -274,5 +350,5 @@ if __name__ == "__main__":
     b.add_argument("--out"); b.add_argument("--compare", nargs=2)
     b.add_argument("--seq", type=int, default=512); b.add_argument("--no-flash", action="store_true")
     A = ap.parse_args()
-    {"init": cmd_init, "aux": cmd_aux, "placement": cmd_placement, "grad": cmd_grad,
+    {"init": cmd_init, "aux": cmd_aux, "auxparity": cmd_auxparity, "placement": cmd_placement, "grad": cmd_grad,
      "zero": cmd_zero, "bitwise": cmd_bitwise}[A.cmd](A)
