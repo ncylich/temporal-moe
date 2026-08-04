@@ -184,3 +184,34 @@ residency keeps getting cheaper as expert count grows, with or without a shared 
 896 experts would be the test.
 
 Producer: `analysis/ple/qwen_cost_curve.py`. Data: `qwen35_cost_curve.csv` (30 cells).
+
+
+## 6. The free-set claim, with error bars
+
+Section 5B rests on a 0.0025 BPB gap out of a 0.056 constraint, which is small enough that it needed
+an error bar before anyone acted on it. Each set was rescored on **three disjoint 32-sequence blocks**,
+with damage measured against a per-block free baseline so block difficulty cancels.
+
+| free set | mean damage | sd across blocks |
+|---|---|---|
+| none | +0.057606 | 0.001743 |
+| first 2 | +0.054157 | 0.001513 |
+| last 2 | +0.040167 | 0.001647 |
+| first2 + last2 | +0.036733 | 0.001502 |
+| last 4 | +0.034443 | 0.001805 |
+| last 8 | +0.021150 | 0.001933 |
+
+Block-to-block spread is ~0.0017, which on its own is comparable to the effect being claimed. The
+paired per-block difference is the sensitive test, because difficulty is common to both arms:
+
+| comparison (same budget) | per-block differences | mean +- sd | sign consistent |
+|---|---|---|---|
+| last-4 minus first2+last2 | -0.002370, -0.002564, -0.001936 | **-0.002290 +- 0.000321** | 3/3 |
+| last-2 minus first-2 | -0.014169, -0.013962, -0.013839 | **-0.013990 +- 0.000166** | 3/3 |
+
+Pairing tightens the standard deviation about 5x relative to the raw damages. Both effects are large
+against their own spread -- roughly 7 sigma and 84 sigma -- and both hold in the same direction on
+every block. **The tail-only free set is genuinely better than the recipe inherited from OLMoE at
+matched budget, and it is not close for the two-layer case.**
+
+Producer: `analysis/ple/qwen_freeset_precision.py`. Data: `qwen35_freeset_precision.csv`.
