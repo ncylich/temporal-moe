@@ -89,3 +89,28 @@ Sum of the 40 solo damages vs constraining all 40 at once: +0.04374 vs +0.05480 
 visible one layer at a time, unlike the free-set interactions seen on OLMoE.
 
 Producer: `analysis/ple/qwen_sweep.py`. Data: `qwen35_residency_suite.csv` (84 cells).
+
+
+## 4. Adaptation was attempted and abandoned — throughput, not a result
+
+Three matched training arms were set up (constrained; ends-freed + attention LoRA; unconstrained
+null), on 67.8M Qwen-tokenized training tokens disjoint from the eval slice, with 461M LoRA
+parameters and 8-bit Adam fitting comfortably in 73.4 GB. The arms ran, and then were stopped.
+
+**Measured throughput: 176 s/step, or 93 tok/s.** The same model evaluates at 4700 tok/s. At that
+rate the 30M-token budget needs 90 hours, and the 100-minute per-arm cap would have bought 0.6M
+tokens -- far too few to move BPB detectably, let alone to separate three arms.
+
+The cause is structural rather than a misconfiguration. `Qwen3_5MoeExperts.forward` iterates in
+Python over every hit expert; with 40 layers and 256 experts that is up to 10240 small GEMMs per
+forward. The per-expert LoRA branch adds two more linears inside that loop, and gradient
+checkpointing recomputes the whole thing on the backward pass. OLMoE, with 64 experts over 16
+layers, trains at 11300 tok/s -- a 120x gap that the 3x difference in active parameters does not
+come close to explaining.
+
+So the honest position is: **this document contains no Qwen adaptation result**, and the OLMoE
+recovery numbers have no Qwen counterpart yet. Making one needs a batched expert kernel (grouped GEMM
+over the hit set rather than a Python loop), which is a real piece of engineering and not something
+to attempt against a deadline. What the night bought instead is the test-time characterisation above
+and in section 5, which is what the scaling question actually asked and which does not depend on this
+checkpoint being base or instruct.
