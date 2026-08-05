@@ -33,7 +33,7 @@ global-batch does not apply. Micro-batch is simpler and matches what the model s
 | axis | grid | note |
 |---|---|---|
 | **learning rate** | 1e-5, 3e-5, 1e-4, 3e-4, 1e-3 | 3e-4 is the inherited value, fitted for a *different* intervention on a model under the gate-mass artifact. Never validated here |
-| **LoRA rank** | 16, 32 | rank does not transfer between models — the same label buys ~4× different capacity depending on depth and head geometry. On Qwen3.5 it may be a memory decision rather than a capacity one |
+| **LoRA rank** | 32, 128 | rank does not transfer between models — the same label buys ~4× different capacity depending on depth and head geometry. On Qwen3.5 it may be a memory decision rather than a capacity one |
 
 Nothing else. Selection: lowest held-out BPB at 15M; prune runs that diverge or that sit within noise
 (~0.003) of untrained; tie-break on the 5M checkpoint, preferring whichever got there soonest.
@@ -41,11 +41,17 @@ Nothing else. Selection: lowest held-out BPB at 15M; prune runs that diverge or 
 Recovery percentages need a null at the **same** LR — a higher LR damages the null too, so scoring
 against a null from another LR silently changes the reference. Run nulls only at the finalists.
 
-## Order, and why it is deferred
+## Order
 
-Qwen3-30B first (most headroom), then Qwen3.5. OLMoE only if a cheap reference is wanted.
+**OLMoE first, and it can start now.** Cheapest per run, largest constraint damage so the most signal,
+a matched null already on disk, and the published ladder as a reference. Unsloth does not support it,
+so nothing about the Qwen work changes its path — this sweep is unblocked.
 
-**Do not start this until the Unsloth work lands.** Unsloth ships a tuned MoE fine-tuning setup —
-their own LoRA defaults, gradient checkpointing, and kernels — which is likely a better starting
-point than sweeping our hand-rolled path. Sweeping now would tune a configuration we intend to
-replace, and rank and LR both interact with whatever adapter implementation ends up underneath.
+**Qwen3-30B then Qwen3.5, both deferred until the Unsloth work lands.** Unsloth ships a tuned MoE
+fine-tuning setup — its own LoRA defaults, gradient checkpointing and kernels — which is likely a
+better starting point than our hand-rolled path. Sweeping first would tune a configuration we intend
+to replace, and both axes interact with whatever adapter implementation ends up underneath.
+
+LR should transfer reasonably from OLMoE: all three models have `hidden_size = 2048`, so an r32
+adapter has identically shaped matrices in each, and adapter width is the main thing that breaks LR
+transfer. Rank will not transfer and has to be tested per model.
