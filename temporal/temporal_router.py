@@ -195,10 +195,17 @@ def _graph_scan(logits, k, use_lru):
 #
 # The t=0 cold fill (torch.topk) is done in torch so its tie-breaking matches the
 # reference exactly; the kernel reproduces torch's first-index argmax/argmin tie
-# semantics via "max value, then min index achieving it". All comparisons are in
-# fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
+# semantics either via "max value, then min index achieving it" or via Triton's
+# tie_break_left fused reduction (same result; see the kernel). All comparisons are
+# in fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
 # bit-identical to the reference for any input dtype. Verified == reference once at
 # runtime by compute_resident_mask_accel, which raises hard on any mismatch.
+#
+# The loop is latency-bound, not throughput-bound: one program per batch element and a
+# strictly sequential recurrence over S, so per-token cost is a dependent chain of a
+# global load plus warp-shuffle reductions. It is tuned on that basis -- prefetch to hide
+# the load, and a reduction shape/num_warps picked per BLOCK. temporal/bench_scan.py is
+# the benchmark those choices come from; re-run it before changing any of them.
 # ---------------------------------------------------------------------------
 if _HAS_TRITON:
     @triton.jit
@@ -211,29 +218,66 @@ if _HAS_TRITON:
         resident = tl.load(res0_ptr + b * E + e, mask=valid, other=0) != 0
         refresh = tl.load(ref0_ptr + b * E + e, mask=valid, other=0.0)
         tl.store(out_ptr + b * E + e, resident.to(tl.int8), mask=valid)   # out[0] = cold fill
+        row = b * E + e
+        # 2-deep software pipeline. Only the DECISION is sequential: logits[t] is known before the
+        # loop starts and its address never depends on the resident state, so the loads for t+1/t+2
+        # are issued two iterations early and their global-memory latency is hidden behind the
+        # reductions. Worth up to 1.75x on its own (see temporal/bench_scan.py).
+        p1 = tl.load(logits_ptr + (1 * B * E + row), mask=valid & (1 < S), other=0.0).to(tl.float32)
+        p2 = tl.load(logits_ptr + (2 * B * E + row), mask=valid & (2 < S), other=0.0).to(tl.float32)
         for t in range(1, S):
-            base = t * B * E + b * E + e
-            lt = tl.load(logits_ptr + base, mask=valid, other=0.0).to(tl.float32)
-            # nominee = argmax over NON-resident logits (first index on ties)
-            masked_nom = tl.where(valid & (resident == 0), lt, NEG)
-            nom_val = tl.max(masked_nom, 0)
-            nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
-            # worst resident logit (the swap trigger)
-            worst_val = tl.min(tl.where(resident, lt, POS), 0)
-            do_swap = nom_val > worst_val
-            # evict: lru -> oldest refresh; min_logit -> lowest current logit (first index on ties)
-            if use_lru:
-                evict_key = refresh
+            lt = p1
+            p1 = p2
+            p2 = tl.load(logits_ptr + ((t + 2) * B * E + row), mask=valid & (t + 2 < S),
+                         other=0.0).to(tl.float32)
+            # Two formulations of the same three selections. Which one wins is a measured property
+            # of the reduction width, not a preference: at BLOCK >= 256 one fused value+index
+            # reduction beats two dependent ones (~1.25x), and at BLOCK <= 128 it loses (~4%),
+            # because the fused combiner shuffles twice per level. Both give torch's first-index
+            # tie-breaking, so the mask is identical either way.
+            if BLOCK >= 256:
+                nom_val, nom_i = tl.max(tl.where(valid & (resident == 0), lt, NEG), 0,
+                                        return_indices=True)
+                if use_lru:
+                    worst_val = tl.min(tl.where(resident, lt, POS), 0)
+                    _, evict_i = tl.min(tl.where(resident, refresh, POS), 0, return_indices=True)
+                else:                       # min_logit: the evict key IS lt, so one reduction does
+                    worst_val, evict_i = tl.min(tl.where(resident, lt, POS), 0,   # both selections
+                                                return_indices=True)
             else:
-                evict_key = lt
-            masked_ev = tl.where(resident, evict_key, POS)
-            ev_val = tl.min(masked_ev, 0)
-            evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
+                # nominee = argmax over NON-resident logits (first index on ties)
+                masked_nom = tl.where(valid & (resident == 0), lt, NEG)
+                nom_val = tl.max(masked_nom, 0)
+                nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
+                # worst resident logit (the swap trigger)
+                worst_val = tl.min(tl.where(resident, lt, POS), 0)
+                # evict: lru -> oldest refresh; min_logit -> lowest logit (first index on ties)
+                if use_lru:
+                    evict_key = refresh
+                else:
+                    evict_key = lt
+                masked_ev = tl.where(resident, evict_key, POS)
+                ev_val = tl.min(masked_ev, 0)
+                evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
+            do_swap = nom_val > worst_val
             is_evict = (e == evict_i) & do_swap
             is_nom = (e == nom_i) & do_swap
             resident = (resident & (is_evict == 0)) | is_nom
             refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)   # newest (read only when lru)
-            tl.store(out_ptr + base, resident.to(tl.int8), mask=valid)
+            tl.store(out_ptr + (t * B * E + row), resident.to(tl.int8), mask=valid)
+
+
+def _scan_num_warps(BLOCK, use_lru):
+    """num_warps for the scan, chosen by measurement (temporal/bench_scan.py, H100).
+
+    One program per batch element, so this is the only parallelism knob; B is irrelevant to the
+    per-token cost (measured identical at B=1/2/8). More warps shorten the per-thread serial part
+    of each reduction but add a shared-memory cross-warp step, and the crossover sits at BLOCK=256.
+    Going wide below that is severe (num_warps=4 at BLOCK=64 is 0.46x).
+    """
+    if BLOCK <= 128:
+        return 1
+    return 2 if use_lru else 4
 
 
 def _triton_scan(logits, k, use_lru):
@@ -243,17 +287,19 @@ def _triton_scan(logits, k, use_lru):
     S, B, E = logits.shape
     dev = logits.device
     logits = logits.contiguous()
-    resident0 = torch.zeros(B, E, dtype=torch.bool, device=dev)
+    resident0 = torch.zeros(B, E, dtype=torch.int8, device=dev)   # int8: what the kernel loads
     refresh0 = torch.full((B, E), float("-inf"), device=dev, dtype=torch.float32)
     _, top_i = logits[0].topk(k, dim=-1)
-    resident0.scatter_(1, top_i, True)
+    resident0.scatter_(1, top_i, 1)
     rank = torch.arange(k - 1, -1, -1, device=dev, dtype=torch.float32).expand(B, k)
     refresh0.scatter_(1, top_i, rank)
     out = torch.empty(S, B, E, dtype=torch.int8, device=dev)
     BLOCK = 1 << (E - 1).bit_length()
-    _scan_kernel[(B,)](logits, resident0.to(torch.int8), refresh0, out,
-                       S, B, k, E, use_lru, BLOCK, num_warps=1)
-    return out.to(torch.bool)
+    _scan_kernel[(B,)](logits, resident0, refresh0, out, S, B, k, E, use_lru, BLOCK,
+                       num_warps=_scan_num_warps(BLOCK, use_lru))
+    # every element is written by exactly one program with a 0/1 int8, so this reinterprets the
+    # buffer as bool for free -- .to(torch.bool) would cost an extra alloc + launch + full copy.
+    return out.view(torch.bool)
 
 
 def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
