@@ -34,6 +34,7 @@ global-batch does not apply. Micro-batch is simpler and matches what the model s
 |---|---|---|
 | **learning rate** | 1e-5, 3e-5, 1e-4, 3e-4, 1e-3 | 3e-4 is the inherited value, fitted for a *different* intervention on a model under the gate-mass artifact. Never validated here |
 | **LoRA rank** | 32, 128 | rank does not transfer between models — the same label buys ~4× different capacity depending on depth and head geometry. On Qwen3.5 it may be a memory decision rather than a capacity one |
+| **null arm** | at each finalist only | `--free-set all`, residency provably inert (`swap = 0.0000`); the achievable ceiling every recovery figure is measured against |
 
 Nothing else. Selection: lowest held-out BPB at 15M; prune runs that diverge or that sit within noise
 (~0.003) of untrained; tie-break on the 5M checkpoint, preferring whichever got there soonest.
