@@ -56,3 +56,13 @@ to replace, and both axes interact with whatever adapter implementation ends up 
 LR should transfer reasonably from OLMoE: all three models have `hidden_size = 2048`, so an r32
 adapter has identically shaped matrices in each, and adapter width is the main thing that breaks LR
 transfer. Rank will not transfer and has to be tested per model.
+
+## Final deliverable — downstream eval on the winning config
+
+At the end, take each model's best config and run the ten-task downstream suite against both its
+matched null and the untrained baseline (no retraining). Report two tables:
+
+1. every run: downstream evals, BPB increase over `min(null, baseline)`, and % recovery from the
+   untrained temporally-constrained model;
+2. per model, best run vs null vs baseline: BPB increase, % recovery, avg raw performance, and avg
+   raw performance / avg baseline performance (performance retained).
