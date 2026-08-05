@@ -21,21 +21,21 @@ scope: 13,900 tok/s already, 2.2x Qwen3-30B, and no library supports it.
 | top-1 agreement | ≥ same-kernel floor − 0.01 | absolute thresholds are meaningless — stock agrees with itself only 0.9779 |
 | A/B validity | exactly one variable | every past speedup here failed on this, three times |
 
-## Harness: Unsloth, bf16
+## Harness: Unsloth, bf16, in `/workspace/venv_fla` (torch 2.13 + transformers 5.12.1)
 
-Only option covering both models with fused MoE kernels. Kernels on by default
-(`UNSLOTH_MOE_BACKEND` selects backend); their default `target_modules` already includes
-`gate_proj/up_proj/down_proj`, so expert LoRA is their out-of-the-box recipe.
+Only option covering both models with fused MoE kernels. The live path (verified by loading
+Qwen3-30B, not from docs) is **`torch._grouped_mm`** installed by
+`unsloth_zoo.temporary_patches.qwen3_moe` — the `grouped_gemm/reference/` tree and
+`unsloth/models/qwen3_moe.py` are dead code, and `UNSLOTH_MOE_BACKEND` does not exist. torch 2.13 is
+required: 2.4 lacks `_grouped_mm` and the zoo silently degrades to slow fallbacks. Their MoE LoRA
+detection auto-enables expert LoRA from the default `target_modules`. grouped_mm's BPB delta is
+**recorded, not vetoed at 1e-4** — explicit decision, since their use of it is trusted.
 
-**Residency patches into routing, not kernels.** Their routing is plain PyTorch:
-
-    calculate_topk(gating_output, top_k, use_sigmoid, renormalize, ...)
-        scores = F.softmax(gating_output.to(torch.float32), dim=1)
-        topk_weights, topk_ids = torch.topk(scores, k=top_k, dim=1)
-
-Router logits arrive as an argument, so we override `run_router()` and mask them to −inf — the same
-shape of patch as `residency_qwen._router_forward`. Their fused GEMMs never learn residency exists.
-`renormalize=True` on Qwen3 means masking cannot reintroduce the gate-mass artifact.
+**Residency patches into routing, not kernels** — override
+`_make_qwen_moe_sparse_moe_block_forward`'s product, where `[B, S]` is still in scope at the
+`self.gate(...)` call. On transformers 5.x the gate is a `TopKRouter` doing top-k *inside*, so the
+mask wraps the gate rather than sitting between gate and experts. The same factory serves
+`qwen3_5_moe`, so one patch covers both models. Their fused GEMMs never learn residency exists.
 
 ## Execution — Qwen3-30B first (headroom, and a validated fallback exists)
 
@@ -64,13 +64,12 @@ validated at Δ 9.6e-06, never deployed. Makes (d) a fair fight between two opti
   no backward. If FP8 is needed, quantise the bf16 base with Qwen's own published recipe
   (fine-grained fp8, block 128) rather than an invented scheme.
 
-## Open — gating, in order
+## Resolved — all gating questions closed by measurement
 
-1. Does the production fused block use that same `calculate_topk`, or a per-backend variant? The file
-   read is under `grouped_gemm/reference/`.
-2. Is `[B, S]` recoverable at the router? Our scan is temporal; `calculate_topk` sees `[M, E]` flat.
-3. Does `FastModel.from_pretrained` accept our local base checkpoints, or only Unsloth's repos?
-4. **Rank on Qwen3.5 is a memory decision.** Unsloth quotes 74 GB for bf16 LoRA but states no config;
-   their reference is r=16. r32 + router + norms on 80 GB likely does not fit. If not: drop to the
-   highest rank that does, compare Unsloth at that same rank, and let Unsloth spend any memory it
-   saves on batch — reported as best-achievable, never as the matched number.
+Steps a–d are DONE for both models; numbers and verdicts in
+`results/ablations/unsloth_parity.md`. Kernels accepted at both residency states.
+Qwen3-30B: matched = best = mb2 r32, **10.5×** (5,429 vs 516 tok/s). Qwen3.5: **r32 fits
+neither arm** (69.3 GB text-only model + ~15 GB surface > 85 decimal GB) — the rank is
+**r16** per this plan's fallback; matched mb1 **~17×** (3,889 vs 218–231), best mb2 4,576
+tok/s, requiring `UNSLOTH_COMPILE_DISABLE=1` (CUDA-graph pools hold ~7.4 GB VRAM) and
+warmed autotune caches. All tok/s steady-state; startup is an additive constant.
