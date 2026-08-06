@@ -1,68 +1,56 @@
 # Hyperparameter sweep — residency adaptation
 
-**Goal.** Find a learning rate and LoRA rank that actually adapt the model to rolling residency.
-Throughput is a separate document ([`TRAINING_OPTIM_PLAN.md`](TRAINING_OPTIM_PLAN.md)); this one is
-about what to train and at what settings.
+**Goal.** Find the learning rate that adapts each model to rolling residency. Throughput is
+[`TRAINING_OPTIM_PLAN.md`](TRAINING_OPTIM_PLAN.md); this is what to train and at what settings.
 
-**Everything measured before this plan is void.** The completed 50M runs froze the experts
-(`--lora 0`) and, on Qwen, the router too — so ~90% of each model never adapted, and the recovery
-percentages were computed against a null with a different trainable surface. Details in
-`results/ablations/crossmodel_RESULTS.md` §0 and §9. Nothing from them carries forward except the
-training-free constraint costs.
+**Everything measured before this plan is void.** The 50M runs froze the experts (and, on Qwen,
+the router), so ~90% of each model never adapted — `results/ablations/crossmodel_RESULTS.md` §0/§9.
+Only the training-free constraint costs carry forward.
 
 ## Fixed, not swept
 
-    trainable  expert LoRA + attn LoRA + router gates + RMSNorm gains — identical across models
+    trainable  expert LoRA r32 + attn LoRA r32 + router gates + RMSNorm gains, all models
     residency  R = k = 8 on every MoE layer (R < k cannot fill top-k; degenerate)
-    data       corpus reshaped so every token is reachable; keep epochs < 1
+    data       corpus reshaped so every token is reachable; epochs < 1
     budget     15M tokens, evals at 5M/10M/15M — the 50M runs saturated by 10M
-    batch      16,384 tokens/optimiser-step, matched across models so LR transfers as a model
-               property and not a batch artefact
+    batch      16,384 tokens/optimiser-step, matched across models so LR transfers as a
+               model property and not a batch artefact
+    harness    OLMoE: stock path (train_ple.py, sweep_olmoe.sh). Qwen: Unsloth path
+               (train_unsloth.py, sweep_qwen_unsloth.sh). Implementations carry O(1e-03)
+               BPB offsets under the constraint (unsloth_parity.md), so every number that
+               enters a comparison — run, null, baseline — comes from one path per model
 
-**Aux loss is NOT a hyperparameter.** Each model ships its own `router_aux_loss_coef` — 0.001 for both
-Qwen models, 0.01 for OLMoE — and the trainers now read it from the config. Every previous run used
-0.01 everywhere, i.e. 10× the intended pressure on Qwen. Use the vendor's number; do not search it.
+Optimizer: OLMoE keeps its published cells' fp32-master AdamW; Qwen uses AdamW8bit +
+cut_cross_entropy, the only configuration that fits r32 on one H100. One optimizer per model,
+and runs with different optimizers are never differenced.
 
-**Aux scope: micro-batch, deliberately.** Qwen3 pretrains with *global-batch* load balancing, on the
-argument that micro-batch balancing suppresses expert specialisation over trillions of tokens. We are
-adapting an already-specialised model for ~15M tokens and cannot un-specialise it, so the reason for
-global-batch does not apply. Micro-batch is simpler and matches what the model sees.
+**Aux loss is NOT a hyperparameter.** Each model ships `router_aux_loss_coef` — 0.001 both
+Qwen, 0.01 OLMoE — and the trainers read it from the config; previous runs used 0.01
+everywhere, 10× the intended pressure on Qwen. Scope is micro-batch, deliberately: global-batch
+exists to protect specialisation over trillions of pretraining tokens, and adapting an
+already-specialised model for 15M tokens is not that regime.
 
 ## What to sweep
 
 | axis | grid | note |
 |---|---|---|
-| **learning rate** | 1e-5, 3e-5, 1e-4, 3e-4, 1e-3 | 3e-4 is the inherited value, fitted for a *different* intervention on a model under the gate-mass artifact. Never validated here |
-| **LoRA rank** | 32, 128 | rank does not transfer between models — the same label buys ~4× different capacity depending on depth and head geometry. On Qwen3.5 it may be a memory decision rather than a capacity one |
-| **null arm** | at each finalist only | `--free-set all`, residency provably inert (`swap = 0.0000`); the achievable ceiling every recovery figure is measured against |
+| **learning rate** | 1e-5, 3e-5, 1e-4, 3e-4, 1e-3 | 3e-4 is inherited from a different intervention under the gate-mass artifact; never validated here |
+| **LoRA rank** | OLMoE only: 32, 128 | Qwen is fixed at r32 — r128 is ~4× r32's 1.9B trainable params, physically impossible on one H100 |
+| **null arm** | `--free-set all`, at each finalist only | the achievable ceiling; a null at another LR silently changes the reference |
 
-Nothing else. Selection: lowest held-out BPB at 15M; prune runs that diverge or that sit within noise
-(~0.003) of untrained; tie-break on the 5M checkpoint, preferring whichever got there soonest.
-
-Recovery percentages need a null at the **same** LR — a higher LR damages the null too, so scoring
-against a null from another LR silently changes the reference. Run nulls only at the finalists.
+Selection (pre-registered, `summarize_sweep.py`): lowest held-out BPB at 15M; prune diverged
+runs and runs within noise (~0.003) of untrained; tie-break on the 5M checkpoint.
 
 ## Order
 
-**OLMoE first, and it can start now.** Cheapest per run, largest constraint damage so the most signal,
-a matched null already on disk, and the published ladder as a reference. Unsloth does not support it,
-so nothing about the Qwen work changes its path — this sweep is unblocked.
-
-**Qwen3-30B then Qwen3.5, both deferred until the Unsloth work lands.** Unsloth ships a tuned MoE
-fine-tuning setup — its own LoRA defaults, gradient checkpointing and kernels — which is likely a
-better starting point than our hand-rolled path. Sweeping first would tune a configuration we intend
-to replace, and both axes interact with whatever adapter implementation ends up underneath.
-
-LR should transfer reasonably from OLMoE: all three models have `hidden_size = 2048`, so an r32
-adapter has identically shaped matrices in each, and adapter width is the main thing that breaks LR
-transfer. Rank will not transfer and has to be tested per model.
+OLMoE first (cheapest, largest constraint damage, matched null on disk), then Qwen3-30B
+(~3.4 h per grid), then Qwen3.5 (~6.3 h) — both unblocked by the accepted Unsloth path.
+LR should transfer reasonably (all three have hidden_size 2048, so adapters are identically
+shaped) but is verified per model, not assumed.
 
 ## Final deliverable — downstream eval on the winning config
 
-At the end, take each model's best config and run the ten-task downstream suite against both its
-matched null and the untrained baseline (no retraining). Report two tables:
-
-1. every run: downstream evals, BPB increase over `min(null, baseline)`, and % recovery from the
-   untrained temporally-constrained model;
-2. per model, best run vs null vs baseline: BPB increase, % recovery, avg raw performance, and avg
-   raw performance / avg baseline performance (performance retained).
+Per model: the ten-task downstream suite for best config vs matched null vs untrained baseline.
+Table 1: every run — downstream evals, BPB increase over min(null, baseline), % recovery from
+the untrained constrained model. Table 2: per model, best vs null vs baseline — BPB increase,
+% recovery, avg raw performance, and avg raw / avg baseline (performance retained).

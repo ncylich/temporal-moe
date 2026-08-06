@@ -44,6 +44,36 @@ import residency as RES                                            # noqa: E402
 _CFG = RES._CFG
 _ORIG = {}
 
+# Per-micro-step (aux, z) values logged by the in-forward injection, detached floats.
+AUX_LOG = []
+
+
+class _AuxInject(torch.autograd.Function):
+    """Megatron-style aux-loss injection: identity on the block output in forward; in
+    backward, feeds d(total)/d(aux) = scale into the aux subgraph. This is how FLAME's own
+    pretraining wires the balancing loss, and it is the only construction that survives
+    every gradient-checkpointing mode: post-forward aux from hook-captured logits dies
+    under any checkpoint whose outer forward runs under no-grad (unsloth's offloaded mode,
+    HF reentrant) -- measured, not hypothetical: the first train_unsloth smoke test caught
+    exactly that detachment."""
+
+    @staticmethod
+    def forward(ctx, out, aux, scale):
+        ctx.scale = scale
+        return out
+
+    @staticmethod
+    def backward(ctx, g):
+        global _INJ_FIRED
+        _INJ_FIRED = True
+        return g, torch.tensor(ctx.scale, device=g.device, dtype=torch.float32), None
+
+
+# Set by _AuxInject.backward; the trainer's step-0 guard checks it, because a zero-looking
+# gate gradient cannot distinguish dead injection (the LM loss also reaches the gate,
+# through the softmax routing weights).
+_INJ_FIRED = False
+
 
 @torch.compiler.disable
 def _forward(self, hidden_states):
@@ -86,6 +116,26 @@ def _forward(self, hidden_states):
     weights = weights.to(router_logits.dtype)
 
     out = self.experts(hs, selected, weights)                      # zoo grouped_mm forward
+
+    # Training-time aux/z injection. The per-layer math is residency.aux_z_from_router_logits
+    # verbatim -- P and f from the same (masked iff constrained) distribution, aux = E*(f*P).sum(),
+    # z = logsumexp^2 -- computed here inside the checkpointed region so the gradient exists in
+    # every checkpointing mode. Gated on grad being enabled: eval passes and the no-grad outer
+    # pass of a reentrant checkpoint skip it entirely, so step-0 parity is untouched.
+    inj = _CFG.get("aux_inject")
+    if inj is not None and torch.is_grad_enabled():
+        k = self.gate.top_k
+        pf = probs                                                 # [M, E] float, post-mask
+        P = pf.mean(0)
+        idx = pf.topk(k, dim=-1).indices
+        f = torch.zeros_like(P).scatter_add_(
+            0, idx.reshape(-1),
+            torch.ones(idx.numel(), device=P.device, dtype=P.dtype)) / pf.shape[0]
+        aux = P.shape[0] * (f * P).sum()
+        z = (torch.logsumexp(used.float(), dim=-1) ** 2).mean()
+        out = _AuxInject.apply(out, aux, inj["aux"])
+        out = _AuxInject.apply(out, z, inj["z"])
+        AUX_LOG.append((float(aux.detach()), float(z.detach())))
 
     if shared_out is not None:
         out = out + F.sigmoid(self.shared_expert_gate(hs)) * shared_out
