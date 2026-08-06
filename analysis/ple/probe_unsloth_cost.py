@@ -33,7 +33,10 @@ def main():
     # adamw8bit (bitsandbytes, unsloth's own LoRA default) stores both Adam states in 1 byte
     # with block-wise quantisation: saves 2 bytes/trainable = 3.7 GB at r32 -- the gap
     # between r32 fitting and not on Qwen3.5.
-    ap.add_argument("--opt", default="fused", choices=("fused", "adamw8bit"))
+    # paged32: full fp32 Adam states in CUDA unified memory, paged to host under pressure.
+    # EXACT fp32 dynamics -- cleaner than both bf16-state fused AdamW and 8-bit -- at a
+    # PCIe cost on the paged fraction, once per optimiser step.
+    ap.add_argument("--opt", default="fused", choices=("fused", "adamw8bit", "paged32"))
     # cce: see probe_expert_lora_cost -- exact CE without materialising logits, ~2 GB on
     # this vocab; the dynamics-preserving alternative to adamw8bit for fitting r32.
     ap.add_argument("--ce", default="plain", choices=("plain", "cce"))
@@ -91,6 +94,9 @@ def main():
     if A.opt == "adamw8bit":
         import bitsandbytes as bnb
         opt = bnb.optim.AdamW8bit(params, lr=1e-5)
+    elif A.opt == "paged32":
+        import bitsandbytes as bnb
+        opt = bnb.optim.PagedAdamW32bit(params, lr=1e-5)
     else:
         opt = torch.optim.AdamW(params, lr=1e-5, fused=True)
     cfg = getattr(model.config, "text_config", model.config)

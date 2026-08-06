@@ -132,6 +132,16 @@ vs ~19 h. r16 rows retained as alternates (~17×/~20×). The optimizer is a trai
 choice, not a kernel: step-0 guards are unaffected, but the sweep must use one optimizer
 consistently across arms and models — never difference runs that used different optimizers.
 
+**Optimizer menu for r32, all measured (unsloth arm, mb1):** CCE (exact fused CE, logits
+never materialised, ~2 GB) stacks with any of these but substitutes for none — fused
+AdamW + CCE still OOMs by ~1.5 GiB.
+
+| optimizer | states | fits | tok/s | note |
+|---|---|---|---|---|
+| fused AdamW | bf16 on-GPU | no | — | misses by ~1.5 GiB even with CCE |
+| AdamW8bit | 8-bit on-GPU | yes | 3,305 | unsloth's LoRA default; recommended (+ CCE for headroom) |
+| PagedAdamW32bit + CCE | fp32, unified-mem paged | yes | 1,255 probe / ~2,800 est. | probe steps the optimizer every micro-step (worst case); at acc8 the ~1.0 s/step paging cost amortises 8× → est. ~15% below 8-bit, with exact fp32 Adam dynamics |
+
 Operational requirements on this model, both memory- not time-motivated:
 - `UNSLOTH_COMPILE_DISABLE=1` — unsloth's compiled CUDA-graph pools permanently hold
   ~7.4 GB of VRAM outside the torch allocator, which is exactly the OOM margin. The 3,889
