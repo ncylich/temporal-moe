@@ -29,7 +29,16 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--tag", required=True)
 ap.add_argument("--rank", default="off", help="off | 32 | 128 | 512 | full")
 ap.add_argument("--tokens", type=int, default=10_000_000)
-ap.add_argument("--lr", type=float, default=3e-4)          # bake-off winner LR, arm C
+ap.add_argument("--lr", type=float, default=3e-4)          # bake-off winner LR, arm C --
+# NOTE: arm C was a PLE bake-off, i.e. this LR was fitted for per-layer-embedding adaptation,
+# not for residency, and the OLMoE runs it was carried into were under the gate-mass artifact.
+# It has never been validated for this task on a correctly configured model.
+# None = use the model's shipped router_aux_loss_coef. OLMoE declares 0.01, which is what every
+# run to date used, so this is a no-op for OLMoE -- it matters for the Qwen models, which
+# declare 0.001 and were nonetheless trained at 0.01.
+ap.add_argument("--aux-c", type=float, default=None)
+ap.add_argument("--aux-scope", default="micro", choices=("micro", "global"))
+ap.add_argument("--z-c", type=float, default=0.001)
 ap.add_argument("--ple-lr", type=float, default=None, help="defaults to --lr")
 ap.add_argument("--eval-every", type=int, default=10_000_000)
 ap.add_argument("--table-wd", type=float, default=0.0,
@@ -109,6 +118,9 @@ meta = json.load(open(f"{DATA_DIR}/bpb_slice_meta.json"))
 D = meta["divisor_D"]                                        # re-read, never inherited
 
 model, tok = RES.load_model()
+if A.aux_c is None:
+    A.aux_c = float(getattr(model.config, 'router_aux_loss_coef', 0.01))
+    print(f"  [aux] using the model's shipped router_aux_loss_coef = {A.aux_c}", flush=True)
 RES.enable_residency(R=8, free_layers=A.free_layers)
 RES.enable_grad_checkpointing(model)
 _FREE = [int(x) for x in A.free_set.split(",") if x.strip() != ""]
@@ -309,8 +321,8 @@ while seen < A.tokens:
         lm = torch.nn.functional.cross_entropy(logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels)
         aux, z = RES.aux_z_from_router_logits(out.router_logits, batch.shape[0], batch.shape[1],
                                               RES._CFG["R"])
-        RES.assert_aux_live(out, aux, AUX_C)
-        loss = (lm + AUX_C * aux + Z_C * z) / A.accum
+        RES.assert_aux_live(out, aux, A.aux_c) if A.aux_c else None
+        loss = (lm + A.aux_c * aux + A.z_c * z) / A.accum
         if not torch.isfinite(loss):
             print(f"[ABORT] non-finite loss step {step} micro {_micro}", flush=True); sys.exit(3)
         loss.backward()

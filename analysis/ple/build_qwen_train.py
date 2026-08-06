@@ -29,11 +29,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-tokens", type=int, default=60_000_000)
     ap.add_argument("--seq", type=int, default=4096)
+    # Qwen3-30B and Qwen3.5-35B do NOT share a tokenizer -- their BPB divisors differ (3.1998611 vs
+    # 3.1642666, i.e. 4.617 vs 4.565 bytes/token), so the same text packs differently and each model
+    # needs its own corpus. Defaults reproduce the Qwen3.5 build exactly.
+    ap.add_argument("--qwen-model", default=QWEN)
+    ap.add_argument("--out-dir", default=OUT_DIR)
+    ap.add_argument("--out-name", default="qwen", help="suffix: finetune_ids_<name>.pt")
+    ap.add_argument("--tokenizer-label", default="Qwen3.5-35B-A3B-Base")
     A = ap.parse_args()
-    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(A.out_dir, exist_ok=True)
 
     tok_o = AutoTokenizer.from_pretrained(OLMOE)
-    tok_q = AutoTokenizer.from_pretrained(QWEN)
+    tok_q = AutoTokenizer.from_pretrained(A.qwen_model)
 
     # Qwen packs ~4.565 bytes/token vs OLMoE's ~4.485, so it needs slightly FEWER tokens for the same
     # text. Take a margin so a 50M-token run cannot run off the end of the corpus mid-epoch.
@@ -54,16 +61,16 @@ def main():
     n_full = len(qids) // A.seq
     packed = torch.tensor(qids[: n_full * A.seq], dtype=torch.int32).view(n_full, A.seq)
 
-    torch.save(packed, os.path.join(OUT_DIR, "finetune_ids_qwen.pt"))
+    torch.save(packed, os.path.join(A.out_dir, f"finetune_ids_{A.out_name}.pt"))
     meta = {"n_seq": int(n_full), "seq": A.seq, "n_tokens": int(n_full * A.seq),
             "n_bytes": n_bytes, "bytes_per_token": n_bytes / len(qids),
-            "olmoe_seqs_consumed": int(n_seq), "tokenizer": "Qwen3.5-35B-A3B-Base",
+            "olmoe_seqs_consumed": int(n_seq), "tokenizer": A.tokenizer_label,
             "source": "byte-identical to the leading slice of OLMoE finetune_ids.pt; "
                       "disjoint from bpb_slice_ids.pt (the held-out eval slice)"}
-    with open(os.path.join(OUT_DIR, "finetune_meta_qwen.json"), "w") as f:
+    with open(os.path.join(A.out_dir, f"finetune_meta_{A.out_name}.json"), "w") as f:
         json.dump(meta, f, indent=2)
     print(f"  {n_full} x {A.seq} = {n_full*A.seq/1e6:.1f}M Qwen tokens from {n_bytes/1e6:.1f}MB")
-    print(f"[write] {OUT_DIR}/finetune_ids_qwen.pt", flush=True)
+    print(f"[write] {A.out_dir}/finetune_ids_{A.out_name}.pt", flush=True)
 
 
 if __name__ == "__main__":

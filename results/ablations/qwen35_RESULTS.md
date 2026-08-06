@@ -98,6 +98,14 @@ null), on 67.8M Qwen-tokenized training tokens disjoint from the eval slice, wit
 parameters and 8-bit Adam fitting comfortably in 73.4 GB. The arms ran, and then were stopped.
 
 **Measured throughput: 176 s/step, or 93 tok/s.** The same model evaluates at 4700 tok/s. At that
+
+> **This figure was later misused and the misuse is withdrawn.** 93 tok/s is correct for what it
+> measures: Qwen3.5 (40 layers x 256 experts) carrying 461M of EXPERT LoRA through
+> `_experts_forward_lora`'s Python loop at micro-batch 1. `bench_train_fused.py` then cited it as the
+> "stock" baseline for a Qwen3-30B benchmark using attention-only LoRA and the stock expert forward,
+> yielding a 22.7x and a 65x that do not exist. Stock in the configuration actually trained ran at
+> **6,274 tok/s** (the 50M Qwen3-30B arm, 49,987,584 tokens in 132.8 min). Do not use this number as
+> a baseline for any other configuration. See `analysis/ple/results/ablations/crossmodel_RESULTS.md S9` §1.
 rate the 30M-token budget needs 90 hours, and the 100-minute per-arm cap would have bought 0.6M
 tokens -- far too few to move BPB detectably, let alone to separate three arms.
 

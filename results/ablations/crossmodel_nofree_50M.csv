@@ -1,0 +1,54 @@
+# Rolling residency imposed on EVERY MoE layer at R=k=8 (the tightest valid setting -- R<k cannot
+# fill the top-k and is degenerate), then adapted for 50M tokens with cross-entropy plus attention
+# LoRA rank 32 on q/k/v/o. No expert LoRA and no freed layers, so all three models get the same
+# recipe. bf16 throughout. All three consume the same 300,658,454 bytes of source text, re-tokenized
+# per model, so the corpus is held fixed and only the model varies.
+#
+# BPB is bits per byte = CE_nats / (ln2 * bytes_per_token); lower is better. It is used rather than
+# per-token cross-entropy because the three tokenizers differ, and BPB is tokenizer-invariant.
+#
+# EVALUATION SUBSETS DIFFER BETWEEN MODELS AND THAT IS DELIBERATE. Each model's untrained references
+# are measured on the same subset its own trained cell is scored on: OLMoE on the 256 sequences that
+# train_ple.py selects via linspace(0, n-1, 256), Qwen on the first 8 sequences that train_qwen.py
+# takes. Recovery percentages are therefore valid WITHIN a row. Comparing absolute BPB ACROSS rows is
+# only approximate -- the free baseline of the OLMoE slice alone varies 0.6359..0.6822 across disjoint
+# blocks, so cross-row BPB differences smaller than ~0.05 carry no meaning.
+#
+# recovery = (untrained_constrained - trained) / (untrained_constrained - untrained_free): the share
+# of the constraint's damage that adaptation removed. Negative means training ended worse than not
+# training at all.
+#
+# CAVEAT ON THE RECOVERY COLUMN. It is measured against the UNTRAINED unconstrained model, which
+# assumes continual training on this corpus is neutral. It is not: OLMoE's matched unconstrained null
+# (ce_freeall_50M) lost 0.0224 BPB over 50M tokens with the residency machinery provably inert. Every
+# recovery figure here is therefore a LOWER BOUND. The Qwen3.5 null is the arm that quantifies this
+# for Qwen and was still running when this file was written.
+#
+# CAVEAT ON THE RECIPE. "CE + attention LoRA" is not the same intervention across these models.
+# Attention LoRA reaches 48 of 48 layers on Qwen3-30B and 16 of 16 on OLMoE, but only 10 of Qwen3.5's
+# 40 -- its other 30 layers are Gated DeltaNet and have no q/k/v/o to adapt. Qwen3.5 receives a
+# structurally thinner intervention and its row should not be read as the same treatment.
+#
+#
+# !! RECOVERY COLUMNS WITHDRAWN. All three runs used --lora 0, so no expert LoRA was trained:
+# ~90% of each model, and the component residency reroutes tokens between, stayed frozen. Every
+# published OLMoE cell carries lora=32 INCLUDING ce_freeall_50M, the null these are scored
+# against, so recovery_pct/recovery_vs_null_pct subtract an expert-LoRA null from an
+# attention-LoRA arm. The Qwen rows additionally had frozen routers, 10x the shipped aux
+# coefficient, and 1.49 epochs of repeated data. See analysis/ple/results/ablations/crossmodel_RESULTS.md S9 S7 and S9.
+# The BPB columns and constraint_cost are real; the two recovery columns are not.
+#
+# Producers: analysis/ple/train_ple.py (OLMoE), analysis/ple/train_qwen.py (both Qwen),
+# analysis/ple/olmoe_ref_256.py (OLMoE references), analysis/ple/qwen_downstream.py (Qwen references).
+# null_bpb: the matched unconstrained arm (--free-set all, residency provably inert, swap=0.0000),
+# trained on identical tokens/adapter/optimiser/schedule. It is the ACHIEVABLE ceiling; recovery_vs
+# _null_pct is the honest figure. Blank where the null has not been run.
+# Qwen3-30B's null is 30M, not 50M: an initial 50M attempt OOM'd after its 10M eval (vocab-sized
+# logits at mb=4 fragmenting the allocator) and was relaunched at mb=2 for 30M. Extrapolating to
+# 50M is safe -- it reads 0.586725/0.586834/0.586729 at 10M/20M/30M, sd 6e-05, i.e. the corpus
+# cost saturates by 10M. Qwen3.5's 50M null behaves the same way (sd 1.6e-04 over 5 points).
+# OLMoE's does NOT: it climbs monotonically to 50M, so this shortcut would not be valid there.
+model,experts,resident_pct,eval_seqs,untrained_free_bpb,untrained_constrained_bpb,trained_bpb,null_bpb,constraint_cost,recovery_pct,recovery_vs_null_pct,attn_lora_layers,minutes
+OLMoE-1B-7B,64,12.500,256,0.672723,0.842848,0.804438,0.695064,+0.170125,22.6,26.0,16/16,60
+Qwen3-30B-A3B-Base,128,6.250,8,0.582025,0.686861,0.642922,0.586729,+0.104836,41.9,43.9,48/48,132.8
+Qwen3.5-35B-A3B-Base,256,3.125,8,0.586121,0.637653,0.641656,0.588630,+0.051532,-7.8,-8.2,10/40,216.5

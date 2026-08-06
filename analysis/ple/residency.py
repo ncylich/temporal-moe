@@ -268,7 +268,8 @@ def effective_experts(router_logits_tuple, B, S, R, evict="min_logit"):
     return out
 
 
-def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
+def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit", global_f=None,
+                             out_f=None):
     """Switch aux + router z-loss, ONE formula for every layer, matching temporal-moe.
 
     FLAME does not branch. `temporal_forward` masks non-resident experts to -inf and calls the
@@ -320,7 +321,19 @@ def aux_z_from_router_logits(router_logits_tuple, B, S, R, evict="min_logit"):
         idx = probs.topk(k, dim=-1).indices
         f = torch.zeros_like(P).scatter_add_(
             0, idx.reshape(-1), torch.ones(idx.numel(), device=rl.device, dtype=P.dtype)) / N
+        # Global-batch balancing. Qwen3-MoE "adopts the global-batch load balancing loss to encourage
+        # expert specialization" (arXiv 2505.09388); their argument is that the micro-batch form
+        # suppresses specialisation by forcing every small batch toward uniform expert usage. With
+        # gradient accumulation the micro-batch f is exactly that pathological case: a 2-sequence
+        # batch cannot use 128 experts evenly, so the loss punishes correct specialised routing.
+        # Substituting the dispatch fraction accumulated over the previous full optimiser step gives
+        # the global signal while keeping the gradient local through P, which is where it flows
+        # anyway -- f comes from a topk and carries none.
+        if global_f is not None and _li < len(global_f) and global_f[_li] is not None:
+            f = global_f[_li].to(P.dtype)
         aux = E * (f * P).sum()
+        if out_f is not None:
+            out_f.append(f.detach())
         z = (torch.logsumexp(used, dim=-1) ** 2).mean()
         aux_t = aux if aux_t is None else aux_t + aux
         z_t = z if z_t is None else z_t + z; n += 1

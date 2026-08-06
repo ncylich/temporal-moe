@@ -4,6 +4,8 @@
 Adaptation on this model is not reachable on one GPU: HF's Qwen MoE forward loops in Python over hit
 experts (40 layers x up to 256 experts), the per-expert LoRA branch doubles that loop's work, and
 gradient checkpointing recomputes all of it -- measured at 176 s/step, or 93 tok/s against 4700 tok/s
+(that figure is specific to Qwen3.5 with 461M expert LoRA at mb=1; it is NOT a general stock
+baseline and was wrongly used as one -- see results/ablations/crossmodel_RESULTS.md S9)
 for the same model in eval. Three matched training arms were not reachable before the deadline, so
 the budget goes where this hardware is 50x more productive: test-time characterisation, which is what
 the scaling question asked for in the first place and which needs no base-vs-instruct distinction.

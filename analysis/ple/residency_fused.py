@@ -74,7 +74,11 @@ def _forward(self, hidden_states):
     h = self.down_proj(h, m_offsets)
     h = h[inv_sort_idx].view(M, self.num_selected, H)
     out = torch.einsum("beo,be->bo", h, routing_weights).view(B, S, H)
-    return out, router_logits
+    # transformers 5.12's decoder layer does `residual + self.mlp(x)` and expects a bare tensor.
+    # The library returns (hidden_states, router_logits), which was the convention in an earlier
+    # transformers; against 5.12 that makes the residual add a tuple and raises TypeError. Router
+    # logits are recovered by capture where needed, so returning the tensor alone is the right fix.
+    return out
 
 
 def install(model=None):

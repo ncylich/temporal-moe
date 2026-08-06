@@ -44,3 +44,4 @@ results/phase0/probe_batch_cache/
 # results/ablations/ple_row_norms.csv           }
 # results/ablations/ple_trainfree_and_buckets.csv }
 results/ablations/ple_ladder.csv
+analysis/ple/unsloth_compiled_cache/
