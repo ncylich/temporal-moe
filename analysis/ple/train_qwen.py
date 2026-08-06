@@ -166,7 +166,10 @@ def evaluate(model, ids, divisor, mb=1):
         ntok += tg.numel()
         del lg
     model.train()
-    swap, ent = RES.telem_summary(model.config.num_experts)
+    # Unsloth loads Qwen3.5 with its composite config: num_experts lives on text_config.
+    # The stock text-only load keeps it top-level; resolve both.
+    _cfg = getattr(model.config, "text_config", model.config)
+    swap, ent = RES.telem_summary(_cfg.num_experts)
     return (tot / ntok) / divisor, swap, ent
 
 

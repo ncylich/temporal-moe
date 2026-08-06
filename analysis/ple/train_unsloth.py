@@ -173,6 +173,12 @@ def main():
             print(f"  step {step}/{steps} tok={seen/1e6:.1f}M lm={float(lm.detach()):.4f} "
                   f"aux={a_m:.3f} {(time.time()-t0)/60:.1f}min", flush=True)
         if seen >= nxt or step == steps - 1:
+            # Free last step's gradients (~3.8 GB, already consumed by opt.step) and
+            # defragment before eval: evaluate() materialises full logits, 1.0 GB bf16 +
+            # a 0.5 GB fp32 chunk on Qwen3.5's 248k vocab -- exactly what OOM'd the first
+            # 5M eval. The eval protocol itself is unchanged.
+            opt.zero_grad(set_to_none=True)
+            torch.cuda.empty_cache()
             model.eval()
             bpb, swap, ent = TQ.evaluate(model, bpb_ids, D, A.mb)
             model.train()
@@ -184,6 +190,8 @@ def main():
                 print(f"  [cap] stopping at an eval boundary", flush=True)
                 break
 
+    opt.zero_grad(set_to_none=True)
+    torch.cuda.empty_cache()
     model.eval()
     bpb, swap, ent = TQ.evaluate(model, bpb_ids, D, A.mb)
     res = {"tag": A.tag, "family": A.family, "harness": "unsloth", "final_bpb": bpb,

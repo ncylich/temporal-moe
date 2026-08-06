@@ -29,14 +29,17 @@ import re
 
 def parse(path):
     txt = open(path, errors="ignore").read()
-    evals = re.findall(r"tok=(\d+)M BPB=([0-9.]+).*?eff_load\[min/med/max\]=([0-9.]+)/([0-9.]+)/([0-9.]+)",
-                       txt)
+    # eff_load is optional: train_ple prints it, train_unsloth does not. The eval line is
+    # the shared contract: "[eval] ... tok=<n>M BPB=<x>".
+    evals = re.findall(
+        r"\[eval\][^\n]*?tok=(\d+)M BPB=([0-9.]+)"
+        r"(?:[^\n]*?eff_load\[min/med/max\]=([0-9.]+)/([0-9.]+)/([0-9.]+))?", txt)
     lms = [float(x) for x in re.findall(r"lm=([0-9.]+)", txt)]
     lr = re.search(r"_lr([0-9e.\-]+?)\.log", path)
     return {
         "lr": lr.group(1) if lr else path,
         "curve": [(int(t), float(b)) for t, b, *_ in evals],
-        "eff": [(float(a), float(m), float(x)) for _, _, a, m, x in evals],
+        "eff": [(float(a), float(m), float(x)) for _, _, a, m, x in evals if a],
         "lm_first": sum(lms[:5]) / max(1, len(lms[:5])),
         "lm_last": sum(lms[-5:]) / max(1, len(lms[-5:])),
         "done": "[DONE]" in txt,
@@ -69,7 +72,12 @@ def main():
         final = r["curve"][-1][1]
         drift = r["lm_last"] - r["lm_first"]
         eff = r["eff"][-1] if r["eff"] else (0, 0, 0)
-        if final > A.baseline or drift > 0.05:
+        # Divergence per the registered rules: the HELD-OUT curve rises past noise, or the
+        # run ends above the untrained-constrained baseline. The earlier lm-drift>0.05
+        # trigger was a train-loss heuristic the plan never specified; OneCycle warmup
+        # trips it on healthy runs (it pruned an arm whose held-out BPB fell 0.7993->0.7933).
+        rising = final - r["curve"][0][1] > A.noise
+        if final > A.baseline or rising:
             v = "PRUNE: diverged/above baseline"
         elif abs(final - A.baseline) < A.noise:
             v = "PRUNE: dead, within noise of untrained"
