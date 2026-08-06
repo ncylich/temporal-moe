@@ -91,10 +91,11 @@ AdamW in both, `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` in both, bf16 
 |---|---|---|---|---|
 | ours (stock expert loop) | mb2 × seq2048 | 487 (foreach) / **516** (fused AdamW) | 7.94 | 78.4 |
 | unsloth (grouped_mm) | mb2 × seq2048 | **5,429** | 0.75 | 77.7 |
-| unsloth | mb4 attempt | OOM in backward (needs ~4.6 GB more) | — | — |
+| unsloth | mb4, fused AdamW | OOM in backward (needs ~4.6 GB more) | — | — |
+| **unsloth, best achievable** | mb4, adamw8bit | **6,072** | 1.35 | 76.5 |
 
-**Matched config = best achievable = mb2. Speedup 10.5× end-to-end.** 15M tokens: 46 min vs
-8.1 h; a 5-point LR sweep: 3.8 h vs 40 h. This is consistent with the profiling record —
+**Matched: mb2, 10.5× end-to-end. Best achievable: mb4 with 8-bit Adam, 6,072 tok/s.**
+15M tokens: 41–46 min vs 8.1 h; a 5-point LR sweep: 3.4–3.8 h vs 40 h. This is consistent with the profiling record —
 the stock path spends 89.5% of a MoE layer in the Python expert loop (`torch.where` +
 `index_add_`), which is precisely what grouped_mm replaces. Caveat for the sweep, not the
 comparison: bf16 adapters were forced for memory parity; unsloth's fp32-adapter default
@@ -109,18 +110,27 @@ warmup steps absorb model load, JIT, and autotune, so one-off startup (~5–10 m
 fla autotune warm + triton JIT) is an additive constant to a run's wall-clock, never a
 throughput factor.
 
-**r32 does not fit either arm.** The text-only model is 69.3 GB on GPU (its checkpoint is
-ForConditionalGeneration; `AutoModelForCausalLM` loads text-only — the vision tower was
-ruled out as the cause) and the r32 surface needs ~15 GB more: 69.3 + 15 > 85 (decimal GB).
-Per the plan's fallback, the rank for this model is **r16**.
+**r32 fits — but only with 8-bit Adam.** The text-only model is 69.3 GB on GPU (its
+checkpoint is ForConditionalGeneration; `AutoModelForCausalLM` loads text-only — the vision
+tower was ruled out as the cause). With bf16 Adam states the r32 surface needs ~15 GB and
+misses the 85 (decimal) GB card by ~2–3 GB; bitsandbytes `AdamW8bit` (block-quantised
+1-byte states — unsloth's own LoRA default) returns 3.7 GB and closes it. An earlier
+version of this note called r32 "a hardware fact" — that was wrong; it was a fact of
+2-byte optimizer states.
 
 | arm | config | tok/s | s/micro-step | peak GB (decimal, card = 85.0) |
 |---|---|---|---|---|
-| ours (stock expert loop) | r16 mb1 | 218–231 (two runs) | 8.9–9.4 | 79.4 |
-| **unsloth, matched** | r16 mb1 | **3,889** | 0.53 | 79.3 |
-| **unsloth, best achievable** | r16 mb2 | **4,576** | 0.90 | 83.4 |
+| ours (stock expert loop) | r32 mb1, adamw8bit | 215 | 9.51 | 82.2 |
+| **unsloth, matched (target config)** | r32 mb1, adamw8bit | **3,305** | 0.62 | 82.6 |
+| unsloth | r32 mb2, adamw8bit | OOM (−1.9 GiB) | — | — |
+| ours | r16 mb1, fused AdamW | 218–231 (two runs) | 8.9–9.4 | 79.4 |
+| unsloth | r16 mb1 | 3,889 | 0.53 | 79.3 |
+| unsloth | r16 mb2 | 4,576 | 0.90 | 83.4 |
 
-**Matched speedup ~17×; best achievable ~20×.** 15M tokens: 55–64 min vs ~19 h.
+**At the target config (r32): matched speedup ~15.4×** (3,305 vs 215), 15M tokens in 76 min
+vs ~19 h. r16 rows retained as alternates (~17×/~20×). The optimizer is a training-dynamics
+choice, not a kernel: step-0 guards are unaffected, but the sweep must use one optimizer
+consistently across arms and models — never difference runs that used different optimizers.
 
 Operational requirements on this model, both memory- not time-motivated:
 - `UNSLOTH_COMPILE_DISABLE=1` — unsloth's compiled CUDA-graph pools permanently hold

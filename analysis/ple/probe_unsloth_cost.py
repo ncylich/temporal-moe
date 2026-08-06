@@ -30,6 +30,10 @@ def main():
     ap.add_argument("--lora", type=int, default=32)
     ap.add_argument("--residency", default="on", choices=("on", "off"))
     ap.add_argument("--adapter-dtype", default="bf16", choices=("bf16", "fp32"))
+    # adamw8bit (bitsandbytes, unsloth's own LoRA default) stores both Adam states in 1 byte
+    # with block-wise quantisation: saves 2 bytes/trainable = 3.7 GB at r32 -- the gap
+    # between r32 fitting and not on Qwen3.5.
+    ap.add_argument("--opt", default="fused", choices=("fused", "adamw8bit"))
     A = ap.parse_args()
 
     import unsloth  # noqa: F401  must precede any transformers import
@@ -81,7 +85,11 @@ def main():
 
     model.train()
     # fused: single-kernel step with no foreach temporaries; matched with probe_expert_lora_cost.
-    opt = torch.optim.AdamW(params, lr=1e-5, fused=True)
+    if A.opt == "adamw8bit":
+        import bitsandbytes as bnb
+        opt = bnb.optim.AdamW8bit(params, lr=1e-5)
+    else:
+        opt = torch.optim.AdamW(params, lr=1e-5, fused=True)
     cfg = getattr(model.config, "text_config", model.config)
     V = cfg.vocab_size
     print(f"  {A.model} unsloth: blocks={nblk} residency={A.residency} mb={A.mb} seq={A.seq} "

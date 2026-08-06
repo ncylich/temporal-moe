@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--model", required=True, choices=("olmoe", "qwen3", "qwen3_5"))
     ap.add_argument("--steps", type=int, default=6)
     ap.add_argument("--lora", type=int, default=32)
+    ap.add_argument("--opt", default="fused", choices=("fused", "adamw8bit"))
     A = ap.parse_args()
     sys.path.insert(0, "/workspace/temporal-moe/analysis/ple")
     import residency as RES
@@ -72,7 +73,12 @@ def main():
     model.train()
     # fused: single-kernel step with no foreach temporaries. The default (foreach) OOM'd the
     # unsloth arm by ~30 MiB at 1.3B trainable; both probes use fused so the arms stay matched.
-    opt = torch.optim.AdamW(params, lr=1e-5, fused=True)
+    # adamw8bit: see probe_unsloth_cost -- 1-byte block-quantised states, saves 3.7 GB at r32.
+    if A.opt == "adamw8bit":
+        import bitsandbytes as bnb
+        opt = bnb.optim.AdamW8bit(params, lr=1e-5)
+    else:
+        opt = torch.optim.AdamW(params, lr=1e-5, fused=True)
     ntr = sum(p.numel() for p in params)
     V = getattr(model.config, "vocab_size", None) or model.config.text_config.vocab_size
     print(f"  {A.model}: E={E} mb={mb} seq={seq} trainable={ntr/1e6:.1f}M "

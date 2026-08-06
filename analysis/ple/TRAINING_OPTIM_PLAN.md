@@ -68,8 +68,9 @@ validated at Δ 9.6e-06, never deployed. Makes (d) a fair fight between two opti
 
 Steps a–d are DONE for both models; numbers and verdicts in
 `results/ablations/unsloth_parity.md`. Kernels accepted at both residency states.
-Qwen3-30B: matched = best = mb2 r32, **10.5×** (5,429 vs 516 tok/s). Qwen3.5: **r32 fits
-neither arm** (69.3 GB text-only model + ~15 GB surface > 85 decimal GB) — the rank is
-**r16** per this plan's fallback; matched mb1 **~17×** (3,889 vs 218–231), best mb2 4,576
-tok/s, requiring `UNSLOTH_COMPILE_DISABLE=1` (CUDA-graph pools hold ~7.4 GB VRAM) and
-warmed autotune caches. All tok/s steady-state; startup is an additive constant.
+Qwen3-30B: matched mb2 r32 **10.5×** (5,429 vs 516 tok/s); best mb4 + 8-bit Adam 6,072.
+Qwen3.5: **the target config (r32) fits — with bitsandbytes AdamW8bit** (bf16 Adam states
+miss the card by ~2–3 GB; 1-byte states return 3.7 GB): matched mb1 **~15.4×** (3,305 vs
+215), requiring `UNSLOTH_COMPILE_DISABLE=1` (CUDA-graph pools hold ~7.4 GB VRAM) and warmed
+autotune caches. One optimizer everywhere — never difference runs with different
+optimizers. All tok/s steady-state; startup is an additive constant.
