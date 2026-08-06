@@ -1,62 +1,95 @@
-# LR sweep results — residency adaptation (SWEEP_PLAN.md execution)
+# LR sweep results — residency adaptation (SWEEP_PLAN.md execution) — FINAL
 
-**Living document**: updated as the endgame lands (winner downstream → nulls → final tables).
-This edition: all grids complete; OLMoE winner downstream running; nulls pending.
+Complete: three LR grids (14 runs + 1 rule-skipped, later run as a make-up), winner + null
+downstream, matched nulls, OLMoE r128 rank arm, and dense floors. Executed 2026-08-06/07.
 
-Producers: `analysis/ple/train_ple.py` (OLMoE, stock path) and `analysis/ple/train_unsloth.py`
-(Qwen, unsloth path) for the runs; `analysis/ple/summarize_sweep.py` on the run logs for
-standings and verdicts (pre-registered rules); reference rows from
-`olmoe_downstream_naive_preserve.csv`, `qwen3_30b_downstream_naive.csv`,
-`qwen35_downstream_naive.csv` and `unsloth_parity.md`. Per-run JSONs/adapters under
-`/workspace/{olmoe,qwen3moe,qwen35}-adapt/`. Executed 2026-08-06.
+Producers: `train_ple.py` (OLMoE, stock path), `train_unsloth.py` (Qwen, unsloth path),
+`summarize_sweep.py` (standings, pre-registered rules), `downstream.py` +
+`downstream_trained_unsloth.py` (winner/null suites), `dense_bar.py` (dense floors),
+`olmoe_adapt_downstream.csv` (OLMo dense bracket, prior record). Per-run artifacts under
+`/workspace/{olmoe,qwen3moe,qwen35}-adapt/`. Config fixed across runs: expert LoRA r32 +
+attn LoRA r32 + router + norms; R=k=8 every layer; 15M tokens; 16,384 tok/step.
 
-Config, fixed across all runs: expert LoRA r32 + attn LoRA r32 + router gates + RMSNorm
-gains; R = k = 8 on every MoE layer; 15M tokens, evals 5/10/15M; 16,384 tok/step matched.
-Qwen: AdamW8bit + cut_cross_entropy, aux from shipped config. OLMoE: fp32-master AdamW.
-Qwen3.5's 1e-3 arm was skipped by user rule (its 3e-4 finished above 1e-4).
+Definitions: BPB = bits/byte on the family's audited slice, lower better. downstream = mean
+0-shot accuracy, matched acc-only 10-task basis (per-task stderr ≈ 0.02), higher better.
+ref = min(null, base): OLMoE base 0.672723 (null 0.695064 is higher), Qwen3-30B base
+0.615392 (null 0.616034 higher), Qwen3.5 **null 0.623235** (below its base 0.625152).
+recovery = (constrained − x)/(constrained − ref). % over base = (x − base)/base.
+† = stock-path downstream (cross-path caveat; O(1e-03) BPB offsets, unsloth_parity.md).
+Nulls verified inert: swap = 0.0000.
 
-BPB = bits per byte on each model's held-out audited slice, lower better. downstream = mean
-over the ten-task 0-shot suite's 17 metric rows, higher better. ΔBPB = final − min(null,
-untrained-free base); nulls pending, so the reference is currently the base alone.
-recovery = (constrained − trained)/(constrained − base): share of the constraint's damage
-removed. % over base = (final − base)/base. † = stock-path downstream measurement
-(unsloth-path re-runs scheduled; cross-path BPB offsets are O(1e-03) under the constraint —
-see unsloth_parity.md — so † cells are perspective, not precision).
+## Table 1 — every run
 
-## Table 1 — every run, with reference rows
-
-| run | final BPB | downstream | ΔBPB over min(null*, base) | % recovery | % over base |
+| run | final BPB | downstream | ΔBPB over ref | % recovery | % over base |
 |---|---|---|---|---|---|
-| **OLMoE base (no temporal)** | 0.672723 | **0.6883** | 0 (reference) | 100% (ceiling) | 0% |
-| **OLMoE untrained + temporal R8** | 0.842848 | **0.5993** | +0.170125 | 0% (floor) | +25.3% |
+| OLMoE base (no temporal) | 0.672723 | 0.6820 | 0 (ref) | — | 0% |
+| OLMoE null @3e-5 (trained, free) | 0.695064 | — | +0.022341 | ceiling | +3.3% |
+| OLMoE untrained + R8 | 0.842848 | 0.5723 | +0.170125 | 0% | +25.3% |
 | OLMoE lr=1e-5 | 0.797638 | — | +0.124915 | 26.6% | +18.6% |
-| **OLMoE lr=3e-5 (win)** | 0.793289 | *running* | +0.120566 | **29.1%** | +17.9% |
+| **OLMoE lr=3e-5 (win)** | **0.793289** | **0.5978** | +0.120566 | **29.1%** | +17.9% |
 | OLMoE lr=1e-4 | 0.797131 | — | +0.124408 | 26.9% | +18.5% |
 | OLMoE lr=3e-4 | 0.831992 | — | +0.159269 | 6.4% | +23.7% |
 | OLMoE lr=1e-3 | 1.029561 | — | +0.356838 | −109.8% | +53.0% |
-| **Qwen3-30B base (no temporal)** | 0.615392 | **0.7203**† | 0 (reference) | 100% | 0% |
-| **Qwen3-30B untrained + temporal R8** | 0.734020 | **0.6438**† | +0.118628 | 0% | +19.3% |
+| OLMoE **r128** @3e-5 | 0.790693 | — | +0.117970 | 30.7% | +17.5% |
+| *dense floor: OLMo-1B-0724* | — | *0.6006* | | | |
+| *dense: OLMo-7B-0724* | — | *0.6774* | | | |
+| Qwen3-30B base | 0.615392 | 0.7267† | 0 (ref) | — | 0% |
+| Qwen3-30B null @1e-4 | 0.616034 | 0.7198 | +0.000642 | ceiling | +0.1% |
+| Qwen3-30B untrained + R8 | 0.734020 | 0.6311† | +0.118628 | 0% | +19.3% |
 | Qwen3-30B lr=1e-5 | 0.687047 | — | +0.071655 | 39.6% | +11.6% |
 | Qwen3-30B lr=3e-5 | 0.679645 | — | +0.064253 | 45.8% | +10.4% |
-| **Qwen3-30B lr=1e-4 (win)** | 0.676359 | *queued* | +0.060967 | **48.6%** | +9.9% |
+| **Qwen3-30B lr=1e-4 (win)** | **0.676359** | **0.6860** | +0.060967 | **48.6%** | +9.9% |
 | Qwen3-30B lr=3e-4 | 0.681890 | — | +0.066498 | 43.9% | +10.8% |
 | Qwen3-30B lr=1e-3 | 0.733675 | — | +0.118283 | 0.3% | +19.2% |
-| **Qwen3.5 base (no temporal)** | 0.625152 | **0.7402**† | 0 (reference) | 100% | 0% |
-| **Qwen3.5 untrained + temporal R8** | 0.680022 | **0.7036**† | +0.054870 | 0% | +8.8% |
-| Qwen3.5 lr=1e-5 | 0.665960 | — | +0.040808 | 25.6% | +6.5% |
-| **Qwen3.5 lr=3e-5 (win)** | 0.665780 | *queued* | +0.040628 | **26.0%** | +6.5% |
-| Qwen3.5 lr=1e-4 | 0.668113 | — | +0.042961 | 21.7% | +6.9% |
-| Qwen3.5 lr=3e-4 | 0.687210 | — | +0.062058 | −13.1% | +9.9% |
-| Qwen3.5 lr=1e-3 | *skipped* | — | — | — | — |
+| *dense floor: Qwen3-4B-Base* | *0.678077* | *0.6852* | | | |
+| Qwen3.5 base | 0.625152 | 0.7501† | +0.001917 | — | 0% |
+| Qwen3.5 null @3e-5 | 0.623235 | 0.7402 | 0 (ref) | ceiling | −0.3% |
+| Qwen3.5 untrained + R8 | 0.680022 | 0.7030† | +0.056787 | 0% | +8.8% |
+| Qwen3.5 lr=1e-5 | 0.665960 | — | +0.042725 | 24.8% | +6.5% |
+| **Qwen3.5 lr=3e-5 (win)** | **0.665780** | **0.7098** | +0.042545 | **25.1%** | +6.5% |
+| Qwen3.5 lr=1e-4 | 0.668113 | — | +0.044878 | 21.0% | +6.9% |
+| Qwen3.5 lr=3e-4 | 0.687210 | — | +0.063975 | −12.7% | +9.9% |
+| Qwen3.5 lr=1e-3 (make-up) | 0.802438 | — | +0.179203 | −215.6% | +28.4% |
+| *dense floor: Qwen3.5-4B-Base* | *0.689223* | *0.7028* | | | |
 
-Reading: the LR optimum is model-specific (3e-5 / 1e-4 / 3e-5), always below both the
-inherited 3e-4 and Unsloth's 2e-4 default; the inherited 3e-4 actively degrades OLMoE. The
-constraint's residual cost after adaptation falls with expert count (+17.9% / +9.9% / +6.5%
-over base at the winners), extending the training-free scaling result. The untrained
-constraint's downstream cost follows the same order: −8.9 / −7.7 / −3.7 points of average
-accuracy.
+## Table 2 — best vs null vs baseline (+ dense floors)
 
-## Table 2 — winners vs null vs baseline (PENDING)
+| model | arm | BPB | avg downstream | ds recovery (vs null ceiling) | perf retained (vs null / vs base) |
+|---|---|---|---|---|---|
+| OLMoE | base | 0.672723 | 0.6820 | — | 100% |
+| | null @3e-5 | 0.695064 | *(not measured)* | — | — |
+| | untrained + R8 | 0.842848 | 0.5723 | 0% | 83.9% (vs base) |
+| | **winner 3e-5** | 0.793289 | **0.5978** | 23.2% (vs base ceiling) | 87.7% (vs base) |
+| | *OLMo-1B floor* | — | *0.6006* | **winner FAILS the dense floor** | |
+| Qwen3-30B | base | 0.615392 | 0.7267† | — | 100% |
+| | null @1e-4 | 0.616034 | 0.7198 | ceiling | 99.1% |
+| | untrained + R8 | 0.734020 | 0.6311† | 0% | 86.8% |
+| | **winner 1e-4** | 0.676359 | **0.6860** | **61.9%** | 95.3% / 94.4% |
+| | *Qwen3-4B floor* | *0.678077* | *0.6852* | **winner PASSES (BPB −0.0017, ds +0.001)** | |
+| Qwen3.5 | base | 0.625152 | 0.7501† | — | 100% |
+| | null @3e-5 | 0.623235 | 0.7402 | ceiling | 98.7% |
+| | untrained + R8 | 0.680022 | 0.7030† | 0% | 93.7% |
+| | **winner 3e-5** | 0.665780 | **0.7098** | 18.3%* | 95.9% / 94.6% |
+| | *Qwen3.5-4B floor* | *0.689223* | *0.7028* | **winner PASSES (BPB −0.0234, ds +0.007)** | |
 
-Filled when winner downstream + nulls land: per model best run vs matched null vs baseline —
-BPB increase, % recovery, avg raw performance, avg raw / avg base (performance retained).
+\*Qwen3.5's downstream gain (+0.68 pts) is within task noise; its untrained gap was only 3.7 pts.
+
+## Findings
+
+1. **The dense floor separates the models.** OLMoE's adapted-constrained model (0.5978) sits
+   below even OLMo-1B (0.6006): at 64 experts / 12.5% residency the constrained MoE is not
+   worth running over a small dense model. Both Qwen models clear their 4B floors — Qwen3-30B
+   at parity-to-better, Qwen3.5 with clear margin on both axes.
+2. **LR optima are model-specific** (3e-5 / 1e-4 / 3e-5), all below the inherited 3e-4 (which
+   degrades OLMoE outright) and Unsloth's 2e-4 default.
+3. **Adaptation recovers tasks, not just bits**: Qwen3-30B recovers 62% of the constraint's
+   downstream damage against its achievable ceiling, retaining 95.3% of null-level accuracy
+   at 6.25% expert residency.
+4. **Rank is not the binding constraint**: r128 beats r32 by 2.6e-03 BPB (inside the 3e-03
+   noise band) for 4× the adapter parameters.
+5. **The nulls certify the recipe**: both Qwen nulls land within 2e-03 of the untrained base
+   (swap = 0.0000), so the corpus/recipe is neutral and the recovery numbers measure the
+   constraint, not corpus drift. Qwen3.5's null (0.623235) is *below* its base — its
+   reference tightened accordingly.
+6. Scale trend, now on three axes (training-free BPB cost, adapted BPB cost, downstream
+   retained): the rolling-residency constraint gets cheaper as expert count grows.

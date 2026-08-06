@@ -45,6 +45,9 @@ def main():
     ap.add_argument("--eval-seq", type=int, default=16)
     ap.add_argument("--limit", type=int, default=500)
     ap.add_argument("--batch-size", type=int, default=8)
+    ap.add_argument("--free-set", default="",
+                    help="'' = constrained R8 everywhere (trained winners); 'all' = residency "
+                         "inert (null arms must be scored in their training configuration)")
     A = ap.parse_args()
 
     FAM = TQ.resolve(A.family)
@@ -56,6 +59,9 @@ def main():
     model, tok = FastModel.from_pretrained(
         FAM["model"], max_seq_length=2048, dtype=torch.bfloat16,
         load_in_4bit=False, full_finetuning=False)
+    # Qwen3.5's composite checkpoint makes unsloth return a Processor; HFLM asserts on
+    # tokenizer type, so unwrap to the inner tokenizer (no-op for plain tokenizers).
+    tok = getattr(tok, "tokenizer", tok)
     for mod in model.modules():
         if getattr(mod, "visual", None) is not None and "Vision" in type(mod.visual).__name__:
             mod.visual = None
@@ -79,7 +85,11 @@ def main():
 
     RU.install(model)
     RES._CFG.update(on=True, R=ck.get("R", 8), evict="min_logit", collect_telem=True)
-    RES.set_free_layers(None)
+    if A.free_set == "all":
+        L = getattr(model.config, "text_config", model.config).num_hidden_layers
+        RES.set_free_layers(list(range(L)))
+    else:
+        RES.set_free_layers(None)
     model.eval()
 
     bpb_ids = torch.load(f"{FAM['data']}/bpb_slice_ids_{FAM['suffix']}.pt",
