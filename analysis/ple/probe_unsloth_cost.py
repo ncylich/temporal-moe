@@ -34,6 +34,9 @@ def main():
     # with block-wise quantisation: saves 2 bytes/trainable = 3.7 GB at r32 -- the gap
     # between r32 fitting and not on Qwen3.5.
     ap.add_argument("--opt", default="fused", choices=("fused", "adamw8bit"))
+    # cce: see probe_expert_lora_cost -- exact CE without materialising logits, ~2 GB on
+    # this vocab; the dynamics-preserving alternative to adamw8bit for fitting r32.
+    ap.add_argument("--ce", default="plain", choices=("plain", "cce"))
     A = ap.parse_args()
 
     import unsloth  # noqa: F401  must precede any transformers import
@@ -96,16 +99,24 @@ def main():
           f"trainable={ntr/1e6:.1f}M (+{n_extra} router/norm tensors)", flush=True)
 
     ids = torch.randint(0, V, (A.mb, A.seq), device="cuda")
+    if A.ce == "cce":
+        from cut_cross_entropy import linear_cross_entropy
+        causal = model.base_model.model                 # peft wrapper -> CausalLM
+
+        def compute_loss():
+            h = causal.model(ids)[0]                    # last hidden, logits never built
+            return linear_cross_entropy(h, causal.lm_head.weight, ids, shift=True)
+    else:
+        def compute_loss():
+            lg = model(ids).logits[:, :-1]
+            # bf16 CE, matched with probe_expert_lora_cost -- see the comment there.
+            return torch.nn.functional.cross_entropy(
+                lg.reshape(-1, lg.shape[-1]), ids[:, 1:].reshape(-1))
+
     def step():
-        out = model(ids)
-        lg = out.logits[:, :-1]
-        # bf16 CE, matched with probe_expert_lora_cost -- see the comment there.
-        loss = torch.nn.functional.cross_entropy(
-            lg.reshape(-1, lg.shape[-1]), ids[:, 1:].reshape(-1))
-        loss.backward()
+        compute_loss().backward()
         opt.step()
         opt.zero_grad(set_to_none=True)
-        del out, lg
 
     for _ in range(2):
         step()

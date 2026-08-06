@@ -30,6 +30,10 @@ def main():
     ap.add_argument("--steps", type=int, default=6)
     ap.add_argument("--lora", type=int, default=32)
     ap.add_argument("--opt", default="fused", choices=("fused", "adamw8bit"))
+    # cce: cut_cross_entropy computes exact CE fused from hidden states + lm_head, never
+    # materialising the [B,S,V] logits -- ~2 GB on a 248k vocab at mb1. The alternative
+    # route to fitting r32: unlike adamw8bit it changes no training dynamics.
+    ap.add_argument("--ce", default="plain", choices=("plain", "cce"))
     A = ap.parse_args()
     sys.path.insert(0, "/workspace/temporal-moe/analysis/ple")
     import residency as RES
@@ -88,18 +92,24 @@ def main():
     # explicit .float() copy costs mb*seq*V*4 bytes twice (fwd + saved-for-bwd) -- 1.9 GB at
     # mb1 on Qwen3.5's 232k vocab, which was the difference between fitting and OOM.
     ids = torch.randint(0, V, (mb, seq), device="cuda")
+    if A.ce == "cce":
+        from cut_cross_entropy import linear_cross_entropy
+
+        def compute_loss():
+            h = model.model(ids)[0]                     # last hidden, logits never built
+            return linear_cross_entropy(h, model.lm_head.weight, ids, shift=True)
+    else:
+        def compute_loss():
+            lg = model(ids).logits[:, :-1]
+            return torch.nn.functional.cross_entropy(
+                lg.reshape(-1, lg.shape[-1]), ids[:, 1:].reshape(-1))
+
     for _ in range(2):
-        out = model(ids); lg = out.logits[:, :-1]
-        loss = torch.nn.functional.cross_entropy(
-            lg.reshape(-1, lg.shape[-1]), ids[:, 1:].reshape(-1))
-        loss.backward(); opt.zero_grad(set_to_none=True); del out, lg
+        compute_loss().backward(); opt.zero_grad(set_to_none=True)
     torch.cuda.synchronize()
     t0 = time.time()
     for _ in range(A.steps):
-        out = model(ids); lg = out.logits[:, :-1]
-        loss = torch.nn.functional.cross_entropy(
-            lg.reshape(-1, lg.shape[-1]), ids[:, 1:].reshape(-1))
-        loss.backward(); opt.step(); opt.zero_grad(set_to_none=True); del out, lg
+        compute_loss().backward(); opt.step(); opt.zero_grad(set_to_none=True)
     torch.cuda.synchronize()
     dt = (time.time() - t0) / A.steps
     tps = mb * seq / dt
