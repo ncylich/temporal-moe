@@ -73,6 +73,17 @@ def main():
                     help="distillation temperature; loss scaled by T^2 so gradient magnitude "
                          "is T-invariant and one LR bracket serves all T")
     ap.add_argument("--evict", default="min_logit", choices=("min_logit", "lru"))
+    # paged8bit: SAME 8-bit block-quantised Adam states as adamw8bit, held in CUDA unified
+    # memory -- frees ~3.8 GB of committed VRAM (the difference that lets Qwen3.5 run mb2)
+    # at a small paging cost once per optimiser step, amortised over accum.
+    ap.add_argument("--opt", default="adamw8bit", choices=("adamw8bit", "paged8bit"))
+    # Rolling cached teacher (user design 2026-08-08): every segment of N tokens, generate
+    # the teacher's top-K targets for the NEXT min(N, remaining) tokens in one fat-batched
+    # no-grad sweep (weights swapped ONCE per segment, cache held in host RAM), then train
+    # the student over that segment at CE-like speed reading cached targets. 0 = inline.
+    ap.add_argument("--teacher-cache-tokens", type=int, default=0)
+    ap.add_argument("--teacher-topk", type=int, default=256)
+    ap.add_argument("--teacher-mb", type=int, default=8)
     A = ap.parse_args()
     # Distillation runs the chunked-checkpointed KL (gradient-identical to full KL,
     # validated), which never materialises the [B,S,V] logits -- so the micro-batch no
@@ -151,7 +162,8 @@ def main():
 
     import bitsandbytes as bnb
     from cut_cross_entropy import linear_cross_entropy
-    opt = bnb.optim.AdamW8bit(params, lr=A.lr, weight_decay=0.0, betas=(0.9, 0.95))
+    _Opt = bnb.optim.PagedAdamW8bit if A.opt == "paged8bit" else bnb.optim.AdamW8bit
+    opt = _Opt(params, lr=A.lr, weight_decay=0.0, betas=(0.9, 0.95))
     model.train()
     # Aux/z scales for the in-forward injection: residency.aux_z_from_router_logits averages
     # per-layer values over the L MoE layers and the trainer divides the total loss by accum,
@@ -192,6 +204,62 @@ def main():
             RES._CFG["on"] = True
             _teacher_swap(restore=True)
             return h_t
+
+        def generate_cache(row0, n_rows):
+            """Teacher targets for corpus rows [row0, row0+n_rows): top-K values (bf16) +
+            indices (int32) per position, in host RAM. Weights swapped once for the sweep."""
+            _teacher_swap()
+            was_on = RES._CFG["on"]
+            RES._CFG["on"] = False
+            K = A.teacher_topk
+            vals = torch.empty(n_rows, A.seq, K, dtype=torch.bfloat16)
+            idxs = torch.empty(n_rows, A.seq, K, dtype=torch.int32)
+            mass_sum, mass_n = 0.0, 0
+            with torch.no_grad(), model.disable_adapter():
+                for i in range(0, n_rows, A.teacher_mb):
+                    rb = corpus[row0 + i: row0 + min(i + A.teacher_mb, n_rows), :A.seq] \
+                        .to("cuda").long()
+                    h = causal.model(rb)[0]
+                    for j0 in range(0, A.seq, 512):          # chunk the vocab projection
+                        lg = (h[:, j0:j0 + 512] @ causal.lm_head.weight.T).float()
+                        v, ix = lg.topk(K, dim=-1)
+                        logZ = torch.logsumexp(lg, -1, keepdim=True)
+                        mass_sum += float((v - logZ).exp().sum(-1).mean()) * v.shape[0] * v.shape[1]
+                        mass_n += v.shape[0] * v.shape[1]
+                        vals[i:i + rb.shape[0], j0:j0 + 512] = v.to(torch.bfloat16).cpu()
+                        idxs[i:i + rb.shape[0], j0:j0 + 512] = ix.to(torch.int32).cpu()
+                        del lg, v, ix, logZ
+                    del h, rb
+            RES._CFG["on"] = was_on
+            _teacher_swap(restore=True)
+            print(f"  [cache] top-{K} mass coverage {mass_sum / max(1, mass_n):.6f}", flush=True)
+            return vals, idxs
+
+        def cached_kl(h_s, cv, cix, T, chunk=512):
+            """Soft-CE of the student against renormalised cached top-K teacher targets,
+            chunk-checkpointed like chunked_kl. Constant teacher-entropy term omitted (no
+            gradient); reported value is soft-CE + renormalised entropy - matches KL up to
+            the top-K truncation."""
+            from torch.utils.checkpoint import checkpoint
+            W = causal.lm_head.weight
+
+            def _chunk(hs_c, cv_c, cix_c):
+                lg_s = (hs_c @ W.T).float() / T
+                logZ = torch.logsumexp(lg_s, -1, keepdim=True)
+                sel = lg_s.gather(-1, cix_c.long()) - logZ          # log p_s at cached idx
+                with torch.no_grad():
+                    p = torch.softmax(cv_c.float() / T, -1)          # renormalised top-K
+                    ent = (p * torch.log_softmax(cv_c.float() / T, -1)).sum(-1)
+                return (-(p * sel).sum(-1) + ent).sum()
+
+            S = h_s.shape[1]
+            tot = None
+            for i in range(0, S, chunk):
+                c = checkpoint(_chunk, h_s[:, i:i + chunk],
+                               cv[:, i:i + chunk].to("cuda"), cix[:, i:i + chunk].to("cuda"),
+                               use_reentrant=False)
+                tot = c if tot is None else tot + c
+            return (T * T) * tot / (S * h_s.shape[0])
 
         def chunked_kl(h_s, h_t, T, chunk=512):
             from torch.utils.checkpoint import checkpoint
@@ -242,6 +310,9 @@ def main():
               f"then R={A.R}", flush=True)
 
     hist, seen, t0, nxt, ptr = [], 0, time.time(), A.eval_every, 0
+    cache_v = cache_i = None
+    cache_row0 = cache_rows = 0
+    seg_rows = max(A.mb, A.teacher_cache_tokens // A.seq) if A.teacher_cache_tokens else 0
     for step in range(steps):
         if anneal_steps and step < anneal_steps:
             u = step / anneal_steps
@@ -269,13 +340,25 @@ def main():
         opt.zero_grad(set_to_none=True)
         aux_vals = []
         for _ in range(A.accum):
+            bp = ptr                                     # row index of THIS batch (for cache)
             b = corpus[ptr:ptr + A.mb, :A.seq].to("cuda").long()
             ptr = 0 if ptr + 2 * A.mb > len(corpus) else ptr + A.mb
             RU.AUX_LOG.clear()
-            if A.distill:
-                # Chunked-checkpointed KL for every family: gradient-identical to the full
-                # formulation (validated), never materialises [B,S,V] logits, and therefore
-                # trains at the family's native micro-batch.
+            if A.distill and seg_rows:
+                # Rolling cached teacher: (re)generate when the batch leaves the segment.
+                if cache_v is None or bp < cache_row0 or bp + A.mb > cache_row0 + cache_rows:
+                    n = min(seg_rows, len(corpus) - bp)
+                    print(f"  [cache] generating teacher segment rows {bp}..{bp + n} "
+                          f"({n * A.seq / 1e6:.0f}M tokens, top-{A.teacher_topk}) "
+                          f"{(time.time()-t0)/60:.1f}min", flush=True)
+                    cache_v, cache_i = generate_cache(bp, n)
+                    cache_row0, cache_rows = bp, n
+                    print(f"  [cache] segment ready {(time.time()-t0)/60:.1f}min", flush=True)
+                o = bp - cache_row0
+                h = causal.model(b)[0]
+                lm = cached_kl(h, cache_v[o:o + A.mb], cache_i[o:o + A.mb], A.distill_T)
+            elif A.distill:
+                # Inline chunked-checkpointed KL (exact; used when caching is off).
                 h_t = teacher_hidden(b)
                 h = causal.model(b)[0]
                 lm = chunked_kl(h, h_t, A.distill_T)
