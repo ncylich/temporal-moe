@@ -320,3 +320,21 @@ def test_residency_R_banner():
         assert "residency_R=36" in banner_knobs()
     finally:
         os.environ.pop("TEMPORAL_RESIDENCY_R", None)
+
+
+def test_multiswap_anchor_and_budget():
+    """swaps >= k reproduces per-token top-k exactly (greedy exchange converges in <= k
+    sub-swaps); intermediate budgets change at most `swaps` experts per token."""
+    torch.manual_seed(3)
+    lg = torch.randn(96, 2, 32)
+    m = compute_resident_mask(lg, k=4, evict="min_logit", swaps=4)
+    tk = torch.zeros_like(m)
+    tk.scatter_(-1, lg.topk(4, -1).indices, True)
+    assert torch.equal(m, tk)
+    for s in (1, 2, 3):
+        ms = compute_resident_mask(lg, k=4, evict="min_logit", swaps=s)
+        changes = (ms[1:] ^ ms[:-1]).sum(-1)                 # 2 per swap (one in, one out)
+        assert int(changes.max()) <= 2 * s
+    # s=1 is byte-identical to the pre-swaps behaviour (default arg path)
+    assert torch.equal(compute_resident_mask(lg, k=4, evict="min_logit", swaps=1),
+                       compute_resident_mask(lg, k=4, evict="min_logit"))

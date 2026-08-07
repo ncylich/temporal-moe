@@ -37,7 +37,8 @@ except Exception:                                           # triton missing -> 
 
 
 def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
-                          tau: float = 0.0, ema_beta: float = 1.0) -> torch.Tensor:
+                          tau: float = 0.0, ema_beta: float = 1.0,
+                          swaps: int = 1) -> torch.Tensor:
     """Rolling-residency expert selection.
 
     Args:
@@ -71,7 +72,12 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
     Refresh times (for "lru"): cold-fill experts rank by ascending logit (lowest = oldest); each
     nomination is the newest. All resident refresh times stay distinct, so eviction is deterministic.
     """
+    # swaps: budget of resident-set changes per token (the swap-axis knob; 1 == shipped).
+    # Each sub-swap repeats the same trigger: best non-resident vs worst resident. The greedy
+    # exchange converges to top-k(logits[t]) in <= k sub-swaps, so swaps >= k reproduces the
+    # unconstrained per-token top-k exactly -- the analytic anchor the tests check.
     assert evict in ("lru", "min_logit"), f"unknown evict policy {evict!r}"
+    assert swaps >= 1
     use_lru = evict == "lru"
     S, B, E = logits.shape
     dev = logits.device
@@ -98,15 +104,16 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
 
     for t in range(1, S):
         lt = trig[t]                                        # token t pulls in one expert and uses it
-        nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)      # best non-resident [B]
-        worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)       # worst resident   [B]
-        do_swap = (nom_val > worst_val + tau).unsqueeze(-1)             # [B,1]; tau=0 == shipped
-        evict_key = refresh if use_lru else lt
-        evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
-        evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
-        nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
-        resident = (resident & ~evicted) | nominee
-        refresh = refresh.masked_fill(nominee, float(k + t))           # newest (read only when "lru")
+        for _sw in range(swaps):
+            nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)  # best non-resident [B]
+            worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)   # worst resident   [B]
+            do_swap = (nom_val > worst_val + tau).unsqueeze(-1)         # [B,1]; tau=0 == shipped
+            evict_key = refresh if use_lru else lt
+            evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove
+            evicted = F.one_hot(evict_i, E).bool() & do_swap            # [B,E]
+            nominee = F.one_hot(nom_i, E).bool() & do_swap              # [B,E]
+            resident = (resident & ~evicted) | nominee
+            refresh = refresh.masked_fill(nominee, float(k + t))        # newest ("lru" only)
         out[t] = resident
 
     return out
@@ -210,7 +217,8 @@ def _graph_scan(logits, k, use_lru):
 if _HAS_TRITON:
     @triton.jit
     def _scan_kernel(logits_ptr, res0_ptr, ref0_ptr, out_ptr,
-                     S, B, k, E, use_lru: tl.constexpr, BLOCK: tl.constexpr):
+                     S, B, k, E, use_lru: tl.constexpr, BLOCK: tl.constexpr,
+                     NSWAPS: tl.constexpr):
         b = tl.program_id(0)
         e = tl.arange(0, BLOCK)
         valid = e < E                                        # BLOCK = next pow2 >= E; mask pad lanes
@@ -235,35 +243,39 @@ if _HAS_TRITON:
             # reduction beats two dependent ones (~1.25x), and at BLOCK <= 128 it loses (~4%),
             # because the fused combiner shuffles twice per level. Both give torch's first-index
             # tie-breaking, so the mask is identical either way.
-            if BLOCK >= 256:
-                nom_val, nom_i = tl.max(tl.where(valid & (resident == 0), lt, NEG), 0,
-                                        return_indices=True)
-                if use_lru:
-                    worst_val = tl.min(tl.where(resident, lt, POS), 0)
-                    _, evict_i = tl.min(tl.where(resident, refresh, POS), 0, return_indices=True)
-                else:                       # min_logit: the evict key IS lt, so one reduction does
-                    worst_val, evict_i = tl.min(tl.where(resident, lt, POS), 0,   # both selections
-                                                return_indices=True)
-            else:
-                # nominee = argmax over NON-resident logits (first index on ties)
-                masked_nom = tl.where(valid & (resident == 0), lt, NEG)
-                nom_val = tl.max(masked_nom, 0)
-                nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
-                # worst resident logit (the swap trigger)
-                worst_val = tl.min(tl.where(resident, lt, POS), 0)
-                # evict: lru -> oldest refresh; min_logit -> lowest logit (first index on ties)
-                if use_lru:
-                    evict_key = refresh
+            # NSWAPS sub-swaps per token (swap-axis budget; 1 == shipped). static_range unrolls,
+            # so NSWAPS=1 compiles to exactly the previous kernel body.
+            for _sw in tl.static_range(NSWAPS):
+                if BLOCK >= 256:
+                    nom_val, nom_i = tl.max(tl.where(valid & (resident == 0), lt, NEG), 0,
+                                            return_indices=True)
+                    if use_lru:
+                        worst_val = tl.min(tl.where(resident, lt, POS), 0)
+                        _, evict_i = tl.min(tl.where(resident, refresh, POS), 0,
+                                            return_indices=True)
+                    else:                   # min_logit: the evict key IS lt, so one reduction does
+                        worst_val, evict_i = tl.min(tl.where(resident, lt, POS), 0,  # both
+                                                    return_indices=True)
                 else:
-                    evict_key = lt
-                masked_ev = tl.where(resident, evict_key, POS)
-                ev_val = tl.min(masked_ev, 0)
-                evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
-            do_swap = nom_val > worst_val
-            is_evict = (e == evict_i) & do_swap
-            is_nom = (e == nom_i) & do_swap
-            resident = (resident & (is_evict == 0)) | is_nom
-            refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)   # newest (read only when lru)
+                    # nominee = argmax over NON-resident logits (first index on ties)
+                    masked_nom = tl.where(valid & (resident == 0), lt, NEG)
+                    nom_val = tl.max(masked_nom, 0)
+                    nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
+                    # worst resident logit (the swap trigger)
+                    worst_val = tl.min(tl.where(resident, lt, POS), 0)
+                    # evict: lru -> oldest refresh; min_logit -> lowest logit (first index ties)
+                    if use_lru:
+                        evict_key = refresh
+                    else:
+                        evict_key = lt
+                    masked_ev = tl.where(resident, evict_key, POS)
+                    ev_val = tl.min(masked_ev, 0)
+                    evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
+                do_swap = nom_val > worst_val
+                is_evict = (e == evict_i) & do_swap
+                is_nom = (e == nom_i) & do_swap
+                resident = (resident & (is_evict == 0)) | is_nom
+                refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)  # newest (lru only)
             tl.store(out_ptr + (t * B * E + row), resident.to(tl.int8), mask=valid)
 
 
@@ -280,7 +292,7 @@ def _scan_num_warps(BLOCK, use_lru):
     return 2 if use_lru else 4
 
 
-def _triton_scan(logits, k, use_lru):
+def _triton_scan(logits, k, use_lru, swaps=1):
     """Single-launch Triton fast path: cold fill in torch, full t>=1 scan in one kernel."""
     if not _HAS_TRITON:
         raise RuntimeError("triton unavailable")
@@ -295,14 +307,14 @@ def _triton_scan(logits, k, use_lru):
     refresh0.scatter_(1, top_i, rank)
     out = torch.empty(S, B, E, dtype=torch.int8, device=dev)
     BLOCK = 1 << (E - 1).bit_length()
-    _scan_kernel[(B,)](logits, resident0, refresh0, out, S, B, k, E, use_lru, BLOCK,
+    _scan_kernel[(B,)](logits, resident0, refresh0, out, S, B, k, E, use_lru, BLOCK, swaps,
                        num_warps=_scan_num_warps(BLOCK, use_lru))
     # every element is written by exactly one program with a 0/1 int8, so this reinterprets the
     # buffer as bool for free -- .to(torch.bool) would cost an extra alloc + launch + full copy.
     return out.view(torch.bool)
 
 
-def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
+def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0, swaps=1):
     """Resident mask via a GPU fast path; identical result to compute_resident_mask.
 
     On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects the
@@ -320,19 +332,21 @@ def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
             _scan_path = "eager-shaped"
             print(f"[temporal] scan path: eager (shaped trigger: tau={tau}, ema_beta={ema_beta})")
         with torch.no_grad():
-            return compute_resident_mask(logits, k, evict, tau=tau, ema_beta=ema_beta)
+            return compute_resident_mask(logits, k, evict, tau=tau, ema_beta=ema_beta, swaps=swaps)
     if not logits.is_cuda or mode == "eager":               # CPU (tests) or explicit opt-out
         if _scan_path is None:
             _scan_path = "eager"
             print("[temporal] scan path: eager")
         with torch.no_grad():
-            return compute_resident_mask(logits, k, evict)
+            return compute_resident_mask(logits, k, evict, swaps=swaps)
+    if swaps != 1 and mode == "graph":
+        raise RuntimeError("swaps>1 is implemented for the triton scan only; unset TEMPORAL_SCAN")
     # GPU fast path — correct or crash; no fallback.
     with torch.no_grad():
         out, pathname = ((_graph_scan(logits, k, evict == "lru"), "cuda-graph") if mode == "graph"
-                         else (_triton_scan(logits, k, evict == "lru"), "triton"))
+                         else (_triton_scan(logits, k, evict == "lru", swaps), "triton"))
         if _scan_path is None:                              # one-time bit-exactness gate (hard)
-            ref = compute_resident_mask(logits, k, evict)
+            ref = compute_resident_mask(logits, k, evict, swaps=swaps)
             if not torch.equal(out, ref):
                 bad = (out != ref).any(dim=-1).sum().item()
                 raise RuntimeError(
