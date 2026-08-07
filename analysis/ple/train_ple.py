@@ -37,6 +37,11 @@ ap.add_argument("--lr", type=float, default=3e-4)          # bake-off winner LR,
 # run to date used, so this is a no-op for OLMoE -- it matters for the Qwen models, which
 # declare 0.001 and were nonetheless trained at 0.01.
 ap.add_argument("--aux-c", type=float, default=None)
+# Distillation (mirrors train_unsloth): KL to the pristine unconstrained base -- expert +
+# attn LoRA disabled by zeroing their scales, router/norm C-surface swapped to its initial
+# values for the teacher pass, residency off. Loss scaled by T^2 (gradient T-invariant).
+ap.add_argument("--distill", action="store_true")
+ap.add_argument("--distill-T", type=float, default=1.0)
 ap.add_argument("--aux-scope", default="micro", choices=("micro", "global"))
 ap.add_argument("--z-c", type=float, default=0.001)
 ap.add_argument("--ple-lr", type=float, default=None, help="defaults to --lr")
@@ -159,6 +164,38 @@ if A.lora_attn:
 train_params = rp + extra
 masters = [p.detach().float().clone().requires_grad_(True) for p in train_params]
 opt = torch.optim.AdamW(masters, lr=A.lr, betas=(0.9, 0.95), weight_decay=0.0)
+
+if A.distill:
+    # Teacher machinery. rp (router linears + RMSNorm gains) train in-place, so the teacher
+    # needs their INITIAL values (snapshotted here, before any step). The LoRA deltas are
+    # additive with explicit scales, so zeroing the scales disables them exactly.
+    _rp_pristine = [p.detach().clone() for p in rp]
+    _attn_lora_lins = [lin for m in model.modules() if type(m).__name__ == "OlmoeAttention"
+                       for lin in (getattr(m, n, None) for n in ("q_proj", "k_proj", "v_proj", "o_proj"))
+                       if lin is not None and hasattr(lin, "_lora_scale")]
+
+    def _teacher_logits(batch):
+        saved_scale = RES._LORA["scale"]
+        RES._LORA["scale"] = 0.0
+        saved_attn = [lin._lora_scale for lin in _attn_lora_lins]
+        for lin in _attn_lora_lins:
+            lin._lora_scale = 0.0
+        cur = [p.detach().clone() for p in rp]
+        with torch.no_grad():
+            for p, pr in zip(rp, _rp_pristine):
+                p.data.copy_(pr)
+        was_on = RES._CFG["on"]
+        RES._CFG["on"] = False
+        with torch.no_grad():
+            lg_t = model(batch).logits.float()
+        RES._CFG["on"] = was_on
+        with torch.no_grad():
+            for p, c in zip(rp, cur):
+                p.data.copy_(c)
+        for lin, s in zip(_attn_lora_lins, saved_attn):
+            lin._lora_scale = s
+        RES._LORA["scale"] = saved_scale
+        return lg_t
 
 # ---- the PLE branch, entirely absent when --rank off ----
 ple_mod = None
@@ -316,9 +353,20 @@ while seen < A.tokens:
             pos = 0
         batch = corpus[order[pos:pos + A.mb]].to("cuda").long(); pos += A.mb
         labels = batch[:, 1:].reshape(-1)
+        if A.distill:
+            lg_t = _teacher_logits(batch)
         out = model(batch, output_router_logits=True)
         logits = out.logits
-        lm = torch.nn.functional.cross_entropy(logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels)
+        if A.distill:
+            # Forward KL(teacher || student) at T, position-averaged, T^2-scaled.
+            _T = A.distill_T
+            _pt = torch.softmax(lg_t / _T, -1)
+            lm = (_T * _T) * (
+                -(_pt * torch.log_softmax(logits.float() / _T, -1)).sum(-1).mean()
+                + (_pt * torch.log_softmax(lg_t / _T, -1)).sum(-1).mean())
+            del lg_t, _pt
+        else:
+            lm = torch.nn.functional.cross_entropy(logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels)
         aux, z = RES.aux_z_from_router_logits(out.router_logits, batch.shape[0], batch.shape[1],
                                               RES._CFG["R"])
         RES.assert_aux_live(out, aux, A.aux_c) if A.aux_c else None

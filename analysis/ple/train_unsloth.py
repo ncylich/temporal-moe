@@ -60,9 +60,8 @@ def main():
     # Recipe ablations (SWEEP follow-up). --distill: replace the CE objective with KL to the
     # pristine unconstrained base (teacher = same weights, adapters disabled, residency off,
     # router/norms restored to their initial values for the teacher pass) -- optimises exactly
-    # what recovery measures. Forces mb=1 (two logit tensors in flight). --r-anneal F:
-    # anneal R linearly from E (free) to the target R over the first F of optimiser steps,
-    # testing whether avoiding the early constraint shock helps.
+    # what recovery measures; chunked-checkpointed KL, so it runs at the family's native mb.
+    # --r-anneal F: anneal R from E (free) to the target over the first F of optimiser steps.
     ap.add_argument("--distill", action="store_true")
     ap.add_argument("--r-anneal", type=float, default=0.0)
     ap.add_argument("--anneal-style", default="linear", choices=("linear", "damage"),
@@ -75,8 +74,10 @@ def main():
                          "is T-invariant and one LR bracket serves all T")
     ap.add_argument("--evict", default="min_logit", choices=("min_logit", "lru"))
     A = ap.parse_args()
-    if A.distill:
-        A.mb = 1
+    # Distillation runs the chunked-checkpointed KL (gradient-identical to full KL,
+    # validated), which never materialises the [B,S,V] logits -- so the micro-batch no
+    # longer needs to drop to 1. Family-default mb applies, restoring ~1.8x throughput
+    # on qwen3 (its forced-mb1 era covered the 15M screens/brackets; recorded).
     if A.mb == 0:
         A.mb = 2 if A.family == "qwen3" else 1
     A.accum = max(1, 16_384 // (A.mb * A.seq))          # 16,384 tok/step, matched across models
@@ -169,20 +170,49 @@ def main():
                     if n.endswith(".gate.weight") or "norm" in n.split(".")[-2]}
         trained = {}
 
-        def teacher_logits(b):
+        def _teacher_swap(restore=False):
             for n, p in model.named_parameters():
                 if n in pristine:
-                    trained[n] = p.detach().clone()
-                    p.data.copy_(pristine[n])
+                    if restore:
+                        p.data.copy_(trained[n])
+                    else:
+                        trained[n] = p.detach().clone()
+                        p.data.copy_(pristine[n])
+
+        def teacher_hidden(b):
+            # Qwen3.5's 248k vocab makes full-logit KL OOM; the teacher hands back HIDDEN
+            # states (8 MB, not 2 GB) and each chunk's logits are built inside a
+            # checkpointed loss that recomputes in backward. Valid because lm_head is
+            # frozen and identical for teacher and student, so teacher chunk logits are
+            # recomputable at backward time without the weight swap being active.
+            _teacher_swap()
             RES._CFG["on"] = False
             with torch.no_grad(), model.disable_adapter():
-                h_t = causal.model(b)[0]
-                lg_t = (h_t @ causal.lm_head.weight.T).float()   # [1, S, V]
+                h_t = causal.model(b)[0].detach()
             RES._CFG["on"] = True
-            for n, p in model.named_parameters():
-                if n in trained:
-                    p.data.copy_(trained[n])
-            return lg_t
+            _teacher_swap(restore=True)
+            return h_t
+
+        def chunked_kl(h_s, h_t, T, chunk=512):
+            from torch.utils.checkpoint import checkpoint
+            W = causal.lm_head.weight
+
+            def _kl_chunk(hs_c, ht_c):
+                lg_s = (hs_c @ W.T).float() / T
+                with torch.no_grad():
+                    lg_t = (ht_c @ W.T).float() / T
+                    pt = torch.softmax(lg_t, -1)
+                    ent = (pt * torch.log_softmax(lg_t, -1)).sum(-1)
+                ce = -(pt * torch.log_softmax(lg_s, -1)).sum(-1)
+                return (ce + ent).sum()
+
+            S = h_s.shape[1]
+            tot = None
+            for i in range(0, S, chunk):
+                c = checkpoint(_kl_chunk, h_s[:, i:i + chunk], h_t[:, i:i + chunk],
+                               use_reentrant=False)
+                tot = c if tot is None else tot + c
+            return (T * T) * tot / (S * h_s.shape[0])
 
     E_total = getattr(model.config, "text_config", model.config).num_experts
     anneal_steps = int(A.r_anneal * steps)
@@ -243,17 +273,13 @@ def main():
             ptr = 0 if ptr + 2 * A.mb > len(corpus) else ptr + A.mb
             RU.AUX_LOG.clear()
             if A.distill:
-                lg_t = teacher_logits(b)
+                # Chunked-checkpointed KL for every family: gradient-identical to the full
+                # formulation (validated), never materialises [B,S,V] logits, and therefore
+                # trains at the family's native micro-batch.
+                h_t = teacher_hidden(b)
                 h = causal.model(b)[0]
-                lg_s = (h @ causal.lm_head.weight.T).float()
-                # Forward KL(teacher || student) at temperature T, position-averaged, scaled
-                # by T^2 (keeps gradient magnitude T-invariant so one LR serves all T).
-                T = A.distill_T
-                pt = torch.softmax(lg_t / T, -1)
-                lm = (T * T) * (
-                    -(pt * torch.log_softmax(lg_s / T, -1)).sum(-1).mean()
-                    + (pt * torch.log_softmax(lg_t / T, -1)).sum(-1).mean())
-                del lg_t, lg_s, pt
+                lm = chunked_kl(h, h_t, A.distill_T)
+                del h_t
             else:
                 h = causal.model(b)[0]                   # logits never materialised (CCE)
                 lm = linear_cross_entropy(h, causal.lm_head.weight, b, shift=True)
