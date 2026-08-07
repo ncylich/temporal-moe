@@ -65,6 +65,14 @@ def main():
     # testing whether avoiding the early constraint shock helps.
     ap.add_argument("--distill", action="store_true")
     ap.add_argument("--r-anneal", type=float, default=0.0)
+    ap.add_argument("--anneal-style", default="linear", choices=("linear", "damage"),
+                    help="linear: R falls linearly E/4->R over the window. damage: transit "
+                         "each segment at time proportional to its measured training-free "
+                         "damage share (qwen3 R-curve 2026-08-07, 32->8 total 0.0930 BPB: "
+                         "32->16 34.2%%, 16->12 22.8%%, 12->10 16.1%%, 10->8 26.9%%)")
+    ap.add_argument("--distill-T", type=float, default=1.0,
+                    help="distillation temperature; loss scaled by T^2 so gradient magnitude "
+                         "is T-invariant and one LR bracket serves all T")
     ap.add_argument("--evict", default="min_logit", choices=("min_logit", "lru"))
     A = ap.parse_args()
     if A.distill:
@@ -178,15 +186,56 @@ def main():
 
     E_total = getattr(model.config, "text_config", model.config).num_experts
     anneal_steps = int(A.r_anneal * steps)
+    if anneal_steps and A.anneal_style == "damage":
+        # Fit d(R) = A_fit * R^-gamma to the measured training-free damage curve (qwen3,
+        # 2026-08-07; damage = BPB above free 0.615306), log-log least squares. The schedule
+        # inverts the fit so damage increases EXACTLY linearly in window time -- continuous,
+        # not piecewise -- with integer dwells falling out of the rounding.
+        import math
+        assert A.family == "qwen3" and A.R == 8, "damage schedule is qwen3/R=8-specific"
+        _pts = [(64, 0.007892), (32, 0.025135), (16, 0.056882),
+                (12, 0.078085), (10, 0.093056), (8, 0.118096)]
+        _xs = [math.log(r) for r, _ in _pts]
+        _ys = [math.log(d) for _, d in _pts]
+        _mx, _my = sum(_xs) / len(_pts), sum(_ys) / len(_pts)
+        _gamma = -sum((x - _mx) * (y - _my) for x, y in zip(_xs, _ys)) \
+            / sum((x - _mx) ** 2 for x in _xs)
+        _logA = _my + _gamma * _mx
+        # Ramp from d(E) (start at FULL residency: the loose descent E -> E/4 costs ~1 step
+        # per R under damage pacing -- a warm-up sweep) to d(target R): ramping the damage
+        # target all the way to d(8) with R clamped >= 9 in-window gives R=9 its natural
+        # dwell share, so dwell is monotone in tightness right up to the hold.
+        _dStart = math.exp(_logA - _gamma * math.log(E_total))
+        _dEnd = math.exp(_logA - _gamma * math.log(A.R))
+        print(f"  [anneal] fitted d(R) = A*R^-gamma, gamma = {_gamma:.3f}; window walks "
+              f"damage linearly {_dStart:.4f} -> {_dEnd:.4f} (R {E_total} -> 9, clamped), "
+              f"then R={A.R}", flush=True)
 
     hist, seen, t0, nxt, ptr = [], 0, time.time(), A.eval_every, 0
     for step in range(steps):
-        if anneal_steps and step <= anneal_steps:
-            # Linear R anneal from E (residency inert) down to the target; after the window
-            # the config holds the target permanently.
-            RES._CFG["R"] = max(A.R, int(round(E_total - (E_total - A.R) * step / anneal_steps)))
-        elif anneal_steps and step == anneal_steps + 1:
+        if anneal_steps and step < anneal_steps:
+            u = step / anneal_steps
+            if A.anneal_style == "damage":
+                # Continuous damage-linear schedule from the fitted power law: R >= 9 strictly
+                # inside the window; the deployment setting R=8 owns the entire hold.
+                import math
+                _d_u = _dStart + u * (_dEnd - _dStart)
+                new_R = max(9, min(E_total,
+                                   int(round(math.exp((_logA - math.log(_d_u)) / _gamma)))))
+            else:
+                # Linear: E/4 -> R across the window (the user's arm (i) start point).
+                # Clamped >= R+1 in-window so BOTH arms spend exactly the 40% hold at the
+                # deployment R -- the linear ramp otherwise touches R a few steps early.
+                start = E_total // 4
+                new_R = max(A.R + 1, int(round(start - (start - A.R) * u)))
+            if RES._CFG["R"] != new_R:
+                print(f"  [anneal] step {step}/{steps} R -> {new_R}", flush=True)
+            RES._CFG["R"] = new_R
+        elif anneal_steps and step == anneal_steps:
+            print(f"  [anneal] step {step}/{steps} window closed, R -> {A.R} (deployment)",
+                  flush=True)
             RES._CFG["R"] = A.R
+            anneal_steps = 0                                 # hold permanently; stop scheduling
         opt.zero_grad(set_to_none=True)
         aux_vals = []
         for _ in range(A.accum):
@@ -197,12 +246,14 @@ def main():
                 lg_t = teacher_logits(b)
                 h = causal.model(b)[0]
                 lg_s = (h @ causal.lm_head.weight.T).float()
-                # Forward KL(teacher || student): CE of the student against the teacher's
-                # distribution, position-averaged. The pure recovery objective.
-                lm = -(torch.softmax(lg_t, -1) *
-                       torch.log_softmax(lg_s, -1)).sum(-1).mean() \
-                     + (torch.softmax(lg_t, -1) * torch.log_softmax(lg_t, -1)).sum(-1).mean()
-                del lg_t, lg_s
+                # Forward KL(teacher || student) at temperature T, position-averaged, scaled
+                # by T^2 (keeps gradient magnitude T-invariant so one LR serves all T).
+                T = A.distill_T
+                pt = torch.softmax(lg_t / T, -1)
+                lm = (T * T) * (
+                    -(pt * torch.log_softmax(lg_s / T, -1)).sum(-1).mean()
+                    + (pt * torch.log_softmax(lg_t / T, -1)).sum(-1).mean())
+                del lg_t, lg_s, pt
             else:
                 h = causal.model(b)[0]                   # logits never materialised (CCE)
                 lm = linear_cross_entropy(h, causal.lm_head.weight, b, shift=True)

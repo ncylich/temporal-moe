@@ -10,8 +10,12 @@ R and swap-budget are both damage axes and complements: R is fine when loose but
    extend the EAGER scan to s swaps/token, BPB at s ∈ {8,4,2,1} at R=8. No fast kernel needed.
 2. Derive schedules from the curves (damage-paced: allocate time where the curve is steep);
    user reviews curves + schedule choice vs the E/4 → 60% cool → 40% hold proposal.
-3. Train arms: (i) user schedule R-only; (ii) damage-paced R-only; (iii) R-then-s combined —
-   gated on the s-curve being smooth near s=1, since only (iii) needs the multi-swap triton kernel.
+3. Train arms: (i) user schedule R-only; (ii) damage-paced R-only; (iii) DROPPED by decision.
+Agreed specs (08-07): both arms hold R=8 for EXACTLY the final 40% (366/915 steps), R >= 9
+strictly in-window. Arm (ii): d(R) = A·R^-γ fitted to the 6-point qwen3 damage curve (γ=1.282,
+log-log LSQ); R(u) inverts the fit so damage rises linearly from d(128) (warm-up sweep, ~1
+step per R above 32) to d(8), clamped [9,128] — dwell monotone into the hold (…55, 111, 366).
+Arm (i): linear 32 → 9 over the window, same clamp and hold.
 
 ## Track 2 — distillation (SECOND: mechanical, runs overnight unattended)
 
