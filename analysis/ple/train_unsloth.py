@@ -57,7 +57,18 @@ def main():
     ap.add_argument("--eval-every", type=int, default=5_000_000)
     ap.add_argument("--eval-seq", type=int, default=16)
     ap.add_argument("--max-minutes", type=float, default=0.0)
+    # Recipe ablations (SWEEP follow-up). --distill: replace the CE objective with KL to the
+    # pristine unconstrained base (teacher = same weights, adapters disabled, residency off,
+    # router/norms restored to their initial values for the teacher pass) -- optimises exactly
+    # what recovery measures. Forces mb=1 (two logit tensors in flight). --r-anneal F:
+    # anneal R linearly from E (free) to the target R over the first F of optimiser steps,
+    # testing whether avoiding the early constraint shock helps.
+    ap.add_argument("--distill", action="store_true")
+    ap.add_argument("--r-anneal", type=float, default=0.0)
+    ap.add_argument("--evict", default="min_logit", choices=("min_logit", "lru"))
     A = ap.parse_args()
+    if A.distill:
+        A.mb = 1
     if A.mb == 0:
         A.mb = 2 if A.family == "qwen3" else 1
     A.accum = max(1, 16_384 // (A.mb * A.seq))          # 16,384 tok/step, matched across models
@@ -99,7 +110,7 @@ def main():
         free = [int(x) for x in A.free_set.split(",")]
     else:
         free = None
-    RES._CFG.update(on=True, R=A.R, evict="min_logit", collect_telem=True)
+    RES._CFG.update(on=True, R=A.R, evict=A.evict, collect_telem=True)
     RES.set_free_layers(free)
 
     # peft froze everything outside the adapters; the sweep's fixed surface also trains
@@ -142,16 +153,59 @@ def main():
                                                 pct_start=0.02, anneal_strategy="cos")
 
 
+    if A.distill:
+        # Pristine router/norm values for the teacher: these train in-place (unlike the
+        # adapters, which disable_adapter() bypasses), so without this the teacher would
+        # drift with the student. ~30 MB total.
+        pristine = {n: p.detach().clone() for n, p in model.named_parameters()
+                    if n.endswith(".gate.weight") or "norm" in n.split(".")[-2]}
+        trained = {}
+
+        def teacher_logits(b):
+            for n, p in model.named_parameters():
+                if n in pristine:
+                    trained[n] = p.detach().clone()
+                    p.data.copy_(pristine[n])
+            RES._CFG["on"] = False
+            with torch.no_grad(), model.disable_adapter():
+                h_t = causal.model(b)[0]
+                lg_t = (h_t @ causal.lm_head.weight.T).float()   # [1, S, V]
+            RES._CFG["on"] = True
+            for n, p in model.named_parameters():
+                if n in trained:
+                    p.data.copy_(trained[n])
+            return lg_t
+
+    E_total = getattr(model.config, "text_config", model.config).num_experts
+    anneal_steps = int(A.r_anneal * steps)
+
     hist, seen, t0, nxt, ptr = [], 0, time.time(), A.eval_every, 0
     for step in range(steps):
+        if anneal_steps and step <= anneal_steps:
+            # Linear R anneal from E (residency inert) down to the target; after the window
+            # the config holds the target permanently.
+            RES._CFG["R"] = max(A.R, int(round(E_total - (E_total - A.R) * step / anneal_steps)))
+        elif anneal_steps and step == anneal_steps + 1:
+            RES._CFG["R"] = A.R
         opt.zero_grad(set_to_none=True)
         aux_vals = []
         for _ in range(A.accum):
             b = corpus[ptr:ptr + A.mb, :A.seq].to("cuda").long()
             ptr = 0 if ptr + 2 * A.mb > len(corpus) else ptr + A.mb
             RU.AUX_LOG.clear()
-            h = causal.model(b)[0]                       # logits never materialised (CCE)
-            lm = linear_cross_entropy(h, causal.lm_head.weight, b, shift=True)
+            if A.distill:
+                lg_t = teacher_logits(b)
+                h = causal.model(b)[0]
+                lg_s = (h @ causal.lm_head.weight.T).float()
+                # Forward KL(teacher || student): CE of the student against the teacher's
+                # distribution, position-averaged. The pure recovery objective.
+                lm = -(torch.softmax(lg_t, -1) *
+                       torch.log_softmax(lg_s, -1)).sum(-1).mean() \
+                     + (torch.softmax(lg_t, -1) * torch.log_softmax(lg_t, -1)).sum(-1).mean()
+                del lg_t, lg_s
+            else:
+                h = causal.model(b)[0]                   # logits never materialised (CCE)
+                lm = linear_cross_entropy(h, causal.lm_head.weight, b, shift=True)
             lm.div(A.accum).backward()                   # aux/z arrive via _AuxInject
             aux_vals.extend(RU.AUX_LOG)
             seen += b.numel()
@@ -197,7 +251,9 @@ def main():
     res = {"tag": A.tag, "family": A.family, "harness": "unsloth", "final_bpb": bpb,
            "final_swap": swap, "free_set": A.free_set, "R": A.R, "lora": A.lora,
            "tokens": seen, "divisor": D, "curve": hist, "trainable": n_tr,
-           "aux_c": A.aux_c, "z_c": A.z_c, "lr": A.lr, "opt": "adamw8bit", "ce": "cce",
+           "aux_c": A.aux_c, "z_c": A.z_c, "lr": A.lr, "opt": "adamw8bit",
+           "ce": "distill_kl" if A.distill else "cce",
+           "r_anneal": A.r_anneal,
            "minutes": (time.time() - t0) / 60}
     try:
         sd = {n: p.detach().to(torch.bfloat16).cpu()

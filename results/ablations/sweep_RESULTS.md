@@ -93,3 +93,19 @@ Nulls verified inert: swap = 0.0000.
    reference tightened accordingly.
 6. Scale trend, now on three axes (training-free BPB cost, adapted BPB cost, downstream
    retained): the rolling-residency constraint gets cheaper as expert count grows.
+
+## Eviction-policy ablation — settled (2026-08-07)
+
+Training-free, R=8 every layer, matched 16-seq slices; producers: the scan kernel's two
+policies (`compute_resident_mask(..., evict=)`, bit-exact-tested in
+`temporal/tests/test_temporal_router.py`), evaluated via the family harnesses.
+
+| model | min_logit | lru | lru penalty | swap min_logit / lru |
+|---|---|---|---|---|
+| OLMoE | **0.839290** | 0.890595 | +0.051 | — |
+| Qwen3-30B | **0.733680** | 0.812270 | +0.079 | 0.9973 / 0.9998 |
+| Qwen3.5 | **0.679861** | 0.716777 | +0.037 | 0.9996 / 1.0000 |
+
+min_logit wins unanimously by 12–26× the noise band: evicting the expert the router
+currently values least keeps the resident set aligned with routing demand, while lru
+churns more (higher swap) and hurts more. min_logit is the policy everywhere, permanently.
