@@ -148,12 +148,16 @@ eviction policy, BPB 2.7507 — a denominator of +2.078 over base. In absolute t
 best arms were: CE (router+norms+LoRA) 0.8149, full 7B finetune F' 0.8106, and that doc
 called ~0.81 "the irreducible constraint price".
 
-The current program measures against the far stronger min_logit warm-rolling impose
-(~0.843, +0.170 over base), so recoveries read smaller while absolute results are better:
-the 100M distillation run's 0.7779 beats the old full-finetune ceiling by 0.033 BPB at
-2.5x fewer tokens. Same eval slice and divisor in both eras (base = 0.6727 in both).
-Rule restated: never compare recovery PERCENTAGES across eras — compare absolute BPB;
-both eras agree OLMoE under all-layers R=8 converges to ~0.78-0.81, never near 0.6727.
+More fundamentally, the Stage-2 era used gate_mass=RENORM — expert weights renormalized
+to sum to 1 over the selection — which on a norm_topk_prob=False model is the WRONG
+convention: it raises top-k gate mass from ~0.40 to 1.0 and scales every MoE block output
+~2.5x over 16 layers (olmoe_gatemass_remeasure.csv, which measures the same untrained R=8
+cell at 2.6717 renorm vs 0.8393 preserve). Every Stage-2 number — impose 2.7507, the
+1.28 router arms, CE 0.8149, full-finetune 0.8106 — trained AND evaluated that different
+intervention. Therefore NO cross-era BPB comparison is valid, absolute or percentage.
+The olmoe_adapt_* files are retained as history of the renorm-era program only. The
+correct-convention record is entirely current-era: untrained impose 0.839 -> best
+adapted (distill, 100M) 0.7779, never near the 0.6727 free base.
 
 Housekeeping (08-08): the fuller historical CSVs (olmoe_adapt_bakeoff.csv with per-arm
 curves, olmoe_adapt_impose.csv with the wikitext derivation) and the two router-parity
