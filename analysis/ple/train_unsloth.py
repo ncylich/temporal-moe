@@ -351,6 +351,9 @@ def main():
                     print(f"  [cache] generating teacher segment rows {bp}..{bp + n} "
                           f"({n * A.seq / 1e6:.0f}M tokens, top-{A.teacher_topk}) "
                           f"{(time.time()-t0)/60:.1f}min", flush=True)
+                    # Free the old segment first: two live segments peak at 2x cache RAM,
+                    # which is what breached the 251GB cgroup cap on 08-07.
+                    cache_v = cache_i = None
                     cache_v, cache_i = generate_cache(bp, n)
                     cache_row0, cache_rows = bp, n
                     print(f"  [cache] segment ready {(time.time()-t0)/60:.1f}min", flush=True)

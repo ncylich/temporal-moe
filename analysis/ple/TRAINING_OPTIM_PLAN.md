@@ -56,6 +56,11 @@ validated at Δ 9.6e-06, never deployed. Makes (d) a fair fight between two opti
 
 - **GEMMs are not a lever**: 451 of 494.7 TFLOP/s, 91% of peak. Time is in gather+scatter (37.5%) and
   the residency scan (14.7% of a block).
+  UPDATE (08-08, profile_moe_step.py on the CURRENT unsloth grouped_mm path, qwen3 mb4): the 37.5%
+  figure was measured on the retired fused library and no longer holds. Whole-step CUDA time now
+  splits ~29% attention (fmha), ~25% unfused elementwise/norm/softmax, ~15% MoE GEMMs, ~10.6%
+  permute/gather/scatter, 4.1% residency scan, 2.3% 8-bit optimizer. Permutation-kernel work
+  (tier 2/3) caps at ~10% step time — parked for 1B; elementwise fusion is the bigger lever.
 - **The scan is ours; Unsloth will not touch it.** Because it's sequential, it barely uses
   parallelization, thus it's effectively O(N) unlike most things which are O(BN) or O(BN^2) in
   training. Therefore, as batch size increases its overhead plummets from as high as ~28% at MB=1 to

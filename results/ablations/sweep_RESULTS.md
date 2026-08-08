@@ -109,3 +109,32 @@ policies (`compute_resident_mask(..., evict=)`, bit-exact-tested in
 min_logit wins unanimously by 12–26× the noise band: evicting the expert the router
 currently values least keeps the resident set aligned with routing demand, while lru
 churns more (higher swap) and hurts more. min_logit is the policy everywhere, permanently.
+
+## 100M distillation campaign — complete (2026-08-08)
+
+Winning recipe per model (distill T=1, KL against the own-base teacher, LR from the 15M
+brackets), 100M tokens, evals every 10M, downstream immediately after each run. Producers:
+`analysis/ple/train_unsloth.py` (Qwen; rolling cached teacher, 5M-token segments, top-2048,
+mass coverage 0.992-0.994), `analysis/ple/train_ple.py` (OLMoE, inline teacher),
+`downstream_trained_unsloth.py` / `downstream.py`. BPB lower is better; downstream is the
+mean over the ten 0-shot tasks (limit 500), scored under R=8 everywhere.
+
+| model | BPB 100M | 15M best | dense floor | null | ds 100M | ds dense bar | ds null |
+|---|---|---|---|---|---|---|---|
+| Qwen3-30B | **0.667648** | 0.671301 | 0.678077 | 0.616034 | **0.6926** | 0.6852 | 0.7198 |
+| Qwen3.5 | **0.662826** | 0.664074 | 0.689223 | 0.623235 | **0.7144** | 0.7028 | 0.7402 |
+| OLMoE | **0.777929** | 0.788727 | 0.672723 | (base 0.6727) | **0.6079** | 0.6006 (OLMo-1B) | — |
+
+Findings:
+7. **All three models clear their dense downstream bars at 100M** (+0.7 to +1.2 acc points);
+   both Qwens also clear the dense BPB floor (by 0.010 / 0.026). OLMoE still fails its BPB
+   floor by 0.105 — at 64 experts / 12.5% residency the constraint's bits are unrecoverable,
+   but task accuracy is not: 80% of downstream damage closed (0.3164 -> 0.6079 vs base 0.6823).
+8. **Token scaling saturates by ~20-40M.** Qwen3.5 15M->100M is flat on both axes (BPB
+   -1.2e-03, inside noise; downstream -0.005, <1 sigma). Qwen3 gains modestly (BPB -3.7e-03,
+   downstream +1.6 sigma) — enough to flip it from under to over the dense bar. OLMoE, least
+   converged at 15M, gains most (-1.1e-02 BPB). Next levers are rank, LR schedule and data
+   quality, not more tokens.
+9. **The cached top-K teacher is free of measurable cost**: at 10M tokens the cached run
+   matched the inline-teacher reference to +3.3e-05 BPB while lifting throughput 3.5k -> 4.3k
+   tok/s (qwen3 mb4). Teacher truncation at top-2048 of the vocab covers 99.2-99.4% of mass.

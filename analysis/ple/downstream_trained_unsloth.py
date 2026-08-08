@@ -94,7 +94,9 @@ def main():
 
     bpb_ids = torch.load(f"{FAM['data']}/bpb_slice_ids_{FAM['suffix']}.pt",
                          weights_only=False)[: A.eval_seq]
-    bpb, swap, ent = TQ.evaluate(model, bpb_ids, D, 1)
+    # mb=2: measured batch-invariant on this stack (bs1-vs-bs2 agreement exactly 1.0),
+    # halves the reload-check wall time.
+    bpb, swap, ent = TQ.evaluate(model, bpb_ids, D, 2)
     model.eval()
     dev = bpb - A.expect_bpb
     print(f"  [reload-check] BPB {bpb:.6f} vs expected {A.expect_bpb:.6f} (dev {dev:+.2e}, "

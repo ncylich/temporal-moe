@@ -45,10 +45,12 @@ import residency_qwen as RQ                                         # noqa: E402
 # qwen3_5, and the two arms should not be read as the same recipe applied twice.
 FAMILY = {
     "qwen3_5": {"mod": "qwen3_5_moe", "experts": "Qwen3_5MoeExperts", "attn": "Qwen3_5MoeAttention",
-                "model": "/workspace/qwen35-adapt/model", "data": "/workspace/qwen35-adapt/data",
+                "model": "/workspace/qwen35-adapt/model", "shm": "/dev/shm/qwen35-model",
+                "data": "/workspace/qwen35-adapt/data",
                 "out": "/workspace/qwen35-adapt/results", "suffix": "qwen"},
     "qwen3":   {"mod": "qwen3_moe", "experts": "Qwen3MoeExperts", "attn": "Qwen3MoeAttention",
-                "model": "/dev/shm/qwen3-30b", "data": "/workspace/qwen3moe-adapt/data",
+                "model": "/workspace/qwen3moe-adapt/model", "shm": "/dev/shm/qwen3-30b",
+                "data": "/workspace/qwen3moe-adapt/data",
                 "out": "/workspace/qwen3moe-adapt/results", "suffix": "qwen3"},
 }
 _CLS = {}
@@ -60,6 +62,10 @@ def resolve(family):
                    fromlist=[f["experts"], f["attn"]])
     _CLS["experts"] = getattr(m, f["experts"])
     _CLS["attn"] = getattr(m, f["attn"])
+    # Prefer a RAM-staged copy when one exists; /dev/shm holds only one 60GB-class model at a
+    # time, so which family is staged changes across the campaign and this must stay a fallback.
+    if os.path.isdir(f["shm"]):
+        f = dict(f, model=f["shm"])
     return f
 
 DATA = "/workspace/qwen35-adapt/data"

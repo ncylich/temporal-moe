@@ -30,6 +30,10 @@ CANDIDATES = {
     "fineweb-edu": ("HuggingFaceFW/fineweb-edu", "sample-10BT", "text"),
     "dclm":        ("mlfoundations/dclm-baseline-1.0-parquet", None, "text"),
     "nemotron-cc": ("nvidia/Nemotron-CC-v2", None, "text"),
+    # Qwen's pretraining mix skews heavily to code+math; these probe whether a mixture
+    # beats pure FineWeb-Edu for the 100M+ adaptation corpus.
+    "finemath":    ("HuggingFaceTB/finemath", "finemath-3plus", "text"),
+    "python-edu":  ("HuggingFaceTB/smollm-corpus", "python-edu", "text"),
 }
 TOKENIZERS = {"qwen3": "/dev/shm/qwen3-30b", "qwen": "/workspace/qwen35-adapt/model"}
 OUT = "/workspace/corpus_candidates"

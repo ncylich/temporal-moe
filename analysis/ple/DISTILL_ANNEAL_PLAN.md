@@ -26,3 +26,24 @@ Arm (i): linear 32 → 9 over the window, same clamp and hold.
 2. LR bracket at 15M with winning T: {3e-5, 1e-4, 3e-4}.
 3. Head-to-heads: best distill vs CE baseline; plus distill+anneal combined if Track 1 won.
 Deferred until these verdicts: λ<1 KL/CE mixtures, any 100M/1B commitment.
+
+## Queue (08-07): verdicts in, distillation won everywhere — 100M campaign
+
+Verdicts: anneal NEGATIVE (100%-hold beats both schedules); distill T=1 optimum on all three
+models; T=0.5 collapses. 15M bests: qwen3 0.671301 (lr 1e-4), olmoe 0.788727 (lr 3e-5),
+q35 distill15M lr 3e-5 in flight (10M eval 0.664297 already beats CE winner 0.665780).
+Chain (autonomous, sequential, fires on q35 15M save):
+1. Downstream gate on the three 15M bests (pre-100M confirmation; ten-task 0-shot suite).
+2. Profiler re-measure of MoE permute cost on the unsloth path (stale 37.5% figure); then
+   cached-teacher smoke (gate: top-K mass coverage > 0.995) and q35 mb4 smoke.
+3. 100M runs, evals every 10M, winning recipe (distill T=1) per model vs its dense floor:
+   qwen3 lr 1e-4 mb4 + 10M rolling teacher cache (floor Qwen3-4B 0.678077, null 0.616034);
+   q35 lr 3e-5 mb4-if-smoke-passes + cache (floor Qwen3.5-4B 0.689223, null 0.623235);
+   olmoe lr 3e-5 (floor OLMo-1B shared-tok 0.672723 — only model still failing its floor).
+4. Wrap-up: tables (recipe grid, 100M curves, dense verdicts), update sweep_RESULTS.md +
+   TRAINING_OPTIM_PLAN.md (profiler findings), commit producers, reproduce.sh, push.
+Parked for 1B: fp8 compute, permutation kernels tier 2-3, causal-conv1d (CUDA-13 toolchain).
+
+OUTCOME (08-08): campaign complete — see sweep_RESULTS.md "100M distillation campaign".
+All three clear dense downstream bars; both Qwens clear dense BPB floors; token axis
+saturates ~20-40M (q35 flat 15M->100M). 1B levers now: rank (r64+), 100M-tuned LR, data.
