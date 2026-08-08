@@ -28,8 +28,6 @@
 #   C = router + learnable RMSNorm gains (OLMoE RMSNorm.weight is learnable -> arm RUNS).
 #   F = full-FT ceiling (8-bit Adam, LR 1e-5) — OPTIONAL, only if GPU idle after C.
 #
-# --- OPTIONAL-IDLE rank screens (per 0074): LoRA rank sweep on the E-recipe, 50M screening, eval 10M. Tests adapter minimality vs E(r32). ---
-# --- OPTIONAL-IDLE arm H (per 0072/0074): E-recipe (router+LoRA r32) + zone-confined anneal R 24->8 over first 50M, hold R=8 for 200M. Tests if expert-representation benefits from a curriculum where routing (B) didn't. ---
 arm,tok_M,adapted_BPB,recovery,swap_rate,usage_entropy,train_R,note
 A,50,1.3468,0.6758,,,8,sweep-winner reference (from olmoe_adapt_sweep.csv lr=3e-4)
 A,100,1.3067,0.6951,,,8,sweep-winner reference
@@ -40,17 +38,17 @@ B,50,2.7264,0.0117,0.9992,0.9878,46,anneal ramp — R=8 eval ~ impose while trai
 B,100,2.6831,0.0325,0.9994,0.9878,27,anneal ramp — still ~impose at R=8 eval
 B,150,1.4830,0.6100,0.9999,0.9916,8,anneal reaches R=8 — BPB drops sharply
 B,200,1.2829,0.7058,0.9999,0.9915,8,R=8 hold
-B,250,1.2788,0.7083,0.9999,0.9918,8,"FINAL — vs arm A 1.2825/70.7%: +0.0037 BPB = <1sigma = NOISE. Anneal wastes first 150M (R=8 eval flat at impose until trainR hits 8); no real gain, less token-efficient. Telemetry clean (swap~1.0 ceiling, ent~0.99 no collapse)."
+B,250,1.2788,0.7083,0.9999,0.9918,8,FINAL — vs arm A 1.2825/70.7%: +0.0037 BPB = <1sigma = NOISE. Anneal wastes first 150M (R=8 eval flat at impose until trainR hits 8); no real gain, less token-efficient. Telemetry clean (swap~1.0 ceiling, ent~0.99 no collapse).
 E,50,0.8642,0.9081,0.9997,0.9975,8,router+LoRA r32 a64 all-expert up/down (234.9M trainable) — already 90.8% at 50M
 E,100,0.8586,0.9108,0.9997,0.9972,8,
 E,150,0.8549,0.9126,0.9997,0.9975,8,
 E,200,0.8513,0.9143,0.9997,0.9974,8,
-E,250,0.8507,0.9143,0.9997,0.9977,8,"FINAL — 91.4% recovery vs router-only 70.7% (arm A). +20.7 pts, 0.432 BPB (~70sigma, NOT noise). LoRA on experts closes nearly the whole residency gap. Telemetry clean (swap~1.0, ent~0.998 no collapse). NOTE ckpt 474MB (234.9M LoRA params)."
-C,50,0.8791,0.9007,0.9998,0.9978,8,"router + RMSNorm gains (133K extra, 2.23M total trainable)"
+E,250,0.8507,0.9143,0.9997,0.9977,8,FINAL — 91.4% recovery vs router-only 70.7% (arm A). +20.7 pts, 0.432 BPB (~70sigma, NOT noise). LoRA on experts closes nearly the whole residency gap. Telemetry clean (swap~1.0, ent~0.998 no collapse). NOTE ckpt 474MB (234.9M LoRA params).
+C,50,0.8791,0.9007,0.9998,0.9978,8,router + RMSNorm gains (133K extra, 2.23M total trainable)
 C,100,0.8627,0.9086,0.9998,0.9982,8,
 C,150,0.8560,0.9118,0.9998,0.9984,8,
 C,200,0.8526,0.9134,0.9998,0.9987,8,
-C,250,0.8505,0.9144,0.9998,0.9988,8,"FINAL — 91.4% recovery, STATISTICALLY IDENTICAL to arm E LoRA (0.8507/91.4%); delta 0.0002 BPB << sigma 0.006. Norm-gain rescaling (133K params) fully matches LoRA (234.9M, 1766x more). => residency gap is a CALIBRATION problem, not expert-capacity. Cheap-surface recipe. Telemetry clean (swap~1.0, ent~0.999)."
+C,250,0.8505,0.9144,0.9998,0.9988,8,FINAL — 91.4% recovery, STATISTICALLY IDENTICAL to arm E LoRA (0.8507/91.4%); delta 0.0002 BPB << sigma 0.006. Norm-gain rescaling (133K params) fully matches LoRA (234.9M, 1766x more). => residency gap is a CALIBRATION problem, not expert-capacity. Cheap-surface recipe. Telemetry clean (swap~1.0, ent~0.999).
 CE,10,0.8584,0.9106,0.9997,0.9974,8,router+norms+LoRA (237M trainable) — screen grid start
 CE,20,0.8413,0.9189,0.9997,0.9982,8,
 CE,30,0.8337,0.9225,0.9997,0.9980,8,
@@ -59,28 +57,30 @@ CE,50,0.8269,0.9258,0.9997,0.9983,8,SCREEN pt: beats E@50M(0.8642) by 6.2sigma +
 CE,100,0.8209,0.9287,0.9997,0.9986,8,
 CE,150,0.8178,0.9302,0.9997,0.9985,8,
 CE,200,0.8158,0.9312,0.9997,0.9986,8,
-CE,250,0.8149,0.9316,0.9997,0.9988,8,"FINAL — 93.2% recovery. Stacked norms+LoRA beats either single mechanism (91.4%) by +1.8pts / 0.0356 BPB (~6sigma). Mechanisms ADD. 3-term: routing 70.7 + calibration 91.4 + capacity-on-top 93.2. Telemetry clean. ckpt 474MB (LoRA) gitignored; full resumable ckpt_bake_CE.pt (2.85GB, F-prime warm-start) local."
+CE,250,0.8149,0.9316,0.9997,0.9988,8,FINAL — 93.2% recovery. Stacked norms+LoRA beats either single mechanism (91.4%) by +1.8pts / 0.0356 BPB (~6sigma). Mechanisms ADD. 3-term: routing 70.7 + calibration 91.4 + capacity-on-top 93.2. Telemetry clean. ckpt 474MB (LoRA) gitignored; full resumable ckpt_bake_CE.pt (2.85GB, F-prime warm-start) local.
 D,50,1.3107,0.6929,0.9999,0.9907,8,router-only + self-distillation (0.5 dataCE + 0.5 softCE from base free-routing teacher)
 D,100,1.2986,0.6987,0.9999,0.9896,8,
 D,150,1.2929,0.7015,0.9999,0.9896,8,
 D,200,1.2875,0.7041,0.9999,0.9891,8,
-D,250,1.2919,0.7020,0.9999,0.9903,8,"FINAL — 70.2%, ~= arm A router-only 70.7% (delta 0.0094 = ~1.6sigma, marginally worse/noise). Distillation gives NO benefit on router-only => the ~70% basin is CAPACITY-limited, not signal-limited. Confirms the plateau interpretation."
-G,50,0.8358,0.9215,0.9998,0.9984,8,"router+norms+LoRA + self-distillation (0.5 dataCE + 0.5 softCE from base free-routing teacher); 150M cap (0.15B fallback per 0071, 250M projected 13h)"
+D,250,1.2919,0.7020,0.9999,0.9903,8,FINAL — 70.2%, ~= arm A router-only 70.7% (delta 0.0094 = ~1.6sigma, marginally worse/noise). Distillation gives NO benefit on router-only => the ~70% basin is CAPACITY-limited, not signal-limited. Confirms the plateau interpretation.
+G,50,0.8358,0.9215,0.9998,0.9984,8,router+norms+LoRA + self-distillation (0.5 dataCE + 0.5 softCE from base free-routing teacher); 150M cap (0.15B fallback per 0071, 250M projected 13h)
 G,100,0.8325,0.9231,0.9998,0.9984,8,
-G,150,0.8306,0.9240,0.9998,0.9984,8,"FINAL(150M) — 92.4%, BELOW CE(no-distill same surface) 93.0%@150M / 93.2%@250M by ~2sigma. Distillation HURTS the rich surface slightly. Combined with D(=A on router-only): base free-routing self-distill adds NOTHING on any surface. Signal is not the bottleneck; trainable SURFACE is. ckpt 474MB (LoRA) gitignored; resumable to 250M via ckpt if wanted."
+G,150,0.8306,0.9240,0.9998,0.9984,8,FINAL(150M) — 92.4%, BELOW CE(no-distill same surface) 93.0%@150M / 93.2%@250M by ~2sigma. Distillation HURTS the rich surface slightly. Combined with D(=A on router-only): base free-routing self-distill adds NOTHING on any surface. Signal is not the bottleneck; trainable SURFACE is. ckpt 474MB (LoRA) gitignored; resumable to 250M via ckpt if wanted.
 Fprime,0,0.8147,0.9317,,,8,merged parent (CE deltas: norms plain + exact LoRA merge; identity check |delta|=0.0002)
 Fprime,25,0.8125,0.9327,0.9997,0.9988,8,full-FT all 6.92B params unfrozen 8-bit Adam lr1e-5
 Fprime,50,0.8116,0.9332,,,8,
 Fprime,100,0.8101,0.9339,,,8,
 Fprime,150,0.8099,0.9340,,,8,
-Fprime,200,0.8106,0.9337,,,8,"FINAL — 93.4% vs merged parent 93.2%, delta +0.0041 BPB = 0.7sigma (< 2sigma bar). SAME plateau = CONSTRAINT PRICE, not capacity floor. Full 7B-param finetuning recovers only +0.2pts over the cheap CE recipe. The ~93.4% ceiling is the intrinsic irreducible cost of R=8 rolling residency; ~6.6% of the base->impose gap cannot be recovered by adaptation."
-Er8,10,0.9155,0.8831,0.9997,0.9967,8,"LoRA r=8 (58.7M trainable, alpha/r=2)"
-Er8,50,0.8956,0.8927,0.9997,0.9972,8,"r=8 FINAL(50M screen) — 89.3%, ~5sigma WORSE than E-r32@50M(0.8642/90.8%). r=8 undershoots; even below norms-alone(C 91.4%,133K). Not promoted."
-Er64,10,0.8896,0.9036,0.9997,0.9973,8,"LoRA r=64 (469.8M trainable, alpha/r=2)"
+Fprime,200,0.8106,0.9337,,,8,FINAL — 93.4% vs merged parent 93.2%, delta +0.0041 BPB = 0.7sigma (< 2sigma bar). SAME plateau = CONSTRAINT PRICE, not capacity floor. Full 7B-param finetuning recovers only +0.2pts over the cheap CE recipe. The ~93.4% ceiling is the intrinsic irreducible cost of R=8 rolling residency; ~6.6% of the base->impose gap cannot be recovered by adaptation.
+# --- OPTIONAL-IDLE rank screens (per 0074): LoRA rank sweep on the E-recipe, 50M screening, eval 10M. Tests adapter minimality vs E(r32). ---
+Er8,10,0.9155,0.8831,0.9997,0.9967,8,LoRA r=8 (58.7M trainable, alpha/r=2)
+Er8,50,0.8956,0.8927,0.9997,0.9972,8,r=8 FINAL(50M screen) — 89.3%, ~5sigma WORSE than E-r32@50M(0.8642/90.8%). r=8 undershoots; even below norms-alone(C 91.4%,133K). Not promoted.
+Er64,10,0.8896,0.9036,0.9997,0.9973,8,LoRA r=64 (469.8M trainable, alpha/r=2)
 Er64,20,0.8720,0.9121,0.9997,0.9975,8,
-Er64,50,0.8592,0.9103,0.9997,0.9974,8,"r=64 FINAL(50M screen) — 91.0%, only +0.2pt over E-r32@50M(90.8%), within noise. Not promoted. => LoRA rank SATURATES ~r=32: r8 undershoots, r64 no better. r=32 is the sweet spot."
-H,50,0.8790,0.9007,0.9998,0.9981,8,"zone-anneal ramp (trainR 24->8) — R=8 eval behind plain E, ramp wasted (mirrors B)"
-H,100,0.8613,0.9092,0.9998,0.9979,8,"R=8 hold phase, catching up"
+Er64,50,0.8592,0.9103,0.9997,0.9974,8,r=64 FINAL(50M screen) — 91.0%, only +0.2pt over E-r32@50M(90.8%), within noise. Not promoted. => LoRA rank SATURATES ~r=32: r8 undershoots, r64 no better. r=32 is the sweet spot.
+# --- OPTIONAL-IDLE arm H (per 0072/0074): E-recipe (router+LoRA r32) + zone-confined anneal R 24->8 over first 50M, hold R=8 for 200M. Tests if expert-representation benefits from a curriculum where routing (B) didn't. ---
+H,50,0.8790,0.9007,0.9998,0.9981,8,zone-anneal ramp (trainR 24->8) — R=8 eval behind plain E, ramp wasted (mirrors B)
+H,100,0.8613,0.9092,0.9998,0.9979,8,R=8 hold phase, catching up
 H,150,0.8572,0.9112,0.9998,0.9976,8,
 H,200,0.8527,0.9134,0.9998,0.9980,8,
-H,250,0.8510,0.9142,0.9997,0.9981,8,"FINAL — 91.4% == arm E (0.8507/91.4%) within noise (delta 0.0003), nowhere near the 0.8387 bar. Zone anneal gives LoRA NO benefit. => the curriculum/anneal axis is DEAD for BOTH routing (B) and capacity (H): what to adapt (surface) matters, the constraint schedule does not."
+H,250,0.8510,0.9142,0.9997,0.9981,8,FINAL — 91.4% == arm E (0.8507/91.4%) within noise (delta 0.0003), nowhere near the 0.8387 bar. Zone anneal gives LoRA NO benefit. => the curriculum/anneal axis is DEAD for BOTH routing (B) and capacity (H): what to adapt (surface) matters, the constraint schedule does not.

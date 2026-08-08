@@ -138,3 +138,23 @@ Findings:
 9. **The cached top-K teacher is free of measurable cost**: at 10M tokens the cached run
    matched the inline-teacher reference to +3.3e-05 BPB while lifting throughput 3.5k -> 4.3k
    tok/s (qwen3 mb4). Teacher truncation at top-2048 of the vocab covers 99.2-99.4% of mass.
+
+## Cross-era reconciliation: why old OLMoE "recovery" numbers looked near-floor
+
+The Stage-2b program (olmoe_adapt_RESULTS.md, 250M tokens/arm) reported 91-93% recovery,
+which reads as "nearly at the free-routing floor". Those percentages were computed against
+that era's impose reference: an untrained R=8 mask with per-sequence COLD-FILL and no
+eviction policy, BPB 2.7507 — a denominator of +2.078 over base. In absolute terms its
+best arms were: CE (router+norms+LoRA) 0.8149, full 7B finetune F' 0.8106, and that doc
+called ~0.81 "the irreducible constraint price".
+
+The current program measures against the far stronger min_logit warm-rolling impose
+(~0.843, +0.170 over base), so recoveries read smaller while absolute results are better:
+the 100M distillation run's 0.7779 beats the old full-finetune ceiling by 0.033 BPB at
+2.5x fewer tokens. Same eval slice and divisor in both eras (base = 0.6727 in both).
+Rule restated: never compare recovery PERCENTAGES across eras — compare absolute BPB;
+both eras agree OLMoE under all-layers R=8 converges to ~0.78-0.81, never near 0.6727.
+
+Housekeeping (08-08): the fuller historical CSVs (olmoe_adapt_bakeoff.csv with per-arm
+curves, olmoe_adapt_impose.csv with the wikitext derivation) and the two router-parity
+checkpoints were ported from FLAME-MoE, which no longer carries adaptation files.
