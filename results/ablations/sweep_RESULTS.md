@@ -155,10 +155,12 @@ convention: it raises top-k gate mass from ~0.40 to 1.0 and scales every MoE blo
 cell at 2.6717 renorm vs 0.8393 preserve). Every Stage-2 number — impose 2.7507, the
 1.28 router arms, CE 0.8149, full-finetune 0.8106 — trained AND evaluated that different
 intervention. Therefore NO cross-era BPB comparison is valid, absolute or percentage.
-The olmoe_adapt_* files are retained as history of the renorm-era program only. The
-correct-convention record is entirely current-era: untrained impose 0.839 -> best
-adapted (distill, 100M) 0.7779, never near the 0.6727 free base.
+The renorm-era files (olmoe_adapt_*, olmoe_cal*, olmoe_scratch_ladder, minflow captures,
+adapt_ckpts, the old plan doc) are quarantined in results/archive/olmoe_renorm_era/ —
+its README states the error and forbids any use of those numbers. The correct-convention
+record is entirely current-era: untrained impose 0.839 -> best adapted (distill, 100M)
+0.7779, never near the 0.6727 free base.
 
-Housekeeping (08-08): the fuller historical CSVs (olmoe_adapt_bakeoff.csv with per-arm
-curves, olmoe_adapt_impose.csv with the wikitext derivation) and the two router-parity
-checkpoints were ported from FLAME-MoE, which no longer carries adaptation files.
+Housekeeping (08-08): before archiving, the fuller historical CSVs (olmoe_adapt_bakeoff
+per-arm curves, olmoe_adapt_impose wikitext derivation) and the two router-parity
+checkpoints were recovered from FLAME-MoE, which remains archived in its original state.
