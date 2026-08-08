@@ -3,7 +3,7 @@
 
 `ple_RESULTS.md` §7 records this as not runnable: "lm_eval is incompatible with transformers 5.12.1
 (`AutoModelForVision2Seq` removed)". That is true of an unguarded import and false of this program --
-`scripts/adaptation/lmeval_downstream.py` had already worked around it two months earlier by stubbing
+`lmeval_downstream.py` (now results/archive/olmoe_wrong_renorm/scripts) had already worked around it two months earlier by stubbing
 the two vision model modules before importing anything from lm_eval, and its 706 KB log is the
 published `olmoe_adapt_downstream.csv`. The blocker was solved in a sibling script and the solution
 was not carried across. Same three lines are at the top of this file.
@@ -22,9 +22,12 @@ of an unattended chain and losing it to a rounding difference costs the whole ru
     downstream.py --csurf csurf_ce_free_0_1_2_at200M.pt --free-set 0,1,2 --tag ce_free_0_1_2_200M
 
 Writes/extends results/ablations/layer_freeing_downstream.csv. Reference columns (base free routing,
-residency imposed untrained, CE-adapted at full residency) are read from the published
-olmoe_adapt_downstream.csv rather than recomputed: same harness, same venv, same tasks, and
-recomputing them would cost an hour to reproduce numbers that are already committed.
+residency imposed untrained, CE-adapted at full residency) are read from
+olmoe_downstream_ref.csv (producer make_downstream_ref.py) rather than recomputed: same harness,
+same venv, same tasks. Until 08-08 the reference was the renorm-era olmoe_adapt_downstream.csv,
+whose impose_R8 (0.3164 mean) and CE_adapt_R8 (0.5888) measured the WRONG gate convention
+(archived: results/archive/olmoe_wrong_renorm) — cells written before then carry inflated
+cell_gap_closed values; the correct-convention floors are impose 0.5723, CE winner 0.5978.
 """
 import sys, types
 
@@ -47,7 +50,7 @@ from lm_eval import simple_evaluate                                  # noqa: E40
 
 TASKS = ["arc_easy", "arc_challenge", "hellaswag", "piqa", "winogrande",
          "openbookqa", "sciq", "boolq", "lambada_openai", "copa"]
-REF = os.path.join(ABLATIONS, "olmoe_adapt_downstream.csv")
+REF = os.path.join(ABLATIONS, "olmoe_downstream_ref.csv")
 OUT = os.path.join(ABLATIONS, "layer_freeing_downstream.csv")
 
 ap = argparse.ArgumentParser()
@@ -228,10 +231,11 @@ for t in TASKS:
 HEADER = ["task", "metric", "base_free", "impose_R8", "CE_adapt_R8", "cell_acc", "cell_se",
           "cell_minus_base", "cell_minus_CE", "cell_gap_closed", "CE_gap_closed",
           "cell", "free_set", "train_tokens", "cell_bpb"]
-NOTE = ("# Downstream 10-task 0-shot for free-set cells. Harness, tasks and metric convention match "
-        "olmoe_adapt_downstream.csv, whose base_free / impose_R8 / CE_adapt_R8 columns are reused "
-        "verbatim rather than recomputed. cell_gap_closed = (cell - impose)/(base_free - impose): "
-        "1.0 is free-routing quality, 0.0 is the untrained mask. Higher is better.")
+NOTE = ("# Downstream 10-task 0-shot for free-set cells. base_free / impose_R8 / CE_adapt_R8 are "
+        "reused verbatim from olmoe_downstream_ref.csv (correct convention, gate_mass=preserve; "
+        "rows before 08-08 joined the renorm-era reference instead — see downstream.py header). "
+        "cell_gap_closed = (cell - impose)/(base_free - impose): 1.0 is free-routing quality, "
+        "0.0 is the untrained mask. Higher is better.")
 
 prior = []
 if os.path.exists(OUT):

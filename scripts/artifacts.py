@@ -46,7 +46,7 @@ LAYOUT = {
     ("extras", "tokenizer_tok16k"): "data/_tok16k_from_extras",
     ("extras", "olmoe_adapt"): "artifacts/olmoe-adapt",
     ("extras", "merged_ce_model"): "artifacts/olmoe-adapt",
-    ("router-adapt", "adapt_ckpts"): "results/ablations",
+    ("router-adapt", "adapt_ckpts"): "results/archive/olmoe_wrong_renorm",
     ("router-adapt", "olmoe_adapt"): "artifacts/olmoe-adapt/data",
     ("router-adapt", "metadata"): "artifacts/olmoe-adapt/metadata",
     ("corpus", "dclm_tokenized"): "data",
@@ -91,6 +91,12 @@ def destination(root, repo, hf_path):
     if (s, first) in {("corpus", "tokenizer"), ("extras", "tokenizer_tok16k"),
                       ("extras", "run_captures")}:
         hf_path = "/".join(hf_path.split("/")[1:])
+    # Renorm-era OLMoE files are quarantined (results/archive/olmoe_wrong_renorm/README.md);
+    # reroute their pulls there so a fetch can never rehydrate them into results/ablations.
+    name = hf_path.split("/")[-1]
+    if s == "extras" and first == "ablations" and (
+            name.startswith(("olmoe_adapt_", "olmoe_minflow_", "olmoe_cal", "olmoe_scratch"))):
+        return os.path.join(root, "results", "archive", "olmoe_wrong_renorm", name)
     return os.path.join(root, base, hf_path)
 
 

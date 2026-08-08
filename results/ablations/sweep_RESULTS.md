@@ -129,7 +129,10 @@ Findings:
 7. **All three models clear their dense downstream bars at 100M** (+0.7 to +1.2 acc points);
    both Qwens also clear the dense BPB floor (by 0.010 / 0.026). OLMoE still fails its BPB
    floor by 0.105 — at 64 experts / 12.5% residency the constraint's bits are unrecoverable,
-   but task accuracy is not: 80% of downstream damage closed (0.3164 -> 0.6079 vs base 0.6823).
+   but task accuracy fares better: 32% of downstream damage closed on the correct-convention
+   basis (untrained R8 floor 0.5723 -> 0.6079 vs base 0.6820), edging the OLMo-1B bar. (An
+   earlier draft said 80%, computed against the renorm-era floor 0.3164 — see the cross-era
+   note below; that basis is invalid.)
 8. **Token scaling saturates by ~20-40M.** Qwen3.5 15M->100M is flat on both axes (BPB
    -1.2e-03, inside noise; downstream -0.005, <1 sigma). Qwen3 gains modestly (BPB -3.7e-03,
    downstream +1.6 sigma) — enough to flip it from under to over the dense bar. OLMoE, least

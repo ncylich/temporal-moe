@@ -29,6 +29,11 @@ norm-gain calibration, LoRA stacking, anneal curricula, self-distillation; the L
 shape; telemetry/forensics methodology), in case any idea is revisited — under the
 correct convention, from scratch.
 
+`scripts/` holds the era's producer code (train_bakeoff, train_cal2, the O-series minflow
+scripts, lmeval harnesses, dense_bracket, forensics). It is the code that implemented the
+wrong convention and writes absolute paths from its original home; keep it for reading,
+never for producing results.
+
 Era distinction within this directory: the `olmoe_minflow_*` capture studies scored
 candidate resident sets by **base softmax mass and never renormalized** (see their
 headers), so they are not convention-poisoned — they are archived as superseded
