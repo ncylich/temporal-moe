@@ -156,7 +156,7 @@ cell at 2.6717 renorm vs 0.8393 preserve). Every Stage-2 number — impose 2.750
 1.28 router arms, CE 0.8149, full-finetune 0.8106 — trained AND evaluated that different
 intervention. Therefore NO cross-era BPB comparison is valid, absolute or percentage.
 The renorm-era files (olmoe_adapt_*, olmoe_cal*, olmoe_scratch_ladder, minflow captures,
-adapt_ckpts, the old plan doc) are quarantined in results/archive/olmoe_renorm_era/ —
+adapt_ckpts, the old plan doc) are quarantined in results/archive/olmoe_wrong_renorm/ —
 its README states the error and forbids any use of those numbers. The correct-convention
 record is entirely current-era: untrained impose 0.839 -> best adapted (distill, 100M)
 0.7779, never near the 0.6727 free base.

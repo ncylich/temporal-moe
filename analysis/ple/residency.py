@@ -360,14 +360,14 @@ def load_c_adapted(model, path=None):
     train_bakeoff.py::save_delta.
 
     ARCHIVED SURFACE: these deltas were trained under the renorm-era gate convention (see
-    results/archive/olmoe_renorm_era/README.md) — load them only to inspect that era's record,
+    results/archive/olmoe_wrong_renorm/README.md) — load them only to inspect that era's record,
     never as an adaptation surface for correct-convention results.
     """
     import os as _os
     from safetensors.torch import load_file
     if path is None:
         _root = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-        path = _os.path.join(_root, "results", "archive", "olmoe_renorm_era", "adapt_ckpts",
+        path = _os.path.join(_root, "results", "archive", "olmoe_wrong_renorm", "adapt_ckpts",
                              "router_bake_C.safetensors")
     sd = load_file(path)
     rp, npar = router_params(model), norm_params(model)
