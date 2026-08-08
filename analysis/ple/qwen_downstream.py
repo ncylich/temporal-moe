@@ -3,7 +3,7 @@
 
 BPB is a held-out likelihood and it is the right instrument for small effects, but it is not what a
 deployment cares about. This scores the same ten 0-shot tasks, with the same harness and the same
-primary-metric convention as `olmoe_adapt_downstream.csv`, so the Qwen columns sit beside the OLMoE
+primary-metric convention as `olmoe_downstream_ref.csv`, so the Qwen columns sit beside the OLMoE
 ones without re-deriving anything.
 
 "Naive" is the point: the constraint is switched on at evaluation time with **no adaptation at all**.
@@ -121,7 +121,7 @@ def main():
         w = csv.writer(f, lineterminator="\n")
         w.writerow([f"# {A.tag} ({A.family}, E={E}, {L} layers): downstream cost of imposing rolling "
                     f"residency with NO adaptation. Ten 0-shot tasks, same harness and metric "
-                    f"convention as olmoe_adapt_downstream.csv. 'free' is the published model; R8/R32 "
+                    f"convention as olmoe_downstream_ref.csv. 'free' is the published model; R8/R32 "
                     f"switch the constraint on at eval time only. BPB on the audited slice is "
                     f"recomputed per arm from the same configuration. Each task subsampled to {A.limit} "
                     f"documents (0 = full); the stderr columns give the resulting precision. Producer: "

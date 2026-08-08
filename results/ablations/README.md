@@ -83,27 +83,10 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `temporal_router_tau_ema_sweep.csv` | Temporal-router τ (min-logit eviction threshold) × EMA-β sweep — swap rate & coverage (audit-scored). | a6000@6f9e02bc |
 | `temporal_router_tau_ema_sweep_selfscored.csv` | Same τ×EMA sweep, self-scored coverage. | a6000@6f9e02bc |
 | `unmask_eval.csv` | Unmask / cross-regime eval — native vs cross-regime metric per scale & paradigm. | a6000@d3fbc238 |
-| `olmoe_adapt_impose.csv` | OLMoE-1B-7B-0125 Stage-0 zero-shot impose (R=k=8 of 64) + R-sweep coherence + audited-slice restatement (base 0.6727 / impose 2.7507 BPB, D=3.1089 byte-derived). | h100@29556cc6, restated h100@dbc9461a |
-| `olmoe_adapt_corpus_audit.md` | Adaptation program provenance: no-unconsumed-tail finding, parent-pool corpus recipe (1B tok, dedup counts), ReMoE/MELINOE budget priors, throughput root cause (HF per-expert python dispatch loop). | h100@92ccb2f2 + updates |
-| `olmoe_adapt_sweep.csv` | Stage-2 router-only LR sweep under R=8 (3e-5/1e-4/3e-4 × 0.25B, full 50M eval series; winner 3e-4, 70.7% recovery, late crossover). | h100@358818ab |
-| `olmoe_adapt_bakeoff.csv` | Stage-2b escalation bake-off, all 11 arms + curves + eval-noise sigma (A/B/D routing 70%; C norms 91.4% == E LoRA; CE winner 93.2%; F' full-FT 93.4% = constraint price; G distill hurts; Er8/Er64 rank saturation; H zone-anneal null). | h100 per-arm commits 0065–0101 |
-| `olmoe_adapt_lmeval_impose.csv` | Stage-0 3-task downstream impose (arc_easy/piqa/obqa collapse under cold R=8 mask). | h100@dbc9461a |
-| `olmoe_adapt_downstream.csv` | Stage-3 downstream 10-task lm-eval, 5 cells: base-free / impose-R8 / CE-adapted-R8 / OLMo-1B-0724 / OLMo-7B-0724 (74.4% accuracy recovery; CE-adapt 0.589 vs dense-1B 0.601; base 0.682 vs dense-7B 0.677). | h100@15200735 + dense bracket h100@01170b04 |
-| `olmoe_adapt_forensics.csv` | Stage-3 de-lex probe battery, CE-adapt vs base-impose (locus flips token->context: ctx-tok -0.004 -> +0.049; generalists -> 0; demand AUC ~0.96 both = non-discriminator). | h100@0124 result commit |
-| `olmoe_adapt_telemetry.csv` | Stage-3 routing telemetry of CE-adapted @R=8 (swap 0.9997 ~= ceiling, dwell 13.4 tok, usage entropy 0.9988). | h100@0125 result commit |
-| `olmoe_scratch_ladder.csv` | Baseline-equivalence: c4val harness validation (ours 2.4730 vs OLMoE-0924 wandb 2.4807) + from-scratch 0924 checkpoint ladder on our slice (20B..524B) -> crossings ~28B (C) / ~46B (CE) tokens, agrees with wandb train-curve 25.7/42.8B. | h100@61db892b + ladder commits |
-| `olmoe_minflow_calib.csv` | O-series captured-mass ladder per layer (windowed + full-4096: static 0.213 / greedy 0.277 / MinFlow-m1 0.327 / top-8 bound 0.405; flat-router coverage finding top-24=0.684). | h100@2aa82d49 + full h100@0137 |
-| `olmoe_minflow_msweep.csv` | O-1 swap-budget m-sweep {1,2,4} (m>1 diagnostic-only, non-deployable: m× fetch bandwidth). | h100@f54f3fb3 |
-| `olmoe_minflow_bpb.csv` | O-2/O-close reward->BPB transfer + the three decisive pairs: replay headroom 0.0231±0.0076; free-vs-drift 0.4034±0.0178; CE winner-gate scan-oracle -0.0113±0.0021 (live scan BEATS forced free-logit oracle -> offline scheduling dead). | h100@0110–0138 commits, final 0130a03a |
-| `olmoe_minflow_capture_meta.json` | O-0 reward-field capture metadata (rank-mass histogram, coverage). | h100@2aa82d49 |
-| `olmoe_cal0.csv` | Cal-0 closed-form moment-matching probe: REJECTED (raw 1.1% / clipped 31.5% recovery; not benign under free routing; cos~0.01 vs learned gains). | h100@e6795ec0 |
-| `olmoe_cal2.csv` | Cal-2 calibrated-init training screen: NULL, undone-to-single-basin (final 0.9262 vs C@50M 0.8791; cos-to-init 1.0->0.17, cos-to-C -0.03->0.44; init axis closed). | h100@9f0ca8ae |
-| `olmoe_adapt_RESULTS.md` | Full adaptation-study writeup (11-arm table, four-part mechanism story, recommendations). | h100@0101 closeout |
 | `ple_results.csv` | Per-layer-embedding experiments, all results in one tidy table (`group` slices it: trained_cell / reference / parity / accounting / coverage / trainfree / calibration / cal_stack / locus / row_norms / heldout). Narrative: [ple_RESULTS.md](ple_RESULTS.md). | ple-adaptation, `analysis/ple/consolidate.py` |
 | `ple_RESULTS.md` | PLE write-up: r=512 ties C@250M at a fifth of the tokens (5x token efficiency, 1 KB/token); mechanism claim REFUTED by the locus probe; LoRA stacking, calibrated init and sequential-vs-joint all null; training-free norm+PLE stack reaches 53.13% but only in the PLE-then-norms order. | ple-adaptation closeout |
 | `layer_freeing_results.csv` | Per-layer residency RELAXATION, a separate line of inquiry (`group`: layer_damage / free_set / trained_cell / reference). Narrative: [layer_freeing_RESULTS.md](layer_freeing_RESULTS.md). | ple-adaptation, `analysis/ple/consolidate.py` |
 | `layer_freeing_RESULTS.md` | Freeing MoE layers 0/1/15 reaches 0.7978 (93.98%), beating F' by 1.07 sigma at +131% resident expert memory and unchanged FLOPs. Per-layer damage is U-shaped, layer 1 worst at 1.99x uniform; solo damage does NOT predict joint value, and the training-free profile is refuted as a design tool — it made the third freed layer worth 5.8x more as layer 2 than as layer 15, and trained at identical memory layer 15 wins by 0.0108 BPB with the better downstream score. Free sets must not be chosen from solo damage. | ple-adaptation closeout |
-| `adapt_ckpts/*.safetensors` | Router-only checkpoints (~4MB each): LR-sweep arms, bake-off router arms (B/C/D), Cal-2. LoRA-bearing ckpts (474MB) remain pod-local by policy. | h100 arm commits |
 | `ple_accounting.csv` | PLE Phase 0 accounting: parameters, per-token flash fetch, RAM-resident basis and training-memory cost at each rung of the rank ladder (32/128/512/full), against one expert swap (12,582,912 B bf16) as the comparator. Confirms every figure in PLE_PLAN.md §2. | ple-adaptation, `analysis/ple/accounting.py --accounting` |
 | `ple_coverage.csv` | PLE Phase 0 coverage: fraction of audited-slice tokens with a PLE row (by type / by occurrence / by eval-loss carried), plus the occurrence-count distribution that says whether those rows can have learned anything. | ple-adaptation, `analysis/ple/accounting.py --coverage --model-for-loss C` |
 | `ple_parity.csv` | PLE Phase 0 parity: the new trainer with the PLE flag off against the adaptation program's unmodified `train_bakeoff.py` arm C, and the run-to-run non-determinism floor measured from two identical flag-off runs. | ple-adaptation, `analysis/ple/parity_report.py` |
@@ -171,6 +154,35 @@ tested and rejected.
 | `mechinterp_oracle.csv` | C7 nonparametric token-identity oracle: best achievable AUC from token id alone, and `I(expert; token id)/H(expert)`, per (layer, expert). The ceiling the linear token probe is measured against. |
 
 ## Files that are not current
+
+### Archived: renorm-era OLMoE adaptation — wrong gate convention, results void
+
+These files moved to `../archive/olmoe_wrong_renorm/` (code in its `scripts/`). They were
+produced with post-top-k renormalization on a `norm_topk_prob=False` model — every BPB,
+recovery and downstream number in them is wrong and must not be used or compared (see the
+archive README; `olmoe_gatemass_remeasure.csv` quantifies the error: same untrained R=8 cell,
+2.6717 renorm vs 0.8393 correct). Rows kept here as a catalog of what the era measured:
+
+| file (now under `../archive/olmoe_wrong_renorm/`) | description (era claims — void) | provenance |
+|---|---|---|
+| `olmoe_adapt_impose.csv` | OLMoE-1B-7B-0125 Stage-0 zero-shot impose (R=k=8 of 64) + R-sweep coherence + audited-slice restatement (base 0.6727 / impose 2.7507 BPB, D=3.1089 byte-derived). | h100@29556cc6, restated h100@dbc9461a |
+| `olmoe_adapt_corpus_audit.md` | Adaptation program provenance: no-unconsumed-tail finding, parent-pool corpus recipe (1B tok, dedup counts), ReMoE/MELINOE budget priors, throughput root cause (HF per-expert python dispatch loop). | h100@92ccb2f2 + updates |
+| `olmoe_adapt_sweep.csv` | Stage-2 router-only LR sweep under R=8 (3e-5/1e-4/3e-4 × 0.25B, full 50M eval series; winner 3e-4, 70.7% recovery, late crossover). | h100@358818ab |
+| `olmoe_adapt_bakeoff.csv` | Stage-2b escalation bake-off, all 11 arms + curves + eval-noise sigma (A/B/D routing 70%; C norms 91.4% == E LoRA; CE winner 93.2%; F' full-FT 93.4% = constraint price; G distill hurts; Er8/Er64 rank saturation; H zone-anneal null). | h100 per-arm commits 0065–0101 |
+| `olmoe_adapt_lmeval_impose.csv` | Stage-0 3-task downstream impose (arc_easy/piqa/obqa collapse under cold R=8 mask). | h100@dbc9461a |
+| `olmoe_adapt_downstream.csv` | Stage-3 downstream 10-task lm-eval, 5 cells: base-free / impose-R8 / CE-adapted-R8 / OLMo-1B-0724 / OLMo-7B-0724 (74.4% accuracy recovery; CE-adapt 0.589 vs dense-1B 0.601; base 0.682 vs dense-7B 0.677). | h100@15200735 + dense bracket h100@01170b04 |
+| `olmoe_adapt_forensics.csv` | Stage-3 de-lex probe battery, CE-adapt vs base-impose (locus flips token->context: ctx-tok -0.004 -> +0.049; generalists -> 0; demand AUC ~0.96 both = non-discriminator). | h100@0124 result commit |
+| `olmoe_adapt_telemetry.csv` | Stage-3 routing telemetry of CE-adapted @R=8 (swap 0.9997 ~= ceiling, dwell 13.4 tok, usage entropy 0.9988). | h100@0125 result commit |
+| `olmoe_scratch_ladder.csv` | Baseline-equivalence: c4val harness validation (ours 2.4730 vs OLMoE-0924 wandb 2.4807) + from-scratch 0924 checkpoint ladder on our slice (20B..524B) -> crossings ~28B (C) / ~46B (CE) tokens, agrees with wandb train-curve 25.7/42.8B. | h100@61db892b + ladder commits |
+| `olmoe_minflow_calib.csv` | O-series captured-mass ladder per layer (windowed + full-4096: static 0.213 / greedy 0.277 / MinFlow-m1 0.327 / top-8 bound 0.405; flat-router coverage finding top-24=0.684). | h100@2aa82d49 + full h100@0137 |
+| `olmoe_minflow_msweep.csv` | O-1 swap-budget m-sweep {1,2,4} (m>1 diagnostic-only, non-deployable: m× fetch bandwidth). | h100@f54f3fb3 |
+| `olmoe_minflow_bpb.csv` | O-2/O-close reward->BPB transfer + the three decisive pairs: replay headroom 0.0231±0.0076; free-vs-drift 0.4034±0.0178; CE winner-gate scan-oracle -0.0113±0.0021 (live scan BEATS forced free-logit oracle -> offline scheduling dead). | h100@0110–0138 commits, final 0130a03a |
+| `olmoe_minflow_capture_meta.json` | O-0 reward-field capture metadata (rank-mass histogram, coverage). | h100@2aa82d49 |
+| `olmoe_cal0.csv` | Cal-0 closed-form moment-matching probe: REJECTED (raw 1.1% / clipped 31.5% recovery; not benign under free routing; cos~0.01 vs learned gains). | h100@e6795ec0 |
+| `olmoe_cal2.csv` | Cal-2 calibrated-init training screen: NULL, undone-to-single-basin (final 0.9262 vs C@50M 0.8791; cos-to-init 1.0->0.17, cos-to-C -0.03->0.44; init axis closed). | h100@9f0ca8ae |
+| `olmoe_adapt_RESULTS.md` | Full adaptation-study writeup (11-arm table, four-part mechanism story, recommendations). | h100@0101 closeout |
+| `adapt_ckpts/*.safetensors` | Router-only checkpoints (~4MB each): LR-sweep arms, bake-off router arms (B/C/D), Cal-2. LoRA-bearing ckpts (474MB) remain pod-local by policy. | h100 arm commits |
+
 
 Everything above is a result someone may cite. These rows are the exceptions, and each one is listed
 because silence about a file is indistinguishable from the file not existing.

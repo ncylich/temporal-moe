@@ -11,7 +11,8 @@ residency is meant to test, and re-measurement showed it accounts for 91.6% of t
 
 So the task collapse in that row is very likely an activation blow-up rather than a routing effect,
 but "very likely" is inference from BPB. This measures it directly, same ten tasks and harness as
-`olmoe_adapt_downstream.csv`, so the corrected row drops into the published table.
+the era table olmoe_adapt_downstream.csv (archived: results/archive/olmoe_wrong_renorm),
+so the corrected row drops into the published table.
 
 Two arms only, which is what the comparison needs:
 
@@ -108,7 +109,8 @@ def main():
                     f"contribute; 'renorm' is the published behaviour, which on this "
                     f"norm_topk_prob=False model also rescales gate mass ~0.40 -> 1.0 and accounts "
                     f"for 91.6% of the measured BPB damage. Ten 0-shot tasks, same harness as "
-                    f"olmoe_adapt_downstream.csv. Producer: analysis/ple/olmoe_downstream_naive.py"])
+                    f"the archived era table (results/archive/olmoe_wrong_renorm). "
+                    f"Producer: analysis/ple/olmoe_downstream_naive.py"])
         w.writerow(["task", "metric", "free", "R8", "free_stderr", "R8_stderr", "delta_R8_vs_free"])
         for t in TASKS:
             for m in ("acc", "acc_norm"):

@@ -2,7 +2,8 @@
 """Locus probe (PLE_PLAN.md §8 item 1): is expert firing predicted by the token, or by its context?
 
 Follows the protocol the adaptation program's hf_delex.py used, so the numbers are comparable to
-`olmoe_adapt_forensics.csv`:
+`olmoe_adapt_forensics.csv` (renorm-era, archived under results/archive/olmoe_wrong_renorm —
+protocol reference only; its numbers are void):
 
   For each expert e in layers 2-6, predict its firing y_e(t) from
       token_AUC   : the current token's embedding E[x_t] alone

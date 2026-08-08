@@ -384,7 +384,8 @@ switched on with **no adaptation at all**. On OLMoE the answer is catastrophic, 
 whole adaptation programme exists. On Qwen3-30B it is not.
 
 Ten 0-shot tasks, full sets (78,459 scored continuations per arm), same harness and metric convention
-as `olmoe_adapt_downstream.csv`. Retention is imposed/free within each model, so it controls for
+as the era table `olmoe_adapt_downstream.csv` (now archived: `../archive/olmoe_wrong_renorm/`).
+Retention is imposed/free within each model, so it controls for
 Qwen simply being the stronger model.
 
 | task | metric | OLMoE 64e @12.5% resident | Qwen3-30B 128e @6.25% resident |
