@@ -36,8 +36,11 @@ never for producing results.
 
 Era distinction within this directory: the `olmoe_minflow_*` capture studies scored
 candidate resident sets by **base softmax mass and never renormalized** (see their
-headers), so they are not convention-poisoned — they are archived as superseded
-old-era exploration, not as wrong results. Everything else listed above is wrong.
+headers), and `olmoe_scratch_ladder.csv`'s ladder rows are **free-routing evals of
+released from-scratch checkpoints** (no residency in the forward at all) — neither is
+convention-poisoned; they are archived as superseded old-era exploration, and the
+ladder remains citable as data (its era *crossing claims* are void with the rest).
+Everything else listed above is wrong.
 
 The correct-convention record lives in `results/ablations/` (see
 `sweep_RESULTS.md`, `olmoe_gatemass_remeasure.csv`, `layer_freeing_RESULTS.md`):

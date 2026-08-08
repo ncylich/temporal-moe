@@ -9,12 +9,12 @@ committed CSV, not from the transcript, so every number below is reproducible fr
 | topic | lives in |
 |---|---|
 | Phase-0 isoflop sweeps, dense floor, temporal MoE, fine-graining at G1/G3 | [`results/ablations/FINDINGS.md`](../../results/ablations/FINDINGS.md) |
-| OLMoE residency adaptation, Stage 2 LR sweep and the eight-arm bake-off | [`results/ablations/olmoe_adapt_RESULTS.md`](../../results/ablations/olmoe_adapt_RESULTS.md) |
+| OLMoE residency adaptation, current program: LR sweeps, distillation recipe, 100M campaign | [`results/ablations/sweep_RESULTS.md`](../../results/ablations/sweep_RESULTS.md) |
 | De-lexicalization, narrative write-up (see the corrections doc first) | [`mechanism/delexicalization.md`](mechanism/delexicalization.md) |
 | What rolling residency does to routing — findings, by claim | [`mechanism/01-findings.md`](mechanism/01-findings.md) |
 | Corrections to the published de-lexicalization write-up | [`mechanism/02-corrections.md`](mechanism/02-corrections.md) |
 | Selection-shaping program: anticipatory loss, bursty loss, Karen, momentum variants | [`ablations/alignment-program.md`](ablations/alignment-program.md) |
-| MinFlow / O-series offline scheduling, and the calibration and init-axis screens (Cal-0, Cal-2) | [`olmoe-adaptation-plan.md`](olmoe-adaptation-plan.md) close-out, and the `olmoe_minflow_*` / `olmoe_cal*` rows of [`results/ablations/README.md`](../../results/ablations/README.md) |
+| Renorm-era OLMoE program (Stage-2 bake-off, MinFlow/O-series, Cal screens) — ARCHIVED, results void | [`results/archive/olmoe_wrong_renorm/README.md`](../../results/archive/olmoe_wrong_renorm/README.md) |
 | Block-local routing, serving floor | [`ablations/local-global-program.md`](ablations/local-global-program.md), [`background/batch1-offload-feasibility.md`](background/batch1-offload-feasibility.md) |
 | Per-CSV index for everything | [`results/ablations/README.md`](../../results/ablations/README.md) |
 
@@ -112,63 +112,45 @@ would isolate earliness from the choice of norm, was never built.
 
 ---
 
-## 3. OLMoE Stage 3: adaptation recovers three quarters of the downstream loss and reproduces the de-lexicalization signature
+## 3. OLMoE: adaptation recovers a third of the downstream loss and edges the dense-1B bar
 
-The Stage-2 bake-off (documented separately) measured recovery in BPB. Stage 3 asks whether that
-transfers to downstream capability. Three cells, 10 tasks, 0-shot: the base model with free
-routing, the base model with the R=8 residency mask imposed and no training, and the CE-adapted
-model (router + RMSNorm gains + LoRA r32, 0.25B tokens) evaluated at R=8.
-Source: [`olmoe_adapt_downstream.csv`](../../results/ablations/olmoe_adapt_downstream.csv).
+Does BPB recovery transfer to downstream capability? Ten tasks, 0-shot, correct convention
+(gate_mass=preserve) throughout: base model with free routing, base with R=8 imposed untrained,
+and the best adapted model (T=1 distillation, 100M tokens) at R=8. Sources:
+[`olmoe_downstream_ref.csv`](../../results/ablations/olmoe_downstream_ref.csv), the
+`olmoe_distill100M` rows of
+[`layer_freeing_downstream.csv`](../../results/ablations/layer_freeing_downstream.csv).
 
-Mean accuracy over the 10 tasks at each task's primary metric (acc_norm for hellaswag and
-openbookqa, acc for the other eight): **base-free 0.715, impose-R8 0.329, CE-adapted-R8 0.617**,
-giving a downstream recovery of **74.7%** of the accuracy the mask destroys. The recovery fraction
-is stable across metric selection (74.4% acc-only to 74.7% primary-metric), so quote it as roughly
-three quarters rather than to a tenth of a point. The absolute means move by about 0.03 with the
-convention (acc-only gives base 0.682, adapted 0.589), while the recovery fraction does not, which
-is why the fraction is the number to quote.
+Mean accuracy (acc-only basis): **base-free 0.6820, impose-R8 0.5723, adapted 0.6079** — the
+adapted model closes **32%** of the accuracy the mask destroys (15M checkpoints: CE 23%,
+distill 27%). The damage concentrates unevenly: sciq is nearly unharmed by the mask
+(0.938 -> 0.915), lambada_openai takes the largest hit (0.706 -> 0.446) and recovers more than
+half of it (0.601), arc_challenge and winogrande recover a third to a half.
 
-That is meaningfully below the 93.2% BPB recovery from the same adapted model. Downstream is the
-harder test, and the residual constraint cost concentrates in the hardest tasks: near-full recovery
-on knowledge and commonsense (sciq recovers to within 0.001 of base after the mask had driven it to
-near-random; piqa, boolq strong), partial on multi-step reasoning (arc_challenge, hellaswag), and
-lambada_openai goes from 0.706 to **0.000** under the untrained mask before recovering to 0.570.
+**The dense-1B bracket.** Against era-matched released dense checkpoints on the same ten tasks,
+the adapted model at R=8 scores 0.6079 against OLMo-1B-0724's 0.6006 — **above the dense-1B
+peer by +0.7pt** — and 0.070 below the OLMo-7B anchor (0.6774). A residency-constrained MoE
+serving from a fifth of its parameters (1.3B active of 7B) now clears the dense model of its
+active size.
 
-**The dense-1B bracket.** Against era-matched released dense checkpoints, the CE-adapted model at
-R=8 scores 0.617 mean against OLMo-1B-0724's 0.630, a gap of **−0.012**. It wins on ARC
-(arc_easy +0.061, arc_challenge +0.036) and ties on sciq and openbookqa. So a residency-constrained
-MoE serving from roughly a fifth of the parameters (1.3B active of 7B total; serving VRAM itself was
-not benchmarked, since Stage 4 was cancelled) lands within about one point of the unconstrained
-dense-1B peer, and 0.091 below the OLMo-7B anchor.
+An earlier version claimed 74.7% recovery from the renorm-era cells (archived:
+`results/archive/olmoe_wrong_renorm/`): the wrong convention crushed the untrained floor to
+0.3164, flattering the fraction. The routing-forensics claim (de-lexicalization signature under
+adaptation) was measured on renorm-era models and awaits a re-run on the current checkpoint.
 
-**Routing forensics: adaptation reproduces the de-lexicalization signature, weakly.** Running the
-Section-4 locus probe on the adapted model asks whether adaptation reshapes routing the way
-training the constraint in from scratch does. It does, in direction: under the untrained R=8 mask
-routing is marginally token-driven (context-minus-token AUC −0.0041), and after CE adaptation the
-sign flips to context-driven (+0.0493), with context AUC rising 0.603→0.673 while token AUC barely
-moves (0.607→0.624). The generalist fraction drops to 0, so experts become more selective, not
-less. Source: [`olmoe_adapt_forensics.csv`](../../results/ablations/olmoe_adapt_forensics.csv).
-
-The effect is real but small and must be sized as such. The underlying AUCs sit at 0.60–0.67
-against a 0.5 chance floor, so the clean signal is the paired context-minus-token difference, not
-the absolute discriminability, and the flip is far milder than the from-scratch 1e19 battery where
-context-dominated experts go from 0% to 88–96%. Demand-prediction AUC is ~0.96 in both cells, a
-non-discriminator here: a ≤1-swap residency schedule is history-forecastable by construction, so
-the mechanism change appears in the locus rather than the forecastability.
-
-**Caveats.** Era-matched, not data-matched (OLMo-1B trained on ~3T Dolma tokens against OLMoE's
-~5.1T). This compares an adapted-under-constraint model against a free dense model, so it is a
-memory-class comparison and not iso-training. Stderr for every downstream cell is in the CSV. The
-forensics is a single probe run over layers 2–6, 16 packs, so its magnitudes are indicative rather
-than replicated; the sign of the locus flip is the load-bearing claim.
+**Caveats.** Era-matched, not data-matched (OLMo-1B ~3T Dolma vs OLMoE ~5.1T). Adapted-under-
+constraint vs free dense is a memory-class comparison, not iso-training. Stderr on the 10-task
+mean is ~0.005; the +0.7pt dense-1B margin is ~1 sigma, "edges" not "beats".
 
 ---
 
-## 4. Adapting under the constraint is far cheaper than training into it
+## 4. Adapting under the constraint is ~1000x cheaper than training toward it
 
 Evaluating the released from-scratch OLMoE-0924 pretraining checkpoints with free routing on the
 same audited held-out slice gives a quality-versus-tokens ladder, which locates where the adapted
-models sit. Source: [`olmoe_scratch_ladder.csv`](../../results/ablations/olmoe_scratch_ladder.csv).
+models sit. Source: [`olmoe_scratch_ladder.csv`](../../results/archive/olmoe_wrong_renorm/olmoe_scratch_ladder.csv)
+(archived with the era program, but its ladder rows are free-routing evals of released
+checkpoints — valid data, listed in the archive README's exception note).
 
 | from-scratch checkpoint | tokens | BPB (free routing) |
 |---|---|---|
@@ -178,18 +160,18 @@ models sit. Source: [`olmoe_scratch_ladder.csv`](../../results/ablations/olmoe_s
 | step55000 | 230B | 0.7565 |
 | step125000 | 524B | 0.7431 |
 
-Interpolating in token space, the CE-adapted model (0.8147 BPB, reached with **0.25B** tokens of
-adaptation under a hard R=8 constraint) matches from-scratch *unconstrained* quality at about
-**46B** tokens. The cheap norms-only arm (0.8505) matches it at about **28B**. That is roughly
-**110–180×** fewer tokens to reach equivalent held-out quality, while running under the residency
-constraint rather than without it.
+Interpolating in token space, the best adapted model (T=1 distillation, **0.1B** tokens under a
+hard R=8 constraint, 0.777929 BPB — `sweep_RESULTS.md` 100M campaign) matches from-scratch
+*unconstrained* quality at about **100B** tokens, and the 15M-token checkpoint (0.788727)
+already sits near **80B**-equivalent: roughly **1000x** fewer tokens. (An earlier 110–180x
+figure interpolated renorm-era adapted BPBs and is void — archive/olmoe_wrong_renorm.)
 
 The harness was independently validated before this claim: the base model's CE on c4 en-validation
 measured 2.4730 nats/token through our perplexity path, against 2.4807 from the published 0924
 wandb run, in the expected direction since 0125 is the improved checkpoint.
 
 **Caveats.** This is equivalence on one held-out slice (dolmino dclm), not across capabilities;
-§3's downstream numbers are the harder comparison and are less favourable. The from-scratch ladder
+§3's downstream numbers are the harder comparison and remain less favourable. The from-scratch ladder
 runs free, the adapted models run constrained, so this measures cost-to-reach-quality and not an
 iso-training comparison. Non-membership of the audited slice rests on dataset identity plus a
 high-index heuristic, not per-shard proof.
@@ -272,37 +254,25 @@ re-derive `ln2 · bytes_per_token` from the exact evaluation and record it in th
 
 ## Per-layer embeddings (PLE)
 
-A rank-512 per-layer embedding table co-trained with router and norm gains reaches 0.848854 BPB at
-50M tokens, tying the C recipe at 250M — 5x token efficiency at 42.5M parameters and 1 KB flash
-traffic per token, holding down to 10.6M and 256 B at r=128. That is the result that survives.
-
-The mechanism does not. Section 8.1's locus probe, run with a no-PLE control on the same code and
-data, shows adding PLE moves context-minus-token by 0.003 in the WRONG direction (0.0932 -> 0.0964).
-By the plan's own clause the gain is generic capacity, not lexical restoration. PLE also adds nothing
-on top of LoRA (0.49 sigma, wrong side, both ranks), calibrated initialisation is worthless in three
-arms and actively harmful from the strongest starting point (1.23 sigma worse than zero-init), and
-sequential-versus-joint is null. Rank does not bind above 128.
-
-A fully training-free stack of calibrated norms plus a calibrated PLE table reaches 53.13% recovery
-with zero gradient steps, but only in the PLE-then-norms order: reversed, it scores -4.54%. A
-rescaling can be fitted last; an additive offset cannot.
-
-Write-up `results/ablations/ple_RESULTS.md`, numbers `results/ablations/ple_results.csv`.
+A rank-512 per-layer embedding table co-trained with router and norm gains reported 5x token
+efficiency against the C recipe, plus a family of mechanism nulls and a 53% training-free
+calibration stack. Every PLE number predates the 08-04 gate-mass fix: the runs and all their
+references are renorm-era, so none of the claims stand (`ple_RESULTS.md` / `ple_results.csv`
+are the era record). The idea itself is untested under the correct convention — a single
+re-run of the headline arm (~2-3h) would settle whether the token-efficiency survives, and is
+the natural first experiment if this line is picked back up.
 
 ## Per-layer residency relaxation
 
-A separate experiment: instead of adapting to the constraint, remove it from chosen layers. The CE
-recipe with MoE layers 0, 1 and 15 unconstrained reaches 0.797810 (93.98%), beating F' (the 6.92B
-full finetune) by 1.07 sigma. Cost is +131% resident expert memory and nothing else — FLOPs are
-unchanged, since both regimes activate exactly top-8 of 64 and residency only restricts which eight
-are eligible. This is the strongest quality in the adaptation line and it concedes the thesis that
-serving memory tracks active parameters.
+Instead of adapting to the constraint, remove it from chosen layers: a freed layer keeps all
+64 experts resident, so this trades serving memory only — FLOPs are unchanged, both regimes
+activate exactly top-8. The correct-convention training-free profile
+(`olmoe_gatemass_remeasure.csv`, solo_L* rows) rises monotonically with depth: layer 15 is the
+most damaging single layer at +0.0223 BPB (2.9x the mean solo share), early layers are mild
+(~+0.006). This is the OPPOSITE of the renorm-era profile, which put layer 1 first — the
+gate-mass artifact inverted the layer ordering. Solo damages sum to 0.122 against 0.169 joint,
+so about a quarter of the constraint's cost is interaction between layers.
 
-Per-layer damage is U-shaped rather than decaying, and layer 1 is the most damaging single layer at
-1.99x the uniform share. Solo damage does not predict joint value: layers 2 and 15 have identical
-solo damage, but the third freed layer is worth 0.198 if it is layer 2 and 0.034 if it is layer 15.
-The training-free ordering also failed to survive adaptation in the one case tested, so damage
-profiles should not be used to pick configurations without a trained check.
-
-Write-up `results/ablations/layer_freeing_RESULTS.md`, numbers
-`results/ablations/layer_freeing_results.csv`.
+The trained free-set arms (ce_free_*, including "three freed layers beat the full finetune")
+are renorm-era and archived; no free-set training exists under the correct convention, so
+which freed set wins after adaptation is open — a cheap (~1.5h) re-run once wanted.
