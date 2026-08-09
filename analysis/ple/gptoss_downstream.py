@@ -75,6 +75,8 @@ def main():
     ap.add_argument("--tag", required=True)
     ap.add_argument("--batch-size", type=int, default=16)
     ap.add_argument("--limit", type=int, default=500)
+    ap.add_argument("--r", type=int, default=None, help="residency R (default: k)")
+    ap.add_argument("--skip-free", action="store_true")
     A = ap.parse_args()
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -89,8 +91,12 @@ def main():
     from lm_eval import simple_evaluate
     from lm_eval.models.huggingface import HFLM
     out_rows = []
-    for arm, on, bs in (("free", False, A.batch_size), ("Rk", True, 1)):
-        CFG.update(on=on, R=k)
+    R = A.r if A.r is not None else k
+    arms = [("free", False, A.batch_size), (f"R{R}", True, 1)]
+    if A.skip_free:
+        arms = arms[1:]
+    for arm, on, bs in arms:
+        CFG.update(on=on, R=R)
         lm = HFLM(pretrained=model, tokenizer=tok, batch_size=bs)
         res = simple_evaluate(model=lm, tasks=TASKS, num_fewshot=0,
                               limit=(A.limit or None), bootstrap_iters=1000)["results"]
