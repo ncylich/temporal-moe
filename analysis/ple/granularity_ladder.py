@@ -27,8 +27,8 @@ DATA = "/workspace/olmoe-adapt/data"
 MODELS = {
     "lfm25": {"path": "/dev/shm/lfm25-8b-base", "slice": "lfm25",
               "E": 32, "k": 4, "arch": "lfm"},
-    "mixtral": {"path": "/dev/shm/mixtral-8x7b", "slice": "mixtral",
-                "E": 8, "k": 2, "arch": "mixtral", "quant8": True},
+    "gemma4": {"path": "/gemma4-26b", "slice": "gemma4",
+               "E": 128, "k": 8, "arch": "gemma4"},
 }
 CFG = {"on": False, "R": 8}
 
@@ -74,39 +74,31 @@ def patch_lfm():
     m.Lfm2MoeSparseMoeBlock.route_tokens_to_experts = route
 
 
-def patch_mixtral():
-    from transformers.models.mixtral import modeling_mixtral as m
-    orig = m.MixtralSparseMoeBlock.forward
-    import torch.nn.functional as F
+def patch_gemma4():
+    from transformers.models.gemma4 import modeling_gemma4 as m
+    import torch.nn as nn
 
     def fwd(self, hidden_states):
-        if not CFG["on"]:
-            return orig(self, hidden_states)
-        b, s, h = hidden_states.shape
-        x = hidden_states.view(-1, h)
-        router_logits = self.gate(x)
-        lg = router_logits.view(b, s, -1).transpose(0, 1).contiguous()
-        with torch.no_grad():
-            mask = compute_resident_mask_accel(lg.float(), CFG["R"], evict="min_logit", swaps=1)
-        masked = router_logits.masked_fill(~mask.transpose(0, 1).reshape(router_logits.shape),
-                                           float("-inf"))
-        # Mixtral: softmax over experts THEN top-k, weights renormalized over the selected pair
-        # (norm_topk equivalent) -- masked softmax + renorm is exactly its convention.
-        probs = F.softmax(masked, dim=-1, dtype=torch.float)
-        weights, selected = torch.topk(probs, self.top_k, dim=-1)
-        weights = weights / weights.sum(dim=-1, keepdim=True)
-        weights = weights.to(hidden_states.dtype)
-        final = torch.zeros_like(x)
-        one = torch.nn.functional.one_hot(selected, num_classes=self.num_experts).permute(2, 1, 0)
-        for e in range(self.num_experts):
-            idx, top_x = torch.where(one[e])
-            if top_x.numel() == 0:
-                continue
-            cur = self.experts[e](x[top_x]) * weights[top_x, idx, None]
-            final.index_add_(0, top_x, cur.to(x.dtype))
-        return final.view(b, s, h), router_logits
+        hidden_states = self.norm(hidden_states)
+        hidden_states = hidden_states * self.scale * self.scalar_root_size
+        expert_scores = self.proj(hidden_states)                     # [B*S, E]
+        router_probabilities = nn.functional.softmax(expert_scores, dim=-1)
+        if CFG["on"]:
+            # eval runs batch 1, so [B*S, E] is [S, E]; scan wants [S, B, E]
+            lg = expert_scores.unsqueeze(1).float()
+            with torch.no_grad():
+                mask = compute_resident_mask_accel(lg, CFG["R"], evict="min_logit", swaps=1)
+            probs_for_topk = router_probabilities.masked_fill(
+                ~mask.squeeze(1), 0.0)
+        else:
+            probs_for_topk = router_probabilities
+        top_k_weights, top_k_index = torch.topk(probs_for_topk, k=self.config.top_k_experts,
+                                                dim=-1)
+        top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)
+        top_k_weights = top_k_weights * self.per_expert_scale[top_k_index]
+        return router_probabilities, top_k_weights, top_k_index
 
-    m.MixtralSparseMoeBlock.forward = fwd
+    m.Gemma4TextRouter.forward = fwd
 
 
 def bpb(model, ids, divisor):
@@ -136,14 +128,9 @@ def main():
 
     from transformers import AutoModelForCausalLM
     kw = {"dtype": torch.bfloat16}
-    if M.get("quant8"):
-        from transformers import BitsAndBytesConfig
-        kw = {"quantization_config": BitsAndBytesConfig(load_in_8bit=True)}
-    model = AutoModelForCausalLM.from_pretrained(M["path"], **kw)
-    if not M.get("quant8"):
-        model = model.to("cuda")
+    model = AutoModelForCausalLM.from_pretrained(M["path"], **kw).to("cuda")
     model.eval()
-    {"lfm": patch_lfm, "mixtral": patch_mixtral}[M["arch"]]()
+    {"lfm": patch_lfm, "gemma4": patch_gemma4}[M["arch"]]()
 
     D = json.load(open(f"{DATA}/bpb_slice_meta_{M['slice']}.json"))["divisor_D"]
     ids = torch.load(f"{DATA}/bpb_slice_ids_{M['slice']}.pt", weights_only=False)[: A.n_seq]
