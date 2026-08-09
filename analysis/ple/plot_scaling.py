@@ -176,8 +176,48 @@ def figure2():
     fig.savefig(os.path.join(OUT, "downstream_scaling.png"), dpi=150, bbox_inches="tight")
 
 
+def figure3():
+    """OLMoE per-layer damage curves + min-cost allocations, from frontier_olmoe.csv."""
+    import re
+    fr = rows("frontier_olmoe.csv")
+    free = next(float(r["bpb"]) for r in fr if r["cell"] == "free")
+    prof, alloc = {}, {}
+    for r in fr:
+        m = re.match(r"solo_L(\d+)_R(\d+)", r["cell"])
+        if m and r["stage"] == "layers":
+            prof[(int(m.group(1)), int(m.group(2)))] = float(r["bpb"]) - free
+        if r["stage"] == "alloc" and r["R_map"]:
+            b = int(r["cell"].split("_B")[1])
+            alloc[b] = {int(x.split(":")[0]): int(x.split(":")[1])
+                        for x in r["R_map"].split(";")}
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.5, 4.8))
+    rc = {8: "#e76f51", 12: "#e9c46a", 16: "#2a9d8f", 24: "#457b9d"}
+    for R in (8, 12, 16, 24):
+        a1.plot(range(16), [1000 * prof[(l, R)] for l in range(16)], "-o",
+                color=rc[R], ms=4, label=f"layer at R={R}")
+    a1.set_xlabel("layer index (others free)")
+    a1.set_ylabel("solo BPB damage (x1e-3)")
+    a1.set_title("per-layer damage curves d_l(R)", fontsize=10)
+    a1.grid(alpha=0.3); a1.legend(fontsize=8); a1.set_xticks(range(0, 16, 2))
+    w = 0.4
+    a2.bar(np.arange(16) - w/2, [alloc[192][l] for l in range(16)], w,
+           color="#e9c46a", label="fitted, 192 slots (1.5x)")
+    a2.bar(np.arange(16) + w/2, [alloc[256][l] for l in range(16)], w,
+           color="#2a9d8f", label="fitted, 256 slots (2x)")
+    a2.axhline(12, color="#e9c46a", ls=":", lw=1.2)
+    a2.axhline(16, color="#2a9d8f", ls=":", lw=1.2)
+    a2.axhline(8, color="gray", ls="--", lw=1, label="floor R=k=8")
+    a2.set_xlabel("layer index"); a2.set_ylabel("allocated slots R_l")
+    a2.set_title("min-cost allocations (dotted = uniform)", fontsize=10)
+    a2.grid(alpha=0.3, axis="y"); a2.legend(fontsize=8); a2.set_xticks(range(0, 16, 2))
+    fig.suptitle("OLMoE per-layer analysis, gate_mass=preserve", y=1.0)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, "olmoe_perlayer.png"), dpi=150, bbox_inches="tight")
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     figure1()
     figure2()
+    figure3()
     print("wrote", OUT)
