@@ -167,3 +167,29 @@ record is entirely current-era: untrained impose 0.839 -> best adapted (distill,
 Housekeeping (08-08): before archiving, the fuller historical CSVs (olmoe_adapt_bakeoff
 per-arm curves, olmoe_adapt_impose wikitext derivation) and the two router-parity
 checkpoints were recovered from FLAME-MoE, which remains archived in its original state.
+
+## Granularity program — complete (2026-08-10)
+
+Seven models, five labs, training-free: base checkpoints on the byte-identical audited
+slice (BPB) and ten 0-shot tasks (downstream); instruct-only gpt-oss on downstream only.
+Producers: granularity_ladder.py, frontier_*.py, downstream_ladder.py,
+gptoss_downstream.py; figures from plot_scaling.py (figures/damage_law.png,
+figures/downstream_scaling.png). Cells in the named CSVs; % = degradation over free.
+
+| % resident | LFM(32) | OLMoE(64) | gpt-oss-20b(32) | qwen3(128) | gemma4(128+sh) | gpt-oss-120b(128) | q35(256+sh) |
+|---|---|---|---|---|---|---|---|
+| 25 (BPB / ds) | 4.2/2.7 | 14.7/12.4 | -/2.9 | 4.1/4.0 | 1.6/0.4 | -/3.1 | 3.5/2.7 |
+| 12.5 | 7.8/6.1 | 25.1/16.1 | -/6.2 | 9.2/7.3 | 4.1/1.8 | -/5.0 | 4.7/3.4 |
+| 6.25 | floor | floor | floor | 19.3/13.2 | 8.4/3.5 | -/4.8 | 6.2/4.7 |
+
+10. **Within-model law**: degradation = C·(k/R)^0.77, fixed-effects R² 0.92 over 22 BPB
+    rungs; C ranges 6.7% (gemma4) to 25.1% (OLMoE) at R=k, ordered by shared expert
+    (~2x cushion, gemma4-vs-qwen3 controlled pair) and router lexicality (OLMoE).
+11. **At fixed memory fraction, sparser models pay less** (direction robust to dropping
+    any model; slope magnitude uncertain ~2x with 3 x-positions). The direct granularity
+    penalty is ~zero: the benefit is mediated entirely by slots-per-active-expert.
+12. **Correct-convention re-runs**: free-set {14,15} is the best OLMoE cell (BPB 0.7600,
+    ds 0.6119 at 15M); PLE fails under both inits (0.8104/0.8182 vs LoRA 0.7887).
+Protocol notes: MXFP4 (gpt-oss) accs shift ~2pts/task across batch shapes (kernel
+numerics, measured at logit level) — every delta uses same-bs arms; downstream cells
+are the batched pad-warmed protocol of all prior tables.
