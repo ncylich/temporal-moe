@@ -135,8 +135,9 @@ active size.
 
 An earlier version claimed 74.7% recovery from the renorm-era cells (archived:
 `results/archive/olmoe_wrong_renorm/`): the wrong convention crushed the untrained floor to
-0.3164, flattering the fraction. The routing-forensics claim (de-lexicalization signature under
-adaptation) was measured on renorm-era models and awaits a re-run on the current checkpoint.
+0.3164, flattering the fraction. The renorm-era routing-forensics claim ("adaptation reproduces
+the de-lexicalization signature") did not survive its re-run — the locus shift turns out to be
+a property of the constraint, not of adaptation; see §6.
 
 **Caveats.** Era-matched, not data-matched (OLMo-1B ~3T Dolma vs OLMoE ~5.1T). Adapted-under-
 constraint vs free dense is a memory-class comparison, not iso-training. Stderr on the 10-task
@@ -226,6 +227,34 @@ pre-clip transients that clipping absorbed with no divergence (dense_1e19 max 7.
 4310; temporal_coarse_1e19 max 12.47 at iter 830). These are mid-run rather than warmup: the dense
 excursion sits near the middle of training, coinciding with the mid-run loss bump rather than the
 opening iterations, and both runs recovered.
+
+---
+
+## 6. Rolling residency forces de-lexicalized routing; models pay in proportion to how lexical they were
+
+Locus probes (ridge AUC: predict each expert's firing from the token embedding vs the mean of
+its 8 excluded neighbours; 16 packs, 5 layers at 12.5-37.5% relative depth, correct convention)
+on all three models, free routing vs untrained R=8, plus free-routing stability metrics.
+Sources: `results/ablations/ple_locus.csv`, `locus_qwen.csv`; producers `locus.py`,
+`locus_qwen.py`.
+
+| model (E) | free ctx-tok | R8 ctx-tok | forced shift | top-8 gate mass | R8 BPB damage |
+|---|---|---|---|---|---|
+| OLMoE (64) | **-0.145** (token AUC 0.837) | +0.100 | **+0.245** | ~0.40 | +0.169 |
+| Qwen3-30B (128) | +0.022 | +0.147 | +0.125 | 0.353 | +0.117 |
+| Qwen3.5 (256) | -0.000 | +0.127 | +0.127 | **0.168** | **+0.057** |
+
+Three claims. (a) The constraint imposes a context-driven routing regime on every model
+(+0.10 to +0.15), and adaptation does not undo it: the OLMoE distill-100M checkpoint sits at
++0.103 vs the untrained +0.100 — recovery happens *inside* the forced regime, so the
+renorm-era "adaptation reproduces the de-lexicalization signature" story is dead. (b) Damage
+tracks the *displacement*: OLMoE's free router is strongly lexical and is dragged twice as far
+as the Qwens', at twice the BPB cost. (c) Where displacement ties (the two Qwens), gate
+concentration discriminates: qwen3 stakes 2.1x more mass on its top-8 than qwen3.5, whose
+diffuse gates plus an always-resident shared expert make each forced substitution cheap.
+Temporal stability does NOT explain the ordering (qwen3's demand is stabler than qwen3.5's:
+churn 0.56 vs 0.39 retained per token). Single probe run per cell; magnitudes indicative,
+orderings are the claim.
 
 ---
 
