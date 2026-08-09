@@ -15,6 +15,7 @@ import sys
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
+from matplotlib.ticker import NullFormatter, NullLocator
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -89,7 +90,10 @@ def figure1():
     ax.set_ylabel("BPB degradation (% over free routing)")
     ax.set_title(f"degradation = C * (k/R)^{-b[-1]:.2f}   fixed-effects R2 = {r2:.2f}",
                  fontsize=10)
-    ax.grid(alpha=0.3, which="both"); ax.legend(fontsize=8)
+    ax.xaxis.set_minor_formatter(NullFormatter())
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.grid(alpha=0.3, which="major"); ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "damage_law.png"), dpi=150)
 
@@ -164,7 +168,10 @@ def figure2():
     ax.set_ylabel("downstream accuracy degradation (% of free)")
     ax.set_title(f"Downstream cost of residency at fixed memory budgets - {n} cells, "
                  f"7 models, 5 labs", fontsize=10)
-    ax.grid(alpha=0.3, which="both")
+    ax.xaxis.set_minor_formatter(NullFormatter())
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.grid(alpha=0.3, which="major")
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "downstream_scaling.png"), dpi=150, bbox_inches="tight")
 
