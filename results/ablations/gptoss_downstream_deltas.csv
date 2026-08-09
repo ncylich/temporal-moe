@@ -1,0 +1,4 @@
+"# gpt-oss downstream deltas: ten 0-shot tasks (limit 500), free routing vs untrained R=k min_logit residency on the same model. Instruct-only models: accuracy deltas are the domain-neutral measure; no BPB cells by design. Producer: analysis/ple/gptoss_downstream.py"
+model,arm,E,k,arc_easy,arc_challenge,hellaswag,piqa,sciq,winogrande,openbookqa,boolq,lambada_openai,copa,mean_acc
+gptoss20b,free,32,4,0.7640,0.4160,0.4240,0.7560,0.9100,0.6580,0.2680,0.7500,0.1780,0.8000,0.5924
+gptoss20b,Rk,32,4,0.7000,0.3540,0.4100,0.7480,0.8860,0.6680,0.2580,0.6560,0.1540,0.8000,0.5634
