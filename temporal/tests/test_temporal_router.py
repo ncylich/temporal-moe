@@ -338,3 +338,21 @@ def test_multiswap_anchor_and_budget():
     # s=1 is byte-identical to the pre-swaps behaviour (default arg path)
     assert torch.equal(compute_resident_mask(lg, k=4, evict="min_logit", swaps=1),
                        compute_resident_mask(lg, k=4, evict="min_logit"))
+
+
+def test_padded_scan_matches_unpadded_columns():
+    """compute_resident_mask_padded on a left-padded batch must reproduce, at every content
+    position, exactly what an unpadded single-column scan produces."""
+    import torch
+    from temporal.temporal_router import compute_resident_mask, compute_resident_mask_padded
+    torch.manual_seed(0)
+    S, E, k = 48, 16, 4
+    seqs = [torch.randn(S - s0, E) for s0 in (0, 7, 23)]
+    starts = torch.tensor([0, 7, 23])
+    logits = torch.full((S, 3, E), -9.0)
+    for b, (s0, seq) in enumerate(zip(starts.tolist(), seqs)):
+        logits[s0:, b] = seq
+    got = compute_resident_mask_padded(logits.cuda(), k, starts, evict="min_logit")
+    for b, (s0, seq) in enumerate(zip(starts.tolist(), starts.tolist() and seqs)):
+        ref = compute_resident_mask(seq.unsqueeze(1).cuda(), k, evict="min_logit")
+        assert torch.equal(got[s0:, b], ref[:, 0]), f"column {b} diverges"

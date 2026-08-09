@@ -21,7 +21,7 @@ for _m in ("lm_eval.models.hf_vlms", "lm_eval.models.vllm_vlms"):
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from temporal.temporal_router import compute_resident_mask_accel     # noqa: E402
+from temporal.temporal_router import compute_resident_mask_padded    # noqa: E402
 
 TASKS = ["arc_easy", "arc_challenge", "hellaswag", "piqa", "sciq", "winogrande",
          "openbookqa", "boolq", "lambada_openai", "copa"]
@@ -45,13 +45,17 @@ def patch(model):
         router_logits = nn.functional.linear(hidden_states, self.router.weight,
                                              self.router.bias)
         if CFG["on"]:
-            # bs=1 REQUIRED for constrained arms: lm_eval LEFT-pads batches, and pad
-            # tokens ahead of content corrupt the scan cold-fill (measured: arc_easy 0.67
-            # at bs=1 vs 0.63 at bs=16). The [S,B,E] reshape is kept for correctness.
+            # Pad-aware scan (starts from the attention mask when present; zeros = plain
+            # scan). NOTE the measured bs-sensitivity turned out to be generic kernel
+            # numerics, not padding: the protocol fix is same-bs arms, enforced in main().
             lg = router_logits.view(batch_size, -1, router_logits.shape[-1])
             lg = lg.transpose(0, 1).contiguous().float()
+            starts = CFG.get("starts")
+            if starts is None or starts.shape[0] != batch_size:
+                starts = torch.zeros(batch_size, dtype=torch.long)
             with torch.no_grad():
-                mask = compute_resident_mask_accel(lg, CFG["R"], evict="min_logit", swaps=1)
+                mask = compute_resident_mask_padded(lg, CFG["R"], starts,
+                                                    evict="min_logit", swaps=1)
             router_logits = router_logits.masked_fill(
                 ~mask.transpose(0, 1).reshape(router_logits.shape), float("-inf"))
         with on_device(router_logits.device):
@@ -66,7 +70,13 @@ def patch(model):
     for layer in model.model.layers:
         layer.mlp.forward = T.MethodType(fwd, layer.mlp)
         n += 1
-    print(f"[gptoss] rebound {n} mlp forwards (mxfp4 masked routing)", flush=True)
+    orig_model_fwd = model.forward
+    def model_fwd(*args, **kwargs):
+        am = kwargs.get("attention_mask")
+        CFG["starts"] = (am.long().argmax(dim=1).cpu() if am is not None else None)
+        return orig_model_fwd(*args, **kwargs)
+    model.forward = model_fwd
+    print(f"[gptoss] rebound {n} mlp forwards (mxfp4 pad-aware masked routing)", flush=True)
 
 
 def main():
@@ -92,7 +102,7 @@ def main():
     from lm_eval.models.huggingface import HFLM
     out_rows = []
     R = A.r if A.r is not None else k
-    arms = [("free", False, A.batch_size), (f"R{R}", True, 1)]
+    arms = [("free", False, A.batch_size), (f"R{R}", True, A.batch_size)]
     if A.skip_free:
         arms = arms[1:]
     for arm, on, bs in arms:
@@ -117,8 +127,10 @@ def main():
         w = csv.writer(f)
         if not exists:
             f.write('"# gpt-oss downstream deltas: ten 0-shot tasks (limit 500), free routing vs '
-                    'untrained R=k min_logit residency on the same model. Instruct-only models: '
-                    'accuracy deltas are the domain-neutral measure; no BPB cells by design. '
+                    'untrained R min_logit residency on the same model, BOTH ARMS AT THE SAME BATCH SIZE: '
+                    'kernel numerics shift accs ~2pts/task across batch shapes (free arm 0.68 bs1 '
+                    'vs 0.70 bs16, arc_easy@100) so cross-bs deltas are invalid. Instruct-only '
+                    'models: accuracy deltas are the domain-neutral measure; no BPB cells. '
                     'Producer: analysis/ple/gptoss_downstream.py"\n')
             w.writerow(["model", "arm", "E", "k"] + TASKS + ["mean_acc"])
         for arm, accs, mean in out_rows:

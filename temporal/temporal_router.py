@@ -314,6 +314,26 @@ def _triton_scan(logits, k, use_lru, swaps=1):
     return out.view(torch.bool)
 
 
+def compute_resident_mask_padded(logits, k, starts, evict="lru", swaps=1):
+    """Pad-aware scan for LEFT-padded batches: column b's real content begins at starts[b].
+
+    Pure wrapper: each column is rolled so its first real token sits at t=0, the existing
+    (verified) scan runs unchanged - so the cold-fill lands on the first REAL token exactly
+    as in an unbatched call - and the mask is rolled back. Positions before starts[b] are
+    padding; their returned mask rows are whatever the roll wraps around (their router
+    outputs are never attended to or scored). Bit-equivalent to scanning each column's
+    content alone.
+    """
+    S, B, E = logits.shape
+    starts = starts.to(logits.device).long()                       # [B]
+    ar = torch.arange(S, device=logits.device)
+    fwd_idx = (ar[:, None] + starts[None, :]) % S                  # [S, B]
+    shifted = logits.gather(0, fwd_idx[:, :, None].expand(S, B, E))
+    mask = compute_resident_mask_accel(shifted, k, evict=evict, swaps=swaps)
+    back_idx = (ar[:, None] - starts[None, :]) % S                 # [S, B]
+    return mask.gather(0, back_idx[:, :, None].expand(S, B, E))
+
+
 def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0, swaps=1):
     """Resident mask via a GPU fast path; identical result to compute_resident_mask.
 
