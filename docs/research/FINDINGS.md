@@ -274,6 +274,8 @@ most damaging single layer at +0.0223 BPB (2.9x the mean solo share), early laye
 gate-mass artifact inverted the layer ordering. Solo damages sum to 0.122 against 0.169 joint,
 so about a quarter of the constraint's cost is interaction between layers.
 
-The trained free-set arms (ce_free_*, including "three freed layers beat the full finetune")
-are renorm-era and archived; no free-set training exists under the correct convention, so
-which freed set wins after adaptation is open — a cheap (~1.5h) re-run once wanted.
+The corrected profile pays off in both uses: fitting per-layer d_l(R) curves and greedily
+allocating a slot budget beats uniform-R at iso-memory by ~5e-3 BPB untrained (converging
+to parity on adapted surfaces; `frontier_olmoe.csv` alloc rows), and training the standard
+distill recipe with the profile's picks {14,15} freed gives the best OLMoE cells in the
+program (BPB 0.7600, downstream 0.6119 at 15M — vs 0.7887/0.6017 all-constrained).
