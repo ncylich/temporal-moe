@@ -97,7 +97,8 @@ def _router_forward(self, hidden_states):
         with torch.no_grad():
             scan = (RES.compute_resident_mask_accel
                     if (lg.is_cuda and _CFG.get("accel", True)) else RES.compute_resident_mask)
-            mask = scan(lg.float(), _CFG["R"], evict=_CFG["evict"])    # [S, B, E] bool, R per token
+            mask = scan(lg.float(), _CFG["R"], evict=_CFG["evict"],
+                        swaps=_CFG.get("swaps", 1))                    # [S, B, E] bool, R per token
         if _CFG.get("collect_telem"):
             RES._accum_telem(mask)
         used = router_logits.masked_fill(~mask.transpose(0, 1).reshape(N, E), float("-inf"))

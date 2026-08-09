@@ -102,6 +102,9 @@ def _router_forward(self, hidden_states):
     router_logits = F.linear(hidden_states, self.weight)                 # [N, E]
     N, E = router_logits.shape
     R = _CFG["R"]
+    _rmap = _CFG.get("R_map")
+    if _rmap is not None and _li is not None:
+        R = _rmap.get(_li, R)                    # per-layer residency budget (frontier allocation)
     b, s = getattr(self, "_resid_shape", (1, N))
     lg = router_logits.view(b, s, E).transpose(0, 1).contiguous()        # [S, B, E]
     forced = _CFG.get("forced")
@@ -110,7 +113,8 @@ def _router_forward(self, hidden_states):
     else:
         with torch.no_grad():
             scan = compute_resident_mask_accel if (lg.is_cuda and _CFG.get("accel", True)) else compute_resident_mask
-            mask = scan(lg.float(), R, evict=_CFG["evict"])              # [S,B,E] bool, R True/token
+            mask = scan(lg.float(), R, evict=_CFG["evict"],
+                        swaps=_CFG.get("swaps", 1))                      # [S,B,E] bool, R True/token
     if _CFG["collect_telem"]:
         _accum_telem(mask)                                       # swap-rate + usage (eval, R=8)
     mask_flat = mask.transpose(0, 1).reshape(N, E)
