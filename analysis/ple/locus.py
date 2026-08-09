@@ -74,16 +74,22 @@ def main():
     ap.add_argument("--table", default=None)
     ap.add_argument("--csurf", default=None)
     ap.add_argument("--lora", type=int, default=0)
+    ap.add_argument("--lora-attn", type=int, default=0,
+                    help="attention-LoRA rank of the checkpoint (campaign csurfs use 32)")
     ap.add_argument("--packs", type=int, default=16)
     ap.add_argument("--seqlen", type=int, default=2048)
     ap.add_argument("--layers", default="2,3,4,5,6")
     ap.add_argument("--w", type=int, default=8, help="context window = k")
+    ap.add_argument("--free", action="store_true",
+                    help="probe FREE routing (residency off) instead of R=8")
     A = ap.parse_args()
 
     from transformers.models.olmoe.modeling_olmoe import OlmoeTopKRouter
     model, _ = RES.load_model()
     if A.lora:
         LORA_PS = RES.add_lora(model, r=A.lora, alpha=2 * A.lora)
+    if A.lora_attn:
+        ATTN_PS = RES.add_lora_attn(model, r=A.lora_attn, alpha=2 * A.lora_attn)
     if A.csurf:
         ck = torch.load(A.csurf, map_location="cuda")
         # The trainer's parameter list is router + norms + LoRA, in that order, so the
@@ -92,7 +98,8 @@ def main():
         # trained LoRA tensor and leaving LoRA at its zero-init no-op. That reconstructed
         # ce_ple_128 at 1.1652 BPB when the cell had trained to 0.8327. The assert makes the
         # mismatch loud instead of silent.
-        tp = RES.router_params(model) + RES.norm_params(model) + (LORA_PS if A.lora else [])
+        tp = (RES.router_params(model) + RES.norm_params(model)
+              + (LORA_PS if A.lora else []) + (ATTN_PS if A.lora_attn else []))
         assert len(tp) == len(ck["masters"]), \
             f"param/checkpoint mismatch: {len(tp)} params vs {len(ck['masters'])} masters"
         with torch.no_grad():
@@ -111,7 +118,10 @@ def main():
     routers = [m for m in model.modules() if isinstance(m, OlmoeTopKRouter)]
     for i, r in enumerate(routers):
         r.register_forward_hook(_hook(i))
-    RES.enable_residency(R=8)
+    if A.free:
+        RES.disable_residency()
+    else:
+        RES.enable_residency(R=8)
     model.eval()
     E = model.config.num_experts
     emb = model.model.embed_tokens.weight.detach()
