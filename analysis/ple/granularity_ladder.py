@@ -123,6 +123,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True, choices=sorted(MODELS))
     ap.add_argument("--n-seq", type=int, default=16)
+    ap.add_argument("--cells", default=None,
+                    help="comma R list overriding the default fraction ladder")
     A = ap.parse_args()
     M = MODELS[A.model]
 
@@ -159,7 +161,9 @@ def main():
     free = None
     free = cell("free")
     assert free < 1.5, f"free BPB implausible ({free}) - slice or model wiring is wrong"
-    for R in fractions(M["E"], M["k"]):
+    Rs = ([int(x) for x in A.cells.split(",")] if A.cells
+          else fractions(M["E"], M["k"]))
+    for R in Rs:
         v = cell(f"R{R}", R=R)
         assert v > free - 0.01, f"constrained beat free ({v} vs {free}) - masking not engaged"
     fh.close()

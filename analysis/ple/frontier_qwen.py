@@ -37,6 +37,8 @@ def main():
     ap.add_argument("--eval-seq", type=int, default=16)
     ap.add_argument("--mb", type=int, default=2)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--r-list", default=None,
+                    help="comma R list: run ONLY these grid cells (s=1, both surfaces)")
     A = ap.parse_args()
     adapter_file, expect_adapted, expect_impose = ADAPTER[A.family]
 
@@ -96,6 +98,14 @@ def main():
               f"swap={sw:.4f} ({time.time()-t0:.0f}s)", flush=True)
         return v
 
+    if A.r_list:
+        for surface in ("base", "distill100M"):
+            set_surface(surface)
+            for R in (int(x) for x in A.r_list.split(",")):
+                cell("grid", surface, f"R{R}_s1", R=R, swaps=1)
+        fh.close()
+        print(f"FRONTIER {A.family.upper()} EXTRA CELLS COMPLETE", flush=True)
+        return
     set_surface("base")
     v_r8 = cell("smoke", "base", "R8_s1")
     assert abs(v_r8 - expect_impose) < 0.02, f"impose anchor off: {v_r8} vs {expect_impose}"
