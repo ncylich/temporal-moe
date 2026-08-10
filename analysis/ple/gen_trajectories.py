@@ -61,7 +61,8 @@ def main():
         if p["idx"] in done:
             continue
         ids = tok.apply_chat_template([{"role": "user", "content": p["text"]}],
-                                      add_generation_prompt=True, return_tensors="pt")
+                                      add_generation_prompt=True, return_tensors="pt",
+                                      return_dict=True)["input_ids"]
         if ids.shape[1] > A.max_prompt_tok:
             skipped += 1
             continue
