@@ -30,7 +30,7 @@ MODELS = {
     "gemma4": {"path": "/gemma4-26b", "slice": "gemma4",
                "E": 128, "k": 8, "arch": "gemma4"},
 }
-CFG = {"on": False, "R": 8}
+CFG = {"on": False, "R": 8, "free_set": None, "R_map": None}
 
 
 def fractions(E, k):
@@ -83,11 +83,18 @@ def patch_gemma4():
         hidden_states = hidden_states * self.scale * self.scalar_root_size
         expert_scores = self.proj(hidden_states)                     # [B*S, E]
         router_probabilities = nn.functional.softmax(expert_scores, dim=-1)
-        if CFG["on"]:
+        li = getattr(self, "_layer_idx", None)
+        fs = CFG.get("free_set")
+        freed = not CFG["on"] or (fs is not None and li in fs)
+        if not freed:
+            R = CFG["R"]
+            rm = CFG.get("R_map")
+            if rm is not None and li is not None:
+                R = rm.get(li, R)                # per-layer residency budget (allocation cells)
             # eval runs batch 1, so [B*S, E] is [S, E]; scan wants [S, B, E]
             lg = expert_scores.unsqueeze(1).float()
             with torch.no_grad():
-                mask = compute_resident_mask_accel(lg, CFG["R"], evict="min_logit", swaps=1)
+                mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
             probs_for_topk = router_probabilities.masked_fill(
                 ~mask.squeeze(1), 0.0)
         else:
@@ -99,6 +106,100 @@ def patch_gemma4():
         return router_probabilities, top_k_weights, top_k_index
 
     m.Gemma4TextRouter.forward = fwd
+
+
+def tag_gemma4(model):
+    """Index router instances in depth order so free_set/R_map layer indices mean what they say."""
+    from transformers.models.gemma4 import modeling_gemma4 as m
+    n = 0
+    for mod in model.modules():
+        if isinstance(mod, m.Gemma4TextRouter):
+            mod._layer_idx = n
+            n += 1
+    return n
+
+
+R_LAYER = [8, 12, 16, 24]
+
+
+def perlayer(A, M, model, ids, D):
+    """gemma4 per-layer damage curves d_l(R) + fitted greedy allocation vs uniform, base
+    checkpoint only (no adapted surface exists for this model). Mirror of the frontier_qwen.py
+    --perlayer stage; smoke anchors abort before the long part."""
+    import math
+    L = tag_gemma4(model)
+    ALL = list(range(L))
+    print(f"  [perlayer] {L} MoE routers tagged", flush=True)
+    out = os.path.join(ABLATIONS, "perlayer_gemma4.csv")
+    exists = os.path.exists(out)
+    fh = open(out, "a", newline="")
+    w = csv.writer(fh)
+    if not exists:
+        fh.write('"# gemma4 per-layer damage d_l(R): solo layer l constrained at R, others free, '
+                 'base checkpoint; then fitted greedy allocation vs uniform at iso-memory slot '
+                 'budgets. Training-free, min_logit <=1 swap/token, model-convention gating. '
+                 'free_set: ALL = every layer free, all_but_l = solo cell. damage = bpb - free '
+                 'bpb. Producer: analysis/ple/granularity_ladder.py --perlayer"\n')
+        w.writerow(["stage", "cell", "R", "free_set", "R_map", "bpb", "damage", "n_seq", "secs"])
+
+    free = {"v": None}
+
+    def cell(stage, name, R=8, free_set=None, fs_tag="", r_map=None):
+        CFG.update(on=True, R=R, free_set=set(free_set) if free_set is not None else None,
+                   R_map=r_map)
+        t0 = time.time()
+        v = bpb(model, ids, D)
+        w.writerow([stage, name, R, fs_tag,
+                    "" if r_map is None else ";".join(f"{k}:{v2}" for k, v2 in
+                                                      sorted(r_map.items())),
+                    f"{v:.6f}", "" if free["v"] is None else f"{v-free['v']:+.6f}",
+                    A.n_seq, f"{time.time()-t0:.1f}"])
+        fh.flush()
+        print(f"  [{stage}] {name:24} R={R} BPB={v:.6f} ({time.time()-t0:.0f}s)", flush=True)
+        return v
+
+    # smoke: free + impose anchors from the ladder rows, R_map parity, solo sanity
+    v_free = cell("smoke", "free", free_set=ALL, fs_tag="ALL")
+    free["v"] = v_free
+    assert abs(v_free - 0.6449) < 0.02, f"free anchor off: {v_free}"
+    v_r8 = cell("smoke", "R8_all")
+    assert abs(v_r8 - 0.6996) < 0.02, f"impose anchor off: {v_r8}"
+    v_map = cell("smoke", "R8_via_uniform_R_map", r_map={i: 8 for i in ALL})
+    assert abs(v_map - v_r8) < 1e-5, f"R_map parity broken: {v_map} vs {v_r8}"
+    v_solo = cell("smoke", "solo_L00_R8", free_set=[x for x in ALL if x != 0],
+                  fs_tag="all_but_0")
+    assert v_free - 0.01 < v_solo < v_r8, f"solo cell implausible: {v_solo}"
+    print("  [smoke] ALL SMOKES PASS", flush=True)
+
+    d = {(0, 8): v_solo - v_free}
+    for l in range(L):
+        for R in R_LAYER:
+            if (l, R) in d:
+                continue
+            d[(l, R)] = cell("layers", f"solo_L{l:02d}_R{R}", R=R,
+                             free_set=[x for x in ALL if x != l], fs_tag=f"all_but_{l}") - v_free
+
+    fit = {}
+    for l in range(L):
+        xs = [math.log(R) for R in R_LAYER]
+        ys = [math.log(max(d[(l, R)], 1e-6)) for R in R_LAYER]
+        n = len(xs)
+        b = (n * sum(x * y for x, y in zip(xs, ys)) - sum(xs) * sum(ys)) / \
+            (n * sum(x * x for x in xs) - sum(xs) ** 2)
+        a = (sum(ys) - b * sum(xs)) / n
+        fit[l] = (math.exp(a), -b)                      # d_l(R) ~ A * R^-g
+    pred = lambda l, R: fit[l][0] * R ** (-fit[l][1])                    # noqa: E731
+    for budget in (12 * L, 16 * L):
+        alloc = {l: 8 for l in range(L)}
+        for _ in range(budget - 8 * L):
+            best = max(range(L), key=lambda l: pred(l, alloc[l]) - pred(l, alloc[l] + 1))
+            alloc[best] += 1
+        print(f"  [alloc] budget={budget}: " +
+              " ".join(f"L{l}:{alloc[l]}" for l in range(L)), flush=True)
+        cell("alloc", f"fitted_B{budget}", r_map=alloc)
+        cell("alloc", f"uniform_B{budget}", R=budget // L)
+    fh.close()
+    print("PERLAYER GEMMA4 COMPLETE", flush=True)
 
 
 def bpb(model, ids, divisor):
@@ -125,6 +226,8 @@ def main():
     ap.add_argument("--n-seq", type=int, default=16)
     ap.add_argument("--cells", default=None,
                     help="comma R list overriding the default fraction ladder")
+    ap.add_argument("--perlayer", action="store_true",
+                    help="per-layer d_l(R) curves + fitted allocation (gemma4 only)")
     A = ap.parse_args()
     M = MODELS[A.model]
 
@@ -136,6 +239,11 @@ def main():
 
     D = json.load(open(f"{DATA}/bpb_slice_meta_{M['slice']}.json"))["divisor_D"]
     ids = torch.load(f"{DATA}/bpb_slice_ids_{M['slice']}.pt", weights_only=False)[: A.n_seq]
+
+    if A.perlayer:
+        assert M["arch"] == "gemma4", "--perlayer is wired for the gemma4 patch only"
+        perlayer(A, M, model, ids, D)
+        return
 
     out = os.path.join(ABLATIONS, "granularity_ladder.csv")
     exists = os.path.exists(out)

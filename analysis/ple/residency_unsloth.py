@@ -100,11 +100,15 @@ def _forward(self, hidden_states):
     used = router_logits
     if not freed:
         E = router_logits.shape[1]
+        R = _CFG["R"]
+        _rmap = _CFG.get("R_map")
+        if _rmap is not None and li is not None:
+            R = _rmap.get(li, R)                 # per-layer residency budget (frontier allocation)
         lg = router_logits.view(B, S, E).transpose(0, 1).contiguous()   # [S, B, E]
         with torch.no_grad():
             scan = (RES.compute_resident_mask_accel
                     if (lg.is_cuda and _CFG.get("accel", True)) else RES.compute_resident_mask)
-            mask = scan(lg.float(), _CFG["R"], evict=_CFG["evict"],
+            mask = scan(lg.float(), R, evict=_CFG["evict"],
                         swaps=_CFG.get("swaps", 1))
         if _CFG.get("collect_telem"):
             RES._accum_telem(mask)

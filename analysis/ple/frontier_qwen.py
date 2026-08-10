@@ -27,8 +27,102 @@ from paths import ABLATIONS                                          # noqa: E40
 
 ADAPTER = {"qwen3": ("unsloth_distill100M_T1_lr1e-4_adapter.pt", 0.667648, 0.7337),
            "qwen3_5": ("unsloth_distill100M_T1_lr3e-5_adapter.pt", 0.662826, 0.6799)}
-R_GRID, S_GRID = [8, 12, 16, 24, 32], [1, 2, 4]
+R_GRID, S_GRID, R_LAYER = [8, 12, 16, 24, 32], [1, 2, 4], [8, 12, 16, 24]
 FIELDS = ["stage", "surface", "cell", "R", "swaps", "bpb", "swap_rate", "n_seq", "secs"]
+PL_FIELDS = ["stage", "surface", "cell", "R", "free_set", "R_map", "bpb", "swap_rate",
+             "n_seq", "secs"]
+
+
+def perlayer(A, model, set_surface, bpb_ids, D, L, expect_impose):
+    """d_l(R) curves (solo layer constrained, others free), power-law fit, greedy allocation
+    validated jointly via R_map against uniform at iso-memory. Mirror of frontier_olmoe.py's
+    layers/alloc stages; all layers measured (cells are ~6s on this path, no subsampling)."""
+    import math
+    ALL = list(range(L))
+    out = os.path.join(ABLATIONS, f"perlayer_{A.family}.csv")
+    exists = os.path.exists(out)
+    fh = open(out, "a", newline="")
+    w = csv.DictWriter(fh, fieldnames=PL_FIELDS)
+    if not exists:
+        fh.write(f'"# {A.family} per-layer damage d_l(R): solo layer l constrained at R, others '
+                 f'free, base surface; then fitted greedy allocation vs uniform at iso-memory '
+                 f'slot budgets, both surfaces. Training-free, min_logit <=1 swap/token, '
+                 f'gate_mass=preserve. free_set column: ALL = every layer free, all_but_l = solo '
+                 f'cell. Producer: analysis/ple/frontier_qwen.py --perlayer"\n')
+        w.writeheader()
+
+    def cell(stage, surface, name, R=8, free_set=None, fs_tag="", r_map=None):
+        RES._CFG.update(on=True, R=R, evict="min_logit", collect_telem=True, swaps=1,
+                        R_map=r_map)
+        RES.set_free_layers(free_set)
+        t0 = time.time()
+        v, sw, _ = TQ.evaluate(model, bpb_ids, D, A.mb)
+        model.eval()
+        w.writerow({"stage": stage, "surface": surface, "cell": name, "R": R,
+                    "free_set": fs_tag,
+                    "R_map": "" if r_map is None else ";".join(
+                        f"{k}:{v2}" for k, v2 in sorted(r_map.items())),
+                    "bpb": f"{v:.6f}", "swap_rate": f"{sw:.4f}", "n_seq": A.eval_seq,
+                    "secs": f"{time.time()-t0:.1f}"})
+        fh.flush()
+        print(f"  [{stage}] {surface:12} {name:24} R={R} BPB={v:.6f} swap={sw:.4f} "
+              f"({time.time()-t0:.0f}s)", flush=True)
+        return v
+
+    # smoke: free anchor, impose anchor, R_map parity through the NEW plumbing, solo sanity
+    set_surface("base")
+    v_free = cell("smoke", "base", "free", free_set=ALL, fs_tag="ALL")
+    v_r8 = cell("smoke", "base", "R8_s1")
+    assert abs(v_r8 - expect_impose) < 0.02, f"impose anchor off: {v_r8} vs {expect_impose}"
+    assert v_free < v_r8 - 0.02, f"free anchor not below impose: {v_free} vs {v_r8}"
+    v_map = cell("smoke", "base", "R8_via_uniform_R_map", r_map={i: 8 for i in ALL})
+    # NOT 1e-5 as on the OLMoE path: the unsloth experts forward accumulates with atomic
+    # index_add_, which is run-to-run nondeterministic at ~2-3e-4 BPB (the committed frontier
+    # R8 cell moves that much across identical runs). 1e-3 still catches any real R_map error,
+    # the smallest of which (off-by-one layer index) measures ~2e-2.
+    assert abs(v_map - v_r8) < 1e-3, f"R_map parity broken: {v_map} vs {v_r8}"
+    v_solo = cell("smoke", "base", "solo_L00_R8", free_set=[x for x in ALL if x != 0],
+                  fs_tag="all_but_0")
+    assert v_free - 0.01 < v_solo < v_r8, f"solo cell implausible: {v_solo}"
+    print("  [smoke] ALL SMOKES PASS", flush=True)
+    if A.smoke:
+        fh.close()
+        return
+
+    # per-layer damage curves, base surface
+    d = {(0, 8): v_solo - v_free}
+    for l in range(L):
+        for R in R_LAYER:
+            if (l, R) in d:
+                continue
+            v = cell("layers", "base", f"solo_L{l:02d}_R{R}", R=R,
+                     free_set=[x for x in ALL if x != l], fs_tag=f"all_but_{l}")
+            d[(l, R)] = v - v_free
+
+    # fit d_l(R) ~ A * R^-g per layer, greedy marginal allocation, joint validation
+    fit = {}
+    for l in range(L):
+        xs = [math.log(R) for R in R_LAYER]
+        ys = [math.log(max(d[(l, R)], 1e-6)) for R in R_LAYER]
+        n = len(xs)
+        b = (n * sum(x * y for x, y in zip(xs, ys)) - sum(xs) * sum(ys)) / \
+            (n * sum(x * x for x in xs) - sum(xs) ** 2)
+        a = (sum(ys) - b * sum(xs)) / n
+        fit[l] = (math.exp(a), -b)
+    pred = lambda l, R: fit[l][0] * R ** (-fit[l][1])                     # noqa: E731
+    for budget in (12 * L, 16 * L):
+        alloc = {l: 8 for l in range(L)}
+        for _ in range(budget - 8 * L):
+            best = max(range(L), key=lambda l: pred(l, alloc[l]) - pred(l, alloc[l] + 1))
+            alloc[best] += 1
+        print(f"  [alloc] budget={budget}: " +
+              " ".join(f"L{l}:{alloc[l]}" for l in range(L)), flush=True)
+        for surface in ("base", "distill100M"):
+            set_surface(surface)
+            cell("alloc", surface, f"fitted_B{budget}", r_map=alloc)
+            cell("alloc", surface, f"uniform_B{budget}", R=budget // L)
+    fh.close()
+    print(f"PERLAYER {A.family.upper()} COMPLETE", flush=True)
 
 
 def main():
@@ -39,6 +133,8 @@ def main():
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--r-list", default=None,
                     help="comma R list: run ONLY these grid cells (s=1, both surfaces)")
+    ap.add_argument("--perlayer", action="store_true",
+                    help="per-layer d_l(R) curves + fitted allocation (perlayer_{family}.csv)")
     A = ap.parse_args()
     adapter_file, expect_adapted, expect_impose = ADAPTER[A.family]
 
@@ -67,11 +163,15 @@ def main():
             for n, t in src.items():
                 params[n].data.copy_(t.to(params[n].dtype))
 
-    RU.install(model)
+    L = RU.install(model)
     RES.set_free_layers(None)
     model.eval()
     bpb_ids = torch.load(f"{FAM['data']}/bpb_slice_ids_{FAM['suffix']}.pt",
                          weights_only=False)[: A.eval_seq]
+
+    if A.perlayer:
+        perlayer(A, model, set_surface, bpb_ids, D, L, expect_impose)
+        return
 
     out = os.path.join(ABLATIONS, f"frontier_{A.family}.csv")
     exists = os.path.exists(out)
