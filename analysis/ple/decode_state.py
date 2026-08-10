@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Stateful decode-time residency: the rolling rule carried across generate() forwards.
+
+Teacher-forced scoring sees all router logits in one forward, so the batch scan suffices.
+Real generation runs through the KV cache -- each decode forward sees ONE token's logits --
+so the resident set must persist across forwards. This module holds that state and applies
+the instruct-serving protocol:
+
+    prefill  (S > 1): FREE routing (no mask). The verified batch scan runs observe-only over
+                      the prompt logits and its final resident set seeds the decode state.
+                      A prefill also RESETS the layer's state, so back-to-back generate()
+                      calls need no external bookkeeping.
+    decode   (S == 1): one reference `_step` per token (the exact loop body of
+                      compute_resident_mask, reused by import -- not a reimplementation),
+                      then the token routes inside the returned resident set.
+
+min_logit eviction only (the program's policy; refresh state is an lru concept and is
+carried as zeros purely to satisfy _step's signature). Parity with the batch scan on
+identical logit streams is asserted by test_decode_state.py.
+"""
+import torch
+
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from temporal.temporal_router import (  # noqa: E402
+    compute_resident_mask, compute_resident_mask_accel, _step,
+)
+
+DEC = {"on": False, "R": 8, "swaps": 1, "state": {}}   # state[layer] = (resident[B,E], refresh)
+
+
+def reset():
+    DEC["state"].clear()
+
+
+def prefill(layer, lg):
+    """Observe-only over prompt logits lg [S,B,E]; seed state; return None (no mask)."""
+    with torch.no_grad():
+        scan = compute_resident_mask_accel if lg.is_cuda else compute_resident_mask
+        mask = scan(lg.float(), DEC["R"], evict="min_logit", swaps=DEC["swaps"])
+    DEC["state"][layer] = (mask[-1].clone(), torch.zeros_like(lg[0], dtype=torch.float))
+    return None
+
+
+def step(layer, lt):
+    """One decode token: lt [B,E] raw selection signal. Returns resident bool mask [B,E]."""
+    st = DEC["state"].get(layer)
+    with torch.no_grad():
+        if st is None:                          # cold start (no prefill): scan's t=0 cold fill
+            resident = torch.zeros_like(lt, dtype=torch.bool)
+            _, top_i = lt.float().topk(DEC["R"], dim=-1)
+            resident.scatter_(1, top_i, True)
+            refresh = torch.zeros_like(lt, dtype=torch.float)
+        else:
+            resident, refresh = st
+            for _ in range(DEC["swaps"]):
+                resident, refresh = _step(lt.float(), resident, refresh,
+                                          torch.zeros((), device=lt.device), use_lru=False)
+    DEC["state"][layer] = (resident, refresh)
+    return resident
+
+
+def route(layer, lg):
+    """Dispatch on shape: lg [S,B,E]. Returns mask [S,B,E] or None (prefill = free)."""
+    if not DEC["on"]:
+        return None
+    if lg.shape[0] > 1:
+        return prefill(layer, lg)
+    return step(layer, lg[0]).unsqueeze(0)

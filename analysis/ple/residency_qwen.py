@@ -98,11 +98,17 @@ def _router_forward(self, hidden_states):
             R = _rmap.get(_li, R)                # per-layer residency budget (frontier allocation)
         b, s = getattr(self, "_resid_shape", (1, N))
         lg = router_logits.view(b, s, E).transpose(0, 1).contiguous()  # [S, B, E]
-        with torch.no_grad():
-            scan = (RES.compute_resident_mask_accel
-                    if (lg.is_cuda and _CFG.get("accel", True)) else RES.compute_resident_mask)
-            mask = scan(lg.float(), R, evict=_CFG["evict"],
-                        swaps=_CFG.get("swaps", 1))                    # [S, B, E] bool, R per token
+        if _CFG.get("decode_mode"):    # generation: stateful rule across forwards, prefill free
+            import decode_state as _DS
+            mask = _DS.route(_li, lg)
+            if mask is None:                                           # prefill observe = free
+                mask = torch.ones_like(lg, dtype=torch.bool)
+        else:
+            with torch.no_grad():
+                scan = (RES.compute_resident_mask_accel
+                        if (lg.is_cuda and _CFG.get("accel", True)) else RES.compute_resident_mask)
+                mask = scan(lg.float(), R, evict=_CFG["evict"],
+                            swaps=_CFG.get("swaps", 1))                # [S, B, E] bool, R per token
         _ef = _CFG.get("enforce_from", 0)
         if _ef:        # instruct protocol: prefill positions free, rule enforced from response
             mask[:_ef] = True

@@ -59,8 +59,15 @@ def patch_lfm():
         sel_signal = scores + self.expert_bias if self.use_expert_bias else scores
         b, s = self._resid_shape
         lg = sel_signal.view(b, s, -1).transpose(0, 1).contiguous()
-        with torch.no_grad():
-            mask = compute_resident_mask_accel(lg.float(), CFG["R"], evict="min_logit", swaps=1)
+        if CFG.get("decode_mode"):     # generation: stateful rule across forwards, prefill free
+            import decode_state as _DS
+            mask = _DS.route(getattr(self, "_layer_idx", id(self)), lg)
+            if mask is None:
+                mask = torch.ones_like(lg, dtype=torch.bool)
+        else:
+            with torch.no_grad():
+                mask = compute_resident_mask_accel(lg.float(), CFG["R"], evict="min_logit",
+                                                   swaps=1)
         ef = CFG.get("enforce_from", 0)
         if ef:         # instruct protocol: prefill positions free, rule enforced from response
             mask[:ef] = True
@@ -96,8 +103,14 @@ def patch_gemma4():
                 R = rm.get(li, R)                # per-layer residency budget (allocation cells)
             # eval runs batch 1, so [B*S, E] is [S, E]; scan wants [S, B, E]
             lg = expert_scores.unsqueeze(1).float()
-            with torch.no_grad():
-                mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
+            if CFG.get("decode_mode"):  # generation: stateful rule across forwards, prefill free
+                import decode_state as _DS
+                mask = _DS.route(getattr(self, "_layer_idx", id(self)), lg)
+                if mask is None:
+                    mask = torch.ones_like(lg, dtype=torch.bool)
+            else:
+                with torch.no_grad():
+                    mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
             ef = CFG.get("enforce_from", 0)
             if ef:     # instruct protocol: prefill positions free, rule enforced from response
                 mask[:ef] = True

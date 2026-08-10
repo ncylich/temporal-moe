@@ -108,7 +108,12 @@ def _router_forward(self, hidden_states):
     b, s = getattr(self, "_resid_shape", (1, N))
     lg = router_logits.view(b, s, E).transpose(0, 1).contiguous()        # [S, B, E]
     forced = _CFG.get("forced")
-    if forced is not None:                                               # O-2: use a precomputed schedule mask
+    if _CFG.get("decode_mode"):        # generation: stateful rule across forwards, prefill free
+        import decode_state as _DS
+        mask = _DS.route(_li, lg)
+        if mask is None:                                                # prefill observe = free
+            mask = torch.ones_like(lg, dtype=torch.bool)
+    elif forced is not None:                                             # O-2: use a precomputed schedule mask
         mask = forced[self._layer_idx].to(lg.device)                    # [S,B,E] bool for this layer
     else:
         with torch.no_grad():
