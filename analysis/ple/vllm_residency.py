@@ -37,22 +37,44 @@ def set_step(spans):
 
 def apply(layer, router_logits):
     """router_logits [N,E] flattened across spans -> same tensor with non-resident
-    experts masked to -inf on DECODE rows only. Prefill rows pass through free."""
+    experts masked to -inf on DECODE rows only. Prefill rows pass through free.
+
+    All decode rows advance in ONE batched reference _step (the scan's step is batched
+    over B); with hundreds of concurrent requests a per-request loop would be
+    kernel-launch-bound -- the exact pathology this stack exists to escape."""
     if not DEC["on"] or STEP["spans"] is None:
         return router_logits
     N = router_logits.shape[0]
     total = sum(n for _, n, _ in STEP["spans"])
     assert total == N, f"span/token mismatch: spans cover {total}, logits have {N}"
     out = router_logits.clone()
+    dec_rows, dec_keys, cold = [], [], []
     o = 0
     for req_id, n, is_prefill in STEP["spans"]:
         key = (req_id, layer)
-        lg = router_logits[o:o + n].unsqueeze(1)                     # [n, 1, E]
         if is_prefill:
-            DS.observe_chunk(key, lg)
+            DS.observe_chunk(key, router_logits[o:o + n].unsqueeze(1))
         else:
             assert n == 1, f"decode span with {n} tokens"
-            resident = DS.step(key, lg[0])                           # [1, E] bool
-            out[o] = out[o].masked_fill(~resident[0], float("-inf"))
+            if key not in DEC["state"]:
+                cold.append((key, o))                # rare: no prefill seen (cold fill)
+            else:
+                dec_rows.append(o)
+                dec_keys.append(key)
         o += n
+    for key, row in cold:
+        resident = DS.step(key, router_logits[row:row + 1])
+        out[row] = out[row].masked_fill(~resident[0], float("-inf"))
+    if dec_rows:
+        with torch.no_grad():
+            lt = router_logits[dec_rows].float()                     # [D, E]
+            resident = torch.cat([DEC["state"][k][0] for k in dec_keys])
+            refresh = torch.cat([DEC["state"][k][1] for k in dec_keys])
+            for _ in range(DEC["swaps"]):
+                resident, refresh = DS._step(lt, resident, refresh,
+                                             torch.zeros((), device=lt.device),
+                                             use_lru=False)
+        for j, k in enumerate(dec_keys):
+            DEC["state"][k] = (resident[j:j + 1], refresh[j:j + 1])
+        out[dec_rows] = out[dec_rows].masked_fill(~resident, float("-inf"))
     return out
