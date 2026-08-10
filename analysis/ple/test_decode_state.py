@@ -28,7 +28,15 @@ def check(device):
     DS.reset()                                          # cold start: no prefill at all
     got = torch.stack([DS.step(0, logits[t]) for t in range(S)])
     assert torch.equal(got, ref), f"cold-start mismatch on {device}"
-    print(f"  parity OK on {device} (S={S}, E={E}, R={R}, prefixes 32/1/cold)")
+
+    # chunked prefill observe (vLLM path): observing [0:13],[13:40],[40:64] then stepping
+    # must equal a single full-prefix prefill at 64.
+    DS.reset()
+    for a, b in ((0, 13), (13, 40), (40, 64)):
+        DS.observe_chunk(0, logits[a:b])
+    got = torch.stack([DS.step(0, logits[t]) for t in range(64, S)])
+    assert torch.equal(got, ref[64:]), f"chunked-observe mismatch on {device}"
+    print(f"  parity OK on {device} (S={S}, E={E}, R={R}, prefixes 32/1/cold/chunked)")
 
 
 if __name__ == "__main__":

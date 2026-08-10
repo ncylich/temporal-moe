@@ -61,6 +61,29 @@ def step(layer, lt):
     return resident
 
 
+def observe_chunk(layer, lg):
+    """Observe a prefill CHUNK lg [T,B,E] without masking, carrying state across chunks
+    (vLLM chunked prefill). First chunk token cold-fills iff no state exists (the scan's
+    t=0 rule); every other token is one reference _step. Equivalent to running the batch
+    scan over the concatenated chunks -- asserted by test_decode_state.py."""
+    st = DEC["state"].get(layer)
+    t0 = 0
+    with torch.no_grad():
+        if st is None:
+            resident = torch.zeros_like(lg[0], dtype=torch.bool)
+            _, top_i = lg[0].float().topk(DEC["R"], dim=-1)
+            resident.scatter_(1, top_i, True)
+            refresh = torch.zeros_like(lg[0], dtype=torch.float)
+            t0 = 1
+        else:
+            resident, refresh = st
+        for t in range(t0, lg.shape[0]):
+            for _ in range(DEC["swaps"]):
+                resident, refresh = _step(lg[t].float(), resident, refresh,
+                                          torch.zeros((), device=lg.device), use_lru=False)
+    DEC["state"][layer] = (resident, refresh)
+
+
 def route(layer, lg):
     """Dispatch on shape: lg [S,B,E]. Returns mask [S,B,E] or None (prefill = free)."""
     if not DEC["on"]:
