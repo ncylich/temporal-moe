@@ -52,6 +52,7 @@ def main():
     M = MODELS[A.model]
     if A.path:
         M = dict(M, path=A.path)
+    assert os.path.isdir(M["path"]), f"checkpoint dir missing: {M['path']}"
 
     model, tok, _ = load(A.model, M)
     if M["arch"] == "gemma4":
@@ -86,10 +87,15 @@ def main():
         for task, lim in suite:
             set_decode_arm(M, R)
             t0 = time.time()
-            res = simple_evaluate(model=lm, tasks=[task], limit=lim,
-                                  apply_chat_template=True,
-                                  gen_kwargs="do_sample=False",
-                                  confirm_run_unsafe_code=True)
+            try:
+                res = simple_evaluate(model=lm, tasks=[task], limit=lim,
+                                      apply_chat_template=True,
+                                      gen_kwargs="do_sample=False",
+                                      confirm_run_unsafe_code=True)
+            except Exception as e:      # one broken task must not kill the arm's other cells
+                print(f"  [{A.model}] {arm_name} {task}: FAILED {type(e).__name__}: {e}",
+                      flush=True)
+                continue
             secs = time.time() - t0
             # group tasks (e.g. mmlu_flan_cot_fewshot): report the aggregate, not 57 subtasks
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
