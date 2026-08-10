@@ -84,4 +84,37 @@ def install():
         return final_hidden_states.view(orig_shape)
 
     mo.OlmoeMoE.forward = olmoe_moe_forward
-    print("[vllm_glue] runner + olmoe patches installed", flush=True)
+
+    # qwen3.5 (MoE block shared with qwen3-next): the model's own convention
+    # renormalizes over the selection, so masking logits is exact -- no mass
+    # correction. Shared expert lives inside FusedMoE and stays free (correct:
+    # not a swap candidate). The copied body is the external-router, non-SP path;
+    # constrained runs on other paths fail loudly instead of silently free-running.
+    from vllm.model_executor.models import qwen3_next as mq
+    from decode_state import DEC as _DEC
+    orig_q3n = mq.Qwen3NextSparseMoeBlock.forward
+
+    def q3n_forward(self, hidden_states, already_sequence_parallel=False):
+        if self.experts.is_internal_router or self.is_sequence_parallel:
+            assert not _DEC["on"], \
+                "constrained run needs external router and no sequence parallelism"
+            return orig_q3n(self, hidden_states, already_sequence_parallel)
+        orig_shape = hidden_states.shape
+        hidden_states = hidden_states.view(-1, orig_shape[-1])
+        router_logits, _ = self.gate(hidden_states)
+        router_logits = VR.apply(id(self), router_logits)
+        final = self.experts(hidden_states=hidden_states, router_logits=router_logits)
+        return final.view(orig_shape)
+
+    mq.Qwen3NextSparseMoeBlock.forward = q3n_forward
+
+    # gemma4: custom routing function renormalizes over the selection -> masking
+    # the (external) router logits is exact here too.
+    from vllm.model_executor.models import gemma4 as mg
+    orig_g4 = mg.Gemma4MoE.forward
+
+    def g4_forward(self, x, router_logits):
+        return orig_g4(self, x, VR.apply(id(self), router_logits))
+
+    mg.Gemma4MoE.forward = g4_forward
+    print("[vllm_glue] runner + olmoe/qwen3_5/gemma4 patches installed", flush=True)
