@@ -61,6 +61,9 @@ def patch_lfm():
         lg = sel_signal.view(b, s, -1).transpose(0, 1).contiguous()
         with torch.no_grad():
             mask = compute_resident_mask_accel(lg.float(), CFG["R"], evict="min_logit", swaps=1)
+        ef = CFG.get("enforce_from", 0)
+        if ef:         # instruct protocol: prefill positions free, rule enforced from response
+            mask[:ef] = True
         masked = sel_signal.masked_fill(~mask.transpose(0, 1).reshape(sel_signal.shape),
                                         float("-inf"))
         _, selected = torch.topk(masked, k=self.top_k, dim=-1)
@@ -95,6 +98,9 @@ def patch_gemma4():
             lg = expert_scores.unsqueeze(1).float()
             with torch.no_grad():
                 mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
+            ef = CFG.get("enforce_from", 0)
+            if ef:     # instruct protocol: prefill positions free, rule enforced from response
+                mask[:ef] = True
             probs_for_topk = router_probabilities.masked_fill(
                 ~mask.squeeze(1), 0.0)
         else:

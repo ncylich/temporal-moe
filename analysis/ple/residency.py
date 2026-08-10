@@ -115,6 +115,9 @@ def _router_forward(self, hidden_states):
             scan = compute_resident_mask_accel if (lg.is_cuda and _CFG.get("accel", True)) else compute_resident_mask
             mask = scan(lg.float(), R, evict=_CFG["evict"],
                         swaps=_CFG.get("swaps", 1))                      # [S,B,E] bool, R True/token
+    _ef = _CFG.get("enforce_from", 0)
+    if _ef:            # instruct protocol: prefill positions free, rule enforced from response
+        mask[:_ef] = True                       # scan state still warmed by observing the prompt
     if _CFG["collect_telem"]:
         _accum_telem(mask)                                       # swap-rate + usage (eval, R=8)
     mask_flat = mask.transpose(0, 1).reshape(N, E)
