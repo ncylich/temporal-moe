@@ -29,6 +29,18 @@ import vllm_residency as VR                                           # noqa: E4
 
 
 def install():
+    # transformers 5.15 heterogeneity guard: gemma4 marks head_dim per-layer and vLLM
+    # reads it globally; hf_overrides does not reach every config object vLLM constructs,
+    # so permit global access at the mixin class level. gemma4-26B is homogeneous in
+    # practice; the free-arm benchmark scores are the sanity check.
+    try:
+        from transformers.integrations.heterogeneity.configuration_utils import (
+            HeterogeneousConfigMixin,
+        )
+        HeterogeneousConfigMixin.allow_global_per_layer_attribute_access = True
+    except ImportError:
+        pass
+
     # Hook AFTER _update_states: execute_model first syncs input_batch/requests with the
     # scheduler output (new requests added, finished removed), and only then is the batch
     # the authority on this step's token-stream order.
