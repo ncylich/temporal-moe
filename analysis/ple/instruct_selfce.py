@@ -98,32 +98,63 @@ def main():
                  'bits_per_byte over utf8 response bytes. '
                  'Producer: analysis/ple/instruct_selfce.py"\n')
         w.writerow(["model", "E", "k", "arm", "R", "frac_pct", "ce_nats_per_tok",
-                    "bits_per_byte", "resp_tokens", "resp_bytes", "n_traj", "secs"])
+                    "bits_per_byte", "ce_think", "ce_answer", "think_tokens",
+                    "answer_tokens", "resp_tokens", "resp_bytes", "n_traj", "secs"])
 
     resp_bytes = sum(len(tok.decode(r["ids"][r["prompt_len"]:].tolist(),
                                     skip_special_tokens=False).encode("utf-8"))
                      for r in rows)
 
+    # Thinking-segment split (reasoning-default models): a response token is "think" from the
+    # start of the response through the first </think> tag inclusive; with no closing tag but
+    # an opening one (cap hit mid-thought) the whole response counts as think. Models whose
+    # tokenizer has no dedicated think tokens get an all-answer mask.
+    def _tid(s):
+        enc = tok.encode(s, add_special_tokens=False)
+        return enc[0] if len(enc) == 1 else None
+    OPEN, CLOSE = _tid("<think>"), _tid("</think>")
+    for r in rows:
+        resp = r["ids"][r["prompt_len"]:]
+        m = torch.zeros(len(resp), dtype=torch.bool)
+        if CLOSE is not None:
+            close = (resp == CLOSE).nonzero()
+            if len(close):
+                m[: int(close[0]) + 1] = True
+            elif OPEN is not None and bool((resp == OPEN).any()):
+                m[:] = True
+        r["think_mask"] = m
+
     def arm(name, R):
-        t0, tot, ntok = time.time(), 0.0, 0
+        t0 = time.time()
+        tot = tot_th = tot_an = 0.0
+        ntok = n_th = n_an = 0
         with torch.no_grad():
             for r in rows:
                 ids = r["ids"].to("cuda").long().unsqueeze(0)
                 plen = r["prompt_len"]
                 set_arm(R, plen)
                 lg = model(ids).logits[0].float()
-                tot += float(torch.nn.functional.cross_entropy(
-                    lg[plen - 1:-1], ids[0, plen:], reduction="sum"))
-                ntok += ids.shape[1] - plen
-                del lg
+                losses = torch.nn.functional.cross_entropy(
+                    lg[plen - 1:-1], ids[0, plen:], reduction="none")
+                m = r["think_mask"].to(losses.device)
+                tot += float(losses.sum())
+                tot_th += float(losses[m].sum())
+                tot_an += float(losses[~m].sum())
+                ntok += losses.numel()
+                n_th += int(m.sum())
+                n_an += int((~m).sum())
+                del lg, losses
         ce = tot / ntok
         bpb = (tot / math.log(2)) / resp_bytes
         frac = "" if R is None else f"{100*R/M['E']:.2f}"
+        ce_th = f"{tot_th/n_th:.6f}" if n_th else ""
+        ce_an = f"{tot_an/n_an:.6f}" if n_an else ""
         w.writerow([A.model, M["E"], M["k"], name, R or "", frac, f"{ce:.6f}",
-                    f"{bpb:.6f}", ntok, resp_bytes, len(rows), f"{time.time()-t0:.1f}"])
+                    f"{bpb:.6f}", ce_th, ce_an, n_th, n_an, ntok, resp_bytes,
+                    len(rows), f"{time.time()-t0:.1f}"])
         fh.flush()
         print(f"  [{A.model}] {name:10} CE={ce:.4f} nats/tok bpb={bpb:.4f} "
-              f"({time.time()-t0:.0f}s)", flush=True)
+              f"think={ce_th or '-'} answer={ce_an or '-'} ({time.time()-t0:.0f}s)", flush=True)
         return ce
 
     free = arm("free", None)
