@@ -79,8 +79,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True, choices=sorted(MODELS))
     ap.add_argument("--n-traj", type=int, default=500)
+    ap.add_argument("--path", default=None,
+                    help="checkpoint dir override (big models staged on /dev/shm)")
     A = ap.parse_args()
     M = MODELS[A.model]
+    if A.path:
+        M = dict(M, path=A.path)
 
     rows = torch.load(f"{TRAJ}/{A.model}.pt", weights_only=False)["rows"][: A.n_traj]
     assert rows, "no trajectories"
