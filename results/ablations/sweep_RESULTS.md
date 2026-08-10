@@ -189,7 +189,8 @@ figures/downstream_scaling.png). Cells in the named CSVs; % = degradation over f
     any model; slope magnitude uncertain ~2x with 3 x-positions). The direct granularity
     penalty is ~zero: the benefit is mediated entirely by slots-per-active-expert.
 12. **Correct-convention re-runs**: free-set {14,15} is the best OLMoE cell (BPB 0.7600,
-    ds 0.6119 at 15M); PLE fails under both inits (0.8104/0.8182 vs LoRA 0.7887).
+    ds 0.6119 at 15M); PLE dead: zero-init 0.8104, calibrated 0.8061 (preserve-recaptured
+    table; the 0.8182 arm had loaded a renorm-era table) vs LoRA 0.7887.
 Protocol notes: MXFP4 (gpt-oss) accs shift ~2pts/task across batch shapes (kernel
 numerics, measured at logit level) — every delta uses same-bs arms; downstream cells
 are the batched pad-warmed protocol of all prior tables.
