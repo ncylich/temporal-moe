@@ -32,6 +32,7 @@ def main():
     ap.add_argument("--max-gen-toks", type=int, default=640)
     ap.add_argument("--max-model-len", type=int, default=4096)
     ap.add_argument("--gpu-mem", type=float, default=0.85)
+    ap.add_argument("--max-num-seqs", type=int, default=None)
     ap.add_argument("--path", default=None)
     A = ap.parse_args()
     M = MODELS[A.model]
@@ -41,9 +42,16 @@ def main():
     vllm_glue.install()
     from lm_eval import simple_evaluate
     from lm_eval.models.vllm_causallms import VLLM
+    kw = {}
+    if A.max_num_seqs:
+        kw["max_num_seqs"] = A.max_num_seqs
+    if M["arch"] == "gemma4":
+        # transformers 5.15 marks head_dim per-layer on gemma4; vLLM reads it globally.
+        # gemma4-26B is homogeneous in practice -- verified by the free-arm score check.
+        kw["hf_overrides"] = {"allow_global_per_layer_attribute_access": True}
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
-              enforce_eager=True, enable_prefix_caching=False, dtype="bfloat16")
+              enforce_eager=True, enable_prefix_caching=False, dtype="bfloat16", **kw)
 
     out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
     exists = os.path.exists(out)
