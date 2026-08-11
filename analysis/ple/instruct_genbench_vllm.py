@@ -34,6 +34,8 @@ def main():
     ap.add_argument("--gpu-mem", type=float, default=0.85)
     ap.add_argument("--max-num-seqs", type=int, default=None)
     ap.add_argument("--path", default=None)
+    ap.add_argument("--record-as", default=None,
+                    help="model column for the CSV rows (adapted/control variants)")
     A = ap.parse_args()
     M = MODELS[A.model]
     if A.path:
@@ -93,7 +95,7 @@ def main():
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
             for mk, mv in metrics.items():
                 if isinstance(mv, (int, float)) and "_stderr" not in mk:
-                    w.writerow([A.model, M["E"], M["k"], arm_name, R or "", task,
+                    w.writerow([A.record_as or A.model, M["E"], M["k"], arm_name, R or "", task,
                                 mk, f"{mv:.6f}", lim or "full", A.max_gen_toks,
                                 f"{secs:.0f}"])
             fh.flush()
