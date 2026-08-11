@@ -35,6 +35,14 @@ def main():
 
     import vllm_glue                      # gemma4 per-layer config fixes; residency stays off
     vllm_glue.install()
+    from transformers import AutoTokenizer
+    _t = AutoTokenizer.from_pretrained(A.model)
+    kept = [p for p in prompts
+            if len(_t.apply_chat_template([{"role": "user", "content": p["text"]}],
+                                          add_generation_prompt=True)) <= A.max_prompt_tok]
+    print(f"[genv] {len(prompts) - len(kept)} prompts over {A.max_prompt_tok} tokens dropped "
+          f"pre-submission", flush=True)
+    prompts = kept
     from vllm import LLM, SamplingParams
     llm = LLM(model=A.model, enforce_eager=False, gpu_memory_utilization=0.9,
               max_model_len=A.max_prompt_tok + A.max_new)
