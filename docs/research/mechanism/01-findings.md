@@ -429,17 +429,55 @@ sixteen layers freed, training-free (`olmoe_freeset_joint.csv`, blocked spread �
 | winogrande | 0.6938 | 0.5691 | 0.5991 |
 
 - **Adaptation recovers 0.30 of the BPB gap and 32% of downstream**: means 0.6820 free, 0.5723
-  imposed, 0.5978 adapted, 0.6119 with {14,15} free (`olmoe_freeset_trained.csv`). The recovery
-  fractions published against the renorm-era floor were measured against a catastrophe that the
-  constraint does not cause.
+  imposed, 0.5978 adapted, 0.6119 with {14,15} free (`olmoe_freeset_trained.csv`).
 - **Per-layer allocation beats uniform before any training**: fitted 192 slots 0.7902 against uniform
   0.7952, fitted 256 slots 0.7644 against 0.7687, converging once adapted, 0.7585 against 0.7601
   (`frontier_olmoe.csv` alloc rows).
 - **The strategy bake-off is an era record.** Router-only floors, the norms-against-LoRA tie, the
-  anneal and self-distillation nulls, and the LoRA rank sweep were all measured under the broken
-  convention and none has a correct-convention re-run. The archive holds the records; nothing from
-  that table is quotable. The one re-run arm flipped sign: calibrated initialisation now helps
-  slightly (0.8061 against 0.8104) and per-layer embeddings stay dead either way.
+  anneal and self-distillation nulls, and the LoRA rank sweep have no correct-convention re-run;
+  nothing from that table is quotable.
+
+### Across models
+
+**The damage law is shared.** Within-model degradation follows C·(k/R)^0.77, fixed-effects R² 0.92
+over 22 rungs on seven models from five labs; at fixed memory fraction, sparser models pay less
+(`granularity_ladder.csv`, `frontier_qwen3.csv`, `frontier_qwen3_5.csv`; program record
+`results/ablations/sweep_RESULTS.md`).
+
+<img src="../../../results/ablations/figures/damage_law.png" alt="Degradation against R/k, seven models" width="66%">
+
+*Percent BPB degradation against residency over active experts, one line per model. Lower is better.*
+
+<img src="../../../results/ablations/figures/downstream_scaling.png" alt="Downstream accuracy against expert count" width="66%">
+
+*The same law in downstream accuracy, 18 cells over 7 models, bootstrap 68% bands.*
+
+**Allocation gain tracks how peaked the damage profile is.** All-layers damage at R=k, and fitted
+allocation against uniform at iso-memory (`perlayer_qwen3.csv`, `perlayer_qwen3_5.csv`,
+`perlayer_gemma4.csv`, `frontier_olmoe.csv`):
+
+| model | R=k damage, BPB | fitted − uniform |
+|---|---|---|
+| Qwen3-30B, 48 layers | +0.117 | **−0.023** |
+| OLMoE, 16 | +0.169 | −0.005 |
+| Qwen3.5-35B, 40 | +0.055 | −0.004 |
+| gemma4-26B, 30 | +0.052 | +0.002, flat profile, allocation loses |
+
+**Instruct checkpoints obey the same ordering, in generation.** Self-CE is each model's
+cross-entropy on its own greedy responses to 500 fixed prompts, prefill free, rule enforced on
+generated tokens (`instruct_selfce.csv`); benchmarks run the same protocol end to end
+(`instruct_genbench.csv`, `instruct_genbench_vllm.csv`; gemma4 cells in flight):
+
+| model, R = 12.5% of E | self-CE, free → R | gsm8k | ifeval | humaneval | mmlu |
+|---|---|---|---|---|---|
+| OLMoE-Instruct | 0.354 → 1.297 | 0.69 → 0.41 | 0.58 → 0.49 | 0.37 → 0.29 | 0.47 → 0.32 |
+| LFM2.5-A1B | 0.396 → 0.704 | 0.26 → 0.26 | 0.26 → 0.25 | 0.65 → 0.52 | at floor |
+| Qwen3.5-35B | 0.228 → 0.341 | 0.49 → 0.45 | 0.22 → 0.22 | 0.95 → 0.91 | 0.32 → 0.34 |
+| gemma4-26B-IT | 0.139 → 0.350 | — | — | — | — |
+
+- **Task damage is capability-weighted, not uniform.** The lexical-router model loses everywhere;
+  the robust models pay only on their strongest generative skill (LFM humaneval −0.13) or nowhere
+  outside noise (Qwen3.5, whose R=k cells at 3% residency read 0.415/0.22/0.896/0.360).
 
 ## 6. What to do with it
 
