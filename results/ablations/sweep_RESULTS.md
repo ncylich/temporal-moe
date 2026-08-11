@@ -230,3 +230,9 @@ are the batched pad-warmed protocol of all prior tables.
     a mild specialization tax (mean −1.8, no cell beyond −3.5). Held-out self-CE 0.519→0.449
     is the training diagnostic, not the outcome measure. Training data `gemma4_train5k`
     (prompts 501–5500, disjoint from every evaluation set).
+
+17. **Damage anti-correlates with response length** (`length_damage.py`; lengths are
+    throughput-reconstructed estimates): pooled Spearman +0.72 (p=0.01) with damage
+    negative — short-answer tasks take the damage, long generations self-correct. No
+    evidence of error accumulation over decode length; the accumulation hypothesis is
+    refuted at task granularity on three models.
