@@ -15,6 +15,10 @@ import os
 
 import torch
 
+sys_dir = os.path.dirname(os.path.abspath(__file__))
+import sys
+sys.path.insert(0, sys_dir)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -29,6 +33,8 @@ def main():
     prompts = [json.loads(l) for l in open(A.prompts)]
     sha = hashlib.sha256(open(A.prompts, "rb").read()).hexdigest()
 
+    import vllm_glue                      # gemma4 per-layer config fixes; residency stays off
+    vllm_glue.install()
     from vllm import LLM, SamplingParams
     llm = LLM(model=A.model, enforce_eager=False, gpu_memory_utilization=0.9,
               max_model_len=A.max_prompt_tok + A.max_new)
