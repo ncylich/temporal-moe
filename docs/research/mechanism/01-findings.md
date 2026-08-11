@@ -537,8 +537,11 @@ construction), R=8 enforced on response tokens during training, one GPU-hour
   where base damage was largest; adapted MMLU under the constraint passes the model's own free arm
   (0.711 against 0.697). Free-side capability is preserved, largest single move −3.5.
 - **Held-out self-CE is the training diagnostic, not the outcome measure**: 0.519 to 0.449.
-- CONTROL PENDING: plain self-SFT with the constraint off during training, matched data, surface
-  and learning rate (rows `gemma4_ctrl_sft`) — verdict lands with the running arm.
+- **The control — plain self-SFT with the constraint off during training, matched data, surface
+  and learning rate (rows `gemma4_ctrl_sft`) — recovers about half the gain**: R=8 mean 0.811
+  against adapted 0.819 and base 0.799 (GSM8K 0.785, IFEval 0.825, HumanEval 0.939, MMLU 0.693).
+  Most of the benefit is generic self-SFT robustness; the residual for training under the
+  constraint is +0.9 points mean, three of four benchmarks, each inside single-task noise.
 
 ## 6. What to do with it
 

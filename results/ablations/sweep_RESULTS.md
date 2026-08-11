@@ -229,7 +229,10 @@ are the batched pad-warmed protocol of all prior tables.
     where damage was already ~1 point. Free-side control shows
     a mild specialization tax (mean −1.8, no cell beyond −3.5). Held-out self-CE 0.519→0.449
     is the training diagnostic, not the outcome measure. Training data `gemma4_train5k`
-    (prompts 501–5500, disjoint from every evaluation set).
+    (prompts 501–5500, disjoint from every evaluation set). Control (rows `gemma4_ctrl_sft`,
+    same data/surface/LR with the constraint OFF during training): R=8 mean 0.811 vs
+    adapted 0.819, base 0.799 — generic self-SFT recovers about half the gain; the
+    constraint-aware residual (+0.9 mean, 3/4 tasks) sits inside single-task noise.
 
 17. **Damage anti-correlates with response length** (`length_damage.py`; lengths are
     throughput-reconstructed estimates): pooled Spearman +0.72 (p=0.01) with damage
