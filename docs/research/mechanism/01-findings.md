@@ -427,16 +427,18 @@ sixteen layers freed, training-free (`olmoe_freeset_joint.csv`, blocked spread �
 | sciq | 0.9380 | 0.9150 | 0.9270 |
 | winogrande | 0.6938 | 0.5691 | 0.5991 |
 
-- **Adaptation recovers 0.30 of the BPB gap and 32% of downstream**: means 0.6820 free, 0.5723
-  imposed, 0.5978 adapted, 0.6119 with {14,15} free (`olmoe_freeset_trained.csv`).
+- **Adaptation recovers 0.30 of the BPB gap and 0.27 of downstream** (distill, 15M tokens: 0.7887
+  BPB, mean 0.6017 against free 0.6820 and imposed 0.5723, `layer_freeing_downstream.csv`); the
+  {14,15} free variant reaches 0.36 (0.6119, `olmoe_freeset_trained.csv`).
 - **The strategy bake-off is an era record.** Router-only floors, the norms-against-LoRA tie, the
   anneal and self-distillation nulls, and the LoRA rank sweep have no correct-convention re-run;
   nothing from that table is quotable.
 
 ### Across models
 
-**The damage law is shared.** Within-model degradation follows C·(k/R)^0.77, fixed-effects R² 0.92
-over 22 rungs on seven models from five labs; at fixed memory fraction, sparser models pay less
+**The damage law is shared.** Within-model degradation follows C·(k/R)^0.81, fixed-effects R² 0.91
+over 22 rungs on five models; with the two downstream-only models, seven models from five labs; at
+fixed memory fraction, sparser models pay less
 (`granularity_ladder.csv`, `frontier_qwen3.csv`, `frontier_qwen3_5.csv`; program record
 `results/ablations/sweep_RESULTS.md`).
 
