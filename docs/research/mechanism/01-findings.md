@@ -12,10 +12,9 @@ available at every token. *Temporal* is the same shape trained under rolling res
 floating-point operations, and the names match the `regime` column in every CSV and the legends on
 every figure here.
 
-**Out of scope.** Retrofitting the constraint to a pretrained model, and the per-layer embedding work,
-belong to the adaptation program and are written up in
-[`ple_RESULTS.md`](../../../results/ablations/ple_RESULTS.md). Its layer-freeing results appear in
-section 5 because they bear on layer choice.
+**Retrofitting the constraint to a pretrained model is section 5.** The per-layer embedding work is
+dead under the correct convention (section 5);
+[`ple_RESULTS.md`](../../../results/ablations/ple_RESULTS.md) is its era record.
 
 **Cost**, used throughout: test bits per byte with the constraint changed at one layer, minus the
 model in its native regime. Positive is worse. Unmasking a layer for a temporal model, imposing
@@ -430,9 +429,6 @@ sixteen layers freed, training-free (`olmoe_freeset_joint.csv`, blocked spread �
 
 - **Adaptation recovers 0.30 of the BPB gap and 32% of downstream**: means 0.6820 free, 0.5723
   imposed, 0.5978 adapted, 0.6119 with {14,15} free (`olmoe_freeset_trained.csv`).
-- **Per-layer allocation beats uniform before any training**: fitted 192 slots 0.7902 against uniform
-  0.7952, fitted 256 slots 0.7644 against 0.7687, converging once adapted, 0.7585 against 0.7601
-  (`frontier_olmoe.csv` alloc rows).
 - **The strategy bake-off is an era record.** Router-only floors, the norms-against-LoRA tie, the
   anneal and self-distillation nulls, and the LoRA rank sweep have no correct-convention re-run;
   nothing from that table is quotable.
@@ -453,15 +449,15 @@ over 22 rungs on seven models from five labs; at fixed memory fraction, sparser 
 *The same law in downstream accuracy, 18 cells over 7 models, bootstrap 68% bands.*
 
 **Allocation gain tracks how peaked the damage profile is.** All-layers damage at R=k, and fitted
-allocation against uniform at iso-memory (`perlayer_qwen3.csv`, `perlayer_qwen3_5.csv`,
+allocation against uniform at iso-memory, negative favours fitted (`perlayer_qwen3.csv`, `perlayer_qwen3_5.csv`,
 `perlayer_gemma4.csv`, `frontier_olmoe.csv`):
 
 | model | R=k damage, BPB | fitted − uniform |
 |---|---|---|
-| Qwen3-30B, 48 layers | +0.117 | **−0.023** |
+| Qwen3-30B, 48 layers | +0.118 | **−0.023** |
 | OLMoE, 16 | +0.169 | −0.005 |
 | Qwen3.5-35B, 40 | +0.055 | −0.004 |
-| gemma4-26B, 30 | +0.052 | +0.002, flat profile, allocation loses |
+| gemma4-26B, 30 | +0.054 | +0.002, flat profile, allocation loses |
 
 **Instruct checkpoints obey the same ordering, in generation.** Self-CE is each model's
 cross-entropy on its own greedy responses to 500 fixed prompts, prefill free, rule enforced on
@@ -510,5 +506,9 @@ generated tokens (`instruct_selfce.csv`); benchmarks run the same protocol end t
 - Does demand forecastability predict which layers are worth *freeing*, cross-model? Section 4
   correlates it with solo cost on our models; section 5 shows solo damage ranks freeing correctly on
   OLMoE. The forecastability correlate has never been measured on any adapted model.
+- Hit rate and damage disagree about where the memory budget should go. Section 1's hit-rate
+  profile favours shallow layers; sections 4 and 5's damage profiles favour deep ones. The two come
+  from disjoint model sets, trained FLAME against pretrained external, and no model carries both
+  measurements. Measure both on one model.
 - The 1e19 cross-regime cells are re-runnable and would give the imposition direction a third budget.
 - The sham percentages need their producer's definition pinned down before they are quoted again.
