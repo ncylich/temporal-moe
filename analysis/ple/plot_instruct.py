@@ -101,8 +101,8 @@ def bench():
                    label=NAMES[m] if shade == 0 else None)
     for j in range(len(benches) - 1):
         ax.axvline((j + 0.5) * GX, color="grey", lw=0.6, alpha=0.4)
-    ax.bar([], [], color="grey", alpha=1.0, label="dark: R = k", edgecolor="black")
-    ax.bar([], [], color="grey", alpha=0.55, label="light: R = 12.5% of E", edgecolor="black")
+    ax.bar([], [], color="0.25", label="dark: R = k (active params)", edgecolor="black")
+    ax.bar([], [], color="0.8", label="light: R = 12.5% of E", edgecolor="black")
     ax.axhline(0, color="black", lw=0.8)
     ax.set_xticks([j * GX for j in range(len(benches))])
     ax.set_xticklabels(benches)
