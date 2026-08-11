@@ -474,6 +474,16 @@ generated tokens (`instruct_selfce.csv`); benchmarks run the same protocol end t
 | Qwen3.5-35B | 0.228 → 0.341 | 0.49 → 0.45 | 0.22 → 0.22 | 0.95 → 0.91 | 0.32 → 0.34 |
 | gemma4-26B-IT | 0.139 → 0.350 | 0.87 → 0.86 | 0.87 → 0.85 | at floor | 0.70 → 0.67 |
 
+<img src="../../../results/ablations/figures/instruct_selfce_damage.png" alt="Self-CE damage against residency fraction, four instruct models" width="66%">
+
+*Self-CE damage against residency fraction, R=k marked. The vertical ordering is the granularity
+law on instruct checkpoints; the two-point slopes are the k-to-12.5% recovery.*
+
+<img src="../../../results/ablations/figures/instruct_bench_damage.png" alt="Per-benchmark damage, R=k and 12.5% paired" width="66%">
+
+*Per-benchmark accuracy change, dark R=k against light 12.5%. The extra slots pay on GSM8K and
+almost nowhere else; OLMoE and LFM pairs are one cell (k = 12.5%).*
+
 - **Prefill seeding is unnecessary for quality.** Cold decode (scan blind to the prompt) matches
   the prompt-warmed protocol within 5e-3 nats on all four models: OLMoE 1.2941 against 1.2967, LFM
   0.7035 against 0.7037, gemma4 0.3498 against 0.3498, qwen3.5 0.3362 against 0.3414
