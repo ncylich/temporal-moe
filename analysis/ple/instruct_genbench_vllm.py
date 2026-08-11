@@ -84,7 +84,7 @@ def main():
                 res = simple_evaluate(model=lm, tasks=[task], limit=lim,
                                       apply_chat_template=True,
                                       gen_kwargs="do_sample=False",
-                                      confirm_run_unsafe_code=True)
+                                      confirm_run_unsafe_code=True, log_samples=True)
             except Exception as e:
                 print(f"  [{A.model}] {arm_name} {task}: FAILED {type(e).__name__}: {e}",
                       flush=True)
@@ -97,6 +97,18 @@ def main():
                                 mk, f"{mv:.6f}", lim or "full", A.max_gen_toks,
                                 f"{secs:.0f}"])
             fh.flush()
+            samp = (res.get("samples") or {}).get(task)
+            if samp:
+                import json
+                sd = os.path.join(ABLATIONS, "genbench_samples")
+                os.makedirs(sd, exist_ok=True)
+                slim = [{"doc_id": x.get("doc_id"),
+                         **{mk: x[mk] for mk in x
+                            if mk in ("exact_match", "pass@1", "prompt_level_strict_acc",
+                                      "inst_level_strict_acc", "acc")}}
+                        for x in samp]
+                json.dump(slim, open(os.path.join(
+                    sd, f"{A.model}_{arm_name}_{task}.json"), "w"))
             show = {k: round(v, 4) for k, v in metrics.items() if isinstance(v, (int, float))}
             print(f"  [{A.model}] {arm_name} {task}: {show} ({secs:.0f}s)", flush=True)
     fh.close()
