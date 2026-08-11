@@ -474,6 +474,10 @@ generated tokens (`instruct_selfce.csv`); benchmarks run the same protocol end t
 | Qwen3.5-35B | 0.228 → 0.341 | 0.49 → 0.45 | 0.22 → 0.22 | 0.95 → 0.91 | 0.32 → 0.34 |
 | gemma4-26B-IT | 0.139 → 0.350 | 0.87 → 0.86 | 0.87 → 0.85 | at floor | 0.70 → 0.67 |
 
+- **Prefill seeding is unnecessary for quality.** Cold decode (scan blind to the prompt) matches
+  the prompt-warmed protocol within 3e-3 nats on both models measured: OLMoE 1.2941 against 1.2967,
+  LFM 0.7035 against 0.7037 (`instruct_selfce.csv`, R{k}cold rows). The rolling set re-converges
+  within a few tokens, so the serving protocol needs no prefill-observation machinery for quality.
 - **Task damage is capability-weighted, not uniform.** The lexical-router model loses everywhere;
   the robust models pay only on their strongest generative skill (LFM humaneval −0.13, gemma4
   gsm8k −0.09 at R=k) or nowhere outside noise (Qwen3.5, whose R=k cells at 3% residency read

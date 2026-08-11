@@ -209,3 +209,7 @@ are the batched pad-warmed protocol of all prior tables.
     qwen3.5 (0.004) are exact nulls (0.5967/0.5968, 0.7130/0.7120). Preserve-convention
     controlled pair confirms the profile trained: {0,1,15} beats {0,1,2} by 0.0132 BPB
     and +0.6 points at matched memory (`layer_freeing_downstream.csv`).
+
+15. **Warm-start is unnecessary**: cold decode matches prompt-warmed enforcement within
+    3e-3 nats self-CE on OLMoE and LFM (`instruct_selfce.csv` R{k}cold rows) — the rolling
+    set re-converges within a few tokens of response start.
