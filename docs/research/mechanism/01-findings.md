@@ -409,8 +409,9 @@ sixteen layers freed, training-free (`olmoe_freeset_joint.csv`, blocked spread Â
 - **Trained, the profile's picks give the best adapted cell in the program**: distillation with
   {14,15} free reaches 0.7600 BPB against 0.7887 all-constrained, and 0.6119 mean downstream against
   0.5978 (`olmoe_freeset_trained.csv`).
-- **Limit**: no trained controlled pair of the {0,1,15}-against-{0,1,2} form exists under the correct
-  convention; the training-free joint table carries that comparison alone.
+- **Trained controlled pair, matched memory**: {0,1,15} reaches 0.7602 BPB and 0.6103 mean
+  downstream against 0.7734 and 0.6042 for {0,1,2} (`layer_freeing_downstream.csv`, distill 15M,
+  at-10M downstream). The profile's deep pick wins on both axes.
 
 **Pick free sets from single-layer damage measured under the model's own gate convention.**
 
