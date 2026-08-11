@@ -211,5 +211,6 @@ are the batched pad-warmed protocol of all prior tables.
     and +0.6 points at matched memory (`layer_freeing_downstream.csv`).
 
 15. **Warm-start is unnecessary**: cold decode matches prompt-warmed enforcement within
-    3e-3 nats self-CE on OLMoE and LFM (`instruct_selfce.csv` R{k}cold rows) — the rolling
-    set re-converges within a few tokens of response start.
+    5e-3 nats self-CE on all four instruct models (`instruct_selfce.csv` R{...}cold rows:
+    OLMoE 1.2941/1.2967, LFM 0.7035/0.7037, gemma4 0.3498/0.3498, qwen3.5 0.3362/0.3414) —
+    the rolling set re-converges within a few tokens of response start.
