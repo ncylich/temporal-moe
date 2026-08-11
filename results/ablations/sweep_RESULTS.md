@@ -214,3 +214,12 @@ are the batched pad-warmed protocol of all prior tables.
     5e-3 nats self-CE on all four instruct models (`instruct_selfce.csv` R{...}cold rows:
     OLMoE 1.2941/1.2967, LFM 0.7035/0.7037, gemma4 0.3498/0.3498, qwen3.5 0.3362/0.3414) —
     the rolling set re-converges within a few tokens of response start.
+
+16. **CE adaptation works on an instruct model, at the self-CE scale** (gemma4-26B-IT,
+    `train_gemma_ce.py`: attention LoRA r32 + router/norms, 3.4M response tokens of its own
+    vLLM-generated WildChat responses at R=8-on-response): held-out frozen-500 self-CE
+    0.5188 → 0.4488 (18.4% of the constrained gap closed) with free-side task performance
+    preserved (GSM8K 0.860 vs 0.865). GSM8K under R=8 moves 0.770 → 0.790, directionally
+    consistent but not individually significant (paired sign test p=0.30, 18 up / 14 down
+    of 200). Training data: `gemma4_train5k` (prompts 501-5500, disjoint from the frozen
+    evaluation set by construction).
