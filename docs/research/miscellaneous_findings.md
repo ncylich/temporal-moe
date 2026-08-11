@@ -242,13 +242,11 @@ re-derive `ln2 · bytes_per_token` from the exact evaluation and record it in th
 
 ## Per-layer embeddings (PLE)
 
-A rank-512 per-layer embedding table co-trained with router and norm gains reported 5x token
-efficiency against the C recipe, plus a family of mechanism nulls and a 53% training-free
-calibration stack. Every PLE number predates the 08-04 gate-mass fix: the runs and all their
-references are renorm-era, so none of the claims stand (`ple_RESULTS.md` / `ple_results.csv`
-are the era record). The idea itself is untested under the correct convention — a single
-re-run of the headline arm (~2-3h) would settle whether the token-efficiency survives, and is
-the natural first experiment if this line is picked back up.
+Every renorm-era PLE number is an era record and none stands (`ple_RESULTS.md` /
+`ple_results.csv`). The correct-convention re-run happened and PLE is dead under both inits:
+15M-token arms reach 0.8104 zero-init and 0.8061 calibrated against 0.7887 for LoRA
+(`olmoe_freeset_trained.csv`). Write-up:
+[`mechanism/01-findings.md`](mechanism/01-findings.md) section 5, its one home.
 
 ## Per-layer residency relaxation
 
