@@ -201,7 +201,11 @@ are the batched pad-warmed protocol of all prior tables.
     across the board (gsm8k 0.69→0.41, humaneval 0.37→0.29); LFM2.5 and gemma4-IT pay only
     on their strongest generative skill (humaneval −0.13; gsm8k −0.01 at 12.5%, −0.09 at
     R=k); Qwen3.5-35B is within noise of free on three of four benchmarks even at R=k = 3%
-    residency. Floor-censored cells (LFM mmlu, gemma4 humaneval) are extraction artifacts.
+    residency. Floor-censored cells: LFM mmlu (answer-extraction floor) and gemma4 humaneval, where the
+    completion-style prompt derails generation itself — gemma leaks reasoning-channel
+    markers (`thought`, `<channel|>`) mid-body and restarts, identically in every arm, so
+    the cell measures a template quirk, not code ability (qwen 0.945 and lfm 0.646 score
+    normally on the same task and parser).
 
 14. **Allocation's downstream visibility scales with its BPB gap** (`alloc_downstream.csv`,
     fitted vs uniform at iso-memory, base surfaces, training-free): qwen3 (0.023 BPB gap)
