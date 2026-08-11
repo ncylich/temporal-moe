@@ -182,7 +182,7 @@ figures/downstream_scaling.png). Cells in the named CSVs; % = degradation over f
 | 12.5 | 7.8/6.1 | 25.1/16.1 | -/6.2 | 9.2/7.3 | 4.1/1.8 | -/5.0 | 4.7/3.4 |
 | 6.25 | floor | floor | floor | 19.3/13.2 | 8.4/3.5 | -/4.8 | 6.2/4.7 |
 
-10. **Within-model law**: degradation = C·(k/R)^0.77, fixed-effects R² 0.92 over 22 BPB
+10. **Within-model law**: degradation = C·(k/R)^0.81, fixed-effects R² 0.91 over 22 BPB
     rungs; C ranges 6.7% (gemma4) to 25.1% (OLMoE) at R=k, ordered by shared expert
     (~2x cushion, gemma4-vs-qwen3 controlled pair) and router lexicality (OLMoE).
 11. **At fixed memory fraction, sparser models pay less** (direction robust to dropping
