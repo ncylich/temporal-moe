@@ -33,6 +33,10 @@ def main():
     ap.add_argument("--accum", type=int, default=16)
     ap.add_argument("--save-every", type=int, default=800)
     ap.add_argument("--out", default="/workspace/olmoe-adapt/data/gemma_ce_adapter.pt")
+    ap.add_argument("--eval-only", action="store_true",
+                    help="load --out adapter, score frozen-500 self-CE (free and R8), exit")
+    ap.add_argument("--merge-out", default=None,
+                    help="after loading the adapter, save the merged model to this dir and exit")
     A = ap.parse_args()
 
     rows = torch.load(f"/workspace/instruct-traj/{A.traj}.pt", weights_only=False)["rows"]
@@ -88,6 +92,40 @@ def main():
     d = float((lf - lc).abs().max())
     assert d > 1e-3, f"constraint NOT engaged under this loader (max logit delta {d:.2e})"
     print(f"[gce] constraint engaged (max logit delta {d:.3f})", flush=True)
+
+    if A.eval_only or A.merge_out:
+        ck = torch.load(A.out, map_location="cpu", weights_only=False)
+        named = dict(model.named_parameters())
+        miss = [n for n in ck["tensors"] if n not in named]
+        assert not miss, f"{len(miss)} adapter tensors unmatched, e.g. {miss[:3]}"
+        with torch.no_grad():
+            for n, t in ck["tensors"].items():
+                named[n].data.copy_(t.to(named[n].dtype))
+        print(f"[gce] adapter loaded (seen={ck['seen']/1e6:.2f}M)", flush=True)
+        if A.merge_out:
+            m = model.merge_and_unload() if hasattr(model, "merge_and_unload") else model
+            m.save_pretrained(A.merge_out, safe_serialization=True)
+            tok.save_pretrained(A.merge_out)
+            print(f"[gce] merged model -> {A.merge_out}", flush=True)
+            return
+        ev = torch.load("/workspace/instruct-traj/gemma4_instruct.pt",
+                        weights_only=False)["rows"]
+        model.eval()
+        for label, on in (("free", False), ("R8", True)):
+            tot = ntok = 0
+            with torch.no_grad():
+                for r in ev:
+                    ids = r["ids"].to("cuda").long().unsqueeze(0)
+                    plen = int(r["prompt_len"])
+                    GL.CFG.update(on=on, R=8, enforce_from=plen if on else 0,
+                                  cold_start=False, free_set=None, R_map=None)
+                    lg = model(ids).logits[0].float()
+                    tot += float(torch.nn.functional.cross_entropy(
+                        lg[plen - 1:-1], ids[0, plen:], reduction="sum"))
+                    ntok += ids.shape[1] - plen
+            print(f"[gce-eval] {label} self-CE {tot/ntok:.4f} nats/tok "
+                  f"(frozen 500, held out)", flush=True)
+        return
 
     opt = torch.optim.AdamW(train_params, lr=A.lr, weight_decay=0.0)
     model.train()
