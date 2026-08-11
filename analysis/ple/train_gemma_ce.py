@@ -35,6 +35,9 @@ def main():
     ap.add_argument("--accum", type=int, default=16)
     ap.add_argument("--save-every", type=int, default=400)
     ap.add_argument("--out", default="/workspace/olmoe-adapt/data/gemma_ce_adapter.pt")
+    ap.add_argument("--no-constraint", action="store_true",
+                    help="CONTROL: identical run with residency OFF during training "
+                         "(isolates constraint-aware adaptation from plain self-SFT)")
     ap.add_argument("--eval-only", action="store_true",
                     help="load --out adapter, score frozen-500 self-CE (free and R8), exit")
     ap.add_argument("--merge-out", default=None,
@@ -145,7 +148,8 @@ def main():
         named = {n: p.detach().cpu().clone() for n, p in model.named_parameters()
                  if p.requires_grad}
         torch.save({"tensors": named, "seen": seen, "stack":
-                    "unsloth" if use_unsloth else "hf+peft", "R": 8,
+                    "unsloth" if use_unsloth else "hf+peft",
+                    "R": 0 if A.no_constraint else 8,
                     "traj": A.traj, "lr": A.lr}, A.out)
 
     while seen < A.tokens:
@@ -155,7 +159,8 @@ def main():
             oi += 1
             ids = r["ids"].to("cuda").long().unsqueeze(0)
             plen = int(r["prompt_len"])
-            GL.CFG.update(on=True, R=8, enforce_from=plen, cold_start=False)
+            GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plen,
+                          cold_start=False)
             logits = model(ids).logits[:, :-1]
             targets = ids[:, 1:].clone()
             targets[:, : plen - 1] = -100
