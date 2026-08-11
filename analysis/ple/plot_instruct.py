@@ -103,8 +103,11 @@ def bench():
                    label=NAMES[m] if shade == 0 else None)
     for j in range(len(benches) - 1):
         ax.axvline((j + 0.5) * GX, color="grey", lw=0.6, alpha=0.4)
-    ax.bar([], [], color="0.25", label="dark: R = k (active params)", edgecolor="black")
-    ax.bar([], [], color="0.8", label="light: R = 12.5% of total experts", edgecolor="black")
+    from matplotlib.patches import Patch
+    shade_handles = [Patch(facecolor="0.25", edgecolor="black",
+                           label="dark: R = k (active params)"),
+                     Patch(facecolor="0.85", edgecolor="black",
+                           label="light: R = 12.5% of total experts")]
     ax.axhline(0, color="black", lw=0.8)
     ax.set_xticks([j * GX for j in range(len(benches))])
     ax.set_xticklabels(benches)
@@ -112,7 +115,9 @@ def bench():
     ax.set_title("Generative benchmarks under decode-time residency\n"
                  "(constrained − free, same items and stack per pair; "
                  "OLMoE and LFM: k = 12.5%, one cell)", fontsize=9)
-    ax.legend(fontsize=8)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles + shade_handles, labels + [h.get_label() for h in shade_handles],
+              fontsize=8)
     ax.grid(alpha=0.25, axis="y")
     fig.tight_layout()
     fig.savefig(f"{FIG}/instruct_bench_damage.png", dpi=150)
