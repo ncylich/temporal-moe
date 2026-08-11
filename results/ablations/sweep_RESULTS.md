@@ -194,3 +194,11 @@ figures/downstream_scaling.png). Cells in the named CSVs; % = degradation over f
 Protocol notes: MXFP4 (gpt-oss) accs shift ~2pts/task across batch shapes (kernel
 numerics, measured at logit level) — every delta uses same-bs arms; downstream cells
 are the batched pad-warmed protocol of all prior tables.
+
+13. **Generative benchmarks, four instruct models** (`instruct_genbench*.csv`; batch-fair,
+    chat template, greedy, prefill free, stateful rule on generated tokens — the first
+    decode-regime measurement of the constraint): at R = 12.5% of E, OLMoE-Instruct loses
+    across the board (gsm8k 0.69→0.41, humaneval 0.37→0.29); LFM2.5 and gemma4-IT pay only
+    on their strongest generative skill (humaneval −0.13; gsm8k −0.01 at 12.5%, −0.09 at
+    R=k); Qwen3.5-35B is within noise of free on three of four benchmarks even at R=k = 3%
+    residency. Floor-censored cells (LFM mmlu, gemma4 humaneval) are extraction artifacts.
