@@ -129,3 +129,27 @@ instructive error in the program:
 
 All three were found by recomputing from the CSVs rather than by rereading the prose, which is the
 only method that has ever caught anything in this document set.
+
+## 5. The gate-mass correction (2026-08)
+
+Section 5 of `01-findings.md` was rewritten in 2026-08 after one defect invalidated every
+adapted-OLMoE measurement made before 08-04.
+
+| published claim | status | now | cause |
+|---|---|---|---|
+| Imposing the constraint moves the routing locus not at all (−0.0041); the contextual shift is learned | **reversed** | Imposition produces the whole shift, −0.1445 to +0.1001; adaptation adds +0.003 (`ple_locus.csv`) | Defect G |
+| Single-layer damage is U-shaped, worst at layer 1, lowest at layer 11 | **reversed** | Monotone in depth: layer 15 worst at +0.0223, 3.3× the interior mean (`olmoe_gatemass_remeasure.csv`). The published figure plots the artifact and is retired to the archive | Defect G |
+| Layers 2 and 15 tie on solo damage (0.1408); solo damage misranks layers; do not choose free sets from it | **reversed** | Under preserve they differ 4.7×, the profile's picks win at matched memory (`olmoe_freeset_joint.csv`), and the trained {14,15} cell is the program's best (0.7600 BPB, `olmoe_freeset_trained.csv`) | Defect G |
+| Imposing untrained is catastrophic: lambada 0.000, arc easy 0.280 | **reversed in severity** | Mild: lambada 0.4460, arc easy 0.6364 against free 0.7056 and 0.7698 (`olmoe_downstream_ref.csv`). The catastrophe was the artifact, not the constraint | Defect G |
+| Adaptation recovery 0.91 to 0.93; cheap adaptation within 0.02 of full fine-tune | withdrawn | The denominator was the artificial catastrophe. Preserve recovery is 0.30 BPB, 32% downstream. The strategy bake-off, its anneal and self-distillation nulls, and the LoRA rank sweep have no correct-convention re-run and are quotable only as era records | Defect G |
+| Calibrated initialisation 1.23σ worse than zero-init | **sign flipped** | Calibrated 0.8061 against zero-init 0.8104 on the recaptured preserve table; both remain dead against LoRA 0.7887 | Defect G, plus the calibration table itself was captured under the defect |
+
+**G: masking renormalised the gate mass on a model that never does.** OLMoE sets
+`norm_topk_prob=False`, so its top-k gate weights keep their softmax mass, about 0.40 in sum. The
+intervention masked the logits and re-softmaxed, driving the selected mass to 1.0 and scaling every
+MoE block output by roughly 2.5× over 16 layers. Every "impose" and every adapted surface measured
+before 08-04 carries it; models that renormalise natively (the FLAME phase-0 set through Megatron's
+top-k softmax, Qwen, gemma4) are untouched, which is why sections 1 to 4 stand. Era records live in
+`results/archive/olmoe_wrong_renorm/`. The eval path now selects from the masked distribution and
+weights from the unmasked one, and `residency_unsloth.install` refuses `norm_topk_prob=False` models
+on the path that cannot do so.

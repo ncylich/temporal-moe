@@ -80,8 +80,9 @@ context minus token against layer index, bootstrap intervals:
   A temporal router is already contextual at layer 2 and has little further to move.
 - **Use per-arm slopes, not pooled layers.** Pooling hides it, because the eight-layer arms are flat
   while the thirteen-layer arms rise.
-- **This is learned, not mechanical.** Imposing the constraint without training produces no shift at
-  all. Section 5.
+- **Imposed on a pretrained lexical router, the shift is mechanical**: +0.24 without any training,
+  section 5. Whether the trained-from-scratch gap is additionally learned is open; no phase-0
+  impose-locus measurement exists.
 
 <img src="../../../results/phase0/figures/locus_by_layer.png" alt="Context minus token AUC against layer" width="66%">
 
@@ -368,112 +369,84 @@ only contrast in the sweep comfortably resolved.
 
 Everything above is measured on models trained under the constraint from the start. Retrofitting it to
 a pretrained 16-layer model separates what the constraint *does* from what training under it does.
+Every number here is gate_mass=preserve; the renorm-era measurements this section replaces are era
+records in `results/archive/olmoe_wrong_renorm/` and narrated in [`02-corrections.md`](02-corrections.md) §6.
 
-**The contextual shift is learned, not imposed.** Same locus probe, adapted OLMoE:
+**Imposing the constraint contextualises routing by itself; adaptation adds almost nothing.** Same
+locus probe, OLMoE (`ple_locus.csv`):
 
 | condition | context minus token |
 |---|---|
-| base model, constraint imposed, no training | −0.0041 |
-| adapted on cross-entropy | +0.0932 |
-| adapted on cross-entropy, plus per-layer embeddings | +0.0964 |
+| base model, free routing | −0.1445 |
+| constraint imposed, no training | +0.1001 |
+| adapted, distillation at 100M tokens | +0.1032 |
 
-- **Imposing the constraint moves nothing.** Training under it produces the whole shift.
-- **Per-layer embeddings add nothing on top**, 0.0031 against a spread of 0.0031, and in the opposite
-  direction to the one pre-registered. That refuted the premise of the embedding program, which had
-  argued it works by restoring token information the constraint strips out.
-- **All three rows come from one probe.** The published cross-entropy figure of 0.0493 was measured by
-  a different probe on the same surface, so pairing it with the 0.096 would manufacture a shift that
-  is not there. `ple_RESULTS.md` flags this trap directly.
+- **The base router is the most lexical in the program**, token AUC 0.837, and masking to the resident
+  set forces selection off the token axis mechanically. The same imposition shift appears on
+  Qwen3.5-35B: −0.0002 free to +0.1265 imposed (`locus_qwen.csv`).
+- **Per-layer embeddings are dead under the correct convention** on stronger grounds than any probe:
+  15M-token arms land at 0.8104 zero-init and 0.8061 calibrated against 0.7887 for LoRA
+  (`olmoe_freeset_trained.csv`). The era's other adaptation nulls are records only; none was re-run.
 
-- **Five further techniques were tried and none moved anything**: stacking per-layer embeddings on
-  LoRA (0.49σ, wrong side), calibrated initialisation in three variants (the strongest is 1.23σ
-  *worse*), sequential against joint training (0.47σ), and LoRA rank, which stops binding above 128
-  (r = 32 is 1.31σ worse). Together with the two nulls above, eight attempts found one thing that
-  matters.
+**Single-layer damage rises with depth; the last layer costs 3.3 times the interior mean.**
+Layer 15 +0.0223, layer 14 +0.0114, interior mean +0.0067, layer 1 +0.0059
+(`olmoe_gatemass_remeasure.csv`).
 
-**Single-layer damage is U-shaped**, worst at layer 1, lowest at layer 11, both ends elevated. It is
-also the wrong tool for choosing which layers to free.
+<img src="../../../results/ablations/figures/olmoe_perlayer.png" alt="Per-layer damage d_l(R) and fitted allocation, OLMoE" width="66%">
 
-<img src="../../../results/phase0/figures/layer_freeing_damage.png" alt="Per-layer damage across sixteen layers" width="66%">
+*Left: cost of constraining each layer alone at four residency levels; the profile is monotone in
+depth. Right: the greedy allocation it implies against uniform. Lower is better.*
 
-*Cost of constraining each layer alone, all sixteen. Lower is better. The shape is why freeing the
-ends looks attractive; the table below is why it cannot be read off this curve.*
+**Solo damage picks the right layers to free.** Joint free sets at matched resident memory, four of
+sixteen layers freed, training-free (`olmoe_freeset_joint.csv`, blocked spread ±0.016):
 
-Layers 2 and 15 tie on solo damage, 0.1408 against 0.1408. Freeing them is not equivalent:
+| free set | joint damage, BPB |
+|---|---|
+| top four by solo damage {10,12,14,15} | **+0.0936** |
+| tail {12,13,14,15} | +0.1019 |
+| {0,1,14,15} | +0.1092 |
+| head {0,1,2,3} | +0.1418 |
 
-| free set | resident memory | BPB | mean downstream accuracy |
+- **Trained, the profile's picks give the best adapted cell in the program**: distillation with
+  {14,15} free reaches 0.7600 BPB against 0.7887 all-constrained, and 0.6119 mean downstream against
+  0.5978 (`olmoe_freeset_trained.csv`).
+- **Limit**: no trained controlled pair of the {0,1,15}-against-{0,1,2} form exists under the correct
+  convention; the training-free joint table carries that comparison alone.
+
+**Pick free sets from single-layer damage measured under the model's own gate convention.**
+
+### What adaptation buys, and what imposition costs
+
+**Imposition is mild, not catastrophic.** Ten-task zero-shot, correct convention
+(`olmoe_downstream_ref.csv`):
+
+| task | free routing | imposed, no adaptation | adapted (distill) |
 |---|---|---|---|
-| {0,1} | +87.5% | 0.814440 | 0.5937 |
-| {0,1,2} | +131.2% | 0.808615 | 0.5937 |
-| {0,1,15} | +131.2% | 0.797810 | 0.6030 |
-| {0,1,14,15} | +175.0% | 0.786275 | 0.6037 |
+| lambada | 0.7056 | 0.4460 | 0.5791 |
+| arc easy | 0.7698 | 0.6364 | 0.6713 |
+| hellaswag | 0.5847 | 0.4864 | 0.4859 |
+| sciq | 0.9380 | 0.9150 | 0.9270 |
+| winogrande | 0.6938 | 0.5691 | 0.5991 |
 
-- **The middle two rows are a controlled pair**: identical memory, differing only in which layer is
-  freed third. Lower BPB and higher accuracy are better.
-- **The training-free profile predicted layer 2 at 5.8 times layer 15.** Trained, layer 15 wins by
-  0.0108 BPB and takes the better downstream score.
-- **Two further cells contradict the profile the same way.**
-- **Freeing both ends is the best configuration**, and training-free it looked dominated.
-
-**Do not choose free sets from single-layer damage.**
-
-### What adaptation strategy to use
-
-Seven strategies were run on the same corpus, seed and learning rate. **Recovery** is
-`1 − (adapted − base) / (imposed − base)`, so 1.0 fully closes the residency gap and 0 is the
-untrained mask. Differences under about 0.003 are eval noise.
-
-| what is trained | recovery @250M | verdict |
-|---|---|---|
-| router only | 0.707 | the floor for any adaptation |
-| router, annealing R from 64 to 8 over the first 150M | 0.708 | **null**, indistinguishable from no anneal |
-| router, self-distilled from the frozen free-routing teacher | 0.702 | **null**, if anything slightly worse |
-| router + learnable RMSNorm gains | 0.914 | works |
-| router + per-expert LoRA, r = 32 | 0.914 | works, ties RMSNorm gains |
-| router + LoRA + zone-confined anneal | 0.914 | **null**, the anneal again adds nothing |
-| full fine-tune | 0.934 | ceiling |
-
-- **The jump is capacity, not schedule.** Everything that only trains the router lands at 0.70;
-  everything that adds any trainable capacity beyond it lands at 0.91. Nothing in between.
-- **Annealing the residency limit does nothing**, tried twice, alone and on top of LoRA.
-- **Self-distillation from the free-routing teacher does nothing.** The teacher's routing is exactly
-  what the constraint makes unavailable, so there is no signal to transfer.
-- **Two very different mechanisms tie at 0.914.** RMSNorm gains are a few thousand parameters, LoRA at
-  r = 32 is millions. That they land together suggests the binding constraint is having *any* degree
-  of freedom outside the router, not how many.
-- **Cheap adaptation gets within 0.02 of a full fine-tune.** LoRA rank matters little: r = 8 gives
-  0.893 and r = 64 gives 0.910, against 0.914 at r = 32.
-
-### What the downstream evaluations say
-
-Bits per byte is one number. Ten-task zero-shot accuracy agrees with it and shows what the constraint
-costs a model that was never trained under it:
-
-| task | constraint imposed, no adaptation | free routing | {0,1,2} | {0,1,15} | {0,1,14,15} |
-|---|---|---|---|---|---|
-| lambada | 0.000 | 0.706 | 0.564 | 0.595 | 0.577 |
-| arc easy | 0.280 | 0.771 | 0.658 | 0.674 | 0.680 |
-| hellaswag | 0.257 | 0.586 | 0.471 | 0.477 | 0.485 |
-| sciq | 0.293 | 0.937 | 0.914 | 0.925 | 0.934 |
-| winogrande | 0.491 | 0.692 | 0.568 | 0.561 | 0.560 |
-
-- **Imposing the constraint untrained is catastrophic, not merely costly.** Lambada goes to zero and
-  arc easy falls to near chance. This is the same fact as section 4's +0.4314 BPB, in a currency that
-  makes its size obvious.
-- **Adaptation recovers about 70% of the gap**, averaged over all ten tasks: 0.675 for {0,1,2}, 0.698
-  for {0,1,15}, 0.699 for {0,1,14,15}. Gap closed is (cell − imposed) / (free − imposed), so 1.0 is
-  free-routing quality and 0.0 is the untrained mask.
-- **The downstream ordering matches the BPB ordering.** Freeing the last layer beats freeing another
-  early one, on the aggregate and on 3 of the 5 tasks above.
-- **Recovery is uneven by task.** Sciq comes back almost entirely, at 0.925 against 0.937 free.
-  Winogrande barely moves off its 0.491 floor, and it is the one task where the free sets do not
-  separate.
+- **Adaptation recovers 0.30 of the BPB gap and 32% of downstream**: means 0.6820 free, 0.5723
+  imposed, 0.5978 adapted, 0.6119 with {14,15} free (`olmoe_freeset_trained.csv`). The recovery
+  fractions published against the renorm-era floor were measured against a catastrophe that the
+  constraint does not cause.
+- **Per-layer allocation beats uniform before any training**: fitted 192 slots 0.7902 against uniform
+  0.7952, fitted 256 slots 0.7644 against 0.7687, converging once adapted, 0.7585 against 0.7601
+  (`frontier_olmoe.csv` alloc rows).
+- **The strategy bake-off is an era record.** Router-only floors, the norms-against-LoRA tie, the
+  anneal and self-distillation nulls, and the LoRA rank sweep were all measured under the broken
+  convention and none has a correct-convention re-run. The archive holds the records; nothing from
+  that table is quotable. The one re-run arm flipped sign: calibrated initialisation now helps
+  slightly (0.8061 against 0.8104) and per-layer embeddings stay dead either way.
 
 ## 6. What to do with it
 
-- Exempt the first and last MoE layers if you exempt any, on the architectural grounds in section 4,
-  not on lexicality. The last layer is among the least token-bound in the stack.
-- Do not pick free sets from single-layer ablation. It is wrong on this model in three cells.
+- Exempt the deepest MoE layers if you exempt any. Section 4's endpoint result and section 5's
+  corrected profile agree on the last layer; the first is cheap on the pretrained model.
+- Pick free sets from single-layer damage measured under the model's own gate convention. The
+  published contrary advice was measured under a broken one.
 - Do not invest in a better demand oracle. A perfect one is worse at fine granularity.
 - Spend effort on smoothing the demand estimate, worth 2.8 times, before eviction policy, worth 2.
 
@@ -482,8 +455,10 @@ costs a model that was never trained under it:
 - Every locus and lens measurement is one training seed per cell.
 - Only one full MoE run has a preserved router log, so every regime contrast in section 3, and the
   inventory and consistency comparisons in sections 2 and 3, rest on a single baseline.
-- No per-layer measurement above 13 layers on models we trained. The 16-layer evidence is section 5's
-  and comes from a different program on a model we did not train.
+- No per-layer measurement above 13 layers on models we trained. Section 5's 16-layer evidence comes
+  from a model we did not train; its depth profile now replicates at 48, 40 and 30 layers on three
+  further external models (`perlayer_qwen3.csv`, `perlayer_qwen3_5.csv`, `perlayer_gemma4.csv`; the
+  cross-model program's record is `results/ablations/sweep_RESULTS.md`).
 - Eight files cannot be regenerated. Section 3's oracle result rests entirely on two of them and its
   block-wise result on a third, and section 4's cross-regime table on two more.
 - Two structural files were measured by a method since superseded but remain the only record of eight
@@ -494,9 +469,8 @@ costs a model that was never trained under it:
 
 ## 8. What is worth doing next
 
-- Does demand forecastability predict which layers are worth *freeing*, or only what constraining one
-  *costs*? Section 4 correlates it with solo cost; section 5 shows solo measurements misrank layers for
-  set selection. No single model currently carries both measurements, so the question is open by
-  construction.
+- Does demand forecastability predict which layers are worth *freeing*, cross-model? Section 4
+  correlates it with solo cost on our models; section 5 shows solo damage ranks freeing correctly on
+  OLMoE. The forecastability correlate has never been measured on any adapted model.
 - The 1e19 cross-regime cells are re-runnable and would give the imposition direction a third budget.
 - The sham percentages need their producer's definition pinned down before they are quoted again.
