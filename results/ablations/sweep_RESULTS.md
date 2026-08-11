@@ -202,3 +202,10 @@ are the batched pad-warmed protocol of all prior tables.
     on their strongest generative skill (humaneval −0.13; gsm8k −0.01 at 12.5%, −0.09 at
     R=k); Qwen3.5-35B is within noise of free on three of four benchmarks even at R=k = 3%
     residency. Floor-censored cells (LFM mmlu, gemma4 humaneval) are extraction artifacts.
+
+14. **Allocation's downstream visibility scales with its BPB gap** (`alloc_downstream.csv`,
+    fitted vs uniform at iso-memory, base surfaces, training-free): qwen3 (0.023 BPB gap)
+    gains +1.1 downstream points (0.6504 vs 0.6398, 6 of 10 tasks); OLMoE (0.005) and
+    qwen3.5 (0.004) are exact nulls (0.5967/0.5968, 0.7130/0.7120). Preserve-convention
+    controlled pair confirms the profile trained: {0,1,15} beats {0,1,2} by 0.0132 BPB
+    and +0.6 points at matched memory (`layer_freeing_downstream.csv`).
