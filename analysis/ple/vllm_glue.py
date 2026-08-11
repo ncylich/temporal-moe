@@ -104,6 +104,19 @@ def install():
     # constrained runs on other paths fail loudly instead of silently free-running.
     from vllm.model_executor.models import qwen3_next as mq
     from decode_state import DEC as _DEC
+
+    # Force EXTERNAL routing: the engine may fuse the gate into the MoE runner
+    # (is_internal_router), which hides router logits from interception. Dropping the
+    # runner's gate reference before the first forward selects the reference external
+    # path; the block still owns its gate module and computes logits itself.
+    orig_q3n_init = mq.Qwen3NextSparseMoeBlock.__init__
+
+    def q3n_init(self, *a, **k):
+        orig_q3n_init(self, *a, **k)
+        if getattr(self.experts, "gate", None) is not None:
+            self.experts.gate = None
+
+    mq.Qwen3NextSparseMoeBlock.__init__ = q3n_init
     orig_q3n = mq.Qwen3NextSparseMoeBlock.forward
 
     def q3n_forward(self, hidden_states, already_sequence_parallel=False):
