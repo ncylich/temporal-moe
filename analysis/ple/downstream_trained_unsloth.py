@@ -56,7 +56,7 @@ def main():
     D = json.load(open(f"{FAM['data']}/bpb_slice_meta_{FAM['suffix']}.json"))["divisor_D"]
     assert A.base or A.adapter, "need --adapter or --base"
     if A.base:
-        ck, sd = {"R": 8}, {}
+        ck, sd, ck_path = {"R": 8}, {}, "(base surface)"
     else:
         ck_path = A.adapter if os.path.isabs(A.adapter) else os.path.join(FAM["out"], A.adapter)
         ck = torch.load(ck_path, map_location="cpu", weights_only=False)
@@ -127,7 +127,7 @@ def main():
     with open(out, "w", newline="") as f:
         w = csv.writer(f)
         f.write(f'"# {A.family} trained winner downstream, unsloth path, R=8 all layers, '
-                f'adapter {os.path.basename(ck_path)}, reload BPB {bpb:.6f} '
+                f'adapter {os.path.basename(ck_path) if os.sep in ck_path else ck_path}, reload BPB {bpb:.6f} '
                 f'(expected {A.expect_bpb:.6f}). Ten 0-shot tasks, limit {A.limit}. '
                 f'Producer: analysis/ple/downstream_trained_unsloth.py"\n')
         w.writerow(["task", "metric", A.tag, f"{A.tag}_stderr"])
