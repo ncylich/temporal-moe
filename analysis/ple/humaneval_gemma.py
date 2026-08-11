@@ -44,7 +44,7 @@ def main():
 
     os.environ["HF_ALLOW_CODE_EVAL"] = "1"
     from datasets import load_dataset
-    probs = list(load_dataset("openai_humaneval", split="test"))
+    probs = list(load_dataset("openai/openai_humaneval", split="test"))
 
     vllm_glue.install()
     from vllm import LLM, SamplingParams
