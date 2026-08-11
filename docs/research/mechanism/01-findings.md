@@ -435,6 +435,25 @@ sixteen layers freed, training-free (`olmoe_freeset_joint.csv`, blocked spread �
   anneal and self-distillation nulls, and the LoRA rank sweep have no correct-convention re-run;
   nothing from that table is quotable.
 
+**The adaptation campaign: LR sweeps to distillation to 100M tokens, against dense floors.**
+Three models, 15M-token LR brackets, then the winning recipe at 100M; free-trained nulls land
+within 2e-3 of base, so recovery measures the constraint, not corpus drift (records:
+`results/ablations/sweep_RESULTS.md` tables 1–2 and the 100M campaign table):
+
+| model at R=k | adapted BPB / downstream, 100M | dense floor | verdict |
+|---|---|---|---|
+| Qwen3-30B | 0.6676 / 0.6926 | Qwen3-4B: 0.6781 / 0.6852 | **beats its dense floor, both axes** |
+| Qwen3.5-35B | 0.6628 / 0.7144 | Qwen3.5-4B: 0.6892 / 0.7028 | **beats it with margin** |
+| OLMoE | 0.7779 / 0.6079 | OLMo-1B: — / 0.6006 | edges the 1B bar on downstream |
+
+- **LR optima are model-specific and low**: 3e-5 / 1e-4 / 3e-5, all under the inherited defaults;
+  the wrong LR costs more than every recipe refinement combined.
+- **Distillation from the own-base teacher beats plain CE** and is the campaign recipe; the token
+  axis saturates by 20–40M, so 15M buys most of what 100M does.
+- **A constrained MoE can be worth serving over the dense model it outmatches in memory**: both
+  Qwen models clear their 4B floors under the constraint; OLMoE at 64 experts does not clear
+  its own class.
+
 ### Across models
 
 **The damage law is shared.** Within-model degradation follows C·(k/R)^0.81, fixed-effects R² 0.91
