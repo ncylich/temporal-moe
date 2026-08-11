@@ -1,6 +1,11 @@
 # Per-Layer Embeddings for OLMoE residency adaptation
 
-**Status: plan of record. Nothing launched.**
+**Status: CLOSED, negative.** The program ran and PLE is dead under the correct gate
+convention: 15M-token arms reach 0.8104 (zero-init) and 0.8061 (calibrated, preserve-recaptured
+table) against 0.7887 for the plain LoRA surface (`results/ablations/olmoe_freeset_trained.csv`).
+Renorm-era PLE results are era records in `results/archive/olmoe_wrong_renorm/`. This file is the
+plan as written; numbers below predate the 08-04 gate-mass fix and are not quotable. Write-up:
+`docs/research/mechanism/01-findings.md` section 5.
 
 ## 1. The question
 
