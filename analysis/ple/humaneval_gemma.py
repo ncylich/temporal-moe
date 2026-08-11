@@ -65,13 +65,10 @@ def main():
     import json as _json
     import subprocess
     _json.dump({"preds": preds, "tests": tests}, open("/tmp/heg_preds.json", "w"))
-    scorer = (
-        "import json, os; os.environ['HF_ALLOW_CODE_EVAL']='1';\n"
-        "import evaluate; d = json.load(open('/tmp/heg_preds.json'));\n"
-        "res, _ = evaluate.load('code_eval').compute(references=d['tests'],"
-        " predictions=d['preds'], k=[1]);\n"
-        "print('PASS1', res['pass@1'])")
-    out = subprocess.run(["/workspace/venv_fla/bin/python", "-c", scorer], capture_output=True, text=True)
+    out = subprocess.run(["/workspace/venv_fla/bin/python",
+                          os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "heg_scorer.py")],
+                         capture_output=True, text=True)
     line = [l for l in out.stdout.splitlines() if l.startswith("PASS1")]
     assert line, f"scorer failed: {out.stderr[-400:]}"
     res = {"pass@1": float(line[0].split()[1])}
