@@ -15,8 +15,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS                                          # noqa: E402
 
 FIG = os.path.join(ABLATIONS, "figures")
-NAMES = {"olmoe_instruct": "OLMoE-Instruct 64E", "lfm25_instruct": "LFM2.5-A1B 32E",
-         "gemma4_instruct": "gemma4-26B-IT 128E", "qwen35_instruct": "Qwen3.5-35B 256E"}
+NAMES = {"olmoe_instruct": "OLMoE-Instruct (64 experts)",
+         "lfm25_instruct": "LFM2.5-A1B (32 experts)",
+         "gemma4_instruct": "gemma4-26B-IT (128 experts)",
+         "qwen35_instruct": "Qwen3.5-35B (256 experts)"}
 
 
 def selfce():
@@ -43,7 +45,7 @@ def selfce():
     ax.set_xticklabels(["3.1%", "6.25%", "12.5%"])
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
-    ax.set_xlabel("resident experts, % of E")
+    ax.set_xlabel("resident experts, % of total experts")
     ax.set_ylabel("self-CE damage, nats/token (constrained − free)")
     ax.set_title("Instruct models: damage on their own responses\n"
                  "(prefill free, rule on generated tokens; lower is better)", fontsize=10)
