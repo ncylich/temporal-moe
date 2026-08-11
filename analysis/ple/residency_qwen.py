@@ -111,7 +111,15 @@ def _router_forward(self, hidden_states):
                             swaps=_CFG.get("swaps", 1))                # [S, B, E] bool, R per token
         _ef = _CFG.get("enforce_from", 0)
         if _ef:        # instruct protocol: prefill positions free, rule enforced from response
-            mask[:_ef] = True
+            if _CFG.get("cold_start"):
+                with torch.no_grad():
+                    cm = RES.compute_resident_mask_accel(lg[_ef:].float(), R,
+                                                         evict=_CFG["evict"],
+                                                         swaps=_CFG.get("swaps", 1))
+                mask = torch.ones_like(mask)
+                mask[_ef:] = cm
+            else:
+                mask[:_ef] = True
         if _CFG.get("collect_telem"):
             RES._accum_telem(mask)
         used = router_logits.masked_fill(~mask.transpose(0, 1).reshape(N, E), float("-inf"))

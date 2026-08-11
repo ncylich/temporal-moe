@@ -70,7 +70,14 @@ def patch_lfm():
                                                    swaps=1)
         ef = CFG.get("enforce_from", 0)
         if ef:         # instruct protocol: prefill positions free, rule enforced from response
-            mask[:ef] = True
+            if CFG.get("cold_start"):
+                with torch.no_grad():
+                    cm = compute_resident_mask_accel(lg[ef:].float(), CFG["R"],
+                                                     evict="min_logit", swaps=1)
+                mask = torch.ones_like(mask)
+                mask[ef:] = cm
+            else:
+                mask[:ef] = True
         masked = sel_signal.masked_fill(~mask.transpose(0, 1).reshape(sel_signal.shape),
                                         float("-inf"))
         _, selected = torch.topk(masked, k=self.top_k, dim=-1)

@@ -122,7 +122,14 @@ def _router_forward(self, hidden_states):
                         swaps=_CFG.get("swaps", 1))                      # [S,B,E] bool, R True/token
     _ef = _CFG.get("enforce_from", 0)
     if _ef:            # instruct protocol: prefill positions free, rule enforced from response
-        mask[:_ef] = True                       # scan state still warmed by observing the prompt
+        if _CFG.get("cold_start"):              # cold arm: the scan never sees the prompt
+            with torch.no_grad():
+                cm = compute_resident_mask_accel(lg[_ef:].float(), R, evict=_CFG["evict"],
+                                                 swaps=_CFG.get("swaps", 1))
+            mask = torch.ones_like(mask)
+            mask[_ef:] = cm
+        else:
+            mask[:_ef] = True                   # scan state still warmed by observing the prompt
     if _CFG["collect_telem"]:
         _accum_telem(mask)                                       # swap-rate + usage (eval, R=8)
     mask_flat = mask.transpose(0, 1).reshape(N, E)

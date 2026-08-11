@@ -47,20 +47,21 @@ def load(name, M):
         model, _ = RES.load_model(M["path"])
         model.eval()
 
-        def set_arm(R, plen):
+        def set_arm(R, plen, cold=False):
             RES._CFG.update(on=R is not None, R=R or 0, evict="min_logit",
                             gate_mass="preserve", swaps=1, R_map=None,
-                            collect_telem=False, enforce_from=plen)
+                            collect_telem=False, enforce_from=plen, cold_start=cold)
             RES.set_free_layers(None)
     elif M["arch"] == "qwen3_5":
         import residency as RES
         import residency_qwen as RQ
         model, _ = RQ.load_model(M["path"], family="qwen3_5")
 
-        def set_arm(R, plen):
+        def set_arm(R, plen, cold=False):
             RES._CFG.update(on=R is not None, R=R or 0, evict="min_logit",
                             gate_mass="preserve", swaps=1, R_map=None,
-                            collect_telem=False, enforce_from=plen, free_set=None)
+                            collect_telem=False, enforce_from=plen, free_set=None,
+                            cold_start=cold)
     else:
         from transformers import AutoModelForCausalLM
         import granularity_ladder as GL
@@ -69,9 +70,9 @@ def load(name, M):
         model.eval()
         {"lfm": GL.patch_lfm, "gemma4": GL.patch_gemma4}[M["arch"]]()
 
-        def set_arm(R, plen):
+        def set_arm(R, plen, cold=False):
             GL.CFG.update(on=R is not None, R=R or 0, free_set=None, R_map=None,
-                          enforce_from=plen)
+                          enforce_from=plen, cold_start=cold)
     return model, tok, set_arm
 
 
@@ -81,6 +82,8 @@ def main():
     ap.add_argument("--n-traj", type=int, default=500)
     ap.add_argument("--path", default=None,
                     help="checkpoint dir override (big models staged on /dev/shm)")
+    ap.add_argument("--cold", action="store_true",
+                    help="run COLD decode arms only (scan blind to the prompt), rows named R{R}cold")
     A = ap.parse_args()
     M = MODELS[A.model]
     if A.path:
@@ -136,7 +139,7 @@ def main():
             for r in rows:
                 ids = r["ids"].to("cuda").long().unsqueeze(0)
                 plen = r["prompt_len"]
-                set_arm(R, plen)
+                set_arm(R, plen, cold=A.cold)
                 lg = model(ids).logits[0].float()
                 losses = torch.nn.functional.cross_entropy(
                     lg[plen - 1:-1], ids[0, plen:], reduction="none")
@@ -161,11 +164,15 @@ def main():
               f"think={ce_th or '-'} answer={ce_an or '-'} ({time.time()-t0:.0f}s)", flush=True)
         return ce
 
-    free = arm("free", None)
-    assert free < 1.0, f"free self-CE implausible ({free:.3f}) - wiring/template suspect"
-    for R in M["cells"]:
-        c = arm(f"R{R}", R)
-        assert c > free - 1e-4, f"constrained beat free ({c} vs {free}) - masking not engaged"
+    if A.cold:
+        for R in M["cells"]:
+            arm(f"R{R}cold", R)
+    else:
+        free = arm("free", None)
+        assert free < 1.0, f"free self-CE implausible ({free:.3f}) - wiring/template suspect"
+        for R in M["cells"]:
+            c = arm(f"R{R}", R)
+            assert c > free - 1e-4, f"constrained beat free ({c} vs {free}) - masking not engaged"
     fh.close()
     print(f"SELFCE {A.model} COMPLETE", flush=True)
 
