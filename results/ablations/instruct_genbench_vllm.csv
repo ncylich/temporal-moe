@@ -146,3 +146,4 @@ gemma4_instruct,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.98170
 gemma4_instruct,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.926829,full,1536,205
 gemma4_adapted,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,1536,69
 gemma4_adapted,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.951220,full,1536,206
+gemma4_instruct,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,200

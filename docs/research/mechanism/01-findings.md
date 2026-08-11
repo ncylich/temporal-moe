@@ -465,14 +465,14 @@ allocation against uniform at iso-memory, negative favours fitted (`perlayer_qwe
 **Instruct checkpoints obey the same ordering, in generation.** Self-CE is each model's
 cross-entropy on its own greedy responses to 500 fixed prompts, prefill free, rule enforced on
 generated tokens (`instruct_selfce.csv`); benchmarks run the same protocol end to end
-(`instruct_genbench.csv`, `instruct_genbench_vllm.csv`; the two floor cells are answer-extraction failures, not model quality):
+(`instruct_genbench.csv`, `instruct_genbench_vllm.csv`; LFM's mmlu cell is an answer-extraction floor; gemma4's humaneval uses the channel-aware protocol — its template thinks in `<|channel>thought` spans that need a reasoning budget and final-block extraction, `humaneval_gemma.py`):
 
 | model, R = 12.5% of E | self-CE, free → R | gsm8k | ifeval | humaneval | mmlu |
 |---|---|---|---|---|---|
 | OLMoE-Instruct | 0.354 → 1.297 | 0.69 → 0.41 | 0.58 → 0.49 | 0.37 → 0.29 | 0.47 → 0.32 |
 | LFM2.5-A1B | 0.396 → 0.704 | 0.26 → 0.26 | 0.26 → 0.25 | 0.65 → 0.52 | at floor |
 | Qwen3.5-35B | 0.228 → 0.341 | 0.49 → 0.45 | 0.22 → 0.22 | 0.95 → 0.91 | 0.32 → 0.34 |
-| gemma4-26B-IT | 0.139 → 0.350 | 0.87 → 0.86 | 0.87 → 0.85 | at floor | 0.70 → 0.67 |
+| gemma4-26B-IT | 0.139 → 0.350 | 0.87 → 0.86 | 0.87 → 0.85 | 0.98 → 0.97 | 0.70 → 0.67 |
 
 <img src="../../../results/ablations/figures/instruct_selfce_damage.png" alt="Self-CE damage against residency fraction, four instruct models" width="66%">
 
@@ -490,8 +490,8 @@ almost nowhere else; OLMoE and LFM pairs are one cell (k = 12.5%).*
   (`instruct_selfce.csv`, cold rows). The rolling set re-converges
   within a few tokens, so the serving protocol needs no prefill-observation machinery for quality.
 - **Task damage is capability-weighted, not uniform.** The lexical-router model loses everywhere;
-  the robust models pay only on their strongest generative skill (LFM humaneval −0.13, gemma4
-  gsm8k −0.09 at R=k) or nowhere outside noise (Qwen3.5, whose R=k cells at 3% residency read
+  the robust models pay only on their strongest generative skills (LFM humaneval −0.13; gemma4
+  gsm8k −0.09 and humaneval −0.055 at R=k, both mostly recovered at 12.5%) or nowhere outside noise (Qwen3.5, whose R=k cells at 3% residency read
   0.415/0.22/0.896/0.360).
 
 ## 6. What to do with it

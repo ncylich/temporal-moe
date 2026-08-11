@@ -201,11 +201,11 @@ are the batched pad-warmed protocol of all prior tables.
     across the board (gsm8k 0.69→0.41, humaneval 0.37→0.29); LFM2.5 and gemma4-IT pay only
     on their strongest generative skill (humaneval −0.13; gsm8k −0.01 at 12.5%, −0.09 at
     R=k); Qwen3.5-35B is within noise of free on three of four benchmarks even at R=k = 3%
-    residency. Floor-censored cells: LFM mmlu (answer-extraction floor) and gemma4 humaneval, where the
-    completion-style prompt derails generation itself — gemma leaks reasoning-channel
-    markers (`thought`, `<channel|>`) mid-body and restarts, identically in every arm, so
-    the cell measures a template quirk, not code ability (qwen 0.945 and lfm 0.646 score
-    normally on the same task and parser).
+    residency. Floor-censored: LFM mmlu (answer-extraction floor). gemma4's humaneval floor was a
+    protocol artifact — its template thinks in `<|channel>thought` spans and the stock
+    640-token cap + first-block extraction truncated mid-thought; with a 1536 budget and
+    channel-aware final-block extraction (`humaneval_gemma.py`) it scores 0.9817 free,
+    0.9695 at 12.5%, 0.9268 at R=k.
 
 14. **Allocation's downstream visibility scales with its BPB gap** (`alloc_downstream.csv`,
     fitted vs uniform at iso-memory, base surfaces, training-free): qwen3 (0.023 BPB gap)
@@ -223,9 +223,10 @@ are the batched pad-warmed protocol of all prior tables.
     where the constraint hurts** (gemma4-26B-IT, `train_gemma_ce.py`: attention LoRA r32 +
     router/norms, 3.4M response tokens of its own WildChat responses, R=8 on response
     tokens). Same suite and settings as the base grid (`instruct_genbench_vllm.csv`):
-    under R=8, GSM8K 0.770→0.795, MMLU 0.640→0.711, IFEval 0.860→0.820 — mean +1.8 points
-    over the three uncensored benchmarks, with the largest gain where base damage was
-    largest and a small penalty where damage was already ~1 point. Free-side control shows
+    under R=8, GSM8K 0.770→0.795, MMLU 0.640→0.711, HumanEval 0.927→0.951 (channel-aware
+    protocol), IFEval 0.860→0.820 — mean +2.0 points over four benchmarks, three of four
+    positive, with gains concentrated where base damage was largest and the one penalty
+    where damage was already ~1 point. Free-side control shows
     a mild specialization tax (mean −1.8, no cell beyond −3.5). Held-out self-CE 0.519→0.449
     is the training diagnostic, not the outcome measure. Training data `gemma4_train5k`
     (prompts 501–5500, disjoint from every evaluation set).

@@ -37,7 +37,7 @@ def extract(text):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", required=True)
-    ap.add_argument("--arm", required=True, choices=("free", "R8"))
+    ap.add_argument("--arm", required=True, choices=("free", "R8", "R16"))
     ap.add_argument("--tag", default=None, help="model column label; default from path")
     A = ap.parse_args()
     tag = A.tag or ("gemma4_adapted" if "merged" in A.path else "gemma4_instruct")
@@ -50,7 +50,7 @@ def main():
     from vllm import LLM, SamplingParams
     llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=0.85,
               max_model_len=2560, enable_prefix_caching=False)
-    DEC.update(on=A.arm == "R8", R=8, swaps=1)
+    DEC.update(on=A.arm != "free", R=16 if A.arm == "R16" else 8, swaps=1)
     DEC["state"].clear()
     msgs = [[{"role": "user", "content":
               "Complete the following Python function. Provide the complete function "
@@ -78,7 +78,7 @@ def main():
 
     with open(os.path.join(ABLATIONS, "instruct_genbench_vllm.csv"), "a", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow([tag, 128, 8, A.arm, 8 if A.arm == "R8" else "",
+        w.writerow([tag, 128, 8, A.arm, (16 if A.arm == "R16" else 8) if A.arm != "free" else "",
                     "humaneval_gemma_fixed", "pass@1,channel-aware",
                     f"{res['pass@1']:.6f}", "full", 1536, f"{secs:.0f}"])
 

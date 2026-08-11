@@ -62,12 +62,15 @@ def bench():
               "gemma4_instruct": "R16", "qwen35_instruct": "R32"}
     armk = {"olmoe_instruct": "R8", "lfm25_instruct": "R4",
             "gemma4_instruct": "R8", "qwen35_instruct": "R8"}
-    floor = {("lfm25_instruct", "MMLU"), ("gemma4_instruct", "HumanEval")}
+    floor = {("lfm25_instruct", "MMLU")}
     vals = {}
     for f in ("instruct_genbench.csv", "instruct_genbench_vllm.csv"):
         for r in csv.reader(open(f"{ABLATIONS}/{f}")):
             if len(r) > 8 and r[0] in NAMES and r[6] in want and r[8] != "10":
                 vals[(r[0], r[3], want[r[6]])] = float(r[7])
+            # gemma4's humaneval uses the channel-aware protocol rows
+            if len(r) > 7 and r[0] == "gemma4_instruct" and r[5] == "humaneval_gemma_fixed":
+                vals[(r[0], r[3], "HumanEval")] = float(r[7])
     benches = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
     models = list(NAMES)
     fig, ax = plt.subplots(figsize=(8, 5))
