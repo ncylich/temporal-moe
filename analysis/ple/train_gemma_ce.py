@@ -29,9 +29,11 @@ def main():
     ap.add_argument("--model", default="/dev/shm/gemma4-26b-it")
     ap.add_argument("--traj", default="gemma4_train5k")
     ap.add_argument("--tokens", type=int, default=3_400_000, help="response-token budget")
-    ap.add_argument("--lr", type=float, default=5e-5)
+    ap.add_argument("--lr", type=float, default=3e-5)
+    ap.add_argument("--extra-lr-div", type=float, default=5.0,
+                    help="router/norm full-weight lr = lr / this")
     ap.add_argument("--accum", type=int, default=16)
-    ap.add_argument("--save-every", type=int, default=800)
+    ap.add_argument("--save-every", type=int, default=400)
     ap.add_argument("--out", default="/workspace/olmoe-adapt/data/gemma_ce_adapter.pt")
     ap.add_argument("--eval-only", action="store_true",
                     help="load --out adapter, score frozen-500 self-CE (free and R8), exit")
@@ -127,7 +129,12 @@ def main():
                   f"(frozen 500, held out)", flush=True)
         return
 
-    opt = torch.optim.AdamW(train_params, lr=A.lr, weight_decay=0.0)
+    extra_ids = {id(p) for p in extra}
+    lora_ps = [p for p in train_params if id(p) not in extra_ids]
+    opt = torch.optim.AdamW([{"params": lora_ps, "lr": A.lr},
+                             {"params": extra, "lr": A.lr / A.extra_lr_div}],
+                            weight_decay=0.0)
+    print(f"[gce] lr groups: lora {A.lr} | router/norm {A.lr / A.extra_lr_div}", flush=True)
     model.train()
     seen = step = 0
     t0 = time.time()
