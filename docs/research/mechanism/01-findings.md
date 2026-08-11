@@ -516,6 +516,12 @@ almost nowhere else; OLMoE and LFM pairs are one cell (k = 12.5%).*
   damage over eleven model-task cells: long generations self-correct, short answers die from single
   routing mistakes. No error accumulation over decode length (`length_damage.py`).
 
+<img src="../../../results/ablations/figures/length_vs_damage.png" alt="Damage at R=k against mean response length" width="66%">
+
+*Damage at R=k against mean response length, colour per model, shape per benchmark. The damaged
+cells are the short ones; lengths are throughput-reconstructed estimates, and model identity and
+length are partially confounded.*
+
 **A pretrained instruct model adapts using its own responses and plain cross-entropy.**
 gemma4-26B-IT: attention LoRA r32 + router and norm gains, 3.4M response tokens of its own
 vLLM-generated WildChat responses (training prompts disjoint from every evaluation set by
