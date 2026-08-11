@@ -493,6 +493,27 @@ almost nowhere else; OLMoE and LFM pairs are one cell (k = 12.5%).*
   the robust models pay only on their strongest generative skills (LFM humaneval −0.13; gemma4
   gsm8k −0.09 and humaneval −0.055 at R=k, both mostly recovered at 12.5%) or nowhere outside noise (Qwen3.5, whose R=k cells at 3% residency read
   0.415/0.22/0.896/0.360).
+- **Damage lands on short-response tasks.** Spearman +0.72 (p = 0.01) between response length and
+  damage over eleven model-task cells: long generations self-correct, short answers die from single
+  routing mistakes. No error accumulation over decode length (`length_damage.py`).
+
+**A pretrained instruct model adapts using its own responses and plain cross-entropy.**
+gemma4-26B-IT: attention LoRA r32 + router and norm gains, 3.4M response tokens of its own
+vLLM-generated WildChat responses (training prompts disjoint from every evaluation set by
+construction), R=8 enforced on response tokens during training, one GPU-hour
+(`train_gemma_ce.py`, `gen_traj_vllm.py`; cells in `instruct_genbench_vllm.csv`):
+
+| gemma4-26B-IT under R=8 | GSM8K | IFEval | HumanEval | MMLU |
+|---|---|---|---|---|
+| base | 0.770 | 0.860 | 0.927 | 0.640 |
+| adapted | 0.795 | 0.820 | **0.951** | **0.711** |
+
+- **Mean +2.0 points under the constraint, three of four benchmarks positive**, gains concentrated
+  where base damage was largest; adapted MMLU under the constraint passes the model's own free arm
+  (0.711 against 0.697). Free-side capability is preserved, largest single move −3.5.
+- **Held-out self-CE is the training diagnostic, not the outcome measure**: 0.519 to 0.449.
+- CONTROL PENDING: plain self-SFT with the constraint off during training, matched data, surface
+  and learning rate (rows `gemma4_ctrl_sft`) — verdict lands with the running arm.
 
 ## 6. What to do with it
 
