@@ -54,7 +54,10 @@ REF = os.path.join(ABLATIONS, "olmoe_downstream_ref.csv")
 OUT = os.path.join(ABLATIONS, "layer_freeing_downstream.csv")
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--csurf", required=True, help="csurf_*.pt written by train_ple.py, in the data dir")
+ap.add_argument("--csurf", default=None, help="csurf_*.pt written by train_ple.py, in the data dir")
+ap.add_argument("--base", action="store_true", help="score the UNTRAINED base surface (no csurf)")
+ap.add_argument("--r-map", default=None,
+                help="per-layer residency 'l:R;l:R;...' (frontier allocation); overrides uniform R=8")
 ap.add_argument("--free-set", required=True, help="layers left unconstrained, e.g. 0,1,2")
 ap.add_argument("--tag", required=True, help="column label for this cell")
 ap.add_argument("--expect-bpb", type=float, default=None,
@@ -77,27 +80,31 @@ ap.add_argument("--dry-run", action="store_true",
 A = ap.parse_args()
 
 FREE = [int(x) for x in A.free_set.split(",") if x.strip() != ""]
-CK = A.csurf if os.path.isabs(A.csurf) else os.path.join(DATA_DIR, A.csurf)
+RMAP = ({int(p.split(":")[0]): int(p.split(":")[1]) for p in A.r_map.split(";")}
+        if A.r_map else None)
+assert A.base or A.csurf, "need --csurf or --base"
+CK = None if A.base else (A.csurf if os.path.isabs(A.csurf) else os.path.join(DATA_DIR, A.csurf))
 D = json.load(open(f"{DATA_DIR}/bpb_slice_meta.json"))["divisor_D"]
 
 # ---- everything that does not need the GPU, before the 27 GB model load ------------------------
-if not os.path.exists(CK):
+if CK is not None and not os.path.exists(CK):
     sys.exit(f"[abort] no checkpoint at {CK}")
 # Loaded to CPU: `seen` is needed to resolve the recorded BPB, and the masters are copied into the
 # model further down, so this is the one read either way.
-ck = torch.load(CK, map_location="cpu")
-print(f"[ds] {os.path.basename(CK)}: {len(ck['masters'])} tensors, seen={ck['seen'] / 1e6:.0f}M, "
-      f"lora_r={ck.get('lora')}, free_set={ck.get('free_set', '(not recorded)')}", flush=True)
+ck = {"masters": [], "seen": 0} if CK is None else torch.load(CK, map_location="cpu")
+if CK is not None:
+    print(f"[ds] {os.path.basename(CK)}: {len(ck['masters'])} tensors, seen={ck['seen'] / 1e6:.0f}M, "
+          f"lora_r={ck.get('lora')}, free_set={ck.get('free_set', '(not recorded)')}", flush=True)
 
 expect = A.expect_bpb
-if expect is None:
+if expect is None and CK is not None:
     cell = os.path.basename(CK)[len("csurf_"):].rsplit("_at", 1)[0]
     jpath = os.path.join(DATA_DIR, f"ple_{cell}.json")
     if os.path.exists(jpath):
         j = json.load(open(jpath))
         hit = [h for h in j["curve"] if abs(h["tok"] - ck["seen"]) < 10**6]
         expect = hit[-1]["bpb"] if hit else (j["final_bpb"] if j["train_tokens"] == ck["seen"] else None)
-    if expect is None:
+    if expect is None and CK is not None:
         sys.exit(f"[abort] no recorded BPB for {os.path.basename(CK)} at {ck['seen'] / 1e6:.0f}M "
                  f"tokens; pass --expect-bpb explicitly rather than scoring an unverified surface.")
 print(f"[ds] recorded BPB for this surface: {expect:.6f} (tol {A.tol})", flush=True)
@@ -122,11 +129,14 @@ if A.dry_run:
 # ---- rebuild the surface ----------------------------------------------------------------------
 model, tok = RES.load_model()
 RES.enable_residency(R=8)
+RES._CFG.update(R_map=RMAP)
 RES.set_free_layers(FREE)
 _slots = (16 - len(FREE)) * 8 + len(FREE) * 64
 print(f"[ds] layers {FREE} UNCONSTRAINED, rest R=8; resident slots {_slots} vs 128 "
       f"(+{_slots / 128 * 100 - 100:.1f}% memory)", flush=True)
 
+if CK is None:
+    print("[ds] BASE surface: no checkpoint, model as loaded", flush=True)
 RES.freeze_all_but_router(model)
 train_params = RES.router_params(model) + RES.norm_params(model) + RES.add_lora(model, r=32, alpha=64)
 
@@ -145,16 +155,17 @@ if _attn:
     train_params = train_params + RES.add_lora_attn(model, r=_attn, alpha=2 * _attn)
     print(f"[ds] attention LoRA r={_attn} on q/k/v/o", flush=True)
 
-if len(ck["masters"]) != len(train_params):
+if CK is not None and len(ck["masters"]) != len(train_params):
     sys.exit(f"[abort] {os.path.basename(CK)} holds {len(ck['masters'])} tensors, this surface has "
              f"{len(train_params)}. The checkpoint was written by a different recipe -- check --lora.")
-with torch.no_grad():
-    for p, m in zip(train_params, ck["masters"]):
-        if tuple(p.shape) != tuple(m.shape):
-            sys.exit(f"[abort] shape mismatch loading masters: {tuple(m.shape)} into {tuple(p.shape)}")
-        p.data.copy_(m.to("cuda").to(p.dtype))
-print(f"[ds] loaded {os.path.basename(CK)} (seen={ck['seen'] / 1e6:.0f}M, lora_r={ck.get('lora')})",
-      flush=True)
+if CK is not None:
+    with torch.no_grad():
+        for p, m in zip(train_params, ck["masters"]):
+            if tuple(p.shape) != tuple(m.shape):
+                sys.exit(f"[abort] shape mismatch loading masters: {tuple(m.shape)} into {tuple(p.shape)}")
+            p.data.copy_(m.to("cuda").to(p.dtype))
+    print(f"[ds] loaded {os.path.basename(CK)} (seen={ck['seen'] / 1e6:.0f}M, "
+          f"lora_r={ck.get('lora')})", flush=True)
 
 # ---- verify it is the model we think it is (`expect` resolved above) ----------------------------
 bpb_ids = torch.load(f"{DATA_DIR}/bpb_slice_ids.pt")
@@ -190,6 +201,7 @@ else:
 
 # ---- score ---------------------------------------------------------------------------------------
 RES.enable_residency(R=8)
+RES._CFG.update(R_map=RMAP)
 RES.set_free_layers(FREE)
 lm = HFLM(pretrained=model, tokenizer=tok, batch_size=A.batch_size)
 print(f"[ds] scoring {len(TASKS)} tasks 0-shot ...", flush=True)
