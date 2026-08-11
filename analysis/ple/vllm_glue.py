@@ -142,4 +142,30 @@ def install():
         return orig_g4(self, x, VR.apply(id(self), router_logits))
 
     mg.Gemma4MoE.forward = g4_forward
+
+    # transformers 5.15 moves gemma4's head_dim/global_head_dim into its per-layer spec
+    # (deleting the plain global_head_dim the checkpoint json carries), so vLLM's
+    # `getattr(config, "global_head_dim", config.head_dim)` silently falls back and
+    # builds 512-dim full-attention layers at 256 -> checkpoint shape mismatch. Restore
+    # the two plain attributes from the per-layer spec before any layer is constructed.
+    orig_g4layer_init = mg.Gemma4DecoderLayer.__init__
+
+    def g4layer_init(self, config, *a, **k):
+        try:
+            plc = config.per_layer_config
+            dims = {t: getattr(plc[i], "head_dim")
+                    for i, t in enumerate(config.layer_types)}
+            kvs = {t: getattr(plc[i], "num_key_value_heads")
+                   for i, t in enumerate(config.layer_types)}
+            if "sliding_attention" in dims:
+                config.head_dim = dims["sliding_attention"]
+                config.num_key_value_heads = kvs["sliding_attention"]
+            if "full_attention" in dims:
+                config.global_head_dim = dims["full_attention"]
+                config.num_global_key_value_heads = kvs["full_attention"]
+        except (AttributeError, IndexError, TypeError):
+            pass                          # non-heterogeneous config: nothing to restore
+        orig_g4layer_init(self, config, *a, **k)
+
+    mg.Gemma4DecoderLayer.__init__ = g4layer_init
     print("[vllm_glue] runner + olmoe/qwen3_5/gemma4 patches installed", flush=True)
