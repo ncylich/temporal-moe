@@ -142,3 +142,7 @@ gemma4_instruct,128,8,R8,8,humaneval_instruct,sample_len,164.000000,full,640,329
 gemma4_instruct,128,8,R8,8,humaneval_instruct,"pass@1,create_test",0.182927,full,640,329
 gemma4_instruct,128,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,640,994
 gemma4_instruct,128,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.710526,4,640,994
+gemma4_instruct,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,1536,69
+gemma4_instruct,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.926829,full,1536,205
+gemma4_adapted,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,1536,69
+gemma4_adapted,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.951220,full,1536,206
