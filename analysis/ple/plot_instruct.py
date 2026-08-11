@@ -60,6 +60,8 @@ def bench():
             "pass@1,create_test": "HumanEval", "exact_match,get-answer": "MMLU"}
     arm125 = {"olmoe_instruct": "R8", "lfm25_instruct": "R4",
               "gemma4_instruct": "R16", "qwen35_instruct": "R32"}
+    armk = {"olmoe_instruct": "R8", "lfm25_instruct": "R4",
+            "gemma4_instruct": "R8", "qwen35_instruct": "R8"}
     floor = {("lfm25_instruct", "MMLU"), ("gemma4_instruct", "HumanEval")}
     vals = {}
     for f in ("instruct_genbench.csv", "instruct_genbench_vllm.csv"):
@@ -70,27 +72,34 @@ def bench():
     models = list(NAMES)
     fig, ax = plt.subplots(figsize=(8, 5))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
-    w = 0.19
+    w = 0.105
     for i, m in enumerate(models):
-        xs, ys = [], []
-        for j, b in enumerate(benches):
-            if (m, b) in floor:
-                ax.annotate("floor", (j + (i - 1.5) * w, 0.3), fontsize=7, rotation=90,
-                            ha="center", color="grey")
-                continue
-            fr, cn = vals.get((m, "free", b)), vals.get((m, arm125[m], b))
-            if fr is None or cn is None:
-                continue
-            xs.append(j + (i - 1.5) * w)
-            ys.append(100 * (cn - fr))
-        ax.bar(xs, ys, width=w, color=cols[i], label=NAMES[m], edgecolor="black", lw=0.4)
+        for shade, (arms, tag) in enumerate((( armk, "R=k"), (arm125, "12.5%"))):
+            xs, ys = [], []
+            for j, b in enumerate(benches):
+                x = j + (i - 1.5) * 2.1 * w + (shade - 0.5) * w
+                if (m, b) in floor:
+                    if shade == 0:
+                        ax.annotate("floor", (j + (i - 1.5) * 2.1 * w, 0.3), fontsize=7,
+                                    rotation=90, ha="center", color="grey")
+                    continue
+                fr, cn = vals.get((m, "free", b)), vals.get((m, arms[m], b))
+                if fr is None or cn is None:
+                    continue
+                xs.append(x)
+                ys.append(100 * (cn - fr))
+            ax.bar(xs, ys, width=w, color=cols[i], edgecolor="black", lw=0.4,
+                   alpha=1.0 if shade == 0 else 0.55,
+                   label=NAMES[m] if shade == 0 else None)
+    ax.bar([], [], color="grey", alpha=1.0, label="dark: R = k", edgecolor="black")
+    ax.bar([], [], color="grey", alpha=0.55, label="light: R = 12.5% of E", edgecolor="black")
     ax.axhline(0, color="black", lw=0.8)
     ax.set_xticks(range(len(benches)))
     ax.set_xticklabels(benches)
-    ax.set_ylabel("accuracy change at 12.5% residency, points")
+    ax.set_ylabel("accuracy change under residency, points")
     ax.set_title("Generative benchmarks under decode-time residency\n"
-                 "(constrained − free, same items and stack per pair; 0 = no damage)",
-                 fontsize=10)
+                 "(constrained − free, same items and stack per pair; "
+                 "OLMoE and LFM: k = 12.5%, one cell)", fontsize=9)
     ax.legend(fontsize=8)
     ax.grid(alpha=0.25, axis="y")
     fig.tight_layout()
