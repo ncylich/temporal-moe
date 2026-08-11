@@ -58,11 +58,23 @@ def main():
     t0 = time.time()
     outs = llm.chat(msgs, SamplingParams(temperature=0, max_tokens=1536))
 
-    import evaluate as hf_evaluate
-    code_eval = hf_evaluate.load("code_eval")
     preds = [[extract(o.outputs[0].text)] for o in outs]
     tests = [p["test"] + f"\ncheck({p['entry_point']})" for p in probs]
-    res, _ = code_eval.compute(references=tests, predictions=preds, k=[1])
+    # code_eval forks sandbox workers, which is unsafe inside the live vLLM process:
+    # score in a clean subprocess instead.
+    import json as _json
+    import subprocess
+    _json.dump({"preds": preds, "tests": tests}, open("/tmp/heg_preds.json", "w"))
+    scorer = (
+        "import json, os; os.environ['HF_ALLOW_CODE_EVAL']='1';\n"
+        "import evaluate; d = json.load(open('/tmp/heg_preds.json'));\n"
+        "res, _ = evaluate.load('code_eval').compute(references=d['tests'],"
+        " predictions=d['preds'], k=[1]);\n"
+        "print('PASS1', res['pass@1'])")
+    out = subprocess.run([sys.executable, "-c", scorer], capture_output=True, text=True)
+    line = [l for l in out.stdout.splitlines() if l.startswith("PASS1")]
+    assert line, f"scorer failed: {out.stderr[-400:]}"
+    res = {"pass@1": float(line[0].split()[1])}
     secs = time.time() - t0
     print(f"[heg] {tag} {A.arm}: pass@1 = {res['pass@1']:.4f} "
           f"({len(probs)} problems, {secs:.0f}s)", flush=True)
