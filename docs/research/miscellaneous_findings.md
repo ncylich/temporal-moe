@@ -4,20 +4,7 @@ Five results that were produced during the multi-pod experiment program, committ
 reported only inside the pod control-channel transcripts. Each is reconstructed here from its
 committed CSV, not from the transcript, so every number below is reproducible from the repo.
 
-**What is already documented, and is not repeated here:**
-
-| topic | lives in |
-|---|---|
-| Phase-0 isoflop sweeps, dense floor, temporal MoE, fine-graining at G1/G3 | [`results/ablations/FINDINGS.md`](../../results/ablations/FINDINGS.md) |
-| OLMoE residency adaptation, current program: LR sweeps, distillation recipe, 100M campaign | [`results/ablations/sweep_RESULTS.md`](../../results/ablations/sweep_RESULTS.md) |
-| De-lexicalization, narrative write-up (see the corrections doc first) | [`mechanism/delexicalization.md`](mechanism/delexicalization.md) |
-| What rolling residency does to routing — findings, by claim | [`mechanism/01-findings.md`](mechanism/01-findings.md) |
-| Corrections to the published de-lexicalization write-up | [`mechanism/02-corrections.md`](mechanism/02-corrections.md) |
-| Selection-shaping program: anticipatory loss, bursty loss, Karen, momentum variants | [`ablations/alignment-program.md`](ablations/alignment-program.md) |
-| Renorm-era OLMoE program (Stage-2 bake-off, MinFlow/O-series, Cal screens) — ARCHIVED, results void | [`results/archive/olmoe_wrong_renorm/README.md`](../../results/archive/olmoe_wrong_renorm/README.md) |
-| Block-local routing, serving floor | [`ablations/local-global-program.md`](ablations/local-global-program.md), [`background/batch1-offload-feasibility.md`](background/batch1-offload-feasibility.md) |
-| Per-CSV index for everything | [`results/ablations/README.md`](../../results/ablations/README.md) |
-
+Routing index: [`README.md`](README.md).
 **Metric conventions.** `BPB = CE_nats / (ln2 · bytes_per_token)`, bits per byte, lower is better.
 Divisors are byte-derived per corpus and never inherited: **2.9780** for the pythia-50k corpus,
 **2.7600** for the G3-era 16k corpus, **3.1089** for the OLMoE audited held-out slice. `R` is the
@@ -265,21 +252,4 @@ the natural first experiment if this line is picked back up.
 
 ## Per-layer residency relaxation
 
-Instead of adapting to the constraint, remove it from chosen layers: a freed layer keeps all
-64 experts resident, so this trades serving memory only — FLOPs are unchanged, both regimes
-activate exactly top-8. The correct-convention training-free profile
-(`olmoe_gatemass_remeasure.csv`, solo_L* rows) rises monotonically with depth: layer 15 is the
-most damaging single layer at +0.0223 BPB (2.9x the mean solo share), early layers are mild
-(~+0.006). This is the OPPOSITE of the renorm-era profile, which put layer 1 first — the
-gate-mass artifact inverted the layer ordering. Solo damages sum to 0.122 against 0.169 joint,
-so about a quarter of the constraint's cost is interaction between layers.
-
-The corrected profile pays off in both uses (full d_l(R) curves, 16 layers x R in
-{8,12,16,24}, and the fitted allocations:
-[`figures/olmoe_perlayer.png`](../../results/ablations/figures/olmoe_perlayer.png), data
-`frontier_olmoe.csv`). Greedy min-cost allocation vs uniform at iso-memory on the untrained
-base: 0.7902 vs 0.7952 (192 slots) and 0.7644 vs 0.7687 (256); on the 100M-distill adapter
-the gap closes to noise (-0.0016 / -0.0002) — the adapter learns around uniformity. Training
-the standard distill recipe with the profile's picks {14,15} freed gives the best OLMoE
-cells in the program (BPB 0.7600, downstream 0.6119 at 15M — vs 0.7887/0.6017
-all-constrained).
+Moved to [`mechanism/01-findings.md`](mechanism/01-findings.md) section 5, its one home.
