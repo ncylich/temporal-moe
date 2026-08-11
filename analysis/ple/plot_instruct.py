@@ -76,28 +76,35 @@ def bench():
     fig, ax = plt.subplots(figsize=(8, 5))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
     w = 0.105
+    GX = 1.45                                    # group spacing factor
     for i, m in enumerate(models):
         for shade, (arms, tag) in enumerate((( armk, "R=k"), (arm125, "12.5%"))):
             xs, ys = [], []
             for j, b in enumerate(benches):
-                x = j + (i - 1.5) * 2.1 * w + (shade - 0.5) * w
+                x = j * GX + (i - 1.5) * 2.1 * w + (shade - 0.5) * w
                 if (m, b) in floor:
                     if shade == 0:
-                        ax.annotate("floor", (j + (i - 1.5) * 2.1 * w, 0.3), fontsize=7,
-                                    rotation=90, ha="center", color="grey")
+                        ax.annotate("floor", (j * GX + (i - 1.5) * 2.1 * w, 0.3),
+                                    fontsize=7, rotation=90, ha="center", color="grey")
                     continue
                 fr, cn = vals.get((m, "free", b)), vals.get((m, arms[m], b))
                 if fr is None or cn is None:
                     continue
+                d = 100 * (cn - fr)
+                if abs(d) < 0.05:                # zero-damage results must stay visible
+                    ax.annotate("0", (x, 0.35), fontsize=7, ha="center", color=cols[i],
+                                fontweight="bold")
                 xs.append(x)
-                ys.append(100 * (cn - fr))
+                ys.append(d)
             ax.bar(xs, ys, width=w, color=cols[i], edgecolor="black", lw=0.4,
                    alpha=1.0 if shade == 0 else 0.55,
                    label=NAMES[m] if shade == 0 else None)
+    for j in range(len(benches) - 1):
+        ax.axvline((j + 0.5) * GX, color="grey", lw=0.6, alpha=0.4)
     ax.bar([], [], color="grey", alpha=1.0, label="dark: R = k", edgecolor="black")
     ax.bar([], [], color="grey", alpha=0.55, label="light: R = 12.5% of E", edgecolor="black")
     ax.axhline(0, color="black", lw=0.8)
-    ax.set_xticks(range(len(benches)))
+    ax.set_xticks([j * GX for j in range(len(benches))])
     ax.set_xticklabels(benches)
     ax.set_ylabel("accuracy change under residency, points")
     ax.set_title("Generative benchmarks under decode-time residency\n"
