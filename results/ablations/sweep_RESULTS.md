@@ -215,11 +215,13 @@ are the batched pad-warmed protocol of all prior tables.
     OLMoE 1.2941/1.2967, LFM 0.7035/0.7037, gemma4 0.3498/0.3498, qwen3.5 0.3362/0.3414) —
     the rolling set re-converges within a few tokens of response start.
 
-16. **CE adaptation works on an instruct model, at the self-CE scale** (gemma4-26B-IT,
-    `train_gemma_ce.py`: attention LoRA r32 + router/norms, 3.4M response tokens of its own
-    vLLM-generated WildChat responses at R=8-on-response): held-out frozen-500 self-CE
-    0.5188 → 0.4488 (18.4% of the constrained gap closed) with free-side task performance
-    preserved (GSM8K 0.860 vs 0.865). GSM8K under R=8 moves 0.770 → 0.790, directionally
-    consistent but not individually significant (paired sign test p=0.30, 18 up / 14 down
-    of 200). Training data: `gemma4_train5k` (prompts 501-5500, disjoint from the frozen
-    evaluation set by construction).
+16. **CE adaptation of an instruct model under R=k: net-positive downstream, concentrated
+    where the constraint hurts** (gemma4-26B-IT, `train_gemma_ce.py`: attention LoRA r32 +
+    router/norms, 3.4M response tokens of its own WildChat responses, R=8 on response
+    tokens). Same suite and settings as the base grid (`instruct_genbench_vllm.csv`):
+    under R=8, GSM8K 0.770→0.795, MMLU 0.640→0.711, IFEval 0.860→0.820 — mean +1.8 points
+    over the three uncensored benchmarks, with the largest gain where base damage was
+    largest and a small penalty where damage was already ~1 point. Free-side control shows
+    a mild specialization tax (mean −1.8, no cell beyond −3.5). Held-out self-CE 0.519→0.449
+    is the training diagnostic, not the outcome measure. Training data `gemma4_train5k`
+    (prompts 501–5500, disjoint from every evaluation set).
