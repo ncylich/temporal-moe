@@ -35,7 +35,9 @@ TASKS = ["arc_easy", "arc_challenge", "hellaswag", "piqa", "sciq", "winogrande",
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--family", required=True, choices=("qwen3", "qwen3_5"))
-    ap.add_argument("--adapter", required=True, help="unsloth_*_adapter.pt in the family out dir")
+    ap.add_argument("--adapter", default=None, help="unsloth_*_adapter.pt in the family out dir")
+    ap.add_argument("--base", action="store_true", help="score the zero-init (base) surface")
+    ap.add_argument("--r-map", default=None, help="per-layer residency 'l:R;...'")
     ap.add_argument("--expect-bpb", type=float, required=True)
     ap.add_argument("--tag", required=True)
     ap.add_argument("--tol", type=float, default=2e-3,
@@ -52,9 +54,13 @@ def main():
 
     FAM = TQ.resolve(A.family)
     D = json.load(open(f"{FAM['data']}/bpb_slice_meta_{FAM['suffix']}.json"))["divisor_D"]
-    ck_path = A.adapter if os.path.isabs(A.adapter) else os.path.join(FAM["out"], A.adapter)
-    ck = torch.load(ck_path, map_location="cpu", weights_only=False)
-    sd = ck["tensors"]
+    assert A.base or A.adapter, "need --adapter or --base"
+    if A.base:
+        ck, sd = {"R": 8}, {}
+    else:
+        ck_path = A.adapter if os.path.isabs(A.adapter) else os.path.join(FAM["out"], A.adapter)
+        ck = torch.load(ck_path, map_location="cpu", weights_only=False)
+        sd = ck["tensors"]
 
     model, tok = FastModel.from_pretrained(
         FAM["model"], max_seq_length=2048, dtype=torch.bfloat16,
@@ -80,11 +86,15 @@ def main():
     with torch.no_grad():
         for n, t in sd.items():
             params[n].data.copy_(t.to(params[n].dtype))
-    print(f"  [reload] {len(sd)} tensors -> model ({sum(t.numel() for t in sd.values())/1e6:.1f}M)",
-          flush=True)
+    print(("  [reload] BASE surface (zero-init LoRA no-op)" if A.base else
+           f"  [reload] {len(sd)} tensors -> model "
+           f"({sum(t.numel() for t in sd.values())/1e6:.1f}M)"), flush=True)
 
     RU.install(model)
-    RES._CFG.update(on=True, R=ck.get("R", 8), evict="min_logit", collect_telem=True)
+    rmap = ({int(p.split(":")[0]): int(p.split(":")[1]) for p in A.r_map.split(";")}
+            if A.r_map else None)
+    RES._CFG.update(on=True, R=ck.get("R", 8), evict="min_logit", collect_telem=True,
+                    R_map=rmap)
     if A.free_set == "all":
         L = getattr(model.config, "text_config", model.config).num_hidden_layers
         RES.set_free_layers(list(range(L)))
