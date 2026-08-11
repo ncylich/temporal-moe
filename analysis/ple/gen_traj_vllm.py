@@ -37,9 +37,12 @@ def main():
     vllm_glue.install()
     from transformers import AutoTokenizer
     _t = AutoTokenizer.from_pretrained(A.model)
-    kept = [p for p in prompts
-            if len(_t.apply_chat_template([{"role": "user", "content": p["text"]}],
-                                          add_generation_prompt=True)) <= A.max_prompt_tok]
+    def _plen(p):
+        enc = _t.apply_chat_template([{"role": "user", "content": p["text"]}],
+                                     add_generation_prompt=True, tokenize=True,
+                                     return_dict=True)
+        return len(enc["input_ids"])
+    kept = [p for p in prompts if _plen(p) <= A.max_prompt_tok]
     print(f"[genv] {len(prompts) - len(kept)} prompts over {A.max_prompt_tok} tokens dropped "
           f"pre-submission", flush=True)
     prompts = kept
