@@ -51,9 +51,32 @@ def main():
         # transformers 5.15 marks head_dim per-layer on gemma4; vLLM reads it globally.
         # gemma4-26B is homogeneous in practice -- verified by the free-arm score check.
         kw["hf_overrides"] = {"allow_global_per_layer_attribute_access": True}
+    if M["arch"] == "gptoss":
+        kw["dtype"] = "auto"                     # MXFP4 checkpoint: keep native quant
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
-              enforce_eager=True, enable_prefix_caching=False, dtype="bfloat16", **kw)
+              enforce_eager=True, enable_prefix_caching=False,
+              **({"dtype": "bfloat16"} | kw))
+
+    gen_kwargs = "do_sample=False"
+    if M["arch"] == "gptoss":
+        # harmony format: keep special tokens so the analysis/final channel structure
+        # survives detokenization, then score the FINAL channel only (the analysis
+        # channel is free-form reasoning and would fail e.g. IFEval's format rules).
+        # A response truncated before its final channel scores as empty -- a real
+        # outcome, applied identically to every arm.
+        gen_kwargs += ",skip_special_tokens=False"
+        orig_gu = lm.generate_until
+
+        def _final_channel(text):
+            if "<|channel|>final<|message|>" in text:
+                text = text.rsplit("<|channel|>final<|message|>", 1)[1]
+            elif "<|channel|>" in text:
+                return ""
+            return text.split("<|return|>")[0].split("<|end|>")[0]
+
+        lm.generate_until = lambda reqs, **k2: [_final_channel(t)
+                                                for t in orig_gu(reqs, **k2)]
 
     out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
     exists = os.path.exists(out)

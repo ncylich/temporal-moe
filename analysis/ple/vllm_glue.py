@@ -168,4 +168,59 @@ def install():
         orig_g4layer_init(self, config, *a, **k)
 
     mg.Gemma4DecoderLayer.__init__ = g4layer_init
-    print("[vllm_glue] runner + olmoe/qwen3_5/gemma4 patches installed", flush=True)
+
+    # LFM2.5: selection = sigmoid(logits) + expert bias, fused inside vLLM's grouped-topk
+    # router. -inf logit masking is NOT safe here (sigmoid(-inf)=0, but a non-resident
+    # expert's bias alone can still win selection), so reroute through a custom routing
+    # function replicating the audited HF path (granularity_ladder.patch_lfm) exactly:
+    # scan and mask operate on the CHOICE signal sigmoid+bias; gate weights are the raw
+    # sigmoid at the selected experts, renormalized (+1e-6) and scaled. FusedMoE is a
+    # FACTORY FUNCTION in this vLLM version (not a class -- rebinding its __init__ is a
+    # silent no-op, which produced arm-identical generations on the first attempt), so
+    # wrap the name in the lfm2_moe module namespace; the guard matches only LFM's
+    # signature (sigmoid scoring + grouped topk).
+    import torch
+    from vllm.model_executor.models import lfm2_moe as mlf
+    orig_fm = mlf.FusedMoE
+
+    def fm_wrap(*a, **kw):
+        if kw.get("scoring_func") == "sigmoid" and kw.get("use_grouped_topk"):
+            bias = kw.get("e_score_correction_bias")
+            renorm = kw.get("renormalize", True)
+            scale = kw.get("routed_scaling_factor", 1.0)
+            layer_key = object()                      # unique hashable key per MoE layer
+
+            def route(hidden_states, gating_output, topk, renormalize):
+                scores = gating_output.sigmoid()
+                sel_signal = scores + bias if bias is not None else scores
+                masked = VR.apply(layer_key, sel_signal)
+                _, selected = torch.topk(masked, k=topk, dim=-1)
+                weights = torch.gather(scores, 1, selected)
+                if renorm:
+                    weights = weights / (weights.sum(dim=-1, keepdim=True) + 1e-6)
+                return weights * scale, selected
+
+            kw = dict(kw, use_grouped_topk=False, num_expert_group=None,
+                      topk_group=None, custom_routing_function=route)
+        return orig_fm(*a, **kw)
+
+    mlf.FusedMoE = fm_wrap
+
+    # gpt-oss: external router logits, softmax over the selection (renormalize=True)
+    # -> -inf masking before the fused kernel is exact, same as the audited HF MXFP4
+    # port. Copy of the plain CUDA, non-sequence-parallel forward with the mask added.
+    from vllm.model_executor.models import gpt_oss as mgo
+    from vllm.platforms import current_platform
+    orig_goss = mgo.MLPBlock.forward
+
+    def goss_forward(self, x):
+        if current_platform.is_rocm() or self.is_sequence_parallel:
+            assert not _DEC["on"], "constrained gpt-oss needs the plain CUDA path"
+            return orig_goss(self, x)
+        g = self.router(x)
+        g = VR.apply(id(self), g)
+        return self.experts(hidden_states=x, router_logits=g)[:, : self.hidden_size]
+
+    mgo.MLPBlock.forward = goss_forward
+    print("[vllm_glue] runner + olmoe/qwen3_5/gemma4/lfm25/gpt_oss patches installed",
+          flush=True)

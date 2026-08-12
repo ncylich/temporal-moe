@@ -34,6 +34,11 @@ MODELS = {
                         "cells": [8, 16], "arch": "gemma4"},
     "qwen35_instruct": {"path": f"{IM}/qwen35-35b-a3b-instruct", "E": 256, "k": 8,
                         "cells": [8, 32], "arch": "qwen3_5"},
+    # gpt-oss: generative benchmarks only (vLLM stack); no frozen-500 self-CE arm.
+    "gptoss_20b": {"path": "/dev/shm/gpt-oss-20b", "E": 32, "k": 4,
+                   "cells": [4], "arch": "gptoss"},
+    "gptoss_120b": {"path": "/dev/shm/gpt-oss-120b", "E": 128, "k": 4,
+                    "cells": [4, 16], "arch": "gptoss"},
 }
 
 
