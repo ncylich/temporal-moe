@@ -159,15 +159,14 @@ def main():
             DEC.update(on=R is not None, R=R or 0, swaps=1)
             DEC["state"].clear()
             t0 = time.time()
-            try:
-                res = simple_evaluate(model=lm, tasks=[task], limit=lim,
-                                      apply_chat_template=True,
-                                      gen_kwargs=gen_kwargs,
-                                      confirm_run_unsafe_code=True, log_samples=True)
-            except Exception as e:
-                print(f"  [{A.model}] {arm_name} {task}: FAILED {type(e).__name__}: {e}",
-                      flush=True)
-                continue
+            # FAIL FAST, no per-task isolation: this is a results pipeline, not a
+            # service. A swallowed exception obfuscates a bug that needs fixing and
+            # lets a poisoned engine corrupt every later cell (2026-08-12: one walker
+            # crash silently took out five cells under the old try/except-continue).
+            res = simple_evaluate(model=lm, tasks=[task], limit=lim,
+                                  apply_chat_template=True,
+                                  gen_kwargs=gen_kwargs,
+                                  confirm_run_unsafe_code=True, log_samples=True)
             secs = time.time() - t0
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
             for mk, mv in metrics.items():

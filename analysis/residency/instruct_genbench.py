@@ -94,15 +94,12 @@ def main():
         for task, lim in suite:
             set_decode_arm(M, R)
             t0 = time.time()
-            try:
-                res = simple_evaluate(model=lm, tasks=[task], limit=lim,
-                                      apply_chat_template=True,
-                                      gen_kwargs="do_sample=True,temperature=1.0,top_p=1.0",
-                                      confirm_run_unsafe_code=True, log_samples=True)
-            except Exception as e:      # one broken task must not kill the arm's other cells
-                print(f"  [{A.model}] {arm_name} {task}: FAILED {type(e).__name__}: {e}",
-                      flush=True)
-                continue
+            # FAIL FAST (see instruct_genbench_vllm.py): swallowed exceptions obfuscate
+            # bugs and let a corrupted engine poison later cells.
+            res = simple_evaluate(model=lm, tasks=[task], limit=lim,
+                                  apply_chat_template=True,
+                                  gen_kwargs="do_sample=True,temperature=1.0,top_p=1.0",
+                                  confirm_run_unsafe_code=True, log_samples=True)
             secs = time.time() - t0
             # group tasks (e.g. mmlu_flan_cot_fewshot): report the aggregate, not 57 subtasks
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
