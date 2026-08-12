@@ -42,6 +42,10 @@ def main():
     ap.add_argument("--think", choices=("on", "off"), default="off",
                     help="enable_thinking template kwarg (off pre-closes the channel)")
     ap.add_argument("--limit", type=int, default=None, help="first N problems (smoke)")
+    ap.add_argument("--max-tokens", type=int, default=1536,
+                    help="generation budget (think-on needs ~3072: thinking alone can "
+                         "run past 1800 tokens)")
+    ap.add_argument("--max-model-len", type=int, default=2560)
     A = ap.parse_args()
     tag = A.tag or ("gemma4_adapted" if "merged" in A.path else "gemma4_instruct")
 
@@ -54,7 +58,7 @@ def main():
     vllm_glue.install()
     from vllm import LLM, SamplingParams
     llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=0.85,
-              max_model_len=2560, enable_prefix_caching=False)
+              max_model_len=A.max_model_len, enable_prefix_caching=False)
     DEC.update(on=A.arm != "free", R=16 if A.arm == "R16" else 8, swaps=1)
     DEC["state"].clear()
     msgs = [[{"role": "user", "content":
@@ -66,7 +70,7 @@ def main():
     _gc = _json.load(open(os.path.join(A.path, "generation_config.json")))
     outs = llm.chat(msgs, SamplingParams(
         temperature=_gc.get("temperature", 1.0), top_p=_gc.get("top_p", 1.0),
-        top_k=_gc.get("top_k") or -1, seed=1234, max_tokens=1536),
+        top_k=_gc.get("top_k") or -1, seed=1234, max_tokens=A.max_tokens),
         chat_template_kwargs={"enable_thinking": A.think == "on"})
 
     preds = [[extract(o.outputs[0].text)] for o in outs]
@@ -91,7 +95,7 @@ def main():
         w = csv.writer(fh)
         w.writerow([tag, 128, 8, A.arm, (16 if A.arm == "R16" else 8) if A.arm != "free" else "",
                     "humaneval_gemma_fixed", "pass@1,channel-aware",
-                    f"{res['pass@1']:.6f}", "full", 1536, f"{secs:.0f}"])
+                    f"{res['pass@1']:.6f}", A.limit or "full", A.max_tokens, f"{secs:.0f}"])
 
 
 if __name__ == "__main__":
