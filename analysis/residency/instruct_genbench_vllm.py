@@ -43,6 +43,9 @@ def main():
                          "models whose template has no toggle (empty think block)")
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"), help="gpt-oss harmony effort")
+    ap.add_argument("--presence-penalty", type=float, default=None,
+                    help="fallback when the shipped generation_config omits it but the "
+                         "model card requires it (qwen3.5 thinking: 1.5)")
     A = ap.parse_args()
     M = MODELS[A.model]
     if A.path:
@@ -104,8 +107,16 @@ def main():
     _t, _p = _gc.get("temperature", 1.0), _gc.get("top_p", 1.0)
     _k = _gc.get("top_k") or -1
     gen_kwargs = f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
-    print(f"[genbench] sampling: temp={_t} top_p={_p} top_k={_k} (model config)",
-          flush=True)
+    # carry the FULL shipped recipe: qwen3.5's thinking mode needs presence_penalty=1.5
+    # (its rambling guard) -- omitting it produced non-terminating planning monologues
+    _pp = _gc.get("presence_penalty", A.presence_penalty)
+    _mp = _gc.get("min_p")
+    if _pp:
+        gen_kwargs += f",presence_penalty={_pp}"
+    if _mp:
+        gen_kwargs += f",min_p={_mp}"
+    print(f"[genbench] sampling: temp={_t} top_p={_p} top_k={_k} pp={_pp} mp={_mp} "
+          f"(model config)", flush=True)
     if M["arch"] == "gptoss":
         # harmony format: keep special tokens so the analysis/final channel structure
         # survives detokenization, then score the FINAL channel only (the analysis
