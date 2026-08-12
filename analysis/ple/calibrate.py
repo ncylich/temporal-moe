@@ -34,6 +34,7 @@ import argparse, json, os, sys, time
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "residency"))  # sibling dir (2026-08 split)
 import residency as RES               # noqa: E402
 from olmoe_paths import DATA_DIR      # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

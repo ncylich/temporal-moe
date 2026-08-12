@@ -1,4 +1,4 @@
-"# qwen3 per-layer damage d_l(R): solo layer l constrained at R, others free, base surface; then fitted greedy allocation vs uniform at iso-memory slot budgets, both surfaces. Training-free, min_logit <=1 swap/token, gate_mass=preserve. free_set column: ALL = every layer free, all_but_l = solo cell. Producer: analysis/ple/frontier_qwen.py --perlayer"
+"# qwen3 per-layer damage d_l(R): solo layer l constrained at R, others free, base surface; then fitted greedy allocation vs uniform at iso-memory slot budgets, both surfaces. Training-free, min_logit <=1 swap/token, gate_mass=preserve. free_set column: ALL = every layer free, all_but_l = solo cell. Producer: analysis/residency/frontier_qwen.py --perlayer"
 stage,surface,cell,R,free_set,R_map,bpb,swap_rate,n_seq,secs
 smoke,base,free,8,ALL,,0.615448,0.0000,16,35.4
 smoke,base,R8_s1,8,,,0.734118,0.9973,16,6.3

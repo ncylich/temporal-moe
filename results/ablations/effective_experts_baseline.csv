@@ -1,4 +1,4 @@
-"# Per-layer effective expert count of the UNTRAINED OLMoE, on the audited held-out slice (the same tokens the training-time log scores). regime=free is the released model with no residency; regime=imposed is residency R=k applied at eval only, untrained. eff_load = 1/sum(p^2) over dispatch, range 1..E, higher is more balanced. eff_tok = exp(mean token routing entropy). Producer: analysis/ple/effective_experts_baseline.py"
+"# Per-layer effective expert count of the UNTRAINED OLMoE, on the audited held-out slice (the same tokens the training-time log scores). regime=free is the released model with no residency; regime=imposed is residency R=k applied at eval only, untrained. eff_load = 1/sum(p^2) over dispatch, range 1..E, higher is more balanced. eff_tok = exp(mean token routing entropy). Producer: analysis/residency/effective_experts_baseline.py"
 regime,layer,E,k,eff_load,eff_load_frac_of_E,eff_tok,n_tokens
 free,0,64,8,58.707,0.9173,47.314,16384
 free,1,64,8,62.015,0.9690,52.856,16384

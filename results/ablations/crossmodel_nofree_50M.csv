@@ -35,11 +35,11 @@
 # published OLMoE cell carries lora=32 INCLUDING ce_freeall_50M, the null these are scored
 # against, so recovery_pct/recovery_vs_null_pct subtract an expert-LoRA null from an
 # attention-LoRA arm. The Qwen rows additionally had frozen routers, 10x the shipped aux
-# coefficient, and 1.49 epochs of repeated data. See analysis/ple/results/ablations/crossmodel_RESULTS.md S9 S7 and S9.
+# coefficient, and 1.49 epochs of repeated data. See analysis/residency/results/ablations/crossmodel_RESULTS.md S9 S7 and S9.
 # The BPB columns and constraint_cost are real; the two recovery columns are not.
 #
-# Producers: analysis/ple/train_ple.py (OLMoE), analysis/ple/train_qwen.py (both Qwen),
-# analysis/ple/olmoe_ref_256.py (OLMoE references), analysis/ple/qwen_downstream.py (Qwen references).
+# Producers: analysis/ple/train_ple.py (OLMoE), analysis/residency/train_qwen.py (both Qwen),
+# analysis/residency/olmoe_ref_256.py (OLMoE references), analysis/residency/qwen_downstream.py (Qwen references).
 # null_bpb: the matched unconstrained arm (--free-set all, residency provably inert, swap=0.0000),
 # trained on identical tokens/adapter/optimiser/schedule. It is the ACHIEVABLE ceiling; recovery_vs
 # _null_pct is the honest figure. Blank where the null has not been run.

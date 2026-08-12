@@ -1,4 +1,4 @@
-"# qwen3_30b (qwen3, E=128, 48 layers): downstream cost of imposing rolling residency with NO adaptation. Ten 0-shot tasks, same harness and metric convention as olmoe_adapt_downstream.csv. 'free' is the published model; R8/R32 switch the constraint on at eval time only. BPB on the audited slice is recomputed per arm from the same configuration. Each task subsampled to 0 documents (0 = full); the stderr columns give the resulting precision. Producer: analysis/ple/qwen_downstream.py"
+"# qwen3_30b (qwen3, E=128, 48 layers): downstream cost of imposing rolling residency with NO adaptation. Ten 0-shot tasks, same harness and metric convention as olmoe_adapt_downstream.csv. 'free' is the published model; R8/R32 switch the constraint on at eval time only. BPB on the audited slice is recomputed per arm from the same configuration. Each task subsampled to 0 documents (0 = full); the stderr columns give the resulting precision. Producer: analysis/residency/qwen_downstream.py"
 task,metric,free,R8,free_stderr,R8_stderr,delta_R8_vs_free
 arc_easy,acc,0.7980,0.7088,0.0082,0.0093,-0.0892
 arc_easy,acc_norm,0.7967,0.6940,0.0083,0.0095,-0.1027

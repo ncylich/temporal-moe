@@ -1,4 +1,4 @@
-"# Downstream accuracy at each BPB-ladder residency: ten 0-shot tasks, limit 500, batched lm_eval (pad-warmed protocol, matches every published downstream table; ~2pt/task sensitivity vs unbatched cold-fill, model-dependent sign - see producer header). Producer: analysis/ple/downstream_ladder.py"
+"# Downstream accuracy at each BPB-ladder residency: ten 0-shot tasks, limit 500, batched lm_eval (pad-warmed protocol, matches every published downstream table; ~2pt/task sensitivity vs unbatched cold-fill, model-dependent sign - see producer header). Producer: analysis/residency/downstream_ladder.py"
 stack,cell,R,arc_easy,arc_challenge,hellaswag,piqa,sciq,winogrande,openbookqa,boolq,lambada_openai,copa,mean_acc
 lfm25,free,,0.8200,0.5500,0.4920,0.7700,0.9600,0.6620,0.3160,0.7160,0.5680,0.8600,0.6714
 lfm25,4,4,0.7920,0.4700,0.5000,0.7740,0.9340,0.6140,0.2820,0.6860,0.4860,0.7700,0.6308

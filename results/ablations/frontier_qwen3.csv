@@ -1,4 +1,4 @@
-"# qwen3 residency frontier, training-free, unsloth path, min_logit. Surfaces: base (zero-init LoRA no-op) and the 100M T=1 distillation adapter. swap_rate = resident changes/token/layer. Memory axis = R x n_layers slots. Producer: analysis/ple/frontier_qwen.py"
+"# qwen3 residency frontier, training-free, unsloth path, min_logit. Surfaces: base (zero-init LoRA no-op) and the 100M T=1 distillation adapter. swap_rate = resident changes/token/layer. Memory axis = R x n_layers slots. Producer: analysis/residency/frontier_qwen.py"
 stage,surface,cell,R,swaps,bpb,swap_rate,n_seq,secs
 smoke,base,R8_s1,8,1,0.734379,0.9973,16,26.3
 smoke,base,R8_s4,8,4,0.620173,3.3158,16,6.3

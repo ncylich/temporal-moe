@@ -1,4 +1,4 @@
-"# gemma4 per-layer damage d_l(R): solo layer l constrained at R, others free, base checkpoint; then fitted greedy allocation vs uniform at iso-memory slot budgets. Training-free, min_logit <=1 swap/token, model-convention gating. free_set: ALL = every layer free, all_but_l = solo cell. damage = bpb - free bpb. Producer: analysis/ple/granularity_ladder.py --perlayer"
+"# gemma4 per-layer damage d_l(R): solo layer l constrained at R, others free, base checkpoint; then fitted greedy allocation vs uniform at iso-memory slot budgets. Training-free, min_logit <=1 swap/token, model-convention gating. free_set: ALL = every layer free, all_but_l = solo cell. damage = bpb - free bpb. Producer: analysis/residency/granularity_ladder.py --perlayer"
 stage,cell,R,free_set,R_map,bpb,damage,n_seq,secs
 smoke,free,8,ALL,,0.644585,,16,9.6
 smoke,R8_all,8,,,0.696165,+0.051580,16,5.9

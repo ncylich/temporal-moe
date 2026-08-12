@@ -1,4 +1,4 @@
-"# Self-CE of instruct models on their own frozen greedy trajectories (gen_trajectories.py, 500 WildChat prompts). Prefill free, temporal rule enforced from first response token (scan warmed on prompt), CE on response tokens only, batch=1, min_logit <=1 swap/token, model-own gate convention. bits_per_byte over utf8 response bytes. Producer: analysis/ple/instruct_selfce.py"
+"# Self-CE of instruct models on their own frozen greedy trajectories (gen_trajectories.py, 500 WildChat prompts). Prefill free, temporal rule enforced from first response token (scan warmed on prompt), CE on response tokens only, batch=1, min_logit <=1 swap/token, model-own gate convention. bits_per_byte over utf8 response bytes. Producer: analysis/residency/instruct_selfce.py"
 model,E,k,arm,R,frac_pct,ce_nats_per_tok,bits_per_byte,ce_think,ce_answer,think_tokens,answer_tokens,resp_tokens,resp_bytes,n_traj,secs
 olmoe_instruct,64,8,free,,,0.353810,0.120532,,0.353810,0,175920,175920,745002,496,12.3
 olmoe_instruct,64,8,R8,8,12.50,1.296664,0.441733,,1.296664,0,175920,175920,745002,496,10.6

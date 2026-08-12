@@ -13,9 +13,9 @@ BPB is bits per byte, `CE_nats / (ln2 * bytes_per_token)`, lower is better. It i
 per-token cross-entropy because the three tokenizers differ and BPB is tokenizer-invariant.
 
 Data: [`crossmodel_nofree_50M.csv`](crossmodel_nofree_50M.csv).
-Throughput work: [`../../analysis/ple/TRAINING_OPTIM_PLAN.md`](../../analysis/ple/TRAINING_OPTIM_PLAN.md).
-Producers: `analysis/ple/train_ple.py`, `analysis/ple/train_qwen.py`, `analysis/ple/olmoe_ref_256.py`,
-`analysis/ple/score_corpus_candidates.py`, `analysis/ple/fetch_corpus_candidates.py`.
+Throughput work: [`../../analysis/residency/TRAINING_OPTIM_PLAN.md`](../../analysis/residency/TRAINING_OPTIM_PLAN.md).
+Producers: `analysis/ple/train_ple.py`, `analysis/residency/train_qwen.py`, `analysis/residency/olmoe_ref_256.py`,
+`analysis/residency/score_corpus_candidates.py`, `analysis/residency/fetch_corpus_candidates.py`.
 
 
 ## 0. WITHDRAWN: every recovery percentage in this document

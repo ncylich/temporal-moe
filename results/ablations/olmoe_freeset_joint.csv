@@ -1,4 +1,4 @@
-"# OLMoE-1B-7B: joint free-set comparison at R=8 of 64, gate_mass=preserve (after the artifact fix). Residency imposed on every layer EXCEPT the named set; all sets free exactly 4 of 16 layers, so the comparison is matched on resident-memory budget. Damage is BPB above a residency-off baseline scored on the same block. 3 disjoint blocks of 32 sequences give the spread. Producer: analysis/ple/olmoe_freeset_joint.py"
+"# OLMoE-1B-7B: joint free-set comparison at R=8 of 64, gate_mass=preserve (after the artifact fix). Residency imposed on every layer EXCEPT the named set; all sets free exactly 4 of 16 layers, so the comparison is matched on resident-memory budget. Damage is BPB above a residency-off baseline scored on the same block. 3 disjoint blocks of 32 sequences give the spread. Producer: analysis/residency/olmoe_freeset_joint.py"
 set,n_free,free_layers,resident_slots,slots_vs_f0,damage_block0,damage_block1,damage_block2,damage_mean,spread
 f0_all_constrained,0,,128,1.000,+0.167611,+0.168270,+0.183726,+0.173202,0.016115
 f2_last2_14_15,2,14|15,240,1.875,+0.123805,+0.124658,+0.139427,+0.129297,0.015622

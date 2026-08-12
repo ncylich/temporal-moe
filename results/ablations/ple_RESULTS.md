@@ -2,7 +2,7 @@
 
 Program of record: [`PLE_PLAN.md`](../../PLE_PLAN.md). All numbers below are in
 `ple_results.csv` (tidy, sliceable by its `group` column); code is in
-[`analysis/ple/`](../../analysis/ple/README.md).
+[`analysis/residency/`](../../analysis/residency/README.md).
 
 **Scope.** This covers per-layer embeddings only: PLE *adds* a token-indexed lookup while leaving
 the rolling-residency constraint intact. The separate experiment that *relaxes* the constraint on

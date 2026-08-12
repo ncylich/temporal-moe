@@ -1,4 +1,4 @@
-"# OLMoE residency frontier, training-free, gate_mass=preserve, min_logit. Surfaces: base and the 100M T=1 distillation winner (csurf_distill100M). swap_rate = mean resident-set changes/token/layer (fetch-bandwidth axis); memory axis = total resident slots (uniform R: R*16; R_map cells list slots). Producer: analysis/ple/frontier_olmoe.py"
+"# OLMoE residency frontier, training-free, gate_mass=preserve, min_logit. Surfaces: base and the 100M T=1 distillation winner (csurf_distill100M). swap_rate = mean resident-set changes/token/layer (fetch-bandwidth axis); memory axis = total resident slots (uniform R: R*16; R_map cells list slots). Producer: analysis/residency/frontier_olmoe.py"
 stage,surface,cell,R,swaps,free_set,R_map,bpb,swap_rate,n_seq,secs
 smoke,base,free,8,1,"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",,0.670219,0.0000,16,6.9
 smoke,base,R8_s1,8,1,,,0.838229,0.9990,16,7.5

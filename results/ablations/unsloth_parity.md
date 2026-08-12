@@ -1,6 +1,6 @@
 # Unsloth grouped_mm path vs our stock path — numerical parity (Qwen3-30B)
 
-Producer: `analysis/ple/check_unsloth_kernels.py` (arms run separately because unsloth
+Producer: `analysis/residency/check_unsloth_kernels.py` (arms run separately because unsloth
 patches transformers at import; dumps under `/workspace/qwen3moe-adapt/results/unsloth_check/`).
 Model: Qwen3-30B-A3B base bf16 from `/dev/shm/qwen3-30b`. Data: the 16-sequence held-out
 BPB slice (65,520 scored positions). Env: `/workspace/venv_fla`, torch 2.13.0+cu130,
@@ -81,7 +81,7 @@ its original slice) on this slice.
 
 ## Throughput — plan step (d), Qwen3-30B
 
-Producers: `analysis/ple/probe_expert_lora_cost.py` (ours) and `analysis/ple/probe_unsloth_cost.py`
+Producers: `analysis/residency/probe_expert_lora_cost.py` (ours) and `analysis/residency/probe_unsloth_cost.py`
 (unsloth), same venv, same trainable surface (expert LoRA r32 + attn LoRA r32 + router + RMSNorm,
 1297.6M vs 1297.8M — the 0.2M gap is router/norm tensor counting), residency ON in both, fused
 AdamW in both, `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` in both, bf16 adapters in both

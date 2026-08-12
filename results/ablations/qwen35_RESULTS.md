@@ -88,7 +88,7 @@ Sum of the 40 solo damages vs constraining all 40 at once: +0.04374 vs +0.05480 
 +0.02263 vs +0.02993 at R=32 (**1.32x**). Layers interact, but weakly — most of the cost is already
 visible one layer at a time, unlike the free-set interactions seen on OLMoE.
 
-Producer: `analysis/ple/qwen_sweep.py`. Data: `qwen35_residency_suite.csv` (84 cells).
+Producer: `analysis/residency/qwen_sweep.py`. Data: `qwen35_residency_suite.csv` (84 cells).
 
 
 ## 4. Adaptation was attempted and abandoned — throughput, not a result
@@ -105,7 +105,7 @@ parameters and 8-bit Adam fitting comfortably in 73.4 GB. The arms ran, and then
 > "stock" baseline for a Qwen3-30B benchmark using attention-only LoRA and the stock expert forward,
 > yielding a 22.7x and a 65x that do not exist. Stock in the configuration actually trained ran at
 > **6,274 tok/s** (the 50M Qwen3-30B arm, 49,987,584 tokens in 132.8 min). Do not use this number as
-> a baseline for any other configuration. See `analysis/ple/results/ablations/crossmodel_RESULTS.md S9` §1.
+> a baseline for any other configuration. See `analysis/residency/results/ablations/crossmodel_RESULTS.md S9` §1.
 rate the 30M-token budget needs 90 hours, and the 100-minute per-arm cap would have bought 0.6M
 tokens -- far too few to move BPB detectably, let alone to separate three arms.
 
@@ -190,7 +190,7 @@ top-8 leaves far more substitutable capacity than 64 at top-8. The prediction th
 residency keeps getting cheaper as expert count grows, with or without a shared expert. Kimi K3's
 896 experts would be the test.
 
-Producer: `analysis/ple/qwen_cost_curve.py`. Data: `qwen35_cost_curve.csv` (30 cells).
+Producer: `analysis/residency/qwen_cost_curve.py`. Data: `qwen35_cost_curve.csv` (30 cells).
 
 
 ## 6. The free-set claim, with error bars
@@ -221,7 +221,7 @@ against their own spread -- roughly 7 sigma and 84 sigma -- and both hold in the
 every block. **The tail-only free set is genuinely better than the recipe inherited from OLMoE at
 matched budget, and it is not close for the two-layer case.**
 
-Producer: `analysis/ple/qwen_freeset_precision.py`. Data: `qwen35_freeset_precision.csv`.
+Producer: `analysis/residency/qwen_freeset_precision.py`. Data: `qwen35_freeset_precision.csv`.
 
 
 ## 7. Qwen3-30B-A3B-Base: the redundancy control settles the mechanism
@@ -281,7 +281,7 @@ verified on three disjoint 32-sequence blocks with paired differences. The flip 
 suggestive and not yet established to the same standard; it needs the same treatment before anyone
 picks a free set from it.
 
-Producer: `analysis/ple/qwen_cost_curve.py --family qwen3`. Data: `qwen3_30b_cost_curve.csv`.
+Producer: `analysis/residency/qwen_cost_curve.py --family qwen3`. Data: `qwen3_30b_cost_curve.csv`.
 
 
 ## 8. Residency is free at inference -- and the slowness was never residency
@@ -326,7 +326,7 @@ code, the fix was written and deployed into running jobs, and it was never measu
 baseline that had never been established. Two rounds of tuning were spent before the first
 measurement.
 
-Producer: `analysis/ple/bench_inference.py`. Data: `qwen_inference_bench.csv`.
+Producer: `analysis/residency/bench_inference.py`. Data: `qwen_inference_bench.csv`.
 
 
 ## 9. Expert kernels: no win available, and two self-inflicted measurement errors
@@ -372,7 +372,7 @@ to 64, 8.3x) and staging weights in RAM rather than network storage (11 min -> 5
 kernel-level win is available in this stack without installing deepgemm/sonicmoe or writing a correct
 grouped GEMM.
 
-Producer: `analysis/ple/bench_experts.py`, `analysis/ple/check_grouped_mm.py`.
+Producer: `analysis/residency/bench_experts.py`, `analysis/residency/check_grouped_mm.py`.
 Data: `qwen_expert_kernels.csv`.
 
 
@@ -421,7 +421,7 @@ cost-curve evidence in section 7 but not isolated by this table alone. The hones
 the survival is a property of this model, and that expert count is the variable most strongly
 associated with it across the three models measured.
 
-Producer: `analysis/ple/qwen_downstream.py`. Data: `qwen3_30b_downstream_naive.csv`.
+Producer: `analysis/residency/qwen_downstream.py`. Data: `qwen3_30b_downstream_naive.csv`.
 
 
 ## 11. Correction: R < k is not a valid operating point
@@ -469,7 +469,7 @@ That is the third independent instance in this program of solo per-layer damage 
 joint free-set value, after the three recorded in the OLMoE work.
 
 Figure: [`results/phase0/figures/residency_profile_transfer.png`](../phase0/figures/residency_profile_transfer.png).
-Producer: `analysis/ple/plot_profile_transfer.py`.
+Producer: `analysis/residency/plot_profile_transfer.py`.
 
 
 ## 13. CORRECTION — the cross-model comparison is confounded; ratios were ~10x too large
@@ -602,4 +602,4 @@ premium" of 2.6-2.9x across all three; that was 2.66x for OLMoE **only under the
 1.00x corrected. All three models are back-heavy; OLMoE simply has no head premium, where Qwen has a
 modest one. The earlier framing was an artifact masquerading as a cross-model regularity.
 
-Producer: `analysis/ple/olmoe_remeasure.py`. Data: `olmoe_gatemass_remeasure.csv`.
+Producer: `analysis/residency/olmoe_remeasure.py`. Data: `olmoe_gatemass_remeasure.csv`.

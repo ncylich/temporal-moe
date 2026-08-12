@@ -339,7 +339,7 @@ which is its complement (that sweep frees layers and measures the gain; this one
 measures the loss), and with the vertex near two thirds depth seen at 1e18.
 
 *Provenance, resolved 2026-08-03.* The producer was not missing, it was on another branch:
-`analysis/ple/layer_ablation.py` on `ple-adaptation`, with `analysis/ple/joint_free.py` for
+`analysis/residency/layer_ablation.py` on `ple-adaptation`, with `analysis/residency/joint_free.py` for
 `joint_free.csv`. Its protocol is documented and audited — the base model evaluated 18 times with no
 training (all sixteen layers free, then layer *i* alone constrained for *i* = 0..15, then all
 constrained), and both anchors reproduce their published references to six decimals (0.672736 against
@@ -347,7 +347,7 @@ constrained), and both anchors reproduce their published references to six decim
 them. **Treat these values as audited.**
 
 `ple_ladder.csv` is the one exception and the caveat still holds for it: its producer,
-`analysis/ple/ladder_report.py`, was deleted by `ple-adaptation`'s consolidation commit `2a7fc14`
+`analysis/residency/ladder_report.py`, was deleted by `ple-adaptation`'s consolidation commit `2a7fc14`
 ("one results CSV, 17 scripts from 24"). Its contents are derivable from `ple_results.csv` on that
 branch, which keeps the primitives — per-cell `final_bpb` plus the reference rows — from which every
 gate and verdict column in it was computed.

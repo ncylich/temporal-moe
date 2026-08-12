@@ -1,4 +1,4 @@
-"# OLMoE downstream reference, correct convention (gate_mass=preserve) throughout. base_free / impose_R8 from olmoe_downstream_naive_preserve.csv; CE_adapt_R8 = the 15M CE winner (sweep_lr3e5_win rows of layer_freeing_downstream.csv). Replaces the renorm-era olmoe_adapt_downstream.csv reference (archived, results/archive/olmoe_wrong_renorm) whose impose/CE columns measured the wrong intervention. Producer: analysis/ple/make_downstream_ref.py"
+"# OLMoE downstream reference, correct convention (gate_mass=preserve) throughout. base_free / impose_R8 from olmoe_downstream_naive_preserve.csv; CE_adapt_R8 = the 15M CE winner (sweep_lr3e5_win rows of layer_freeing_downstream.csv). Replaces the renorm-era olmoe_adapt_downstream.csv reference (archived, results/archive/olmoe_wrong_renorm) whose impose/CE columns measured the wrong intervention. Producer: analysis/residency/make_downstream_ref.py"
 task,metric,base_free,impose_R8,CE_adapt_R8
 arc_easy,acc,0.7698,0.6364,0.6713
 arc_easy,acc_norm,0.7677,0.6166,0.6616

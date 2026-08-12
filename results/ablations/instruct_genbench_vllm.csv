@@ -1,4 +1,4 @@
-"# Generative benchmarks under decode-time residency, vLLM stack: continuous batching, chat template, greedy, prefill free (observe), stateful rule on generated tokens (vllm_residency walker, parity-tested), gate-mass preserve correction for norm_topk_prob=False models, prefix caching off, all arms same engine. Same deterministic first-N items across arms. Producer: analysis/ple/instruct_genbench_vllm.py"
+"# Generative benchmarks under decode-time residency, vLLM stack: continuous batching, chat template, greedy, prefill free (observe), stateful rule on generated tokens (vllm_residency walker, parity-tested), gate-mass preserve correction for norm_topk_prob=False models, prefix caching off, all arms same engine. Same deterministic first-N items across arms. Producer: analysis/residency/instruct_genbench_vllm.py"
 model,E,k,arm,R,task,metric,value,limit,max_gen_toks,secs
 olmoe_instruct,64,8,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,640,16
 olmoe_instruct,64,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,640,16

@@ -1,4 +1,4 @@
-"# Free-set damage on 3 disjoint blocks of 32 sequences each, R=8, Qwen3.5-35B-A3B-Base. Damage is measured against a per-block free baseline, so block difficulty cancels. The paired rows are the test that matters: block-to-block difficulty is common to both arms, so the per-block difference is far more sensitive than comparing two means. Producer: analysis/ple/qwen_freeset_precision.py"
+"# Free-set damage on 3 disjoint blocks of 32 sequences each, R=8, Qwen3.5-35B-A3B-Base. Damage is measured against a per-block free baseline, so block difficulty cancels. The paired rows are the test that matters: block-to-block difficulty is common to both arms, so the per-block difference is far more sensitive than comparing two means. Producer: analysis/residency/qwen_freeset_precision.py"
 free_set,mean_damage,sd_across_blocks,block0,block1,block2
 free_none,0.057606,0.001743,0.056554,0.056646,0.059618
 free_first2,0.054157,0.001513,0.053273,0.053293,0.055904

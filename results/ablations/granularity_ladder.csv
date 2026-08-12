@@ -1,4 +1,4 @@
-"# Granularity-law ladder, training-free, min_logit <=1 swap/token, base checkpoints, byte-identical audited slice per tokenizer. damage = bpb - free bpb of the same model. Producer: analysis/ple/granularity_ladder.py"
+"# Granularity-law ladder, training-free, min_logit <=1 swap/token, base checkpoints, byte-identical audited slice per tokenizer. damage = bpb - free bpb of the same model. Producer: analysis/residency/granularity_ladder.py"
 model,E,k,cell,R,frac_pct,bpb,damage,n_seq,secs
 lfm25,32,4,free,,,0.730741,,16,4.4
 lfm25,32,4,R4,4,12.50,0.788010,+0.057269,16,1.9

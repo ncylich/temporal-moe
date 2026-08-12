@@ -7,7 +7,7 @@ expert weights were **renormalized to sum to 1** over the selected set. OLMoE is
 selected experts (~0.40 of total on average) with **no** post-top-k normalization.
 
 The error's measured effect (`results/ablations/olmoe_gatemass_remeasure.csv`, producer
-`analysis/ple/olmoe_remeasure.py`): renormalization raises top-k gate mass from ~0.40 to
+`analysis/residency/olmoe_remeasure.py`): renormalization raises top-k gate mass from ~0.40 to
 1.0, scaling every MoE block's output by ~2.5x compounded over 16 layers. The identical
 untrained R=8 cell measures **BPB 2.6717 under renorm vs 0.8393 under the correct
 convention** — the intervention these files study is not rolling residency on OLMoE, but

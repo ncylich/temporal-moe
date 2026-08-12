@@ -114,7 +114,7 @@ churns more (higher swap) and hurts more. min_logit is the policy everywhere, pe
 
 Winning recipe per model (distill T=1, KL against the own-base teacher, LR from the 15M
 brackets), 100M tokens, evals every 10M, downstream immediately after each run. Producers:
-`analysis/ple/train_unsloth.py` (Qwen; rolling cached teacher, 5M-token segments, top-2048,
+`analysis/residency/train_unsloth.py` (Qwen; rolling cached teacher, 5M-token segments, top-2048,
 mass coverage 0.992-0.994), `analysis/ple/train_ple.py` (OLMoE, inline teacher),
 `downstream_trained_unsloth.py` / `downstream.py`. BPB lower is better; downstream is the
 mean over the ten 0-shot tasks (limit 500), scored under R=8 everywhere.

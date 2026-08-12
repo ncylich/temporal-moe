@@ -1,4 +1,4 @@
-"# Generative benchmarks under decode-time residency: batch=1, chat template, greedy, prefill free, stateful rule on generated tokens only (decode_state.py, parity-tested vs the batch scan). Same deterministic first-N items across arms. Producer: analysis/ple/instruct_genbench.py"
+"# Generative benchmarks under decode-time residency: batch=1, chat template, greedy, prefill free, stateful rule on generated tokens only (decode_state.py, parity-tested vs the batch scan). Same deterministic first-N items across arms. Producer: analysis/residency/instruct_genbench.py"
 model,E,k,arm,R,task,metric,value,limit,max_gen_toks,secs
 olmoe_instruct,64,8,free,,gsm8k_cot_zeroshot,sample_len,10.000000,10,640,299
 olmoe_instruct,64,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,10,640,299

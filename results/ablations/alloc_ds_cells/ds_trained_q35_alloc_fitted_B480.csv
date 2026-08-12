@@ -1,4 +1,4 @@
-"# qwen3_5 trained winner downstream, unsloth path, R=8 all layers, adapter (base surface), reload BPB 0.665874 (expected 0.665459). Ten 0-shot tasks, limit 500. Producer: analysis/ple/downstream_trained_unsloth.py"
+"# qwen3_5 trained winner downstream, unsloth path, R=8 all layers, adapter (base surface), reload BPB 0.665874 (expected 0.665459). Ten 0-shot tasks, limit 500. Producer: analysis/residency/downstream_trained_unsloth.py"
 task,metric,q35_alloc_fitted_B480,q35_alloc_fitted_B480_stderr
 arc_easy,acc,0.8040,0.0178
 arc_challenge,acc,0.5380,0.0223
