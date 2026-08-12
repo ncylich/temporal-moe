@@ -48,6 +48,8 @@ def main():
                     choices=("low", "medium", "high"))
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--gpu-mem", type=float, default=0.92)
+    ap.add_argument("--max-tokens", type=int, default=2048,
+                    help="high effort needs 4096+: 35% of high-effort analyses exceed 2048")
     A = ap.parse_args()
     M = MODELS[A.model]
     tag = A.tag or A.model
@@ -61,7 +63,8 @@ def main():
     vllm_glue.install()
     from vllm import LLM, SamplingParams
     llm = LLM(model=M["path"], enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
-              max_model_len=4096, enable_prefix_caching=False)
+              max_model_len=max(4096, A.max_tokens + 512),
+              enable_prefix_caching=False)
     R = None if A.arm == "free" else int(A.arm.lstrip("R"))
     if R is not None:
         assert R >= M["k"]
@@ -80,7 +83,7 @@ def main():
     t0 = time.time()
     outs = llm.chat(msgs, SamplingParams(
         temperature=gc.get("temperature", 1.0), top_p=gc.get("top_p", 1.0),
-        seed=1234, max_tokens=2048, skip_special_tokens=False), **ck)
+        seed=1234, max_tokens=A.max_tokens, skip_special_tokens=False), **ck)
 
     raws = [o.outputs[0].text for o in outs]
     finals = [final_channel(t) for t in raws]
@@ -112,7 +115,7 @@ def main():
         csv.writer(fh).writerow(
             [tag, M["E"], M["k"], A.arm, R or "", "humaneval_gptoss",
              "pass@1,channel-aware", f"{p1:.6f}",
-             A.limit or "full", 2048, f"{secs:.0f}"])
+             A.limit or "full", A.max_tokens, f"{secs:.0f}"])
 
 
 if __name__ == "__main__":
