@@ -285,3 +285,11 @@ smoke_olmoe2,64,8,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.385965,
 smoke_hgo20,32,4,free,,humaneval_gptoss,"pass@1,channel-aware",1.000000,8,2048,38
 smoke_hgo120,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",1.000000,8,2048,39
 smoke_hgo120,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.875000,8,2048,54
+smoke_qwen_off,256,8,free,,gsm8k_cot_zeroshot,sample_len,8.000000,8,1024,43
+smoke_qwen_off,256,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,8,1024,43
+smoke_qwen_off,256,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.875000,8,1024,43
+smoke_eff,32,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.789474,1,1024,67
+smoke_eff,32,4,free,,humaneval_gptoss,"pass@1,channel-aware",1.000000,8,2048,13
+smoke_qwen_on,256,8,free,,gsm8k_cot_zeroshot,sample_len,8.000000,8,1024,161
+smoke_qwen_on,256,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,8,1024,161
+smoke_qwen_on,256,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.875000,8,1024,161

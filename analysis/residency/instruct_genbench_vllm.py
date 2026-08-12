@@ -196,6 +196,10 @@ def main():
                         spans = "".join(_re.findall(THINK_RE, resp, _re.S))
                         if not spans and OPEN_TAG and OPEN_TAG in resp:
                             spans = resp[resp.index(OPEN_TAG):]   # truncated mid-think
+                        if not spans and OPEN_TAG == "<think>" and "</think>" in resp:
+                            # template pre-opens the think block in the prompt (qwen):
+                            # thinking = response start through the first closing tag
+                            spans = resp[: resp.index("</think>")]
                         d["think_toks"] = len(lm.tokenizer(
                             spans, add_special_tokens=False).input_ids) if spans else 0
                         # backtracking markers separate "uniform dilution" (slower
