@@ -132,6 +132,39 @@ def main():
         lm.generate_until = lambda reqs, **k2: [_final_channel(t)
                                                 for t in orig_gu(reqs, **k2)]
 
+    if M["arch"] in ("gemma4", "lfm", "qwen3_5"):
+        # score the ANSWER segment only, exactly as the gpt-oss final-channel filter
+        # does: judging thinking text against task formats punishes the thinking mode
+        # artifactually (gemma think-on IFEval collapsed to 0.25 before this). No-op
+        # when no think segment appears. Think lengths captured here since the scored
+        # text loses them.
+        orig_gu_g = lm.generate_until
+        gemma_think = []
+
+        def _answer_channel(text):
+            if M["arch"] == "gemma4":
+                if "<|channel>" not in text:
+                    gemma_think.append(0)
+                    return text
+                if "<channel|>" in text:
+                    pre, ans = text.rsplit("<channel|>", 1)
+                else:
+                    pre, ans = text, ""          # truncated inside the thought channel
+            else:                                # lfm / qwen: </think> closes thinking
+                if "</think>" in text:
+                    pre, ans = text.split("</think>", 1)
+                elif "<think>" in text or M["arch"] == "qwen3_5" and A.think != "off":
+                    pre, ans = text, ""          # opened (or prompt-opened), never closed
+                else:
+                    gemma_think.append(0)
+                    return text
+            gemma_think.append(len(lm.tokenizer(pre, add_special_tokens=False)
+                                   .input_ids))
+            return ans
+
+        lm.generate_until = lambda reqs, **k2: [_answer_channel(t)
+                                                for t in orig_gu_g(reqs, **k2)]
+
     out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
     exists = os.path.exists(out)
     fh = open(out, "a", newline="")
@@ -218,6 +251,8 @@ def main():
                     # per-item resps are post-filter (final channel only); analysis-
                     # channel lengths captured in generation order, unaligned to doc_id
                     blob["analysis_toks"] = list(goss_think) if "goss_think" in dir() else []
+                if M["arch"] == "gemma4":
+                    blob["analysis_toks"] = list(gemma_think)
                 json.dump(blob, open(os.path.join(
                     sd, f"{A.record_as or A.model}_{arm_name}_{task}.json"), "w"))
                 # full response token ids (re-tokenized; INSTRUCT_ANALYSIS_PLAN.md) --
@@ -234,6 +269,8 @@ def main():
                     os.path.join(td, f"{A.record_as or A.model}_{arm_name}_{task}.pt"))
             if M["arch"] == "gptoss":
                 goss_think.clear()
+            if M["arch"] == "gemma4":
+                gemma_think.clear()
             show = {k: round(v, 4) for k, v in metrics.items() if isinstance(v, (int, float))}
             print(f"  [{A.model}] {arm_name} {task}: {show} ({secs:.0f}s)", flush=True)
     fh.close()
