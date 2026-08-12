@@ -48,6 +48,8 @@ def main():
     ap.add_argument("--limit", type=int, default=4, help="items per subject")
     ap.add_argument("--max-gen-toks", type=int, default=1024)
     ap.add_argument("--gpu-mem", type=float, default=0.92)
+    ap.add_argument("--backoff-cap", type=int, default=2048,
+                    help="hard generation cap; thinking/high-effort arms need 4096")
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"))
     ap.add_argument("--record-as", default=None)
@@ -68,7 +70,7 @@ def main():
             *aa, **{**kk, "reasoning_effort": A.reasoning_effort})
 
     import genbackoff
-    genbackoff.install(lm, A.max_gen_toks)
+    genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap)
     orig_gu = lm.generate_until
 
     def _final_channel(text):

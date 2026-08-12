@@ -32,6 +32,8 @@ def main():
     ap.add_argument("--max-gen-toks", type=int, default=640)
     ap.add_argument("--max-model-len", type=int, default=4096)
     ap.add_argument("--gpu-mem", type=float, default=0.85)
+    ap.add_argument("--backoff-cap", type=int, default=2048,
+                    help="hard generation cap; thinking/high-effort arms need 4096")
     ap.add_argument("--max-num-seqs", type=int, default=None)
     ap.add_argument("--path", default=None)
     ap.add_argument("--record-as", default=None,
@@ -43,6 +45,10 @@ def main():
                          "models whose template has no toggle (empty think block)")
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"), help="gpt-oss harmony effort")
+    ap.add_argument("--temperature", type=float, default=None,
+                    help="override shipped config (mode-specific recipes, e.g. qwen "
+                         "non-thinking: 0.7/0.8)")
+    ap.add_argument("--top-p", type=float, default=None)
     ap.add_argument("--presence-penalty", type=float, default=None,
                     help="fallback when the shipped generation_config omits it but the "
                          "model card requires it (qwen3.5 thinking: 1.5)")
@@ -91,7 +97,7 @@ def main():
               f"prefill={A.think_prefill!r}", flush=True)
 
     import genbackoff
-    genbackoff.install(lm, A.max_gen_toks)
+    genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap)
 
     # Sampling per the model's own generation_config (greedy is NEVER used: thinking
     # models degenerate into repetition loops under it, which both corrupts answers and
@@ -104,7 +110,8 @@ def main():
         _gc = _json.load(open(os.path.join(M["path"], "generation_config.json")))
     except (FileNotFoundError, ValueError):
         _gc = {}
-    _t, _p = _gc.get("temperature", 1.0), _gc.get("top_p", 1.0)
+    _t = A.temperature if A.temperature is not None else _gc.get("temperature", 1.0)
+    _p = A.top_p if A.top_p is not None else _gc.get("top_p", 1.0)
     _k = _gc.get("top_k") or -1
     gen_kwargs = f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
     # carry the FULL shipped recipe: qwen3.5's thinking mode needs presence_penalty=1.5
