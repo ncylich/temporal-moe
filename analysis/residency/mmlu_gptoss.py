@@ -48,6 +48,9 @@ def main():
     ap.add_argument("--limit", type=int, default=4, help="items per subject")
     ap.add_argument("--max-gen-toks", type=int, default=1024)
     ap.add_argument("--gpu-mem", type=float, default=0.92)
+    ap.add_argument("--reasoning-effort", default=None,
+                    choices=("low", "medium", "high"))
+    ap.add_argument("--record-as", default=None)
     A = ap.parse_args()
     M = MODELS[A.model]
 
@@ -57,6 +60,12 @@ def main():
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
               max_model_len=5632, gpu_memory_utilization=A.gpu_mem,
               enforce_eager=True, enable_prefix_caching=False, dtype="auto")
+
+    if A.reasoning_effort:
+        _tk = lm.tokenizer
+        _orig_act = _tk.apply_chat_template
+        _tk.apply_chat_template = lambda *aa, **kk: _orig_act(
+            *aa, **{**kk, "reasoning_effort": A.reasoning_effort})
 
     import genbackoff
     genbackoff.install(lm, A.max_gen_toks)
@@ -100,7 +109,7 @@ def main():
         secs = time.time() - t0
         print(f"  [{A.model}] {arm} mmlu_gptoss_relaxed: acc={acc:.4f} "
               f"({n} items, {miss_extract} unextracted, {secs:.0f}s)", flush=True)
-        w.writerow([A.model, M["E"], M["k"], arm, R or "", "mmlu_gptoss_relaxed",
+        w.writerow([A.record_as or A.model, M["E"], M["k"], arm, R or "", "mmlu_gptoss_relaxed",
                     "acc,relaxed-extract", f"{acc:.6f}", A.limit, A.max_gen_toks,
                     f"{secs:.0f}"])
         fh.flush()

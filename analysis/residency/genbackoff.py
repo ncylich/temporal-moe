@@ -38,7 +38,7 @@ def install(lm, base_toks, cap=HARD_CAP):
                 r = copy.copy(requests[i])
                 ctx, gk = r.args[0], dict(r.args[1])
                 gk["max_gen_toks"] = B
-                r.args = (ctx, gk)
+                r.arguments = (ctx, gk)      # .args is a read-only property view
                 retry.append(r)
             print(f"  [backoff] {len(trunc)}/{len(requests)} truncated, retrying at {B}",
                   flush=True)

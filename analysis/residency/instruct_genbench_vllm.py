@@ -183,7 +183,9 @@ def main():
                 sd = os.path.join(ABLATIONS, "genbench_samples")
                 os.makedirs(sd, exist_ok=True)
                 THINK_RE = {"lfm": r"<think>.*?</think>", "qwen3_5": r"<think>.*?</think>",
-                            "gemma4": r"<channel\|>.*?<\|channel>"}.get(M["arch"])
+                            "gemma4": r"<\|channel>.*?<channel\|>"}.get(M["arch"])
+                OPEN_TAG = {"lfm": "<think>", "qwen3_5": "<think>",
+                            "gemma4": "<|channel>"}.get(M["arch"])
 
                 def _lens(x):
                     resp = (x.get("resps") or [[""]])[0]
@@ -192,6 +194,8 @@ def main():
                                                       add_special_tokens=False).input_ids)}
                     if THINK_RE:
                         spans = "".join(_re.findall(THINK_RE, resp, _re.S))
+                        if not spans and OPEN_TAG and OPEN_TAG in resp:
+                            spans = resp[resp.index(OPEN_TAG):]   # truncated mid-think
                         d["think_toks"] = len(lm.tokenizer(
                             spans, add_special_tokens=False).input_ids) if spans else 0
                         # backtracking markers separate "uniform dilution" (slower

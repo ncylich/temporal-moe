@@ -24,7 +24,7 @@ import vllm_glue                                                     # noqa: E40
 import vllm_residency  # noqa: F401,E402
 from decode_state import DEC                                         # noqa: E402
 
-CHANNEL = re.compile(r"<channel\|>.*?<\|channel>", re.S)
+CHANNEL = re.compile(r"<\|channel>.*?(?:<channel\|>|\Z)", re.S)
 FENCE = re.compile(r"```(?:python)?\n(.*?)```", re.S)
 
 
@@ -41,12 +41,15 @@ def main():
     ap.add_argument("--tag", default=None, help="model column label; default from path")
     ap.add_argument("--think", choices=("on", "off"), default="off",
                     help="enable_thinking template kwarg (off pre-closes the channel)")
+    ap.add_argument("--limit", type=int, default=None, help="first N problems (smoke)")
     A = ap.parse_args()
     tag = A.tag or ("gemma4_adapted" if "merged" in A.path else "gemma4_instruct")
 
     os.environ["HF_ALLOW_CODE_EVAL"] = "1"
     from datasets import load_dataset
     probs = list(load_dataset("openai/openai_humaneval", split="test"))
+    if A.limit:
+        probs = probs[: A.limit]
 
     vllm_glue.install()
     from vllm import LLM, SamplingParams
