@@ -49,7 +49,18 @@ def main():
     from vllm import LLM, SamplingParams
     llm = LLM(model=A.model, enforce_eager=False, gpu_memory_utilization=0.9,
               max_model_len=A.max_prompt_tok + A.max_new)
-    sp = SamplingParams(temperature=0, max_tokens=A.max_new)
+    # sampling per the model's own generation_config (greedy loops on thinking models);
+    # seeded so the trajectory set is reproducible
+    import json as _json
+    try:
+        _gc = _json.load(open(os.path.join(A.model, "generation_config.json")))
+    except (FileNotFoundError, ValueError):
+        _gc = {}
+    sp = SamplingParams(temperature=_gc.get("temperature", 1.0),
+                        top_p=_gc.get("top_p", 1.0), top_k=_gc.get("top_k") or -1,
+                        seed=1234, max_tokens=A.max_new)
+    print(f"[genv] sampling temp={sp.temperature} top_p={sp.top_p} top_k={sp.top_k}",
+          flush=True)
     msgs = [[{"role": "user", "content": p["text"]}] for p in prompts]
     outs = llm.chat(msgs, sp)
 
