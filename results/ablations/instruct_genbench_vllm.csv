@@ -632,3 +632,10 @@ smoke_qwen_final,256,8,free,,ifeval,"prompt_level_strict_acc,none",0.687500,32,2
 smoke_qwen_final,256,8,free,,ifeval,"inst_level_strict_acc,none",0.750000,32,2048,473
 smoke_qwen_final,256,8,free,,ifeval,"prompt_level_loose_acc,none",0.656250,32,2048,473
 smoke_qwen_final,256,8,free,,ifeval,"inst_level_loose_acc,none",0.729167,32,2048,473
+qwen35_instruct,256,8,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,853
+qwen35_instruct,256,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.005000,200,2048,853
+qwen35_instruct,256,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.825000,200,2048,853
+qwen35_instruct,256,8,free,,humaneval_instruct,sample_len,164.000000,full,2048,171
+qwen35_instruct,256,8,free,,humaneval_instruct,"pass@1,create_test",0.158537,full,2048,171
+"# ==================== PROTOCOL CUTOVER 2026-08-13 01:29 UTC ===================="
+"# Rows BELOW use the FINAL corrected protocol: model-card sampling recipes, lm_eval native reasoning path (eos-only stops, thinking stripped pre-scoring), CLI budgets overriding task-yaml caps (ifeval shipped max_gen_toks=1280), thinking caps 4096 (ifeval 8192). Rows ABOVE are earlier eras retained as HISTORY ONLY -- see PROTOCOL_ERAS.md for which cells above remain authoritative. Rule: for any (model, arm, task), the LAST row in this file is authoritative."
