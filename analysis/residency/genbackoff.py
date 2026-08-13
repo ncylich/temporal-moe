@@ -5,7 +5,11 @@ One component owns the generation lifecycle so no layer can hide raw text from a
 (the layering bugs of 2026-08-12/13: filtered dumps fed truncation audits; stripped
 text almost fed continuations):
 
-1. STOPS: every request is sent to vLLM with eos-only stops (task stop-strings fire
+1. BUDGET: every request is submitted at `cap` in a single pass (unused
+   max_tokens is free in vLLM; the trajectory's KV never leaves its slot). The
+   old truncate-and-retry ladder is retired: regeneration was a biased hidden
+   retry, and even continuation re-paid prefill for nothing.
+2. STOPS: every request is sent to vLLM with eos-only stops (task stop-strings fire
    inside think blocks -- "Q:", "\\ndef"); the task's stops are applied AFTER the
    think-strip, matching lm_eval's think_end_token semantics exactly.
 2. CONTINUATION, never regeneration: a response that hits its budget is resubmitted as
@@ -54,30 +58,16 @@ def install(lm, base_toks, cap=HARD_CAP, think_marker=None):
             rr.arguments = (ctx, gk)
             reqs.append(rr)
 
+        # SINGLE PASS AT THE CAP: in vLLM, unused max_tokens is free (early-EOS
+        # sequences release their slot; concurrency is set by max_model_len, which
+        # is already sized to prompt+cap). Submitting at the cap keeps every
+        # trajectory's KV resident until completion -- no truncation, no
+        # continuation, no re-prefill, no re-roll bias. The ladder is retired.
+        for rr in reqs:
+            ctx, gk = rr.args[0], dict(rr.args[1])
+            gk["max_gen_toks"] = cap
+            rr.arguments = (ctx, gk)
         outs = orig(reqs, **kw)
-        budget = {i: int(dict(r.args[1]).get("max_gen_toks", base_toks))
-                  for i, r in enumerate(reqs)}
-        live = list(range(len(reqs)))
-        while True:
-            trunc = [i for i in live
-                     if budget[i] < cap and _ntoks(outs[i]) >= budget[i] - 8]
-            if not trunc:
-                break
-            retry = []
-            for i in trunc:
-                inc = min(budget[i], cap - budget[i])
-                rr = copy.copy(reqs[i])
-                ctx, gk = rr.args[0], dict(rr.args[1])
-                gk["max_gen_toks"] = inc
-                rr.arguments = (ctx + outs[i], gk)     # CONTINUATION from raw partial
-                retry.append((i, inc, rr))
-            print(f"  [backoff] continuing {len(trunc)}/{len(reqs)} truncated "
-                  f"responses (+{retry[0][1]} tokens)", flush=True)
-            tails = orig([rr for _, _, rr in retry], **kw)
-            for (i, inc, _), tail in zip(retry, tails):
-                outs[i] += tail
-                budget[i] += inc
-            live = trunc
         capped = sum(_ntoks(o) >= cap - 8 for o in outs)
         if capped:
             print(f"  [backoff] {capped} responses at hard cap {cap} "
