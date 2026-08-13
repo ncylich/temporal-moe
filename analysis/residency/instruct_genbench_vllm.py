@@ -76,9 +76,8 @@ def main():
     THINK_MARK = {"qwen3_5": "</think>", "lfm": "</think>",
                   "gemma4": "<channel|>",
                   "gptoss": "<|channel|>final<|message|>"}.get(M["arch"])
-    if THINK_MARK and not (M["arch"] == "qwen3_5" and A.think == "off"):
-        kw["think_end_token"] = THINK_MARK
-        kw["enable_thinking"] = True
+    if M["arch"] == "qwen3_5" and A.think == "off":
+        THINK_MARK = None            # instruct mode: no think segment to strip
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
               enforce_eager=True, enable_prefix_caching=False,
@@ -107,18 +106,8 @@ def main():
               f"prefill={A.think_prefill!r}", flush=True)
 
     import genbackoff
-    genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap)
-    RAW_MAP = {}     # doc_id -> raw (pre-filter) response text, for the token dumps
-    RAW_SEQ = []     # generation-order raw texts (native think_end_token path)
-    if kw.get("think_end_token"):
-        from lm_eval.models import vllm_causallms as _VC
-        _orig_pp = _VC.postprocess_generated_text
-
-        def _pp(text, until=None, think_end_token=None):
-            RAW_SEQ.append(text)
-            return _orig_pp(text, until, think_end_token)
-
-        _VC.postprocess_generated_text = _pp
+    genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap,
+                       think_marker=THINK_MARK)
 
     # Sampling per the model's own generation_config (greedy is NEVER used: thinking
     # models degenerate into repetition loops under it, which both corrupts answers and
@@ -236,16 +225,13 @@ def main():
                                       "inst_level_strict_acc", "acc")}}
                         for x in samp]
                 blob = {"items": slim}
-                if kw.get("think_end_token") and RAW_SEQ:
-                    blob["raw_think_toks"] = [
-                        len(lm.tokenizer(t.split("</think>", 1)[0]
-                                         if "</think>" in t else t,
-                                         add_special_tokens=False).input_ids)
-                        for t in RAW_SEQ]
-                    import torch as _t2
-                    _t2.save({"raw_texts": list(RAW_SEQ)}, os.path.join(
-                        "/workspace/instruct-traj/genbench_tokens",
-                        f"{A.record_as or A.model}_{arm_name}_{task}_raw.pt"))
+                if THINK_MARK and genbackoff.FINALS:
+                    # doc-aligned, one entry per item (continuation era)
+                    blob["think_toks_by_doc"] = {
+                        str(d): len(lm.tokenizer(
+                            t.rsplit(THINK_MARK, 1)[0] if THINK_MARK in t else t,
+                            add_special_tokens=False).input_ids)
+                        for d, t in genbackoff.FINALS.items()}
                 json.dump(blob, open(os.path.join(
                     sd, f"{A.record_as or A.model}_{arm_name}_{task}.json"), "w"))
                 # full response token ids (re-tokenized; INSTRUCT_ANALYSIS_PLAN.md) --
@@ -254,8 +240,8 @@ def main():
                 td = "/workspace/instruct-traj/genbench_tokens"
                 os.makedirs(td, exist_ok=True)
                 def _raw_or_resp(x):
-                    if x.get("doc_id") in RAW_MAP:
-                        return RAW_MAP[x["doc_id"]]
+                    if x.get("doc_id") in genbackoff.FINALS:
+                        return genbackoff.FINALS[x["doc_id"]]
                     r = (x.get("resps") or [[""]])[0]
                     return r[0] if r else ""
                 _torch.save({"items": [
@@ -264,8 +250,6 @@ def main():
                                          add_special_tokens=False).input_ids}
                     for x in samp]},
                     os.path.join(td, f"{A.record_as or A.model}_{arm_name}_{task}.pt"))
-            RAW_MAP.clear()
-            RAW_SEQ.clear()
             show = {k: round(v, 4) for k, v in metrics.items() if isinstance(v, (int, float))}
             print(f"  [{A.model}] {arm_name} {task}: {show} ({secs:.0f}s)", flush=True)
     fh.close()

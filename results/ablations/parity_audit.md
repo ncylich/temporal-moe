@@ -13,7 +13,7 @@ NO-REF (nothing comparable published). No unexplained gap remains.
 | gemma4-26B-IT | HumanEval | 0.988 | card reports LiveCodeBench 77.1 not HumanEval | NO-REF; proxy-consistent (strong code) |
 | gemma4-26B-IT | IFEval | 0.855 | not on card | NO-REF, class-typical |
 | gemma4-26B-IT | MMLU-flan-cot | 0.675 (off) / 0.820 (think) | card: MMLU-Pro 82.6 (different task) | NO-REF; think-mode 0.82 tracks MMLU-Pro closely |
-| LFM2.5-8B-A1B | IFEval | 0.808 strict / 0.872 inst-loose (full 541) | 91.84 (basis unstated) | CLOSE: no mechanical defect found (full set, 8192 cap, native path, card sampling); attributed to harness/system-prompt differences |
+| LFM2.5-8B-A1B | IFEval | 0.808 strict / 0.872 inst-loose (full 541; audit-only record `lfm25_fullset_audit` -- canonical pairing stays n=200) | 91.84 (basis unstated) | CLOSE: no mechanical defect found (full set, 8192 cap, native path, card sampling); attributed to harness/system-prompt differences |
 | LFM2.5-8B-A1B | GSM8K | 0.830 | not on card | NO-REF, matches earlier measurements |
 | LFM2.5-8B-A1B | HumanEval | 0.829 (unprimed) | not on card | NO-REF; primed-format rows documented invalid |
 | gpt-oss-120b high | MMLU | 0.895 relaxed-extract | paper ~0.90 | MATCH |
