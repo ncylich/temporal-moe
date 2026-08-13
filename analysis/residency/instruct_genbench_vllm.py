@@ -69,6 +69,16 @@ def main():
         kw["hf_overrides"] = {"allow_global_per_layer_attribute_access": True}
     if M["arch"] == "gptoss":
         kw["dtype"] = "auto"                     # MXFP4 checkpoint: keep native quant
+    # lm_eval's native reasoning support for every think-in-text stack: task
+    # stop-strings stay away from vLLM (they fire inside think blocks -- humaneval's
+    # "\ndef", gsm8k's "Q:") and thinking is stripped before stops and scoring.
+    # Replaces all hand-rolled answer filters. Marker absent => whole text scored.
+    THINK_MARK = {"qwen3_5": "</think>", "lfm": "</think>",
+                  "gemma4": "<channel|>",
+                  "gptoss": "<|channel|>final<|message|>"}.get(M["arch"])
+    if THINK_MARK and not (M["arch"] == "qwen3_5" and A.think == "off"):
+        kw["think_end_token"] = THINK_MARK
+        kw["enable_thinking"] = True
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
               enforce_eager=True, enable_prefix_caching=False,
@@ -99,6 +109,16 @@ def main():
     import genbackoff
     genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap)
     RAW_MAP = {}     # doc_id -> raw (pre-filter) response text, for the token dumps
+    RAW_SEQ = []     # generation-order raw texts (native think_end_token path)
+    if kw.get("think_end_token"):
+        from lm_eval.models import vllm_causallms as _VC
+        _orig_pp = _VC.postprocess_generated_text
+
+        def _pp(text, until=None, think_end_token=None):
+            RAW_SEQ.append(text)
+            return _orig_pp(text, until, think_end_token)
+
+        _VC.postprocess_generated_text = _pp
 
     # Sampling per the model's own generation_config (greedy is NEVER used: thinking
     # models degenerate into repetition loops under it, which both corrupts answers and
@@ -114,7 +134,8 @@ def main():
     _t = A.temperature if A.temperature is not None else _gc.get("temperature", 1.0)
     _p = A.top_p if A.top_p is not None else _gc.get("top_p", 1.0)
     _k = _gc.get("top_k") or -1
-    gen_kwargs = f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
+    gen_kwargs = (f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
+                  f",max_gen_toks={A.max_gen_toks}")
     # carry the FULL shipped recipe: qwen3.5's thinking mode needs presence_penalty=1.5
     # (its rambling guard) -- omitting it produced non-terminating planning monologues
     _pp = _gc.get("presence_penalty", A.presence_penalty)
@@ -126,73 +147,7 @@ def main():
     print(f"[genbench] sampling: temp={_t} top_p={_p} top_k={_k} pp={_pp} mp={_mp} "
           f"(model config)", flush=True)
     if M["arch"] == "gptoss":
-        # harmony format: keep special tokens so the analysis/final channel structure
-        # survives detokenization, then score the FINAL channel only (the analysis
-        # channel is free-form reasoning and would fail e.g. IFEval's format rules).
-        # A response truncated before its final channel scores as empty -- a real
-        # outcome, applied identically to every arm.
-        gen_kwargs += ",skip_special_tokens=False"
-        orig_gu = lm.generate_until
-        goss_think = []          # per-response analysis-channel token counts (this cell)
-
-        def _final_channel(text):
-            if "<|channel|>final<|message|>" in text:
-                pre, text = text.rsplit("<|channel|>final<|message|>", 1)
-                goss_think.append(len(lm.tokenizer(pre, add_special_tokens=False)
-                                      .input_ids))
-            elif "<|channel|>" in text:
-                goss_think.append(len(lm.tokenizer(text, add_special_tokens=False)
-                                      .input_ids))
-                return ""        # truncated inside the analysis channel
-            else:
-                goss_think.append(0)
-            return text.split("<|return|>")[0].split("<|end|>")[0]
-
-        def _gu_goss(reqs, **k2):
-            outs = orig_gu(reqs, **k2)
-            for r, t in zip(reqs, outs):
-                RAW_MAP[getattr(r, "doc_id", None)] = t
-            return [_final_channel(t) for t in outs]
-
-        lm.generate_until = _gu_goss
-
-    if M["arch"] in ("gemma4", "lfm", "qwen3_5"):
-        # score the ANSWER segment only, exactly as the gpt-oss final-channel filter
-        # does: judging thinking text against task formats punishes the thinking mode
-        # artifactually (gemma think-on IFEval collapsed to 0.25 before this). No-op
-        # when no think segment appears. Think lengths captured here since the scored
-        # text loses them.
-        orig_gu_g = lm.generate_until
-        gemma_think = []
-
-        def _answer_channel(text):
-            if M["arch"] == "gemma4":
-                if "<|channel>" not in text:
-                    gemma_think.append(0)
-                    return text
-                if "<channel|>" in text:
-                    pre, ans = text.rsplit("<channel|>", 1)
-                else:
-                    pre, ans = text, ""          # truncated inside the thought channel
-            else:                                # lfm / qwen: </think> closes thinking
-                if "</think>" in text:
-                    pre, ans = text.split("</think>", 1)
-                elif "<think>" in text or M["arch"] == "qwen3_5" and A.think != "off":
-                    pre, ans = text, ""          # opened (or prompt-opened), never closed
-                else:
-                    gemma_think.append(0)
-                    return text
-            gemma_think.append(len(lm.tokenizer(pre, add_special_tokens=False)
-                                   .input_ids))
-            return ans
-
-        def _gu_think(reqs, **k2):
-            outs = orig_gu_g(reqs, **k2)
-            for r, t in zip(reqs, outs):
-                RAW_MAP[getattr(r, "doc_id", None)] = t
-            return [_answer_channel(t) for t in outs]
-
-        lm.generate_until = _gu_think
+        gen_kwargs += ",skip_special_tokens=False"   # channel markers must survive
 
     out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
     exists = os.path.exists(out)
@@ -276,12 +231,16 @@ def main():
                                       "inst_level_strict_acc", "acc")}}
                         for x in samp]
                 blob = {"items": slim}
-                if M["arch"] == "gptoss":
-                    # per-item resps are post-filter (final channel only); analysis-
-                    # channel lengths captured in generation order, unaligned to doc_id
-                    blob["analysis_toks"] = list(goss_think) if "goss_think" in dir() else []
-                if M["arch"] == "gemma4":
-                    blob["analysis_toks"] = list(gemma_think)
+                if kw.get("think_end_token") and RAW_SEQ:
+                    blob["raw_think_toks"] = [
+                        len(lm.tokenizer(t.split("</think>", 1)[0]
+                                         if "</think>" in t else t,
+                                         add_special_tokens=False).input_ids)
+                        for t in RAW_SEQ]
+                    import torch as _t2
+                    _t2.save({"raw_texts": list(RAW_SEQ)}, os.path.join(
+                        "/workspace/instruct-traj/genbench_tokens",
+                        f"{A.record_as or A.model}_{arm_name}_{task}_raw.pt"))
                 json.dump(blob, open(os.path.join(
                     sd, f"{A.record_as or A.model}_{arm_name}_{task}.json"), "w"))
                 # full response token ids (re-tokenized; INSTRUCT_ANALYSIS_PLAN.md) --
@@ -301,10 +260,7 @@ def main():
                     for x in samp]},
                     os.path.join(td, f"{A.record_as or A.model}_{arm_name}_{task}.pt"))
             RAW_MAP.clear()
-            if M["arch"] == "gptoss":
-                goss_think.clear()
-            if M["arch"] == "gemma4":
-                gemma_think.clear()
+            RAW_SEQ.clear()
             show = {k: round(v, 4) for k, v in metrics.items() if isinstance(v, (int, float))}
             print(f"  [{A.model}] {arm_name} {task}: {show} ({secs:.0f}s)", flush=True)
     fh.close()
