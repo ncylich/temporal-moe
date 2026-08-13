@@ -90,10 +90,15 @@ def load_lengths(record, arm, task):
     if not rows:
         return None
     at = b.get("analysis_toks") or b.get("raw_think_toks") or []
+    # retry-inclusive arrays are unaligned to docs and oversample long thinkers;
+    # exact think means only where the array matches the item count (see
+    # PROTOCOL_ERAS.md "Known measurement limitation")
+    think_exact = bool(at) and len(at) == len(rows)
     out = {"n": len(rows),
            "gen": np.mean([i["gen_toks"] for i in rows]),
            "think": np.mean(at) if at else np.mean([i.get("think_toks", 0)
                                                     for i in rows]),
+           "think_exact": think_exact or not at,
            "backtracks": np.mean([i.get("backtracks", 0) for i in rows])}
     return out
 
@@ -189,10 +194,12 @@ def main():
                     lc = load_lengths(rec, arm, task)
                     if not lc:
                         continue
+                    exact = lf.get("think_exact") and lc.get("think_exact")
                     pts.append((model, mode, arm, tname, lf["think"], lc["think"]))
                     print(f"  {model:14s} {mode:6s} {arm:4s} {tname:9s} "
                           f"{lf['think']:5.0f} -> {lc['think']:5.0f}  "
-                          f"(x{lc['think']/max(1, lf['think']):.2f})")
+                          f"(x{lc['think']/max(1, lf['think']):.2f})"
+                          f"{'' if exact else '  ~approx (retry-inclusive)'}")
     if pts:
         fig, ax = plt.subplots(figsize=(6.5, 5.5))
         cols = {m: c for m, c in zip(PAIRS, plt.cm.tab10.colors)}

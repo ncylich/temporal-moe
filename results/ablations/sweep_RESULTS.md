@@ -195,7 +195,10 @@ Protocol notes: MXFP4 (gpt-oss) accs shift ~2pts/task across batch shapes (kerne
 numerics, measured at logit level) — every delta uses same-bs arms; downstream cells
 are the batched pad-warmed protocol of all prior tables.
 
-13. **Generative benchmarks, four instruct models** (`instruct_genbench*.csv`; batch-fair,
+13. **[ERA NOTE 2026-08-13: the numbers in this finding are the superseded greedy-era
+    protocol; authoritative instruct numbers live in instruct_genbench_vllm.csv below the
+    PROTOCOL CUTOVER marker (see PROTOCOL_ERAS.md) and in 01-findings.md §5. The
+    qualitative ordering held; the levels did not.]** **Generative benchmarks, four instruct models** (`instruct_genbench*.csv`; batch-fair,
     chat template, greedy, prefill free, stateful rule on generated tokens — the first
     decode-regime measurement of the constraint): at R = 12.5% of E, OLMoE-Instruct loses
     across the board (gsm8k 0.69→0.41, humaneval 0.37→0.29); LFM2.5 and gemma4-IT pay only
@@ -219,7 +222,9 @@ are the batched pad-warmed protocol of all prior tables.
     OLMoE 1.2941/1.2967, LFM 0.7035/0.7037, gemma4 0.3498/0.3498, qwen3.5 0.3362/0.3414) —
     the rolling set re-converges within a few tokens of response start.
 
-16. **CE adaptation of an instruct model under R=k: net-positive downstream, concentrated
+16. **[ERA NOTE: the adaptation trio below is greedy-era; the three arms are
+    internally paired and the comparison stands, but levels are not comparable to
+    corrected-era tables. See PROTOCOL_ERAS.md.]** **CE adaptation of an instruct model under R=k: net-positive downstream, concentrated
     where the constraint hurts** (gemma4-26B-IT, `train_gemma_ce.py`: attention LoRA r32 +
     router/norms, 3.4M response tokens of its own WildChat responses, R=8 on response
     tokens). Same suite and settings as the base grid (`instruct_genbench_vllm.csv`):
@@ -234,7 +239,11 @@ are the batched pad-warmed protocol of all prior tables.
     adapted 0.819, base 0.799 — generic self-SFT recovers about half the gain; the
     constraint-aware residual (+0.9 mean, 3/4 tasks) sits inside single-task noise.
 
-17. **Damage anti-correlates with response length** (`length_damage.py`; lengths are
+17. **[WITHDRAWN 2026-08-13 — see docs/research/mechanism/02-corrections.md §6]**
+    The claim below was an artifact of budget-truncated short-answer cells and
+    reconstructed lengths; corrected-protocol Spearman is −0.25 (p=0.49). Retained
+    verbatim as an era record:
+    ~~**Damage anti-correlates with response length**~~ (`length_damage.py`; lengths are
     throughput-reconstructed estimates): pooled Spearman +0.72 (p=0.01) with damage
     negative — short-answer tasks take the damage, long generations self-correct. No
     evidence of error accumulation over decode length; the accumulation hypothesis is
