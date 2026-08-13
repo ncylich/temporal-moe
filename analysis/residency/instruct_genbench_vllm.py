@@ -131,8 +131,13 @@ def main():
         _gc = _json.load(open(os.path.join(M["path"], "generation_config.json")))
     except (FileNotFoundError, ValueError):
         _gc = {}
-    _t = A.temperature if A.temperature is not None else _gc.get("temperature", 1.0)
-    _p = A.top_p if A.top_p is not None else _gc.get("top_p", 1.0)
+    # No-recipe fallback: community-standard 0.7/0.95, NOT HF's ancestral 1.0/1.0
+    # (ancestral sampling depressed OLMoE ~5-30 pts across tasks vs its card, worst
+    # on code). Models shipping a recipe are unaffected.
+    _has_recipe = any(k in _gc for k in ("temperature", "top_p", "top_k"))
+    _dt, _dp = (1.0, 1.0) if _has_recipe else (0.7, 0.95)
+    _t = A.temperature if A.temperature is not None else _gc.get("temperature", _dt)
+    _p = A.top_p if A.top_p is not None else _gc.get("top_p", _dp)
     _k = _gc.get("top_k") or -1
     gen_kwargs = (f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
                   f",max_gen_toks={A.max_gen_toks}")
