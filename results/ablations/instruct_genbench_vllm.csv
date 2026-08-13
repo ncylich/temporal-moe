@@ -705,3 +705,17 @@ qwen35_think_off,256,8,R32,32,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.8
 qwen35_instruct,256,8,free,,humaneval_think,"pass@1,channel-aware",0.957317,full,4096,349
 qwen35_instruct,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.810976,full,4096,711
 qwen35_instruct,256,8,R32,32,humaneval_think,"pass@1,channel-aware",0.884146,full,4096,677
+lfm25_instruct,32,4,free,,humaneval_instruct,sample_len,164.000000,full,1024,74
+lfm25_instruct,32,4,free,,humaneval_instruct,"pass@1,create_test",0.530488,full,1024,74
+lfm25_instruct,32,4,R4,4,humaneval_instruct,sample_len,164.000000,full,1024,235
+lfm25_instruct,32,4,R4,4,humaneval_instruct,"pass@1,create_test",0.396341,full,1024,235
+lfm25_instruct,32,4,free,,ifeval,sample_len,200.000000,200,1024,339
+lfm25_instruct,32,4,free,,ifeval,"prompt_level_strict_acc,none",0.790000,200,1024,339
+lfm25_instruct,32,4,free,,ifeval,"inst_level_strict_acc,none",0.842767,200,1024,339
+lfm25_instruct,32,4,free,,ifeval,"prompt_level_loose_acc,none",0.815000,200,1024,339
+lfm25_instruct,32,4,free,,ifeval,"inst_level_loose_acc,none",0.858491,200,1024,339
+lfm25_instruct,32,4,R4,4,ifeval,sample_len,200.000000,200,1024,595
+lfm25_instruct,32,4,R4,4,ifeval,"prompt_level_strict_acc,none",0.710000,200,1024,595
+lfm25_instruct,32,4,R4,4,ifeval,"inst_level_strict_acc,none",0.786164,200,1024,595
+lfm25_instruct,32,4,R4,4,ifeval,"prompt_level_loose_acc,none",0.730000,200,1024,595
+lfm25_instruct,32,4,R4,4,ifeval,"inst_level_loose_acc,none",0.795597,200,1024,595
