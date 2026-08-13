@@ -52,6 +52,18 @@ driver's `--backoff-cap` (2048 default; 4096 thinking; 8192 ifeval-thinking), wh
 not recorded per-row. Cap identification: per-cell `[backoff]` lines in the run logs
 and token-count distributions in the dumps.
 
+## Regeneration-backoff caveat (E4/E5 rows; continuation era not yet begun)
+All E4/E5 rows used REGENERATION on budget-truncated items (fresh trajectory draw at
+2x budget) rather than continuation from the partial output. Under sampling this is a
+hidden retry on exactly the items the model struggles on, at arm-dependent rates
+(constrained arms retried more), plausibly UNDERSTATING damage on high-retry cells.
+Exposure: 39 authoritative cells >=5% retried, 18 >=20% (worst: IFEval everywhere,
+qwen MMLU; table in the session log). The driver now implements continuation
+(commit 54aa22a); no cell has been re-run under it yet -- pending a scope decision.
+Also: qwen35_instruct free GSM8K's authoritative row (L637) remains formally above
+the cutover (correct code/params, killed-chain era); its planned formal re-run was
+cancelled with the rest.
+
 ## Known measurement limitation (documented, not fixed)
 Think-length arrays (`analysis_toks`/`raw_think_toks`) include backoff-retry
 re-generations (unaligned to doc ids), oversampling long thinkers at arm-dependent
