@@ -46,10 +46,9 @@ def main():
     ap.add_argument("--model", required=True, choices=sorted(MODELS))
     ap.add_argument("--arms", required=True)
     ap.add_argument("--limit", type=int, default=4, help="items per subject")
-    ap.add_argument("--max-gen-toks", type=int, default=1024)
+
     ap.add_argument("--gpu-mem", type=float, default=0.92)
-    ap.add_argument("--backoff-cap", type=int, default=2048,
-                    help="hard generation cap; thinking/high-effort arms need 4096")
+    ap.add_argument("--gen-cap", type=int, default=2048)
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"))
     ap.add_argument("--record-as", default=None)
@@ -59,7 +58,7 @@ def main():
     vllm_glue.install()
     from lm_eval import simple_evaluate
     from lm_eval.models.vllm_causallms import VLLM
-    lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
+    lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.gen_cap,
               max_model_len=5632, gpu_memory_utilization=A.gpu_mem,
               enforce_eager=True, enable_prefix_caching=False, dtype="auto")
 
@@ -69,19 +68,9 @@ def main():
         _tk.apply_chat_template = lambda *aa, **kk: _orig_act(
             *aa, **{**kk, "reasoning_effort": A.reasoning_effort})
 
-    import genbackoff
-    genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap)
-    orig_gu = lm.generate_until
-
-    def _final_channel(text):
-        if "<|channel|>final<|message|>" in text:
-            text = text.rsplit("<|channel|>final<|message|>", 1)[1]
-        elif "<|channel|>" in text:
-            return ""
-        return text.split("<|return|>")[0].split("<|end|>")[0]
-
-    lm.generate_until = lambda reqs, **k2: [_final_channel(t)
-                                            for t in orig_gu(reqs, **k2)]
+    import genprotocol
+    genprotocol.install(lm, cap=A.gen_cap,
+                        think_marker="<|channel|>final<|message|>")
 
     out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
     fh = open(out, "a", newline="")
@@ -112,7 +101,7 @@ def main():
         print(f"  [{A.model}] {arm} mmlu_gptoss_relaxed: acc={acc:.4f} "
               f"({n} items, {miss_extract} unextracted, {secs:.0f}s)", flush=True)
         w.writerow([A.record_as or A.model, M["E"], M["k"], arm, R or "", "mmlu_gptoss_relaxed",
-                    "acc,relaxed-extract", f"{acc:.6f}", A.limit, A.max_gen_toks,
+                    "acc,relaxed-extract", f"{acc:.6f}", A.limit, A.gen_cap,
                     f"{secs:.0f}"])
         fh.flush()
     fh.close()

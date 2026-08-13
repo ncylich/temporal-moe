@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
-"""Continuation backoff + reasoning-aware scoring for lm_eval generative runs.
+"""Generation protocol for lm_eval generative runs: budget, stops, think-strip, capture.
 
-One component owns the generation lifecycle so no layer can hide raw text from another
-(the layering bugs of 2026-08-12/13: filtered dumps fed truncation audits; stripped
-text almost fed continuations):
+One component owns the generation lifecycle:
 
-1. BUDGET: every request is submitted at `cap` in a single pass (unused
-   max_tokens is free in vLLM; the trajectory's KV never leaves its slot). The
-   old truncate-and-retry ladder is retired: regeneration was a biased hidden
-   retry, and even continuation re-paid prefill for nothing.
-2. STOPS: every request is sent to vLLM with eos-only stops (task stop-strings fire
-   inside think blocks -- "Q:", "\\ndef"); the task's stops are applied AFTER the
-   think-strip, matching lm_eval's think_end_token semantics exactly.
+1. BUDGET: every request runs in a single pass at `cap` (vLLM allocates KV on demand,
+   so unused budget is free; early-EOS sequences release their slots). Responses that
+   finish at the cap are counted and scored as-is (degeneracy suspects).
+2. STOPS: vLLM receives eos-only stops (task stop-strings fire inside think blocks);
+   the task's stops are applied after the think-strip.
 3. SCORING TEXT: think segment stripped (text after the LAST `think_marker`; marker
-   absent => whole text, lm_eval-identical), then task stops applied.
-4. CAPTURE: FINALS maps doc_id -> final raw text, exactly one entry per item -- the
-   doc-aligned source for dumps and think-length analysis (resolves the
-   retry-inclusive oversampling limitation in PROTOCOL_ERAS.md for cells produced
-   after 2026-08-13 ~21:30 UTC).
-
-Responses still at `cap` are scored as-is and counted (degeneracy suspects).
+   absent => whole text), then task stops applied.
+4. CAPTURE: FINALS maps doc_id -> final raw text, one entry per item.
 """
 import copy
 

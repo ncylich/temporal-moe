@@ -29,20 +29,20 @@ def main():
     ap.add_argument("--model", required=True, choices=sorted(MODELS))
     ap.add_argument("--arms", required=True)
     ap.add_argument("--tasks", default="gsm8k_cot_zeroshot=200,ifeval=200")
-    ap.add_argument("--max-gen-toks", type=int, default=640)
+
     ap.add_argument("--max-model-len", type=int, default=4096)
     ap.add_argument("--gpu-mem", type=float, default=0.85)
-    ap.add_argument("--backoff-cap", type=int, default=2048,
-                    help="hard generation cap; thinking/high-effort arms need 4096")
+    ap.add_argument("--gen-cap", type=int, default=2048,
+                    help="per-request generation budget (single pass; also the hard "
+                         "cap -- responses finishing here are degeneracy-flagged). "
+                         "Thinking arms 4096; ifeval-thinking 8192")
     ap.add_argument("--max-num-seqs", type=int, default=None)
     ap.add_argument("--path", default=None)
     ap.add_argument("--record-as", default=None,
                     help="model column for the CSV rows (adapted/control variants)")
     ap.add_argument("--think", choices=("default", "on", "off"), default="default",
                     help="chat-template thinking toggle (enable_thinking kwarg)")
-    ap.add_argument("--think-prefill", default=None,
-                    help="string appended after the chat template for --think off on "
-                         "models whose template has no toggle (empty think block)")
+
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"), help="gpt-oss harmony effort")
     ap.add_argument("--temperature", type=float, default=None,
@@ -78,7 +78,7 @@ def main():
                   "gptoss": "<|channel|>final<|message|>"}.get(M["arch"])
     if M["arch"] == "qwen3_5" and A.think == "off":
         THINK_MARK = None            # instruct mode: no think segment to strip
-    lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.max_gen_toks,
+    lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.gen_cap,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
               enforce_eager=True, enable_prefix_caching=False,
               **({"dtype": "bfloat16"} | kw))
@@ -95,26 +95,19 @@ def main():
         if A.reasoning_effort:
             _extra["reasoning_effort"] = A.reasoning_effort
 
-        def _act(*aa, **kk):
-            out = _orig_act(*aa, **{**kk, **_extra})
-            if A.think == "off" and A.think_prefill and isinstance(out, str):
-                out = out + A.think_prefill
-            return out
+        _tk.apply_chat_template = lambda *aa, **kk: _orig_act(
+            *aa, **{**kk, **_extra})
+        print(f"[genbench] thinking={A.think} effort={A.reasoning_effort}", flush=True)
 
-        _tk.apply_chat_template = _act
-        print(f"[genbench] thinking={A.think} effort={A.reasoning_effort} "
-              f"prefill={A.think_prefill!r}", flush=True)
-
-    import genbackoff
-    genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap,
-                       think_marker=THINK_MARK)
+    import genprotocol
+    genprotocol.install(lm, cap=A.gen_cap, think_marker=THINK_MARK)
 
     # Sampling per the model's own generation_config (greedy is NEVER used: thinking
     # models degenerate into repetition loops under it, which both corrupts answers and
     # burns the token budget). Fallbacks are the HF semantic defaults (temp 1.0 = the
     # model's deployment behavior when it ships no recommendation). Seeded per request
-    # for reproducibility; the backoff retry reuses the seed so the resampled prefix
-    # stays stable.
+    # for reproducibility.
+
     import json as _json
     try:
         _gc = _json.load(open(os.path.join(M["path"], "generation_config.json")))
@@ -128,8 +121,7 @@ def main():
     _t = A.temperature if A.temperature is not None else _gc.get("temperature", _dt)
     _p = A.top_p if A.top_p is not None else _gc.get("top_p", _dp)
     _k = _gc.get("top_k") or -1
-    gen_kwargs = (f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
-                  f",max_gen_toks={A.max_gen_toks}")
+    gen_kwargs = f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
     # carry the FULL shipped recipe: qwen3.5's thinking mode needs presence_penalty=1.5
     # (its rambling guard) -- omitting it produced non-terminating planning monologues
     _pp = _gc.get("presence_penalty", A.presence_penalty)
@@ -183,7 +175,7 @@ def main():
             for mk, mv in metrics.items():
                 if isinstance(mv, (int, float)) and "_stderr" not in mk:
                     w.writerow([A.record_as or A.model, M["E"], M["k"], arm_name, R or "", task,
-                                mk, f"{mv:.6f}", lim or "full", A.max_gen_toks,
+                                mk, f"{mv:.6f}", lim or "full", A.gen_cap,
                                 f"{secs:.0f}"])
             fh.flush()
             samp = (res.get("samples") or {}).get(task)
@@ -225,13 +217,13 @@ def main():
                                       "inst_level_strict_acc", "acc")}}
                         for x in samp]
                 blob = {"items": slim}
-                if THINK_MARK and genbackoff.FINALS:
+                if THINK_MARK and genprotocol.FINALS:
                     # doc-aligned, one entry per item (continuation era)
                     blob["think_toks_by_doc"] = {
                         str(d): len(lm.tokenizer(
                             t.rsplit(THINK_MARK, 1)[0] if THINK_MARK in t else t,
                             add_special_tokens=False).input_ids)
-                        for d, t in genbackoff.FINALS.items()}
+                        for d, t in genprotocol.FINALS.items()}
                 json.dump(blob, open(os.path.join(
                     sd, f"{A.record_as or A.model}_{arm_name}_{task}.json"), "w"))
                 # full response token ids (re-tokenized; INSTRUCT_ANALYSIS_PLAN.md) --
@@ -240,8 +232,8 @@ def main():
                 td = "/workspace/instruct-traj/genbench_tokens"
                 os.makedirs(td, exist_ok=True)
                 def _raw_or_resp(x):
-                    if x.get("doc_id") in genbackoff.FINALS:
-                        return genbackoff.FINALS[x["doc_id"]]
+                    if x.get("doc_id") in genprotocol.FINALS:
+                        return genprotocol.FINALS[x["doc_id"]]
                     r = (x.get("resps") or [[""]])[0]
                     return r[0] if r else ""
                 _torch.save({"items": [
