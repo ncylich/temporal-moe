@@ -848,3 +848,5 @@ olmoe_instruct,64,8,R8,8,humaneval_instruct,sample_len,164.000000,full,640,198
 olmoe_instruct,64,8,R8,8,humaneval_instruct,"pass@1,create_test",0.219512,full,640,198
 olmoe_instruct,64,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,640,631
 olmoe_instruct,64,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.201754,4,640,631
+lfm25_instruct,32,4,free,,humaneval_think,"pass@1,channel-aware",0.829268,full,4096,90
+lfm25_instruct,32,4,R4,4,humaneval_think,"pass@1,channel-aware",0.670732,full,4096,230
