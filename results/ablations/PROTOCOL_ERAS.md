@@ -25,6 +25,9 @@ affected cell below it. Rows above survive only where listed under "still valid"
   benign, no yaml cap).
 - LFM GSM8K (extraction robust, matches model card) and MMLU (extraction-floor
   censored, as always).
+- gpt-oss GSM8K (all efforts/arms): audited zero cap-outs, no task-yaml cap, stop
+  strings never fired (special tokens preserved), channel filter validated -- redo
+  scope trimmed to IFEval only on this evidence.
 
 ## Known-invalid classes (never cite)
 - Any greedy-era generative row (E1).
