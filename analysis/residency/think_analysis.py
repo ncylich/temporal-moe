@@ -46,13 +46,17 @@ TASKS = {"GSM8K": ("gsm8k_cot_zeroshot", "exact_match,flexible-extract"),
          "HumanEval": ("humaneval_instruct", "pass@1,create_test"),
          "MMLU": ("mmlu_flan_cot_fewshot", "exact_match,get-answer")}
 OVERRIDES = {"gemma4": {"HumanEval": ("humaneval_gemma_fixed", "pass@1,channel-aware")},
+             "lfm": {"HumanEval": ("humaneval_think", "pass@1,channel-aware")},
+             "qwen35": {"HumanEval": ("humaneval_think", "pass@1,channel-aware")},
              "gptoss": {"HumanEval": ("humaneval_gptoss", "pass@1,channel-aware"),
                         "MMLU": ("mmlu_gptoss_relaxed", "acc,relaxed-extract")}}
 
 
 def task_map(record):
     fam = "gemma4" if record.startswith("gemma4") else \
-          "gptoss" if record.startswith("gptoss") else None
+          "gptoss" if record.startswith("gptoss") else \
+          "lfm" if record.startswith("lfm") else \
+          "qwen35" if record.startswith("qwen35") and "think_off" not in record else None
     m = dict(TASKS)
     m.update(OVERRIDES.get(fam, {}))
     return m

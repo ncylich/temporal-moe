@@ -33,7 +33,7 @@ affected cell below it. Rows above survive only where listed under "still valid"
 - Any greedy-era generative row (E1).
 - Any thinking-model IFEval row above the cutover (1280 yaml cap + judged thinking).
 - qwen rows above the cutover (sampling recipe incomplete).
-- LFM `humaneval_instruct` rows above the cutover (stop-strings fired inside thinking).
+- LFM `humaneval_instruct` rows (ALL eras, incl. post-cutover: the primed-fence format needs its stop-strings; eos-only breaks extraction). Authoritative LFM HumanEval = task `humaneval_think` rows.
 - Rows tagged `smoke_*` (probes, never results).
 - `gptoss_20b_high`/`gptoss_120b_high` humaneval rows at max_gen_toks 2048 (purged).
 
