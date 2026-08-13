@@ -18,7 +18,7 @@ HARD_CAP = 2048
 FINALS = {}          # doc_id -> final raw response text for the current cell
 
 
-def install(lm, base_toks, cap=HARD_CAP, think_marker=None):
+def install(lm, cap=HARD_CAP, think_marker=None):
     orig = lm.generate_until
     tok = lm.tokenizer
 
