@@ -89,7 +89,7 @@ def load_lengths(record, arm, task):
     rows = [i for i in rows if "gen_toks" in i]  # pre-capture-era dumps lack lengths
     if not rows:
         return None
-    at = b.get("analysis_toks") or []
+    at = b.get("analysis_toks") or b.get("raw_think_toks") or []
     out = {"n": len(rows),
            "gen": np.mean([i["gen_toks"] for i in rows]),
            "think": np.mean(at) if at else np.mean([i.get("think_toks", 0)
