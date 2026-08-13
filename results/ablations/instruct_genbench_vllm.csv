@@ -610,3 +610,5 @@ gptoss_120b_high,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.914634,f
 gptoss_120b_high,128,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.894737,4,1024,411
 gptoss_120b_high,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.907895,4,1024,2245
 gptoss_120b_high,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.894737,4,1024,2204
+gptoss_20b_high,32,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.847561,full,4096,138
+gptoss_20b_high,32,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.853659,full,4096,312
