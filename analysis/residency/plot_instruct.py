@@ -70,8 +70,11 @@ def bench():
         for r in csv.reader(open(f"{ABLATIONS}/{f}")):
             if len(r) > 8 and r[0] in NAMES and r[6] in want and r[8] != "10":
                 vals[(r[0], r[3], want[r[6]])] = float(r[7])
-            # gemma4's humaneval uses the channel-aware protocol rows
+            # channel-native humaneval variants are authoritative for think-in-text models
             if len(r) > 7 and r[0] == "gemma4_instruct" and r[5] == "humaneval_gemma_fixed":
+                vals[(r[0], r[3], "HumanEval")] = float(r[7])
+            if len(r) > 7 and r[0] in ("lfm25_instruct", "qwen35_instruct") \
+                    and r[5] == "humaneval_think":
                 vals[(r[0], r[3], "HumanEval")] = float(r[7])
     benches = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
     models = list(NAMES)

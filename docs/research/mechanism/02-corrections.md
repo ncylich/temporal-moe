@@ -153,3 +153,33 @@ top-k softmax, Qwen, gemma4) are untouched, which is why sections 1 to 4 stand. 
 `results/archive/olmoe_wrong_renorm/`. The eval path now selects from the masked distribution and
 weights from the unmasked one, and `residency_unsloth.install` refuses `norm_topk_prob=False` models
 on the path that cannot do so.
+
+## 6. The instruct-eval protocol correction (2026-08-13)
+
+One user prior — thinking should not score worse than not thinking — pulled a chain of
+seven harness defects out of the instruct benchmark stack in a single day. Each produced
+plausible numbers with clean exit codes; none was model behaviour.
+
+| defect | symptom it faked | fix |
+|---|---|---|
+| greedy decoding on thinking models | repetition loops read as "degeneration" | card sampling recipes, seeded |
+| `humaneval_instruct`'s primed assistant fence | gpt-oss-120b "token salad" (0.12), qwen 0.16 | channel-native unprimed humaneval per family |
+| thinking text judged against task formats | gemma think-on IFEval 0.25; LFM IFEval 0.26 | answer-only scoring (lm_eval `think_end_token`) |
+| task-yaml budget caps (ifeval ships `max_gen_toks: 1280`) | universal thinking-model IFEval floors | CLI budgets override task yamls; thinking caps 4096 (ifeval 8192) |
+| task stop-strings firing inside think blocks ("Q:", "\ndef") | premature mid-thought endings | eos-only stops during generation, task stops post-strip |
+| incomplete sampling recipes (qwen `presence_penalty`, mode-specific temps; ancestral fallback on OLMoE) | qwen "rambling"; OLMoE 5–30 pts low | full card recipes; community-standard no-recipe fallback |
+| instrument circularity (post-filter dumps fed the truncation audits) | "zero cap-outs" verdicts on capped cells | raw pre-filter dumps keyed by doc; audits on raw text |
+
+**Withdrawn claim**: "damage lands on short-response tasks; long generations self-correct"
+(Spearman +0.72). On the corrected protocol with exact token counts it reads −0.25
+(p = 0.49) — the signal was truncation-depressed short-answer cells plus reconstructed
+lengths. The thinking ablation shows closer to the opposite at tight residency.
+
+**Unchanged**: every teacher-forced result (self-CE program, BPB laws, per-layer work),
+the gemma adaptation trio (internally paired, greedy era, marked in place), and all
+within-protocol conclusions of the corrected era.
+
+Ledger of which rows are authoritative: `results/ablations/PROTOCOL_ERAS.md`. Free-arm
+parity against published numbers: `results/ablations/parity_audit.md`. The drivers now
+fail fast (no per-task exception swallowing), verify staging against shard indexes, and
+log truncation ladders per cell.

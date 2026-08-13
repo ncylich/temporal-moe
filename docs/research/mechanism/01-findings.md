@@ -482,16 +482,19 @@ allocation against uniform at iso-memory, negative favours fitted (`perlayer_qwe
 | gemma4-26B, 30 | +0.054 | +0.002, flat profile, allocation loses |
 
 **Instruct checkpoints obey the same ordering, in generation.** Self-CE is each model's
-cross-entropy on its own greedy responses to 500 fixed prompts, prefill free, rule enforced on
-generated tokens (`instruct_selfce.csv`); benchmarks run the same protocol end to end
-(`instruct_genbench.csv`, `instruct_genbench_vllm.csv`; LFM's mmlu cell is an answer-extraction floor; gemma4's humaneval uses the channel-aware protocol — its template thinks in `<|channel>thought` spans that need a reasoning budget and final-block extraction, `humaneval_gemma.py`):
+cross-entropy on its own frozen responses to 500 fixed prompts, prefill free, rule enforced on
+generated tokens (`instruct_selfce.csv`). Benchmarks run the serving protocol end to end under
+each model's own card sampling recipe, thinking judged answer-only, budgets sized to the mode
+(protocol and superseded-era ledger: `results/ablations/PROTOCOL_ERAS.md`; free arms audited
+against published numbers: `results/ablations/parity_audit.md`; think-in-text models score
+channel-native HumanEval, `humaneval_think`/`humaneval_gemma.py`/`humaneval_gptoss.py`):
 
 | model, R = 12.5% of E | self-CE, free → R | gsm8k | ifeval | humaneval | mmlu |
 |---|---|---|---|---|---|
-| OLMoE-Instruct | 0.354 → 1.297 | 0.69 → 0.41 | 0.58 → 0.49 | 0.37 → 0.29 | 0.47 → 0.32 |
-| LFM2.5-A1B | 0.396 → 0.704 | 0.26 → 0.26 | 0.26 → 0.25 | 0.65 → 0.52 | at floor |
-| Qwen3.5-35B | 0.228 → 0.341 | 0.49 → 0.45 | 0.22 → 0.22 | 0.95 → 0.91 | 0.32 → 0.34 |
-| gemma4-26B-IT | 0.139 → 0.350 | 0.87 → 0.86 | 0.87 → 0.85 | 0.98 → 0.97 | 0.70 → 0.67 |
+| OLMoE-Instruct | 0.354 → 1.297 | 0.70 → 0.47 | 0.59 → 0.53 | 0.37 → 0.27 | 0.50 → 0.29 |
+| LFM2.5-A1B | 0.396 → 0.704 | 0.83 → 0.79 | 0.79 → 0.71 | 0.83 → 0.67 | at floor |
+| Qwen3.5-35B (thinking) | 0.228 → 0.341 | 0.83 → 0.81 | 0.80 → 0.80 | 0.96 → 0.88 | 0.79 → 0.83 |
+| gemma4-26B-IT | 0.139 → 0.350 | 0.86 → 0.85 | 0.86 → 0.88 | 0.99 → 0.97 | 0.68 → 0.72 |
 
 <img src="../../../results/ablations/figures/instruct_selfce_damage.png" alt="Self-CE damage against residency fraction, four instruct models" width="66%">
 
@@ -508,21 +511,52 @@ almost nowhere else; OLMoE and LFM pairs are one cell (k = 12.5%).*
   0.7035 against 0.7037, gemma4 0.3498 against 0.3498, qwen3.5 0.3362 against 0.3414
   (`instruct_selfce.csv`, cold rows). The rolling set re-converges
   within a few tokens, so the serving protocol needs no prefill-observation machinery for quality.
-- **Task damage is capability-weighted, not uniform.** The lexical-router model loses everywhere;
-  the robust models pay only on their strongest generative skills (LFM humaneval −0.13; gemma4
-  gsm8k −0.09 and humaneval −0.055 at R=k, both mostly recovered at 12.5%) or nowhere outside noise (Qwen3.5, whose R=k cells at 3% residency read
-  0.415/0.22/0.896/0.360).
-- **Damage lands on short-response tasks.** Spearman +0.72 (p = 0.01) between response length and
-  damage over eleven model-task cells: long generations self-correct, short answers die from single
-  routing mistakes. No error accumulation over decode length (`length_damage.py`).
+- **Task damage is capability-weighted, not uniform.** The lexical-router model loses everywhere
+  (OLMoE −22.5 gsm8k, −21.9 mmlu at R=k); the robust models pay mostly on code and math at tight
+  residency (LFM humaneval −15.9; qwen −14.6 humaneval, −12.5 gsm8k at R=k), largely recovered at
+  12.5% (qwen humaneval −7.3, gsm8k −1.5).
+- **Length does not protect: a correction.** On the corrected protocol with exact token counts,
+  the previously reported anti-correlation between response length and damage (+0.72) does not
+  replicate: Spearman −0.25 (p = 0.49, n = 10 default-mode cells). The original signal was an
+  artifact of budget-truncated short-answer cells and reconstructed lengths
+  (`length_damage.py`; superseded claim recorded in 02 §6).
 
-<img src="../../../results/ablations/figures/length_vs_damage.png" alt="Damage at R=k against mean response length" width="66%">
+<img src="../../../results/ablations/figures/length_vs_damage.png" alt="Damage at tightest residency against mean response length" width="66%">
 
-*Damage at R=k against mean response length, colour per model, shape per benchmark. The damaged
-cells are the short ones; lengths are throughput-reconstructed estimates, and model identity and
-length are partially confounded.*
+*Damage at the tightest arm against exact mean response length, colour per model, shape per
+benchmark. No significant relationship survives the protocol correction.*
+
+### Thinking and the constraint
+
+Every thinking-capable model ran both thinking modes (gemma toggled on, qwen toggled off,
+gpt-oss at effort low/medium/high; LFM has no toggle), same arms, items and recipes
+(`think_ablation_summary.csv`, `think_analysis.py`):
+
+<img src="../../../results/ablations/figures/think_damage.png" alt="Damage with and without thinking, per model" width="90%">
+
+<img src="../../../results/ablations/figures/think_length_shift.png" alt="Think length, free against constrained" width="60%">
+
+- **Thinking is a tightness-dependent lever, not blanket protection.** At R=k, thinking
+  amplifies damage on both paired models (qwen R8, on vs off: gsm8k −12.5 vs −9.0, humaneval
+  −14.6 vs −3.7, mmlu −7.9 vs −4.8; gemma mirrors it); at R=4k the on-mode damage collapses to
+  ≈0 and beats off-mode on mmlu (+3.1 vs +0.9). More effort erases 120b's mmlu damage even at
+  3% residency (medium −7.5 → high +1.3).
+- **The constraint lengthens thinking, scaled by tightness.** 19 of 28 cells lengthen; the
+  effect grows with tightness (qwen gsm8k ×1.18 at R=k vs ×0.99 at 4k; gemma ×1.13 vs ×1.04)
+  and with effort on 120b (×1.21–1.24 at high) — consistent with reduced per-token progress
+  under a stale resident set. gpt-oss-20b is the counterexample (×0.80–0.90).
+- **Two real mode costs survive every harness check**: gemma's forced-on thinking writes worse
+  code outright (humaneval free 0.99 → 0.84, untruncated, channel-stripped, complete
+  functions failing tests), and high effort trades instruction compliance for deliberation
+  (ifeval free: 20b 0.76 → 0.54, 120b 0.80 → 0.69 medium → high).
+- **At high effort the constraint can help**: 20b's R=k arm beats its free arm on all four
+  benchmarks (+8.5 gsm8k to +0.6 humaneval), and 120b's on gsm8k/mmlu — residency as an
+  overthinking regulariser; flagged as an open direction.
 
 **A pretrained instruct model adapts using its own responses and plain cross-entropy.**
+*(Era note: the adaptation trio below — base, adapted, control — was measured under the
+earlier greedy protocol; the three arms are internally paired and the comparison stands,
+but the levels are not comparable to the corrected tables above. See PROTOCOL_ERAS.md.)*
 gemma4-26B-IT: attention LoRA r32 + router and norm gains, 3.4M response tokens of its own
 vLLM-generated WildChat responses (training prompts disjoint from every evaluation set by
 construction), R=8 enforced on response tokens during training, one GPU-hour
