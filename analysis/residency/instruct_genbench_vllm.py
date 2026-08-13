@@ -98,6 +98,7 @@ def main():
 
     import genbackoff
     genbackoff.install(lm, A.max_gen_toks, cap=A.backoff_cap)
+    RAW_MAP = {}     # doc_id -> raw (pre-filter) response text, for the token dumps
 
     # Sampling per the model's own generation_config (greedy is NEVER used: thinking
     # models degenerate into repetition loops under it, which both corrupts answers and
@@ -147,8 +148,13 @@ def main():
                 goss_think.append(0)
             return text.split("<|return|>")[0].split("<|end|>")[0]
 
-        lm.generate_until = lambda reqs, **k2: [_final_channel(t)
-                                                for t in orig_gu(reqs, **k2)]
+        def _gu_goss(reqs, **k2):
+            outs = orig_gu(reqs, **k2)
+            for r, t in zip(reqs, outs):
+                RAW_MAP[getattr(r, "doc_id", None)] = t
+            return [_final_channel(t) for t in outs]
+
+        lm.generate_until = _gu_goss
 
     if M["arch"] in ("gemma4", "lfm", "qwen3_5"):
         # score the ANSWER segment only, exactly as the gpt-oss final-channel filter
@@ -180,8 +186,13 @@ def main():
                                    .input_ids))
             return ans
 
-        lm.generate_until = lambda reqs, **k2: [_answer_channel(t)
-                                                for t in orig_gu_g(reqs, **k2)]
+        def _gu_think(reqs, **k2):
+            outs = orig_gu_g(reqs, **k2)
+            for r, t in zip(reqs, outs):
+                RAW_MAP[getattr(r, "doc_id", None)] = t
+            return [_answer_channel(t) for t in outs]
+
+        lm.generate_until = _gu_think
 
     out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
     exists = os.path.exists(out)
@@ -278,13 +289,18 @@ def main():
                 import torch as _torch
                 td = "/workspace/instruct-traj/genbench_tokens"
                 os.makedirs(td, exist_ok=True)
+                def _raw_or_resp(x):
+                    if x.get("doc_id") in RAW_MAP:
+                        return RAW_MAP[x["doc_id"]]
+                    r = (x.get("resps") or [[""]])[0]
+                    return r[0] if r else ""
                 _torch.save({"items": [
                     {"doc_id": x.get("doc_id"),
-                     "ids": lm.tokenizer((x.get("resps") or [[""]])[0][0]
-                                         if (x.get("resps") or [[""]])[0] else "",
+                     "ids": lm.tokenizer(_raw_or_resp(x),
                                          add_special_tokens=False).input_ids}
                     for x in samp]},
                     os.path.join(td, f"{A.record_as or A.model}_{arm_name}_{task}.pt"))
+            RAW_MAP.clear()
             if M["arch"] == "gptoss":
                 goss_think.clear()
             if M["arch"] == "gemma4":
