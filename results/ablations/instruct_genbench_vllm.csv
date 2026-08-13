@@ -702,3 +702,6 @@ qwen35_think_off,256,8,R32,32,humaneval_instruct,sample_len,164.000000,full,1024
 qwen35_think_off,256,8,R32,32,humaneval_instruct,"pass@1,create_test",0.890244,full,1024,425
 qwen35_think_off,256,8,R32,32,mmlu_flan_cot_fewshot,sample_len,228.000000,4,1024,1653
 qwen35_think_off,256,8,R32,32,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.850877,4,1024,1653
+qwen35_instruct,256,8,free,,humaneval_think,"pass@1,channel-aware",0.957317,full,4096,349
+qwen35_instruct,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.810976,full,4096,711
+qwen35_instruct,256,8,R32,32,humaneval_think,"pass@1,channel-aware",0.884146,full,4096,677
