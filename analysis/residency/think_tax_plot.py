@@ -75,6 +75,58 @@ def main():
     fig.tight_layout()
     fig.savefig(f"{ABLATIONS}/figures/think_tax.png", dpi=150)
     print("wrote think_tax.png")
+    by_task(cells)
+
+
+def by_task(cells):
+    # transposed view: per benchmark, mean over the four mode-toggle models
+    MCOL = {s[0]: c for s, c in zip(SPEC, plt.cm.tab10([0, 1, 4, 5]))}
+    fig, ax = plt.subplots(figsize=(10, 5))
+    w = 0.19
+    for j, t in enumerate(TASKS):
+        for s in range(2):
+            for a in range(2):
+                got = []
+                for model, lo, hi, armk, arm125 in SPEC:
+                    mode, arm = (lo, hi)[s], (armk, arm125)[a]
+                    if (model, mode, arm, t) in cells:
+                        got.append((model,) + cells[(model, mode, arm, t)])
+                if not got:
+                    continue
+                ds = [d for _, d, _ in got]
+                mean = sum(ds) / len(ds)
+                se = (sum(e * e for _, _, e in got) ** 0.5) / len(got)
+                x = j + (2 * s + a - 1.5) * w
+                ax.bar(x, mean, width=w * 0.9, yerr=se, capsize=3,
+                       color="#4878b0" if s == 0 else "#d1605e",
+                       alpha=1.0 if a == 0 else 0.5,
+                       edgecolor="black", lw=0.5,
+                       label=("thinking off / low effort" if s == 0 else
+                              "thinking on / high effort")
+                       if j == 0 and a == 0 else None)
+                for m, d, _ in got:
+                    ax.scatter(x, d, s=34, color=MCOL[m], edgecolor="black",
+                               lw=0.5, zorder=3)
+    for m in MCOL:
+        ax.scatter([], [], s=42, color=MCOL[m], edgecolor="black", lw=0.5, label=m)
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_xticks(range(len(TASKS)))
+    ax.set_xticklabels(TASKS)
+    ax.set_ylabel("accuracy change under residency, points")
+    ax.set_title("Where does the thinking tax land?  bar = mean over the four "
+                 "mode-toggle models (whisker = SE of mean),\n"
+                 "dark = R=k, light = R=12.5% of experts; dots = individual models "
+                 "(constrained − free; single runs, per-cell SE 2-4 pts)",
+                 fontsize=8.5)
+    from matplotlib.patches import Patch
+    h, l = ax.get_legend_handles_labels()
+    h += [Patch(facecolor="0.3", edgecolor="black"),
+          Patch(facecolor="0.85", edgecolor="black")]
+    ax.legend(h, l + ["dark: R = k", "light: R = 12.5%"], fontsize=8, ncol=2)
+    ax.grid(alpha=0.25, axis="y")
+    fig.tight_layout()
+    fig.savefig(f"{ABLATIONS}/figures/think_tax_by_task.png", dpi=150)
+    print("wrote think_tax_by_task.png")
 
 
 if __name__ == "__main__":
