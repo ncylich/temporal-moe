@@ -112,7 +112,7 @@ Listed here so the retraction is as visible as the claim was:
 Both were single-seed results reported before replication, which is the same failure mode as several
 rows in §1.
 
-Three more were asserted in `01-findings.md` during the reorganisation and corrected within days. They
+Three more were asserted in `01-findings.md` (rewrite pending) during the reorganisation and corrected within days. They
 are listed because they were committed claims, not drafts, and because the third is the most
 instructive error in the program:
 
@@ -132,7 +132,7 @@ only method that has ever caught anything in this document set.
 
 ## 5. The gate-mass correction (2026-08)
 
-Section 5 of `01-findings.md` was rewritten in 2026-08 after one defect invalidated every
+Section 5 of `01-findings.md` (rewrite pending) was rewritten in 2026-08 after one defect invalidated every
 adapted-OLMoE measurement made before 08-04.
 
 | published claim | status | now | cause |
@@ -179,7 +179,7 @@ lengths. The thinking ablation shows closer to the opposite at tight residency.
 the gemma adaptation trio (internally paired, greedy era, marked in place), and all
 within-protocol conclusions of the corrected era.
 
-Ledger and parity documents (`PROTOCOL_ERAS.md`, `parity_audit.md`) are marked for
+Ledger and parity documents (`PROTOCOL_ERAS.md` (rewrite pending), `parity_audit.md`) are marked for
 deletion and fresh rewrite as of 2026-08-14; until the rewrites land, row validity
 is defined structurally: the live CSV contains authoritative rows only (one per
 cell), with all history in `results/ablations/superseded/`. The drivers now

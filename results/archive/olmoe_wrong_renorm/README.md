@@ -43,5 +43,5 @@ ladder remains citable as data (its era *crossing claims* are void with the rest
 Everything else listed above is wrong.
 
 The correct-convention record lives in `results/ablations/` (see
-`sweep_RESULTS.md`, `olmoe_gatemass_remeasure.csv`, `layer_freeing_RESULTS.md`):
+`sweep_RESULTS.md` (rewrite pending), `olmoe_gatemass_remeasure.csv`, `layer_freeing_RESULTS.md`):
 untrained impose 0.839 at R=8, best adapted (T=1 distillation, 100M tokens) 0.7779.

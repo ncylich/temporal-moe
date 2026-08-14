@@ -77,8 +77,9 @@ def main():
     with open(HIST, "a") as fh:
         if (os.path.getsize(HIST) if os.path.exists(HIST) else 0) == 0:
             fh.write('"# Superseded/probe rows partitioned out of the live CSV '
-                     '(2026-08-14). Original order preserved. Era ledger: '
-                     '../PROTOCOL_ERAS.md"\n')
+                     '(2026-08-14). Original order preserved. Validity rules: '
+                     'analysis/residency/partition_eras.py; protocol: '
+                     '../DATA_CONTRACT.md"\n')
         fh.writelines(hist)
     banner = ('"# AUTHORITATIVE ROWS ONLY: one row per (record, arm, task, metric), all '
               'from the single-pass sampled protocol (never greedy; eos-only stops; '

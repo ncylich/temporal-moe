@@ -149,7 +149,7 @@ checkpoints — valid data, listed in the archive README's exception note).
 | step125000 | 524B | 0.7431 |
 
 Interpolating in token space, the best adapted model (T=1 distillation, **0.1B** tokens under a
-hard R=8 constraint, 0.777929 BPB — `sweep_RESULTS.md` 100M campaign) matches from-scratch
+hard R=8 constraint, 0.777929 BPB — `sweep_RESULTS.md` (rewrite pending) 100M campaign) matches from-scratch
 *unconstrained* quality at about **100B** tokens, and the 15M-token checkpoint (0.788727)
 already sits near **80B**-equivalent: roughly **1000x** fewer tokens. (An earlier 110–180x
 figure interpolated renorm-era adapted BPBs and is void — archive/olmoe_wrong_renorm.)
@@ -246,8 +246,8 @@ Every renorm-era PLE number is an era record and none stands (`ple_RESULTS.md` /
 `ple_results.csv`). The correct-convention re-run happened and PLE is dead under both inits:
 15M-token arms reach 0.8104 zero-init and 0.8061 calibrated against 0.7887 for LoRA
 (`olmoe_freeset_trained.csv`). Write-up:
-[`mechanism/01-findings.md`](mechanism/01-findings.md) section 5, its one home.
+[`mechanism/01-findings.md`](mechanism/01-findings.md) (rewrite pending) section 5, its one home.
 
 ## Per-layer residency relaxation
 
-Moved to [`mechanism/01-findings.md`](mechanism/01-findings.md) section 5, its one home.
+Moved to [`mechanism/01-findings.md`](mechanism/01-findings.md) (rewrite pending) section 5, its one home.

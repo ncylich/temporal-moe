@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The regime separation, one point per model arm -- the figure behind 01-findings.md section 1.
+"""The regime separation, one point per model arm -- the figure behind 01-findings.md section 1. (rewrite pending)
 
 Each point is one trained model: the median over its experts of the token-probe AUC (x) against the
 context-probe AUC (y). Colour is regime, marker is compute budget, size is granularity. The diagonal

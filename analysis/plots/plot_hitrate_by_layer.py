@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cache hit rate against MoE layer -- the figure behind 01-findings.md section 1.1.
+"""Cache hit rate against MoE layer -- the figure behind 01-findings.md section 1.1. (rewrite pending)
 
 Hit rate is the fraction of a token's UNCONSTRAINED top-k already resident when it arrives, scored
 before the swap. Higher is better; a random resident set scores k/E, which is 0.094 at both 6-of-64

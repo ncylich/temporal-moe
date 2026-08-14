@@ -24,4 +24,4 @@ Every superseded, probe, and invalid-class row partitioned out of the live instr
 benchmark CSV (original order preserved; no header row — column layout matches the
 live file). Replacement coverage: every non-probe run it contains is superseded by a
 single-pass row in the live file; probe rows (smoke_*, lfm25_vllm) have no replacement
-and are retained purely as history. Ledger: ../PROTOCOL_ERAS.md.
+and are retained purely as history. Validity rules: analysis/residency/partition_eras.py; protocol: ../DATA_CONTRACT.md.

@@ -4,7 +4,7 @@ Reference read: `tmoe-presentation.pdf`, 23 slides. Main deck 1 to 12, closing 1
 to 20, templates 21 to 23.
 
 Source of truth for every number below is
-[`docs/research/mechanism/01-findings.md`](../docs/research/mechanism/01-findings.md), which was
+[`docs/research/mechanism/01-findings.md`](../docs/research/mechanism/01-findings.md) (rewrite pending), which was
 rebuilt from the CSVs and corrected four claims in the process.
 
 ## A. Slides to update

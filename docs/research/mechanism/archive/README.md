@@ -2,7 +2,7 @@
 
 These are kept for provenance, not for reading. Everything true in them has been rewritten into the
 numbered documents one level up, from the committed CSVs rather than by copying. Nothing here should
-be cited; where a number here disagrees with `01-findings.md`, the findings document is correct.
+be cited; where a number here disagrees with `01-findings.md` (rewrite pending), the findings document is correct.
 
 Two reasons a document lands here:
 

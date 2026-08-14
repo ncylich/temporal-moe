@@ -8,7 +8,7 @@ analogous bar, OLMo-1B, is already known to sit at the constrained model's level
 
 BPB is computed on the SAME token ids and divisor as the family's audited slice -- valid
 because each dense sibling shares its family's tokenizer -- so the number is directly
-comparable to every figure in sweep_RESULTS.md. Downstream is the same ten-task 0-shot
+comparable to every figure in sweep_RESULTS.md (rewrite pending). Downstream is the same ten-task 0-shot
 suite, acc-only basis, limit 500.
 
     dense_bar.py --model /workspace/dense-bars/qwen3-4b --family qwen3 --tag qwen3_4b

@@ -14,6 +14,9 @@ import os
 import sys
 import time
 
+sys.exit("RETIRED producer (greedy-era HF path; its CSV lives in results/ablations/"
+         "superseded/instruct_genbench_hf_greedy_era.csv). Use instruct_genbench_vllm.py.")
+
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

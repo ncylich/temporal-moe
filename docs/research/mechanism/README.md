@@ -4,7 +4,7 @@ Five documents, numbered in reading order. Start at 01 unless you know what you 
 
 | | | read it when |
 |---|---|---|
-| [`01-findings.md`](01-findings.md) | What we know, by claim | You want the results. **Start here.** No history, no test identifiers, nothing superseded |
+| [`01-findings.md`](01-findings.md) | What we know, by claim | **Rewrite pending** (see its banner): being rewritten fresh from the data layer; do not cite until it lands. Its §-references below share that status |
 | [`02-corrections.md`](02-corrections.md) | What changed against the published write-up | You are revising the paper, or a number here disagrees with one you remember |
 | [`03-methods.md`](03-methods.md) | Every probe: metric, range, direction, controls, limits | You need to know exactly what a number measures, or to decode an identifier like `C8` or `N5` |
 | [`04-coverage.md`](04-coverage.md) | Which script produces which CSV, over which runs and layers | You are reproducing something, or checking whether a cell exists |

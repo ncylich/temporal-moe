@@ -90,9 +90,8 @@ def load_lengths(record, arm, task):
     if not rows:
         return None
     at = b.get("analysis_toks") or b.get("raw_think_toks") or []
-    # retry-inclusive arrays are unaligned to docs and oversample long thinkers;
-    # exact think means only where the array matches the item count (see
-    # DATA_CONTRACT.md noise-floor note)
+    # exact think means only where the array aligns 1:1 with scored items;
+    # misaligned arrays (legacy dumps) fall back to per-item think_toks
     think_exact = bool(at) and len(at) == len(rows)
     out = {"n": len(rows),
            "gen": np.mean([i["gen_toks"] for i in rows]),
@@ -107,7 +106,8 @@ def main():
     cells = load_cells()
     sm = open(os.path.join(ABLATIONS, "think_ablation_summary.csv"), "w", newline="")
     w = csv.writer(sm)
-    sm.write('"# Thinking ablation summary: damage (constrained-free) and lengths per '
+    sm.write('"# Thinking ablation summary: damage (constrained-free; damage_se = '
+             'UNPAIRED binomial SE of the difference, n per task) and lengths per '
              'model/mode/arm/task. Producer: analysis/residency/think_analysis.py"\n')
     w.writerow(["model", "mode", "arm", "task", "free", "constrained", "damage",
                 "damage_se",
@@ -133,8 +133,9 @@ def main():
                         if lf.get("think") else ""
                     bc = 1000 * lc["backtracks"] / lc["think"] \
                         if lc.get("think") else ""
-                    n_f = (lf or {}).get("n") or 200
-                    n_c = (lc or {}).get("n") or n_f
+                    n_task = {"HumanEval": 164, "MMLU": 228}.get(tname, 200)
+                    n_f = (lf or {}).get("n") or n_task
+                    n_c = (lc or {}).get("n") or n_task
                     se = 100 * ((free * (1 - free) / n_f) +
                                 (con * (1 - con) / n_c)) ** 0.5
                     w.writerow([model, mode, arm, tname, f"{free:.4f}", f"{con:.4f}",

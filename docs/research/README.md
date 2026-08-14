@@ -2,9 +2,9 @@
 
 | topic | lives in |
 |---|---|
-| What rolling residency does to routing — findings, by claim | [`mechanism/01-findings.md`](mechanism/01-findings.md) |
+| What rolling residency does to routing — findings, by claim | [`mechanism/01-findings.md`](mechanism/01-findings.md) (rewrite pending) |
 | Phase-0 isoflop sweeps, dense floor, temporal MoE, fine-graining at G1/G3 | [`results/ablations/FINDINGS.md`](../../results/ablations/FINDINGS.md) |
-| OLMoE residency adaptation, current program: LR sweeps, distillation recipe, 100M campaign | [`results/ablations/sweep_RESULTS.md`](../../results/ablations/sweep_RESULTS.md) |
+| OLMoE residency adaptation, current program: LR sweeps, distillation recipe, 100M campaign | [`results/ablations/sweep_RESULTS.md`](../../results/ablations/sweep_RESULTS.md) (rewrite pending) |
 | De-lexicalization, narrative write-up (see the corrections doc first) | [`mechanism/delexicalization.md`](mechanism/delexicalization.md) |
 | Corrections to the published de-lexicalization write-up | [`mechanism/02-corrections.md`](mechanism/02-corrections.md) |
 | Selection-shaping program: anticipatory loss, bursty loss, Karen, momentum variants | [`ablations/alignment-program.md`](ablations/alignment-program.md) |

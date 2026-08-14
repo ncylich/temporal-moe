@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What the magnitude-matched sham does and does not reproduce -- behind 01-findings.md section 3.2.
+"""What the magnitude-matched sham does and does not reproduce -- behind 01-findings.md section 3.2. (rewrite pending)
 
 Top: per-layer cost of imposing the residency constraint on one layer of a trained unconstrained
 checkpoint, against a sham of matched mean magnitude that carries no lexical information (router-logit

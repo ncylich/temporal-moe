@@ -12,10 +12,14 @@ conclusions and cites no results.
   (`gemma4_adapted`/`gemma4_ctrl_sft`/`gemma4_instruct`@640), valid only as its
   internally-paired three-way comparison.
 - `think_ablation_summary.csv` — derived; producer `think_analysis.py`.
-- `genbench_samples/` — per-item outcomes + lengths for lm_eval-driven cells only
-  (bespoke producers dump token files instead).
-- `/workspace/instruct-traj/genbench_tokens/` (outside repo) — raw token dumps;
-  see MANIFEST.md there.
+- `genbench_samples/` — per-item outcomes + lengths for lm_eval-driven non-group
+  tasks (GSM8K, IFEval, HumanEval via the main driver).
+- `/workspace/instruct-traj/genbench_tokens/` (outside repo) — raw token dumps from
+  the main driver and `humaneval_think.py`/`humaneval_gptoss.py`; see MANIFEST.md.
+- Item-level evidence gaps (by construction, not error): `mmlu_flan_cot_fewshot`
+  (lm_eval group task — no samples), `mmlu_gptoss_relaxed`, and
+  `humaneval_gemma_fixed` cells have neither samples nor token dumps; their CSV
+  rows are the only record. ~35 of 122 live cells fall in this class.
 
 ## Protocol (single-pass; producer instruct_genbench_vllm.py + bespoke scripts)
 - One generation pass per request at `--gen-cap` (= `max_gen_toks` column):

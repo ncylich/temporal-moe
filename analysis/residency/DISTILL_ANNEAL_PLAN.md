@@ -40,10 +40,10 @@ Chain (autonomous, sequential, fires on q35 15M save):
    qwen3 lr 1e-4 mb4 + 10M rolling teacher cache (floor Qwen3-4B 0.678077, null 0.616034);
    q35 lr 3e-5 mb4-if-smoke-passes + cache (floor Qwen3.5-4B 0.689223, null 0.623235);
    olmoe lr 3e-5 (floor OLMo-1B shared-tok 0.672723 — only model still failing its floor).
-4. Wrap-up: tables (recipe grid, 100M curves, dense verdicts), update sweep_RESULTS.md +
+4. Wrap-up: tables (recipe grid, 100M curves, dense verdicts), update sweep_RESULTS.md (rewrite pending) +
    TRAINING_OPTIM_PLAN.md (profiler findings), commit producers, reproduce.sh, push.
 Parked for 1B: fp8 compute, permutation kernels tier 2-3, causal-conv1d (CUDA-13 toolchain).
 
-OUTCOME (08-08): campaign complete — see sweep_RESULTS.md "100M distillation campaign".
+OUTCOME (08-08): campaign complete — see sweep_RESULTS.md (rewrite pending) "100M distillation campaign".
 All three clear dense downstream bars; both Qwens clear dense BPB floors; token axis
 saturates ~20-40M (q35 flat 15M->100M). 1B levers now: rank (r64+), 100M-tuned LR, data.

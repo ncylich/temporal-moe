@@ -525,7 +525,7 @@ qwen35_instruct,256,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.
 qwen35_instruct,256,8,free,,humaneval_instruct,sample_len,164.000000,full,2048,171
 qwen35_instruct,256,8,free,,humaneval_instruct,"pass@1,create_test",0.158537,full,2048,171
 "# ==================== PROTOCOL CUTOVER 2026-08-13 01:29 UTC ===================="
-"# Rows BELOW use the FINAL corrected protocol: model-card sampling recipes, lm_eval native reasoning path (eos-only stops, thinking stripped pre-scoring), CLI budgets overriding task-yaml caps (ifeval shipped max_gen_toks=1280), thinking caps 4096 (ifeval 8192). Rows ABOVE are earlier eras retained as HISTORY ONLY -- see PROTOCOL_ERAS.md for which cells above remain authoritative. Rule: for any (model, arm, task), the LAST row in this file is authoritative."
+"# Rows BELOW use the FINAL corrected protocol: model-card sampling recipes, lm_eval native reasoning path (eos-only stops, thinking stripped pre-scoring), CLI budgets overriding task-yaml caps (ifeval shipped max_gen_toks=1280), thinking caps 4096 (ifeval 8192). Rows ABOVE are earlier eras retained as HISTORY ONLY -- (historical marker; NOTHING in this file is authoritative -- the live CSV holds the single authoritative row per cell, per analysis/residency/partition_eras.py)"
 qwen35_instruct,256,8,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1725
 qwen35_instruct,256,8,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.793860,4,2048,1725
 qwen35_instruct,256,8,R8,8,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,1277
@@ -771,7 +771,7 @@ smoke_sp_mmlu,32,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.789474,1,40
 smoke_sp_olmoe,64,8,free,,gsm8k_cot_zeroshot,sample_len,8.000000,8,2048,9
 smoke_sp_olmoe,64,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,8,2048,9
 smoke_sp_olmoe,64,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.750000,8,2048,9
-"# Superseded/probe rows partitioned out of the live CSV (2026-08-14). Original order preserved. Era ledger: ../PROTOCOL_ERAS.md"
+"# Superseded/probe rows partitioned out of the live CSV (2026-08-14). Original order preserved. Validity rules: analysis/residency/partition_eras.py; protocol: ../DATA_CONTRACT.md"
 gemma4_instruct,128,8,free,,humaneval_instruct,sample_len,164.000000,full,640,104
 gemma4_instruct,128,8,free,,humaneval_instruct,"pass@1,create_test",0.109756,full,640,104
 gemma4_instruct,128,8,R16,16,humaneval_instruct,sample_len,164.000000,full,640,332

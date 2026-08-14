@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generative benchmarks under decode-time residency on the vLLM stack.
 
-Same protocol as instruct_genbench.py (batch-fair: ALL arms share the identical engine,
-continuous batching, chat template, greedy, prefill free, rule on generated tokens) at
+Batch-fair protocol (ALL arms share the identical engine, continuous batching, chat
+template, card-recipe sampling -- NEVER greedy, prefill free, rule on generated tokens) at
 continuous-batching speed. Stack requirements enforced here: in-process engine core,
 enforce_eager, prefix caching OFF, gate-mass preserve correction (vllm_glue).
 
@@ -141,7 +141,8 @@ def main():
     w = csv.writer(fh)
     if not exists:
         fh.write('"# Generative benchmarks under decode-time residency, vLLM stack: '
-                 'continuous batching, chat template, greedy, prefill free (observe), '
+                 'continuous batching, chat template, card-recipe sampling (never '
+                 'greedy), single pass at max_gen_toks, prefill free (observe), '
                  'stateful rule on generated tokens (vllm_residency walker, parity-tested), '
                  'gate-mass preserve correction for norm_topk_prob=False models, prefix '
                  'caching off, all arms same engine. Same deterministic first-N items '

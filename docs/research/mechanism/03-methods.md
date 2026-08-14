@@ -113,7 +113,7 @@ filtering on it silently mixes them; that has happened.
 
 *Fundamental limitation, and the reason T1 exists:* this measures the cost of **removing freedom from a
 model trained expecting it**. It cannot measure the cost of never having had it, and the two differ: the endpoint spike that dominates every C3 measurement is absent under co-adaptation
-(`01-findings.md`).
+(`01-findings.md` (rewrite pending)).
 
 ---
 
@@ -184,13 +184,13 @@ seed per arm as a hypothesis.
 
 ## 3. Glossary
 
-Identifiers are deliberately absent from `01-findings.md`. This is where they decode.
+Identifiers are deliberately absent from `01-findings.md` (rewrite pending). This is where they decode.
 
 ### A, descriptive probes over captures
 
 | id | what | where the result lives |
 |---|---|---|
-| A1 | locus vs normalised depth | `01-findings.md` §1 |
+| A1 | locus vs normalised depth | `01-findings.md` (rewrite pending) §1 |
 | A2 | locus at full depth | §1 |
 | A3 | context-minus-token by layer | §1 |
 | A4 | output lens (per-expert promoted vocabulary) | = C5, `mechinterp_lens*.csv` |
