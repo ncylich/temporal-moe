@@ -4,9 +4,9 @@
 Every superseded, invalid, or probe row moves to
 results/ablations/superseded/instruct_genbench_vllm_history.csv (full original line
 order preserved there). The live file keeps, per (record, arm, task, metric), ONLY the
-last row -- minus records/tasks that are invalid in every era (smoke_*, lfm25_vllm,
-LFM/qwen humaneval_instruct, lfm25_fullset_audit stays live as an explicitly-named
-audit record). After this, cross-era mispairing is structurally impossible: one row
+last row -- minus rows invalid in every era, per the NEVER_LIVE_* rules below
+(probe/superseded records incl. lfm25_fullset_audit and the adaptation trio,
+per-record invalid tasks, inert or rescore metrics). After this, cross-era mispairing is structurally impossible: one row
 per cell, no history in the analysis path.
 
 Run ONLY after a rerun wave completes (partition keeps the newest row per cell).
@@ -33,6 +33,10 @@ NEVER_LIVE_CELLS = {("lfm25_instruct", "humaneval_instruct"),
                     ("gemma4_instruct", "humaneval_instruct"),
                     ("gptoss_20b", "mmlu_flan_cot_fewshot"),
                     ("gptoss_120b", "mmlu_flan_cot_fewshot"),
+                    ("gptoss_20b_low", "mmlu_flan_cot_fewshot"),
+                    ("gptoss_20b_high", "mmlu_flan_cot_fewshot"),
+                    ("gptoss_120b_low", "mmlu_flan_cot_fewshot"),
+                    ("gptoss_120b_high", "mmlu_flan_cot_fewshot"),
                     ("gptoss_120b", "humaneval_instruct"),
                     ("gptoss_20b", "humaneval_instruct")}
 

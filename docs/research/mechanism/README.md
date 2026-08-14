@@ -1,6 +1,7 @@
 # Mechanism, what rolling residency does to MoE routing
 
-Five documents, numbered in reading order. Start at 01 unless you know what you are looking for.
+Five documents, numbered in reading order. (01 is being rewritten from the data
+layer — see its banner; until it lands, 03/04 are the citable references.)
 
 | | | read it when |
 |---|---|---|

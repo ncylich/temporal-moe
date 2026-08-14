@@ -41,6 +41,7 @@ Treat |damage| < 2 SE as noise. `think_ablation_summary.csv` carries SE columns.
 ## Invalid by construction (enforced by partition_eras.py; never in the live file)
 smoke_* probes; lfm25_vllm; lfm25_fullset_audit; adaptation-trio records;
 humaneval_instruct for thinking/channel models (primed fence breaks their templates);
-mmlu_flan_cot_fewshot for gpt-oss and LFM (extraction floor);
+mmlu_flan_cot_fewshot for all gpt-oss records (any effort) and LFM (extraction
+floor; gpt-oss uses mmlu_gptoss_relaxed instead);
 metric exact_match,strict-match (inert under chat protocol);
 metrics *,answer-only (rescores of since-overwritten generations).

@@ -22,11 +22,11 @@ CUTOVER = "Rows BELOW use the FINAL corrected protocol"
 PRIMARY = {"gsm8k_cot_zeroshot": "exact_match,flexible-extract",
            "ifeval": "prompt_level_strict_acc,none",
            "humaneval_instruct": "pass@1,create_test",
-           "humaneval_think": "pass@1,create_test",
-           "humaneval_gemma_fixed": "pass@1,create_test",
-           "humaneval_gptoss": "pass@1,create_test",
+           "humaneval_think": "pass@1,channel-aware",
+           "humaneval_gemma_fixed": "pass@1,channel-aware",
+           "humaneval_gptoss": "pass@1,channel-aware",
            "mmlu_flan_cot_fewshot": "exact_match,get-answer",
-           "mmlu_gptoss_relaxed": "exact_match,get-answer"}
+           "mmlu_gptoss_relaxed": "acc,relaxed-extract"}
 
 
 def show(ref, path):
