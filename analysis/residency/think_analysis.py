@@ -92,7 +92,7 @@ def load_lengths(record, arm, task):
     at = b.get("analysis_toks") or b.get("raw_think_toks") or []
     # retry-inclusive arrays are unaligned to docs and oversample long thinkers;
     # exact think means only where the array matches the item count (see
-    # PROTOCOL_ERAS.md "Known measurement limitation")
+    # DATA_CONTRACT.md noise-floor note)
     think_exact = bool(at) and len(at) == len(rows)
     out = {"n": len(rows),
            "gen": np.mean([i["gen_toks"] for i in rows]),
@@ -110,6 +110,7 @@ def main():
     sm.write('"# Thinking ablation summary: damage (constrained-free) and lengths per '
              'model/mode/arm/task. Producer: analysis/residency/think_analysis.py"\n')
     w.writerow(["model", "mode", "arm", "task", "free", "constrained", "damage",
+                "damage_se",
                 "gen_free", "gen_con", "think_free", "think_con",
                 "backtracks_per_1k_free", "backtracks_per_1k_con"])
 
@@ -132,8 +133,12 @@ def main():
                         if lf.get("think") else ""
                     bc = 1000 * lc["backtracks"] / lc["think"] \
                         if lc.get("think") else ""
+                    n_f = (lf or {}).get("n") or 200
+                    n_c = (lc or {}).get("n") or n_f
+                    se = 100 * ((free * (1 - free) / n_f) +
+                                (con * (1 - con) / n_c)) ** 0.5
                     w.writerow([model, mode, arm, tname, f"{free:.4f}", f"{con:.4f}",
-                                f"{d:+.1f}",
+                                f"{d:+.1f}", f"{se:.1f}",
                                 f"{lf.get('gen', ''):.0f}" if lf else "",
                                 f"{lc.get('gen', ''):.0f}" if lc else "",
                                 f"{lf.get('think', ''):.0f}" if lf else "",

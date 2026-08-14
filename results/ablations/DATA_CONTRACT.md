@@ -1,0 +1,42 @@
+# DATA CONTRACT — instruct benchmark results (permanent; not a narrative doc)
+
+Structural facts only. This file survives the narrative-doc rewrites; it contains no
+conclusions and cites no results.
+
+## Files
+- `instruct_genbench_vllm.csv` — AUTHORITATIVE ONLY: one row per
+  (record, arm, task, metric). Maintained by `analysis/residency/partition_eras.py`;
+  its exclusion rules are the validity definition.
+- `superseded/instruct_genbench_vllm_history.csv` — every superseded/probe/invalid
+  row, original order. Includes the greedy-era gemma adaptation trio
+  (`gemma4_adapted`/`gemma4_ctrl_sft`/`gemma4_instruct`@640), valid only as its
+  internally-paired three-way comparison.
+- `think_ablation_summary.csv` — derived; producer `think_analysis.py`.
+- `genbench_samples/` — per-item outcomes + lengths for lm_eval-driven cells only
+  (bespoke producers dump token files instead).
+- `/workspace/instruct-traj/genbench_tokens/` (outside repo) — raw token dumps;
+  see MANIFEST.md there.
+
+## Protocol (single-pass; producer instruct_genbench_vllm.py + bespoke scripts)
+- One generation pass per request at `--gen-cap` (= `max_gen_toks` column):
+  2048 non-thinking / 4096 thinking / 8192 thinking-IFEval and gpt-oss IFEval.
+  Cap-finishers are degeneracy-flagged in run logs.
+- Sampling: model-card recipe incl. presence_penalty and per-mode temps; seed 1234;
+  fallback 0.7/0.95; NEVER greedy.
+- Stops: eos-only at the engine; think segment stripped (per-arch marker), then task
+  stops applied (`genprotocol.py`).
+- Bespoke producers (their budgets are the valid exceptions):
+  `humaneval_gemma.py` (1536 off / 3072 on), `humaneval_gptoss.py` (2048 low-med /
+  4096 high), `humaneval_think.py` (4096), `mmlu_gptoss.py` (relaxed extraction).
+
+## Noise floor
+Cells are single runs, n=200 (MMLU 228, HumanEval 164), seed 1234. Binomial SE per
+arm ~1.6-3.5 points; paired damage SE ~1.3-3.4 where per-item dumps allow pairing.
+Treat |damage| < 2 SE as noise. `think_ablation_summary.csv` carries SE columns.
+
+## Invalid by construction (enforced by partition_eras.py; never in the live file)
+smoke_* probes; lfm25_vllm; lfm25_fullset_audit; adaptation-trio records;
+humaneval_instruct for thinking/channel models (primed fence breaks their templates);
+mmlu_flan_cot_fewshot for gpt-oss and LFM (extraction floor);
+metric exact_match,strict-match (inert under chat protocol);
+metrics *,answer-only (rescores of since-overwritten generations).

@@ -22,7 +22,12 @@ LIVE = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
 HISTDIR = os.path.join(ABLATIONS, "superseded")
 HIST = os.path.join(HISTDIR, "instruct_genbench_vllm_history.csv")
 
-NEVER_LIVE_RECORDS = ("smoke_", "lfm25_vllm")
+NEVER_LIVE_RECORDS = ("smoke_", "lfm25_vllm", "gemma4_adapted",
+                      "gemma4_ctrl_sft", "lfm25_fullset_audit")
+# the greedy-era adaptation trio and the ladder-era audit probe live ONLY in
+# history: the trio is valid solely as its internally-paired comparison there
+NEVER_LIVE_METRICS = ("exact_match,strict-match", )   # inert under chat protocol
+NEVER_LIVE_METRIC_SUFFIX = ",answer-only"  # rescores of since-overwritten generations
 NEVER_LIVE_CELLS = {("lfm25_instruct", "humaneval_instruct"),
                     ("qwen35_instruct", "humaneval_instruct"),
                     ("gemma4_instruct", "humaneval_instruct"),
@@ -59,7 +64,10 @@ def main():
             continue
         rec, arm, task, met = key
         invalid = any(rec.startswith(p) for p in NEVER_LIVE_RECORDS) \
-            or (rec, task) in NEVER_LIVE_CELLS
+            or (rec, task) in NEVER_LIVE_CELLS \
+            or met in NEVER_LIVE_METRICS \
+            or met.endswith(NEVER_LIVE_METRIC_SUFFIX) \
+            or (rec, task) == ("lfm25_instruct", "mmlu_flan_cot_fewshot")
         if invalid or last[key] != idx:
             hist.append(line)
         else:
@@ -67,14 +75,15 @@ def main():
 
     os.makedirs(HISTDIR, exist_ok=True)
     with open(HIST, "a") as fh:
-        if os.path.getsize(HIST) if os.path.exists(HIST) else 0 == 0:
+        if (os.path.getsize(HIST) if os.path.exists(HIST) else 0) == 0:
             fh.write('"# Superseded/probe rows partitioned out of the live CSV '
                      '(2026-08-14). Original order preserved. Era ledger: '
                      '../PROTOCOL_ERAS.md"\n')
         fh.writelines(hist)
-    banner = ('"# AUTHORITATIVE ROWS ONLY (partitioned 2026-08-14): one row per '
-              '(record, arm, task, metric), produced by the single-pass protocol or '
-              'listed valid in PROTOCOL_ERAS.md. Full history: '
+    banner = ('"# AUTHORITATIVE ROWS ONLY: one row per (record, arm, task, metric), all '
+              'from the single-pass sampled protocol (never greedy; eos-only stops; '
+              'thinking stripped before scoring; budgets in max_gen_toks) or the bespoke '
+              'producers listed in DATA_CONTRACT.md. Full history: '
               'superseded/instruct_genbench_vllm_history.csv"\n')
     open(LIVE, "w").writelines([banner] + keep)
     print(f"live: {len(keep)} lines ({len(last)} cells); history: +{len(hist)} lines")

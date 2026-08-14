@@ -66,7 +66,7 @@ def bench():
             "gemma4_instruct": "R8", "qwen35_instruct": "R8"}
     floor = {("lfm25_instruct", "MMLU")}
     vals = {}
-    for f in ("instruct_genbench.csv", "instruct_genbench_vllm.csv"):
+    for f in ("instruct_genbench_vllm.csv",):   # live authoritative file only
         for r in csv.reader(open(f"{ABLATIONS}/{f}")):
             if len(r) > 8 and r[0] in NAMES and r[6] in want and r[8] != "10":
                 vals[(r[0], r[3], want[r[6]])] = float(r[7])
