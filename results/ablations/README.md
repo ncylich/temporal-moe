@@ -188,7 +188,7 @@ Everything above is a result someone may cite. These rows are the exceptions, an
 because silence about a file is indistinguishable from the file not existing.
 
 [`superseded/`](superseded/) holds files whose replacement covers **every run they contain**, so that
-archiving them loses nothing. It holds one file. Everything below stayed in this directory because it
+archiving them loses nothing. It holds the superseded-results archive (see its README). Everything below stayed in this directory because it
 is the only surviving record of at least one run.
 
 ### Superseded method, sole record of runs the replacement lacks

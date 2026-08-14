@@ -1,85 +1,43 @@
-# Protocol eras of instruct_genbench_vllm.csv (READ BEFORE USING ANY ROW)
+# Protocol eras — instruct benchmark results (CURRENT STATE 2026-08-14)
 
-The CSV is append-only history. **Rule: for any (model, arm, task) cell, the LAST row
-in the file is authoritative.** A `PROTOCOL CUTOVER 2026-08-13 01:29 UTC` comment
-marks where the final protocol begins; the final-rerun chain re-ran every materially
-affected cell below it. Rows above survive only where listed under "still valid".
+## Selection rule (the only one)
+`instruct_genbench_vllm.csv` contains AUTHORITATIVE ROWS ONLY: exactly one row per
+(record, arm, task, metric), all produced by the final single-pass protocol or by a
+bespoke producer listed below. There is no in-file history and no cutover marker.
+Full history (every superseded, probe, and invalid row, original order):
+`superseded/instruct_genbench_vllm_history.csv`.
 
-| era | window (UTC) | defects | status |
-|---|---|---|---|
-| E1 greedy | ... -> 08-12 03:45 | greedy decoding (thinking models degenerate); gpt-oss scored on tag-stripped text | fully superseded |
-| E2 sampled grid | 08-12 05:24 -> 14:40 | thinking text judged against task formats; ifeval task-yaml silently capped ALL generation at 1280; qwen missing presence_penalty + mode recipes; humaneval_instruct stop-strings ("\ndef"...) fired inside thinking (LFM) | superseded except "still valid" list |
-| E3 ablation + partial fixes | 08-12 14:40 -> 08-13 01:00 | same ifeval/budget defects on lm_eval cells; answer-only ",answer-only" rescores partially corrected scoring only | superseded except "still valid" list |
-| E4 FINAL | 08-13 01:29 -> | card sampling recipes (incl. presence_penalty, per-mode temp/top_p); lm_eval native reasoning path (eos-only stops, thinking stripped pre-scoring); CLI budget overrides task-yaml caps; thinking caps 4096 (ifeval 8192); raw token dumps | authoritative |
-| E5 fallback fix | 08-13 19:16 -> | E4 plus: no-recipe sampling fallback corrected to community-standard 0.7/0.95 (was HF-ancestral 1.0/1.0, depressed OLMoE 5-14 pts); OLMoE fully re-run | authoritative (supersedes E4 OLMoE rows) |
+## The final protocol (E7, "single-pass")
+- One generation pass per request at the cap (`--gen-cap`; recorded truthfully in the
+  `max_gen_toks` column): 2048 non-thinking, 4096 thinking, 8192 thinking-IFEval.
+  Responses finishing at the cap are counted and scored as-is (degeneracy suspects).
+- Sampling: each model's card recipe (incl. presence_penalty, per-mode temp/top_p),
+  seed 1234; no-recipe fallback 0.7/0.95. Never greedy.
+- Stops: eos-only at the engine; think segment stripped (per-arch marker), then task
+  stops applied (`genprotocol.py`).
+- Capture: doc-keyed raw token dumps + think lengths (`genbench_tokens/`,
+  `genbench_samples/`).
 
-## Cells above the cutover that remain valid (no E4 rerun needed)
-- OLMoE: E5 rows only (last rows in file). Earlier OLMoE rows -- including early-E4 --
-  ran under the ancestral-sampling fallback and sit 5-14 pts low; superseded.
-- gemma think-OFF: all cells (no thinking text; budgets never bound). Channel-aware
-  HumanEval (`humaneval_gemma_fixed`) all arms/modes at 1536/3072 budgets.
-- gemma think-ON GSM8K (extraction robust; rescore matched exactly) and HumanEval@3072.
-- gpt-oss channel-native HumanEval (`humaneval_gptoss`): all arms/efforts (bespoke
-  llm.chat path -- never touched lm_eval stops/caps); high effort valid only at the
-  4096 rows (2048 rows purged).
-- gpt-oss relaxed MMLU (`mmlu_gptoss_relaxed`): all arms/efforts (until ["</s>"]
-  benign, no yaml cap).
-- LFM GSM8K (extraction robust, matches model card) and MMLU (extraction-floor
-  censored, as always).
-- gpt-oss GSM8K at LOW and MEDIUM effort (finals present, analyses well under
-  budget). HIGH-effort gsm8k rows above the cutover are INVALID: the original
-  "zero cap-outs" audit measured post-filter (final-channel) lengths -- raw-read
-  showed 35% empty finals from analyses hitting 2048. High-effort gsm8k re-run at
-  cap 4096 below the cutover.
+## Bespoke producers (valid, non-lm_eval budgets)
+- `humaneval_gemma_fixed` (1536 think-off / 3072 think-on): `humaneval_gemma.py`.
+- `humaneval_gptoss` (2048 low/med, 4096 high): `humaneval_gptoss.py`.
+- `humaneval_think` (4096): `humaneval_think.py` (LFM, qwen think-on).
+- `mmlu_gptoss_relaxed`: `mmlu_gptoss.py` (harmony-tolerant extraction).
+- `,answer-only` rescores: `rescore_answer_only.py` (max_gen_toks column reads
+  "rescored").
+- `gemma4_adapted`/`gemma4_ctrl_sft`: greedy-era adaptation trio — valid ONLY as the
+  internally-paired three-way comparison (era note in 01-findings §5).
+- `lfm25_fullset_audit`: full-541 IFEval parity probe (ladder era, 1024 base) — audit
+  context only.
 
-## Known-invalid classes (never cite)
-- Any greedy-era generative row (E1).
-- Any thinking-model IFEval row above the cutover (1280 yaml cap + judged thinking).
-- qwen rows above the cutover (sampling recipe incomplete).
-- LFM `humaneval_instruct` rows (ALL eras, incl. post-cutover: the primed-fence format needs its stop-strings; eos-only breaks extraction). Authoritative LFM HumanEval = task `humaneval_think` rows.
-- Rows tagged `smoke_*` (probes, never results).
-- `gptoss_20b_high`/`gptoss_120b_high` humaneval rows at max_gen_toks 2048 (purged).
+## Known-invalid task/record combinations (never live, by construction)
+`smoke_*`, `lfm25_vllm`; `humaneval_instruct` for lfm/qwen-think-on/gemma/gpt-oss
+(primed fence breaks thinking/channel templates); `mmlu_flan_cot_fewshot` for gpt-oss
+(stock extraction floors harmony answers). Enforced by `partition_eras.py`.
 
-## Variant-model records (adaptation program)
-`gemma4_adapted` and `gemma4_ctrl_sft` (fine-tune trio) and `lfm25_vllm` (routing-fix
-era pair) are greedy/E2-era rows: internally paired within their runs, valid ONLY as
-within-trio comparisons (01-findings carries the era note), never mixable with E4/E5
-levels. `lfm25_vllm` is fully superseded by later `lfm25_instruct` rows.
-
-## Column caveat
-The CSV's `max_gen_toks` column records the BASE budget; the hard ceiling is the
-driver's `--backoff-cap` (2048 default; 4096 thinking; 8192 ifeval-thinking), which is
-not recorded per-row. Cap identification: per-cell `[backoff]` lines in the run logs
-and token-count distributions in the dumps.
-
-## Regeneration-backoff caveat (E4/E5 rows; continuation era not yet begun)
-All E4/E5 rows used REGENERATION on budget-truncated items (fresh trajectory draw at
-2x budget) rather than continuation from the partial output. Under sampling this is a
-hidden retry on exactly the items the model struggles on, at arm-dependent rates
-(constrained arms retried more), plausibly UNDERSTATING damage on high-retry cells.
-Exposure: 39 authoritative cells >=5% retried, 18 >=20% (worst: IFEval everywhere,
-qwen MMLU; table in the session log). The driver now implements continuation
-(commit 54aa22a); no cell has been re-run under it yet -- pending a scope decision.
-Also: qwen35_instruct free GSM8K's authoritative row (L637) remains formally above
-the cutover (correct code/params, killed-chain era); its planned formal re-run was
-cancelled with the rest.
-
-## Known measurement limitation (documented, not fixed)
-Think-length arrays (`analysis_toks`/`raw_think_toks`) include backoff-retry
-re-generations (unaligned to doc ids), oversampling long thinkers at arm-dependent
-rates. think_analysis.py restricts exact claims to cells whose array length matches the
-item count; other cells are approximate.
-
-Producer of the corrected era: `analysis/residency/instruct_genbench_vllm.py` at commit
-`3f19416`+; chains committed under `scripts/residency/` (`final_reruns.sh`,
-`final_reruns_tail.sh`, `takeover.sh`, `high_gsm8k_fix.sh`, `audit_fixes.sh`). Defect
-history: docs/research/mechanism/02-corrections.md §6.
-
-## E6/E7 close-out (2026-08-14)
-E6 (no-re-roll: continuation, then single-pass at cap) and E7 (uniformity pass: every
-remaining cell re-run single-pass) completed 14:58 UTC. The ladder is retired
-(`genprotocol.py`); the live CSV is PARTITIONED to authoritative-only rows (one per
-cell); all superseded rows: `superseded/instruct_genbench_vllm_history.csv`. Ladder-era
-scores were systematically understated (mean +2.96 on re-measurement): see
-`reroll_delta_record.md`. The `max_gen_toks` column now records the true single-pass
-budget. Every generative cell in the program is now from ONE protocol era.
+## Era history (abbreviated; details in 02-corrections §6 and reroll_delta_record.md)
+E1 greedy → E2 sampled (judged thinking text; yaml budget caps) → E3 partial fixes →
+E4 native-path corrections → E5 sampling-fallback fix → E6 no-re-roll (continuation)
+→ E7 single-pass uniform (final). Ladder eras (≤E6) systematically understated scores
+(mean +2.96 on re-measurement): `reroll_delta_record.md`. Self-CE and all
+teacher-forced results were never affected by any generative-era defect.

@@ -1,12 +1,7 @@
 "# AUTHORITATIVE ROWS ONLY (partitioned 2026-08-14): one row per (record, arm, task, metric), produced by the single-pass protocol or listed valid in PROTOCOL_ERAS.md. Full history: superseded/instruct_genbench_vllm_history.csv"
+"# AUTHORITATIVE ROWS ONLY (partitioned 2026-08-14): one row per (record, arm, task, metric), produced by the single-pass protocol or listed valid in PROTOCOL_ERAS.md. Full history: superseded/instruct_genbench_vllm_history.csv"
 "# Generative benchmarks under decode-time residency, vLLM stack: continuous batching, chat template, greedy, prefill free (observe), stateful rule on generated tokens (vllm_residency walker, parity-tested), gate-mass preserve correction for norm_topk_prob=False models, prefix caching off, all arms same engine. Same deterministic first-N items across arms. Producer: analysis/residency/instruct_genbench_vllm.py"
 model,E,k,arm,R,task,metric,value,limit,max_gen_toks,secs
-gemma4_instruct,128,8,free,,humaneval_instruct,sample_len,164.000000,full,640,104
-gemma4_instruct,128,8,free,,humaneval_instruct,"pass@1,create_test",0.109756,full,640,104
-gemma4_instruct,128,8,R16,16,humaneval_instruct,sample_len,164.000000,full,640,332
-gemma4_instruct,128,8,R16,16,humaneval_instruct,"pass@1,create_test",0.134146,full,640,332
-gemma4_instruct,128,8,R8,8,humaneval_instruct,sample_len,164.000000,full,640,398
-gemma4_instruct,128,8,R8,8,humaneval_instruct,"pass@1,create_test",0.091463,full,640,398
 gemma4_adapted,128,8,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,640,43
 gemma4_adapted,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,640,43
 gemma4_adapted,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.860000,200,640,43
@@ -55,22 +50,6 @@ gemma4_ctrl_sft,128,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,640,103
 gemma4_ctrl_sft,128,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.692982,4,640,1035
 gemma4_ctrl_sft,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,68
 gemma4_ctrl_sft,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.939024,full,1536,201
-gptoss_120b,128,4,free,,humaneval_instruct,sample_len,164.000000,full,3072,108
-gptoss_120b,128,4,free,,humaneval_instruct,"pass@1,create_test",0.121951,full,3072,108
-gptoss_120b,128,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,123
-gptoss_120b,128,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.030702,4,3072,123
-gptoss_120b,128,4,R4,4,humaneval_instruct,sample_len,164.000000,full,3072,420
-gptoss_120b,128,4,R4,4,humaneval_instruct,"pass@1,create_test",0.067073,full,3072,420
-gptoss_120b,128,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,1234
-gptoss_120b,128,4,R4,4,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.008772,4,3072,1234
-gptoss_120b,128,4,R16,16,humaneval_instruct,sample_len,164.000000,full,3072,421
-gptoss_120b,128,4,R16,16,humaneval_instruct,"pass@1,create_test",0.140244,full,3072,421
-gptoss_120b,128,4,R16,16,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,1194
-gptoss_120b,128,4,R16,16,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.013158,4,3072,1194
-gptoss_20b,32,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,143
-gptoss_20b,32,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.004386,4,3072,143
-gptoss_20b,32,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,845
-gptoss_20b,32,4,R4,4,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.008772,4,3072,845
 lfm25_instruct,32,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,1024,111
 lfm25_instruct,32,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.043860,4,1024,111
 lfm25_instruct,32,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,1024,893

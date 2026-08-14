@@ -17,3 +17,11 @@ checkpoints no longer exist anywhere.
 The retraction is recorded in `docs/research/mechanism/02-corrections.md`, where this file is the
 evidence behind defect A. That is the reason to keep it rather than delete it: a correction whose
 evidence has been thrown away cannot be checked.
+
+
+## instruct_genbench_vllm_history.csv (added 2026-08-14)
+Every superseded, probe, and invalid-class row partitioned out of the live instruct
+benchmark CSV (original order preserved; no header row — column layout matches the
+live file). Replacement coverage: every non-probe run it contains is superseded by a
+single-pass row in the live file; probe rows (smoke_*, lfm25_vllm) have no replacement
+and are retained purely as history. Ledger: ../PROTOCOL_ERAS.md.

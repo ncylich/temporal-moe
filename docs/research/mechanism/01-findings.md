@@ -493,8 +493,8 @@ channel-native HumanEval, `humaneval_think`/`humaneval_gemma.py`/`humaneval_gpto
 
 | model, R = 12.5% of E | self-CE, free → R | gsm8k | ifeval | humaneval | mmlu |
 |---|---|---|---|---|---|
-| OLMoE-Instruct | 0.354 → 1.297 | 0.70 → 0.47 | 0.63 → 0.55 | 0.37 → 0.27 | 0.50 → 0.29 |
-| LFM2.5-A1B | 0.396 → 0.704 | 0.83 → 0.79 | 0.88 → 0.86 | 0.83 → 0.67 | at floor |
+| OLMoE-Instruct | 0.354 → 1.297 | 0.70 → 0.47 | 0.59 → 0.52 | 0.37 → 0.27 | 0.50 → 0.29 |
+| LFM2.5-A1B | 0.396 → 0.704 | 0.85 → 0.77 | 0.88 → 0.86 | 0.83 → 0.67 | at floor |
 | Qwen3.5-35B (thinking) | 0.228 → 0.341 | 0.84 → 0.83 | 0.86 → 0.82 | 0.96 → 0.88 | 0.83 → 0.84 |
 | gemma4-26B-IT | 0.139 → 0.350 | 0.86 → 0.86 | 0.86 → 0.87 | 0.99 → 0.97 | 0.61 → 0.72 |
 
@@ -515,7 +515,7 @@ almost nowhere else; OLMoE and LFM pairs are one cell (k = 12.5%).*
   within a few tokens, so the serving protocol needs no prefill-observation machinery for quality.
 - **Task damage is capability-weighted, not uniform.** The lexical-router model loses everywhere
   (OLMoE −22.5 gsm8k, −21.9 mmlu at R=k); the robust models pay mostly on code and math at tight
-  residency (LFM humaneval −15.9; qwen −14.6 humaneval, −12.5 gsm8k at R=k), largely recovered at
+  residency (LFM humaneval −15.9; qwen −14.6 humaneval at R=k), largely recovered at
   12.5% (qwen humaneval −7.3, gsm8k −1.5).
 - **Length does not protect: a correction.** On the corrected protocol with exact token counts,
   the previously reported anti-correlation between response length and damage (+0.72) does not
@@ -543,19 +543,25 @@ gpt-oss at effort low/medium/high; LFM has no toggle), same arms, items and reci
   −14.6 vs −3.7; gemma R8: humaneval −12.2 vs −6.1, mmlu −9.2 vs positive); at R=4k the
   on-mode damage shrinks to a few points and beats off-mode on mmlu (+1.3 vs +0.4). More
   effort erases 120b's mmlu damage even at 3% residency.
-- **The constraint lengthens thinking, scaled by tightness.** 19 of 28 cells lengthen; the
-  effect grows with tightness (qwen gsm8k ×1.18 at R=k vs ×0.99 at 4k; gemma ×1.13 vs ×1.04)
-  and with effort on 120b (×1.21–1.24 at high) — consistent with reduced per-token progress
-  under a stale resident set. gpt-oss-20b is the counterexample (×0.80–0.90).
+- **Whether the constraint lengthens generation is model- and task-dependent, not
+  universal.** 23 of 38 measured cells lengthen: gemma think-on lengthens strongly
+  (gsm8k ×1.28 at R=k, ×1.18 at R=16) and 120b's high-effort ifeval runs ×1.3, but
+  qwen *shortens* on gsm8k under the constraint (×0.78 at R=k) and 20b is mixed
+  (×0.88–1.04). The earlier claim of a clean tightness-scaled lengthening law was an
+  artifact of the retired retry ladder's length capture and is withdrawn
+  (`think_ablation_summary.csv`, exact doc-keyed counts).
 - **Two real mode costs survive every harness check**: gemma's forced-on thinking writes worse
   code outright (humaneval free 0.99 → 0.84, untruncated, channel-stripped, complete
   functions failing tests) — though it is code-specific: think-on now *beats* think-off on
   gemma's free-arm ifeval (0.925 vs 0.860) and mmlu (0.851 vs 0.605) under the final
   protocol — and high effort still trades instruction compliance for deliberation
   (ifeval free: 20b 0.815 → 0.565, 120b 0.830 → 0.760 medium → high).
-- **At high effort the constraint can help**: 20b's R=k arm beats its free arm on all four
-  benchmarks (+8.5 gsm8k to +0.6 humaneval), and 120b's on gsm8k/mmlu — residency as an
-  overthinking regulariser; flagged as an open direction.
+- **At high effort, residency damage largely vanishes**: 20b's R=k arm sits within
+  ±2.5 points of free on all four benchmarks (+2.5 ifeval to −2.0 gsm8k) and 120b's
+  within ±0.5 on gsm8k/mmlu — against material damage at medium effort. The stronger
+  earlier claim (constrained beating free across the board) came from ladder-era
+  cells and is withdrawn; "more reasoning absorbs the constraint" is the surviving,
+  weaker statement.
 
 **A pretrained instruct model adapts using its own responses and plain cross-entropy.**
 *(Era note: the adaptation trio below — base, adapted, control — was measured under the

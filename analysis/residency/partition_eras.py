@@ -24,7 +24,12 @@ HIST = os.path.join(HISTDIR, "instruct_genbench_vllm_history.csv")
 
 NEVER_LIVE_RECORDS = ("smoke_", "lfm25_vllm")
 NEVER_LIVE_CELLS = {("lfm25_instruct", "humaneval_instruct"),
-                    ("qwen35_instruct", "humaneval_instruct")}
+                    ("qwen35_instruct", "humaneval_instruct"),
+                    ("gemma4_instruct", "humaneval_instruct"),
+                    ("gptoss_20b", "mmlu_flan_cot_fewshot"),
+                    ("gptoss_120b", "mmlu_flan_cot_fewshot"),
+                    ("gptoss_120b", "humaneval_instruct"),
+                    ("gptoss_20b", "humaneval_instruct")}
 
 
 def main():

@@ -771,3 +771,26 @@ smoke_sp_mmlu,32,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.789474,1,40
 smoke_sp_olmoe,64,8,free,,gsm8k_cot_zeroshot,sample_len,8.000000,8,2048,9
 smoke_sp_olmoe,64,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,8,2048,9
 smoke_sp_olmoe,64,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.750000,8,2048,9
+"# Superseded/probe rows partitioned out of the live CSV (2026-08-14). Original order preserved. Era ledger: ../PROTOCOL_ERAS.md"
+gemma4_instruct,128,8,free,,humaneval_instruct,sample_len,164.000000,full,640,104
+gemma4_instruct,128,8,free,,humaneval_instruct,"pass@1,create_test",0.109756,full,640,104
+gemma4_instruct,128,8,R16,16,humaneval_instruct,sample_len,164.000000,full,640,332
+gemma4_instruct,128,8,R16,16,humaneval_instruct,"pass@1,create_test",0.134146,full,640,332
+gemma4_instruct,128,8,R8,8,humaneval_instruct,sample_len,164.000000,full,640,398
+gemma4_instruct,128,8,R8,8,humaneval_instruct,"pass@1,create_test",0.091463,full,640,398
+gptoss_120b,128,4,free,,humaneval_instruct,sample_len,164.000000,full,3072,108
+gptoss_120b,128,4,free,,humaneval_instruct,"pass@1,create_test",0.121951,full,3072,108
+gptoss_120b,128,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,123
+gptoss_120b,128,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.030702,4,3072,123
+gptoss_120b,128,4,R4,4,humaneval_instruct,sample_len,164.000000,full,3072,420
+gptoss_120b,128,4,R4,4,humaneval_instruct,"pass@1,create_test",0.067073,full,3072,420
+gptoss_120b,128,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,1234
+gptoss_120b,128,4,R4,4,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.008772,4,3072,1234
+gptoss_120b,128,4,R16,16,humaneval_instruct,sample_len,164.000000,full,3072,421
+gptoss_120b,128,4,R16,16,humaneval_instruct,"pass@1,create_test",0.140244,full,3072,421
+gptoss_120b,128,4,R16,16,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,1194
+gptoss_120b,128,4,R16,16,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.013158,4,3072,1194
+gptoss_20b,32,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,143
+gptoss_20b,32,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.004386,4,3072,143
+gptoss_20b,32,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,845
+gptoss_20b,32,4,R4,4,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.008772,4,3072,845
