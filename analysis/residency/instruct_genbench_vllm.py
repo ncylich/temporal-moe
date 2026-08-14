@@ -185,32 +185,16 @@ def main():
                 import re as _re
                 sd = os.path.join(ABLATIONS, "genbench_samples")
                 os.makedirs(sd, exist_ok=True)
-                THINK_RE = {"lfm": r"<think>.*?</think>", "qwen3_5": r"<think>.*?</think>",
-                            "gemma4": r"<\|channel>.*?<channel\|>"}.get(M["arch"])
-                OPEN_TAG = {"lfm": "<think>", "qwen3_5": "<think>",
-                            "gemma4": "<|channel>"}.get(M["arch"])
-
                 def _lens(x):
+                    # x["resps"] is the POST-STRIP scoring text: valid for gen_toks
+                    # of the scored answer only. Think lengths come exclusively from
+                    # the raw doc-keyed capture (think_toks_by_doc below); a per-item
+                    # think_toks measured here was a defect (0 for closed blocks,
+                    # full length for cap-truncated ones) and is deliberately gone.
                     resp = (x.get("resps") or [[""]])[0]
                     resp = resp[0] if resp else ""
-                    d = {"gen_toks": len(lm.tokenizer(resp,
-                                                      add_special_tokens=False).input_ids)}
-                    if THINK_RE:
-                        spans = "".join(_re.findall(THINK_RE, resp, _re.S))
-                        if not spans and OPEN_TAG and OPEN_TAG in resp:
-                            spans = resp[resp.index(OPEN_TAG):]   # truncated mid-think
-                        if not spans and OPEN_TAG == "<think>" and "</think>" in resp:
-                            # template pre-opens the think block in the prompt (qwen):
-                            # thinking = response start through the first closing tag
-                            spans = resp[: resp.index("</think>")]
-                        d["think_toks"] = len(lm.tokenizer(
-                            spans, add_special_tokens=False).input_ids) if spans else 0
-                        # backtracking markers separate "uniform dilution" (slower
-                        # progress per token) from "error reaction" (correction bursts)
-                        d["backtracks"] = len(_re.findall(
-                            r"\b([Ww]ait|[Aa]ctually|[Hh]mm|[Ll]et me re|[Dd]ouble.check)",
-                            spans))
-                    return d
+                    return {"gen_toks": len(lm.tokenizer(
+                        resp, add_special_tokens=False).input_ids)}
 
                 slim = [{"doc_id": x.get("doc_id"), **_lens(x),
                          **{mk: x[mk] for mk in x

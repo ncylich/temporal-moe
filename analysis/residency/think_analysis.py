@@ -4,8 +4,9 @@
 Reads instruct_genbench_vllm.csv (last row wins per cell) and genbench_samples dumps
 (doc_id-deduped). Emits:
   1. damage x thinking-mode table (constrained - free within each mode)
-  2. think-length shift (mean think tokens, free vs constrained arms)
-  3. backtracks per 1k think tokens (dilution vs error-reaction)
+  2. think-length shift (mean think tokens from the RAW doc-keyed capture
+     think_toks_by_doc; the per-item think_toks field measured post-strip text and
+     is a defect -- never read it)
 plus figures think_damage.png / think_length_shift.png and
 results/ablations/think_ablation_summary.csv. Partial data prints partial tables.
 """
@@ -89,16 +90,15 @@ def load_lengths(record, arm, task):
     rows = [i for i in rows if "gen_toks" in i]  # pre-capture-era dumps lack lengths
     if not rows:
         return None
-    at = b.get("analysis_toks") or b.get("raw_think_toks") or []
-    # exact think means only where the array aligns 1:1 with scored items;
-    # misaligned arrays (legacy dumps) fall back to per-item think_toks
-    think_exact = bool(at) and len(at) == len(rows)
+    # ONLY valid think source: doc-keyed raw capture (pre-strip). The per-item
+    # think_toks field measured the post-strip scoring text (0 for closed blocks,
+    # full length for cap-truncated ones) -- a defect, never read it.
+    bd = b.get("think_toks_by_doc") or {}
+    tk = [bd[str(i["doc_id"])] for i in rows if str(i["doc_id"]) in bd]
     out = {"n": len(rows),
            "gen": np.mean([i["gen_toks"] for i in rows]),
-           "think": np.mean(at) if at else np.mean([i.get("think_toks", 0)
-                                                    for i in rows]),
-           "think_exact": think_exact or not at,
-           "backtracks": np.mean([i.get("backtracks", 0) for i in rows])}
+           "think": np.mean(tk) if len(tk) == len(rows) else None,
+           "think_exact": len(tk) == len(rows)}
     return out
 
 
@@ -111,8 +111,7 @@ def main():
              'model/mode/arm/task. Producer: analysis/residency/think_analysis.py"\n')
     w.writerow(["model", "mode", "arm", "task", "free", "constrained", "damage",
                 "damage_se",
-                "gen_free", "gen_con", "think_free", "think_con",
-                "backtracks_per_1k_free", "backtracks_per_1k_con"])
+                "gen_free", "gen_con", "think_free", "think_con"])
 
     print("=== 1. damage x thinking mode (points, constrained - free) ===")
     dam = {}
@@ -129,23 +128,16 @@ def main():
                     dam[(model, mode, arm, tname)] = d
                     lf = load_lengths(rec, "free", task) or {}
                     lc = load_lengths(rec, arm, task) or {}
-                    bf = 1000 * lf["backtracks"] / lf["think"] \
-                        if lf.get("think") else ""
-                    bc = 1000 * lc["backtracks"] / lc["think"] \
-                        if lc.get("think") else ""
                     n_task = {"HumanEval": 164, "MMLU": 228}.get(tname, 200)
                     n_f = (lf or {}).get("n") or n_task
                     n_c = (lc or {}).get("n") or n_task
                     se = 100 * ((free * (1 - free) / n_f) +
                                 (con * (1 - con) / n_c)) ** 0.5
+                    fmt = lambda v: f"{v:.0f}" if v is not None else ""
                     w.writerow([model, mode, arm, tname, f"{free:.4f}", f"{con:.4f}",
                                 f"{d:+.1f}", f"{se:.1f}",
-                                f"{lf.get('gen', ''):.0f}" if lf else "",
-                                f"{lc.get('gen', ''):.0f}" if lc else "",
-                                f"{lf.get('think', ''):.0f}" if lf else "",
-                                f"{lc.get('think', ''):.0f}" if lc else "",
-                                f"{bf:.1f}" if bf != "" else "",
-                                f"{bc:.1f}" if bc != "" else ""])
+                                fmt(lf.get("gen")), fmt(lc.get("gen")),
+                                fmt(lf.get("think")), fmt(lc.get("think"))])
                     print(f"  {model:14s} {mode:6s} {arm:4s} {tname:9s} "
                           f"{free:.3f} -> {con:.3f}  ({d:+.1f})")
     sm.close()
