@@ -74,3 +74,12 @@ Producer of the corrected era: `analysis/residency/instruct_genbench_vllm.py` at
 `3f19416`+; chains committed under `scripts/residency/` (`final_reruns.sh`,
 `final_reruns_tail.sh`, `takeover.sh`, `high_gsm8k_fix.sh`, `audit_fixes.sh`). Defect
 history: docs/research/mechanism/02-corrections.md §6.
+
+## E6/E7 close-out (2026-08-14)
+E6 (no-re-roll: continuation, then single-pass at cap) and E7 (uniformity pass: every
+remaining cell re-run single-pass) completed 14:58 UTC. The ladder is retired
+(`genprotocol.py`); the live CSV is PARTITIONED to authoritative-only rows (one per
+cell); all superseded rows: `superseded/instruct_genbench_vllm_history.csv`. Ladder-era
+scores were systematically understated (mean +2.96 on re-measurement): see
+`reroll_delta_record.md`. The `max_gen_toks` column now records the true single-pass
+budget. Every generative cell in the program is now from ONE protocol era.
