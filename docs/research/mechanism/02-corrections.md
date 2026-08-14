@@ -179,7 +179,9 @@ lengths. The thinking ablation shows closer to the opposite at tight residency.
 the gemma adaptation trio (internally paired, greedy era, marked in place), and all
 within-protocol conclusions of the corrected era.
 
-Ledger of which rows are authoritative: `results/ablations/PROTOCOL_ERAS.md`. Free-arm
-parity against published numbers: `results/ablations/parity_audit.md`. The drivers now
+Ledger and parity documents (`PROTOCOL_ERAS.md`, `parity_audit.md`) are marked for
+deletion and fresh rewrite as of 2026-08-14; until the rewrites land, row validity
+is defined structurally: the live CSV contains authoritative rows only (one per
+cell), with all history in `results/ablations/superseded/`. The drivers now
 fail fast (no per-task exception swallowing), verify staging against shard indexes, and
 log truncation ladders per cell.

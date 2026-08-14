@@ -50,6 +50,8 @@ def main():
     keep, hist = [], []
     for idx, line, row, key in parsed:
         if key is None:
+            if "AUTHORITATIVE ROWS ONLY" in line:
+                continue                    # fresh banner is prepended each run
             if "PROTOCOL CUTOVER" in line or "Rows BELOW" in line:
                 hist.append(line)               # cutover markers belong to history now
             else:

@@ -794,7 +794,6 @@ gptoss_20b,32,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,143
 gptoss_20b,32,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.004386,4,3072,143
 gptoss_20b,32,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,3072,845
 gptoss_20b,32,4,R4,4,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.008772,4,3072,845
-"# Superseded/probe rows partitioned out of the live CSV (2026-08-14). Original order preserved. Era ledger: ../PROTOCOL_ERAS.md"
 lfm25_instruct,32,4,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,1024,111
 lfm25_instruct,32,4,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.043860,4,1024,111
 lfm25_instruct,32,4,R4,4,mmlu_flan_cot_fewshot,sample_len,228.000000,4,1024,893
