@@ -1,3 +1,11 @@
+> # ⚠️⚠️⚠️ OUT OF DATE — DO NOT CITE — REWRITE IN PROGRESS ⚠️⚠️⚠️
+> **(2026-08-14)** Numbers below predate the final verified measurement pass.
+> An independent audit found stale figures and two incorrect claims in this
+> generation of write-ups. Every number must be re-derived from
+> `results/ablations/instruct_genbench_vllm.csv` (authoritative-only file) before
+> this banner is removed. Banner is removed only after the independent
+> re-verification passes.
+
 # LR sweep results — residency adaptation (SWEEP_PLAN.md execution) — FINAL
 
 Complete: three LR grids (14 runs + 1 rule-skipped, later run as a make-up), winner + null

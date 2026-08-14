@@ -1,3 +1,11 @@
+> # ⚠️⚠️⚠️ OUT OF DATE — DO NOT CITE — REWRITE IN PROGRESS ⚠️⚠️⚠️
+> **(2026-08-14)** Numbers below predate the final verified measurement pass.
+> An independent audit found stale figures and two incorrect claims in this
+> generation of write-ups. Every number must be re-derived from
+> `results/ablations/instruct_genbench_vllm.csv` (authoritative-only file) before
+> this banner is removed. Banner is removed only after the independent
+> re-verification passes.
+
 # What rolling residency does to routing, and what it costs
 
 Results only. History is in [`05-notebook.md`](05-notebook.md), the delta against the published
