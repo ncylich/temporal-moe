@@ -57,42 +57,59 @@ def selfce():
 
 
 def bench():
-    # deltas at R = 12.5% of E, per benchmark; floor cells excluded and marked
-    want = {"exact_match,flexible-extract": "GSM8K", "prompt_level_strict_acc,none": "IFEval",
-            "pass@1,create_test": "HumanEval", "exact_match,get-answer": "MMLU"}
-    arm125 = {"olmoe_instruct": "R8", "lfm25_instruct": "R4",
-              "gemma4_instruct": "R16", "qwen35_instruct": "R32"}
-    armk = {"olmoe_instruct": "R8", "lfm25_instruct": "R4",
-            "gemma4_instruct": "R8", "qwen35_instruct": "R8"}
-    floor = {("lfm25_instruct", "MMLU")}
+    # per-benchmark damage, all six models, no/low-thinking modes, both R levels
+    # (record, label, R=k arm, 12.5% arm, humaneval task, mmlu task; None = floor)
+    SPEC = [
+        ("olmoe_instruct", "OLMoE-Instruct (64E, k=8)", "R8", "R8",
+         "humaneval_instruct", "mmlu_flan_cot_fewshot"),
+        ("lfm25_instruct", "LFM2.5-A1B, native mode -- no toggle (32E, k=4)", "R4", "R4",
+         "humaneval_think", None),
+        ("qwen35_think_off", "Qwen3.5-35B, think off (256E, k=8)", "R8", "R32",
+         "humaneval_instruct", "mmlu_flan_cot_fewshot"),
+        ("gemma4_instruct", "gemma4-26B-IT, think off (128E, k=8)", "R8", "R16",
+         "humaneval_gemma_fixed", "mmlu_flan_cot_fewshot"),
+        ("gptoss_20b_low", "gpt-oss-20b, low effort (32E, k=4)", "R4", "R4",
+         "humaneval_gptoss", "mmlu_gptoss_relaxed"),
+        ("gptoss_120b_low", "gpt-oss-120b, low effort (128E, k=4)", "R4", "R16",
+         "humaneval_gptoss", "mmlu_gptoss_relaxed"),
+    ]
+    METRIC = {"gsm8k_cot_zeroshot": ("exact_match,flexible-extract",),
+              "ifeval": ("prompt_level_strict_acc,none",),
+              "mmlu_flan_cot_fewshot": ("exact_match,get-answer",),
+              "mmlu_gptoss_relaxed": ("acc,relaxed-extract",)}
     vals = {}
-    for f in ("instruct_genbench_vllm.csv",):   # live authoritative file only
-        for r in csv.reader(open(f"{ABLATIONS}/{f}")):
-            if len(r) > 8 and r[0] in NAMES and r[6] in want and r[8] != "10":
-                vals[(r[0], r[3], want[r[6]])] = float(r[7])
-            # channel-native humaneval variants are authoritative for think-in-text models
-            if len(r) > 7 and r[0] == "gemma4_instruct" and r[5] == "humaneval_gemma_fixed":
-                vals[(r[0], r[3], "HumanEval")] = float(r[7])
-            if len(r) > 7 and r[0] in ("lfm25_instruct", "qwen35_instruct") \
-                    and r[5] == "humaneval_think":
-                vals[(r[0], r[3], "HumanEval")] = float(r[7])
+    for r in csv.reader(open(f"{ABLATIONS}/instruct_genbench_vllm.csv")):
+        if len(r) < 10 or r[0].startswith("#") or r[0] == "model":
+            continue
+        rec, arm, task, met = r[0], r[3], r[5], r[6]
+        ok = met in METRIC.get(task, ()) or \
+            (task.startswith("humaneval") and met.startswith("pass@1"))
+        if ok:
+            vals[(rec, arm, task)] = float(r[7])
+
     benches = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
-    models = list(NAMES)
-    fig, ax = plt.subplots(figsize=(8, 5))
+
+    def task_for(spec, b):
+        return {"GSM8K": "gsm8k_cot_zeroshot", "IFEval": "ifeval",
+                "HumanEval": spec[4], "MMLU": spec[5]}[b]
+
+    fig, ax = plt.subplots(figsize=(9.5, 5))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
-    w = 0.105
+    w = 0.08
     GX = 1.45                                    # group spacing factor
-    for i, m in enumerate(models):
-        for shade, (arms, tag) in enumerate((( armk, "R=k"), (arm125, "12.5%"))):
+    for i, spec in enumerate(SPEC):
+        rec, label = spec[0], spec[1]
+        for shade, (arm, tag) in enumerate(((spec[2], "R=k"), (spec[3], "12.5%"))):
             xs, ys = [], []
             for j, b in enumerate(benches):
-                x = j * GX + (i - 1.5) * 2.1 * w + (shade - 0.5) * w
-                if (m, b) in floor:
+                x = j * GX + (i - 2.5) * 2.1 * w + (shade - 0.5) * w
+                task = task_for(spec, b)
+                if task is None:
                     if shade == 0:
-                        ax.annotate("floor", (j * GX + (i - 1.5) * 2.1 * w, 0.3),
+                        ax.annotate("floor", (j * GX + (i - 2.5) * 2.1 * w, 0.3),
                                     fontsize=7, rotation=90, ha="center", color="grey")
                     continue
-                fr, cn = vals.get((m, "free", b)), vals.get((m, arms[m], b))
+                fr, cn = vals.get((rec, "free", task)), vals.get((rec, arm, task))
                 if fr is None or cn is None:
                     continue
                 d = 100 * (cn - fr)
@@ -103,7 +120,7 @@ def bench():
                 ys.append(d)
             ax.bar(xs, ys, width=w, color=cols[i], edgecolor="black", lw=0.4,
                    alpha=1.0 if shade == 0 else 0.55,
-                   label=NAMES[m] if shade == 0 else None)
+                   label=label if shade == 0 else None)
     for j in range(len(benches) - 1):
         ax.axvline((j + 0.5) * GX, color="grey", lw=0.6, alpha=0.4)
     from matplotlib.patches import Patch
@@ -115,12 +132,13 @@ def bench():
     ax.set_xticks([j * GX for j in range(len(benches))])
     ax.set_xticklabels(benches)
     ax.set_ylabel("accuracy change under residency, points")
-    ax.set_title("Generative benchmarks under decode-time residency\n"
-                 "(constrained − free, same items and stack per pair; "
-                 "OLMoE and LFM: k = 12.5%, one cell)", fontsize=9)
+    ax.set_title("Generative benchmarks under decode-time residency, no/low-thinking modes\n"
+                 "(constrained − free, same items and stack per pair; single runs, "
+                 "binomial SE 2-4 pts;\nOLMoE, LFM and gpt-oss-20b: k = 12.5%, one cell)",
+                 fontsize=9)
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles + shade_handles, labels + [h.get_label() for h in shade_handles],
-              fontsize=8)
+              fontsize=7.5, ncol=2)
     ax.grid(alpha=0.25, axis="y")
     fig.tight_layout()
     fig.savefig(f"{FIG}/instruct_bench_damage.png", dpi=150)
