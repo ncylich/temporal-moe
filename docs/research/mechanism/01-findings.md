@@ -485,16 +485,18 @@ allocation against uniform at iso-memory, negative favours fitted (`perlayer_qwe
 cross-entropy on its own frozen responses to 500 fixed prompts, prefill free, rule enforced on
 generated tokens (`instruct_selfce.csv`). Benchmarks run the serving protocol end to end under
 each model's own card sampling recipe, thinking judged answer-only, budgets sized to the mode
-(protocol and superseded-era ledger: `results/ablations/PROTOCOL_ERAS.md`; free arms audited
-against published numbers: `results/ablations/parity_audit.md`; think-in-text models score
+(the live CSV holds authoritative rows only — one per cell, single protocol era; history and
+ledger: `results/ablations/PROTOCOL_ERAS.md`, `superseded/`; ladder-era understatement record:
+`results/ablations/reroll_delta_record.md`; free arms audited against published numbers:
+`results/ablations/parity_audit.md`; think-in-text models score
 channel-native HumanEval, `humaneval_think`/`humaneval_gemma.py`/`humaneval_gptoss.py`):
 
 | model, R = 12.5% of E | self-CE, free → R | gsm8k | ifeval | humaneval | mmlu |
 |---|---|---|---|---|---|
-| OLMoE-Instruct | 0.354 → 1.297 | 0.70 → 0.47 | 0.59 → 0.53 | 0.37 → 0.27 | 0.50 → 0.29 |
-| LFM2.5-A1B | 0.396 → 0.704 | 0.83 → 0.79 | 0.79 → 0.71 | 0.83 → 0.67 | at floor |
-| Qwen3.5-35B (thinking) | 0.228 → 0.341 | 0.83 → 0.81 | 0.80 → 0.80 | 0.96 → 0.88 | 0.79 → 0.83 |
-| gemma4-26B-IT | 0.139 → 0.350 | 0.86 → 0.85 | 0.86 → 0.88 | 0.99 → 0.97 | 0.68 → 0.72 |
+| OLMoE-Instruct | 0.354 → 1.297 | 0.70 → 0.47 | 0.63 → 0.55 | 0.37 → 0.27 | 0.50 → 0.29 |
+| LFM2.5-A1B | 0.396 → 0.704 | 0.83 → 0.79 | 0.88 → 0.86 | 0.83 → 0.67 | at floor |
+| Qwen3.5-35B (thinking) | 0.228 → 0.341 | 0.84 → 0.83 | 0.86 → 0.82 | 0.96 → 0.88 | 0.83 → 0.84 |
+| gemma4-26B-IT | 0.139 → 0.350 | 0.86 → 0.86 | 0.86 → 0.87 | 0.99 → 0.97 | 0.61 → 0.72 |
 
 <img src="../../../results/ablations/figures/instruct_selfce_damage.png" alt="Self-CE damage against residency fraction, four instruct models" width="66%">
 
@@ -537,18 +539,20 @@ gpt-oss at effort low/medium/high; LFM has no toggle), same arms, items and reci
 <img src="../../../results/ablations/figures/think_length_shift.png" alt="Think length, free against constrained" width="60%">
 
 - **Thinking is a tightness-dependent lever, not blanket protection.** At R=k, thinking
-  amplifies damage on both paired models (qwen R8, on vs off: gsm8k −12.5 vs −9.0, humaneval
-  −14.6 vs −3.7, mmlu −7.9 vs −4.8; gemma mirrors it); at R=4k the on-mode damage collapses to
-  ≈0 and beats off-mode on mmlu (+3.1 vs +0.9). More effort erases 120b's mmlu damage even at
-  3% residency (medium −7.5 → high +1.3).
+  amplifies damage on both paired models (qwen R8, on vs off: ifeval −15.5 vs −12.5, humaneval
+  −14.6 vs −3.7; gemma R8: humaneval −12.2 vs −6.1, mmlu −9.2 vs positive); at R=4k the
+  on-mode damage shrinks to a few points and beats off-mode on mmlu (+1.3 vs +0.4). More
+  effort erases 120b's mmlu damage even at 3% residency.
 - **The constraint lengthens thinking, scaled by tightness.** 19 of 28 cells lengthen; the
   effect grows with tightness (qwen gsm8k ×1.18 at R=k vs ×0.99 at 4k; gemma ×1.13 vs ×1.04)
   and with effort on 120b (×1.21–1.24 at high) — consistent with reduced per-token progress
   under a stale resident set. gpt-oss-20b is the counterexample (×0.80–0.90).
 - **Two real mode costs survive every harness check**: gemma's forced-on thinking writes worse
   code outright (humaneval free 0.99 → 0.84, untruncated, channel-stripped, complete
-  functions failing tests), and high effort trades instruction compliance for deliberation
-  (ifeval free: 20b 0.76 → 0.54, 120b 0.80 → 0.69 medium → high).
+  functions failing tests) — though it is code-specific: think-on now *beats* think-off on
+  gemma's free-arm ifeval (0.925 vs 0.860) and mmlu (0.851 vs 0.605) under the final
+  protocol — and high effort still trades instruction compliance for deliberation
+  (ifeval free: 20b 0.815 → 0.565, 120b 0.830 → 0.760 medium → high).
 - **At high effort the constraint can help**: 20b's R=k arm beats its free arm on all four
   benchmarks (+8.5 gsm8k to +0.6 humaneval), and 120b's on gsm8k/mmlu — residency as an
   overthinking regulariser; flagged as an open direction.
