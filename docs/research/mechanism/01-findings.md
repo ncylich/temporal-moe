@@ -1,10 +1,12 @@
-> # ⚠️⚠️⚠️ OUT OF DATE — DO NOT CITE — REWRITE IN PROGRESS ⚠️⚠️⚠️
-> **(2026-08-14)** Numbers below predate the final verified measurement pass.
-> An independent audit found stale figures and two incorrect claims in this
-> generation of write-ups. Every number must be re-derived from
-> `results/ablations/instruct_genbench_vllm.csv` (authoritative-only file) before
-> this banner is removed. Banner is removed only after the independent
-> re-verification passes.
+> # 🗑️⚠️ SCHEDULED FOR DELETION — REWRITE FROM SCRATCH ⚠️🗑️
+> **(2026-08-14)** This document is deprecated in full. Do NOT cite it, do NOT
+> patch it, do NOT use its text as the starting point for the rewrite. It carries
+> narrative and numbers from superseded measurement eras; an independent audit found
+> stale figures and incorrect claims, and in-place corrections risk silently
+> anchoring on old conclusions. The replacement must be written fresh, solely from:
+> `results/ablations/instruct_genbench_vllm.csv` (authoritative-only),
+> `think_ablation_summary.csv`, the token dumps, and `reroll_delta_record.md`.
+> This file is retained only until the rewrite lands, then deleted.
 
 # What rolling residency does to routing, and what it costs
 

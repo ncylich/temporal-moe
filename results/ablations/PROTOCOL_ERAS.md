@@ -1,3 +1,13 @@
+> # 🗑️⚠️ SCHEDULED FOR DELETION — REWRITE FROM SCRATCH ⚠️🗑️
+> **(2026-08-14)** This document is deprecated in full. Do NOT cite it, do NOT
+> patch it, do NOT use its text as the starting point for the rewrite. It carries
+> narrative and numbers from superseded measurement eras; an independent audit found
+> stale figures and incorrect claims, and in-place corrections risk silently
+> anchoring on old conclusions. The replacement must be written fresh, solely from:
+> `results/ablations/instruct_genbench_vllm.csv` (authoritative-only),
+> `think_ablation_summary.csv`, the token dumps, and `reroll_delta_record.md`.
+> This file is retained only until the rewrite lands, then deleted.
+
 # Protocol eras — instruct benchmark results (CURRENT STATE 2026-08-14)
 
 ## Selection rule (the only one)
