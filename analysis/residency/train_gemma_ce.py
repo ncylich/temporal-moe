@@ -121,6 +121,9 @@ def main():
                     help="per-expert LoRA rank on the 3D expert tensors (0 = off); "
                          "delta applied per HIT expert inside the loop -- never "
                          "materialises the full-tensor delta")
+    ap.add_argument("--max-seq", type=int, default=1024,
+                    help="loader max sequence length; think-on trajectories need "
+                         "2048 (prompt 512 + think+answer 1024+)")
     ap.add_argument("--micro-batch", type=int, default=8,
                     help="rows per forward; rows are length-sorted into chunks and "
                          "padded to the chunk max. Constraint applied per row via "
@@ -150,7 +153,7 @@ def main():
     use_unsloth = True
     try:
         from unsloth import FastModel
-        model, tok = FastModel.from_pretrained(A.model, max_seq_length=1024,
+        model, tok = FastModel.from_pretrained(A.model, max_seq_length=A.max_seq,
                                                dtype=torch.bfloat16, load_in_4bit=False,
                                                full_finetuning=False)
         tok = getattr(tok, "tokenizer", tok)
