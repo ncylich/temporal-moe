@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bulk free-model trajectory generation on vLLM (training data for CE adaptation).
 
-FREE model, greedy, chat template, continuous batching. No residency machinery is loaded:
+FREE model, card-recipe sampling (greedy loops on thinking models), chat template, continuous batching. No residency machinery is loaded:
 these are baseline trajectories (prefix caching is safe and on, since nothing scans).
 Output matches gen_trajectories.py's schema: rows of {idx, prompt_len, ids}.
 
@@ -28,6 +28,8 @@ def main():
     ap.add_argument("--max-new", type=int, default=384)
     ap.add_argument("--max-prompt-tok", type=int, default=512)
     ap.add_argument("--out", default="/workspace/instruct-traj")
+    ap.add_argument("--think", choices=("default", "on", "off"), default="default",
+                    help="chat-template thinking toggle for the generated data")
     A = ap.parse_args()
 
     prompts = [json.loads(l) for l in open(A.prompts)]
@@ -62,7 +64,9 @@ def main():
     print(f"[genv] sampling temp={sp.temperature} top_p={sp.top_p} top_k={sp.top_k}",
           flush=True)
     msgs = [[{"role": "user", "content": p["text"]}] for p in prompts]
-    outs = llm.chat(msgs, sp)
+    ctk = ({} if A.think == "default"
+           else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}})
+    outs = llm.chat(msgs, sp, **ctk)
 
     rows, skipped = [], 0
     for p, o in zip(prompts, outs):
