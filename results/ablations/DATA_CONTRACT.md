@@ -45,3 +45,14 @@ mmlu_flan_cot_fewshot for all gpt-oss records (any effort) and LFM (extraction
 floor; gpt-oss uses mmlu_gptoss_relaxed instead);
 metric exact_match,strict-match (inert under chat protocol);
 metrics *,answer-only (rescores of since-overwritten generations).
+
+## Screening layer (2026-08-15)
+`screening_genbench.csv` holds RELATIVE screening runs only (active-item doc
+subsets via `--samples-json`, small-batch). Free-arm screening matches full runs
+per-item (49/50); constrained arms are batch-composition sensitive (resident-set
+tie cascades), so absolute screening scores are NOT comparable to full-run rows.
+Read only deltas between records measured under the identical screening protocol
+(validated: 4/4 cells within 2 pts of known full-grid deltas). Candidates cited
+anywhere must first get a full 200-item confirmation grid in the live CSV.
+Active sets: scratchpad gemma_active_sets.json (GSM8K 50/200, IFEval 70/200,
+from 12 runs); regenerate as runs accumulate.

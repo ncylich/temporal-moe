@@ -1,0 +1,18 @@
+"# Generative benchmarks under decode-time residency, vLLM stack: continuous batching, chat template, card-recipe sampling (never greedy), single pass at max_gen_toks, prefill free (observe), stateful rule on generated tokens (vllm_residency walker, parity-tested), gate-mass preserve correction for norm_topk_prob=False models, prefix caching off, all arms same engine. Same deterministic first-N items across arms. Producer: analysis/residency/instruct_genbench_vllm.py"
+model,E,k,arm,R,task,metric,value,limit,max_gen_toks,secs
+scr_val_ce_adapted,128,8,free,,gsm8k_cot_zeroshot,sample_len,50.000000,200,2048,58
+scr_val_ce_adapted,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,58
+scr_val_ce_adapted,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.760000,200,2048,58
+scr_val_ce_adapted,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,50.000000,200,2048,68
+scr_val_ce_adapted,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,68
+scr_val_ce_adapted,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.680000,200,2048,68
+scr_val_ce_adapted,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,1536,71
+scr_val_ce_adapted,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.957317,full,1536,199
+scr_val_base,128,8,free,,gsm8k_cot_zeroshot,sample_len,50.000000,200,2048,46
+scr_val_base,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,46
+scr_val_base,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.760000,200,2048,46
+scr_val_base,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,50.000000,200,2048,63
+scr_val_base,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,63
+scr_val_base,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.680000,200,2048,63
+scr_val_base,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,1536,71
+scr_val_base,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.932927,full,1536,193
