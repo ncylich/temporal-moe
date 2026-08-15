@@ -446,13 +446,18 @@ def main():
     oi = 0
 
     def save():
+        # torch.save straight onto the quota-limited network mount produced a
+        # short write (inline_container pos mismatch) that killed the first
+        # expert run at its step-400 checkpoint. Local write, atomic move.
+        import shutil
         named = {n: p.detach().cpu().clone() for n, p in model.named_parameters()
                  if p.requires_grad}
         torch.save({"tensors": named, "seen": seen, "stack":
                     "unsloth" if use_unsloth else "hf+peft",
                     "R": 0 if A.no_constraint else 8, "expert_lora_r": A.expert_lora_r,
                     "elora_layout": "grouped(E,in,out)",
-                    "traj": A.traj, "lr": A.lr}, A.out)
+                    "traj": A.traj, "lr": A.lr}, "/tmp/gce_ckpt_tmp.pt")
+        shutil.move("/tmp/gce_ckpt_tmp.pt", A.out)
 
     while seen < A.tokens:
         opt.zero_grad(set_to_none=True)
