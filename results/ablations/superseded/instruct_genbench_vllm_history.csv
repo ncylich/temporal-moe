@@ -999,3 +999,6 @@ gptoss_120b_high,128,4,R16,16,ifeval,"prompt_level_strict_acc,none",0.715000,200
 gptoss_120b_high,128,4,R16,16,ifeval,"inst_level_strict_acc,none",0.786164,200,4096,999
 gptoss_120b_high,128,4,R16,16,ifeval,"prompt_level_loose_acc,none",0.725000,200,4096,999
 gptoss_120b_high,128,4,R16,16,ifeval,"inst_level_loose_acc,none",0.792453,200,4096,999
+gemma4_ce_adapted,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,46
+gemma4_ce_adapted,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,149
+gemma4_ce_adapted,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,138
