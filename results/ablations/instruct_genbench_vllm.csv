@@ -356,3 +356,6 @@ gemma4_ce_expert,128,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1
 gemma4_ce_expert,128,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.697368,4,2048,1029
 gemma4_ce_expert,128,8,R16,16,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,981
 gemma4_ce_expert,128,8,R16,16,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.627193,4,2048,981
+gemma4_ce_expert,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,1536,57
+gemma4_ce_expert,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,1536,215
+gemma4_ce_expert,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,1536,197
