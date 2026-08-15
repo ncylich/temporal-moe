@@ -387,17 +387,14 @@ gemma4_ce_think3k,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.829
 gemma4_ce_think3k,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.737805,full,3072,868
 gemma4_ce_think3k,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.774390,full,3072,904
 gemma4_ce_domain,128,8,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,43
-gemma4_ce_domain,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,43
 gemma4_ce_domain,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.865000,200,2048,43
 gemma4_ce_domain,128,8,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,94
 gemma4_ce_domain,128,8,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.635965,4,2048,94
 gemma4_ce_domain,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,154
-gemma4_ce_domain,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,154
 gemma4_ce_domain,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.840000,200,2048,154
 gemma4_ce_domain,128,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1064
 gemma4_ce_domain,128,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.627193,4,2048,1064
 gemma4_ce_domain,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,112
-gemma4_ce_domain,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,112
 gemma4_ce_domain,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.865000,200,2048,112
 gemma4_ce_domain,128,8,R16,16,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1100
 gemma4_ce_domain,128,8,R16,16,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.657895,4,2048,1100
