@@ -184,12 +184,14 @@ def main():
             # service. A swallowed exception obfuscates a bug that needs fixing and
             # lets a poisoned engine corrupt every later cell (2026-08-12: one walker
             # crash silently took out five cells under the old try/except-continue).
-            res = simple_evaluate(model=lm, tasks=[task], limit=lim,
+            use_sub = bool(sub and task in sub)   # lm_eval: samples XOR limit
+            res = simple_evaluate(model=lm, tasks=[task],
+                                  limit=None if use_sub else lim,
                                   apply_chat_template=True,
                                   gen_kwargs=gen_kwargs,
                                   confirm_run_unsafe_code=True, log_samples=True,
-                                  **({"samples": {task: sub[task]}}
-                                     if sub and task in sub else {}))
+                                  **({"samples": {task: sub[task]}} if use_sub
+                                     else {}))
             secs = time.time() - t0
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
             for mk, mv in metrics.items():
