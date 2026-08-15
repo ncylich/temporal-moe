@@ -24,6 +24,63 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def add_expert_lora(model, r):
+    """Per-expert LoRA on the fused 3D expert tensors (gate_up_proj (E,2I,H),
+    down_proj (E,H,I)). Deltas are computed per HIT expert inside the forward loop
+    ((2I,r)@(r,H) per hit) -- the full-tensor materialisation that produced the
+    93 tok/s Qwen3.5 figure never happens. B zero-init: delta starts at 0."""
+    import torch.nn as nn
+    patched = 0
+    for mod in model.modules():
+        gu = getattr(mod, "gate_up_proj", None)
+        dp = getattr(mod, "down_proj", None)
+        if not (isinstance(gu, nn.Parameter) and gu.dim() == 3
+                and isinstance(dp, nn.Parameter) and dp.dim() == 3):
+            continue
+        E, twoI, H = gu.shape
+        _, H2, I = dp.shape
+        dev, dt = gu.device, gu.dtype
+        mod.elora_gu_A = nn.Parameter(torch.randn(E, r, H, device=dev, dtype=dt) / r)
+        mod.elora_gu_B = nn.Parameter(torch.zeros(E, twoI, r, device=dev, dtype=dt))
+        mod.elora_dp_A = nn.Parameter(torch.randn(E, r, I, device=dev, dtype=dt) / r)
+        mod.elora_dp_B = nn.Parameter(torch.zeros(E, H2, r, device=dev, dtype=dt))
+        mod.elora_scale = 2.0                     # alpha/r with alpha = 2r
+
+        def fwd(self, hidden_states, top_k_index, top_k_weights):
+            # per-HIT deltas beat a single bmm here: full materialisation costs
+            # ~1.5 GiB of gradient traffic per layer per step (measured 52 vs
+            # 98 tok/s), while per-hit slices keep backward small.
+            final_hidden_states = torch.zeros_like(hidden_states)
+            with torch.no_grad():
+                expert_mask = nn.functional.one_hot(
+                    top_k_index, num_classes=self.num_experts).permute(2, 1, 0)
+                expert_hit = torch.greater(expert_mask.sum(dim=(-1, -2)), 0).nonzero()
+            for expert_idx in expert_hit:
+                e = expert_idx[0]
+                if e == self.num_experts:
+                    continue
+                top_k_pos, token_idx = torch.where(expert_mask[e])
+                current_state = hidden_states[token_idx]
+                w_gu = self.gate_up_proj[e] + self.elora_scale * (
+                    self.elora_gu_B[e] @ self.elora_gu_A[e])
+                w_dp = self.down_proj[e] + self.elora_scale * (
+                    self.elora_dp_B[e] @ self.elora_dp_A[e])
+                gate, up = nn.functional.linear(current_state, w_gu).chunk(2, dim=-1)
+                cur = self.act_fn(gate) * up
+                cur = nn.functional.linear(cur, w_dp)
+                cur = cur * top_k_weights[token_idx, top_k_pos, None]
+                final_hidden_states.index_add_(0, token_idx,
+                                               cur.to(final_hidden_states.dtype))
+            return final_hidden_states
+
+        import types
+        mod.forward = types.MethodType(fwd, mod)
+        patched += 1
+    assert patched, "no 3D expert tensors found to patch"
+    print(f"[gce] expert LoRA r={r} on {patched} layers", flush=True)
+    return patched
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="/dev/shm/gemma4-26b-it")
@@ -40,6 +97,12 @@ def main():
                          "(isolates constraint-aware adaptation from plain self-SFT)")
     ap.add_argument("--eval-only", action="store_true",
                     help="load --out adapter, score frozen-500 self-CE (free and R8), exit")
+    ap.add_argument("--expert-lora-r", type=int, default=0,
+                    help="per-expert LoRA rank on the 3D expert tensors (0 = off); "
+                         "delta applied per HIT expert inside the loop -- never "
+                         "materialises the full-tensor delta")
+    ap.add_argument("--smoke", action="store_true",
+                    help="engagement checks + 2 timed steps + save/reload, then exit")
     ap.add_argument("--merge-out", default=None,
                     help="after loading the adapter, save the merged model to this dir and exit")
     A = ap.parse_args()
@@ -72,6 +135,8 @@ def main():
 
     GL.patch_gemma4()
     GL.tag_gemma4(model)
+    if A.expert_lora_r:
+        add_expert_lora(model, A.expert_lora_r)
 
     # router + norm gains trainable alongside the LoRA
     extra = []
@@ -98,6 +163,81 @@ def main():
     assert d > 1e-3, f"constraint NOT engaged under this loader (max logit delta {d:.2e})"
     print(f"[gce] constraint engaged (max logit delta {d:.3f})", flush=True)
 
+    if A.smoke:
+        # 1) expert-LoRA engagement: B is zero-init, so a forward must be identical
+        #    to base; bumping one B must change logits; restoring must restore.
+        assert A.expert_lora_r, "--smoke requires --expert-lora-r"
+        emods = [m_ for m_ in model.modules() if hasattr(m_, "elora_gu_B")]
+        with torch.no_grad():
+            l0 = model(probe).logits[:, -1].float()
+            emods[0].elora_gu_B.add_(0.05)
+            l1 = model(probe).logits[:, -1].float()
+            emods[0].elora_gu_B.zero_()
+            l2 = model(probe).logits[:, -1].float()
+        dd, dr = float((l0 - l1).abs().max()), float((l0 - l2).abs().max())
+        assert dd > 1e-3, f"expert LoRA NOT engaged (delta {dd:.2e})"
+        assert dr < 1e-4, f"expert LoRA restore failed (delta {dr:.2e})"
+        print(f"[gce-smoke] expert LoRA engaged (bump delta {dd:.3f}, "
+              f"restore {dr:.2e})", flush=True)
+        # 2) two timed optimiser steps on real rows
+        tp = [p for p in model.parameters() if p.requires_grad]
+        print(f"[gce-smoke] trainable {sum(p.numel() for p in tp)/1e6:.1f}M "
+              f"(expert {sum(p.numel() for m_ in emods for p in (m_.elora_gu_A, m_.elora_gu_B, m_.elora_dp_A, m_.elora_dp_B))/1e6:.1f}M)",
+              flush=True)
+        sopt = torch.optim.AdamW(tp, lr=1e-5)
+        model.train()
+        torch.cuda.reset_peak_memory_stats()
+        tok_seen, t0 = 0, time.time()
+        steady_tok, steady_t = 0, 0.0
+        for si in range(6):
+            sopt.zero_grad(set_to_none=True)
+            t_step, stoks = time.time(), 0
+            for r in rows[si * 2:si * 2 + 2]:
+                ids = r["ids"].to("cuda").long().unsqueeze(0)
+                plen2 = int(r["prompt_len"])
+                GL.CFG.update(on=True, R=8, enforce_from=plen2, cold_start=False)
+                logits = model(ids).logits[:, :-1]
+                targets = ids[:, 1:].clone()
+                targets[:, : plen2 - 1] = -100
+                loss = torch.nn.functional.cross_entropy(
+                    logits.reshape(-1, logits.shape[-1]).float(),
+                    targets.reshape(-1), ignore_index=-100) / 2
+                loss.backward()
+                tok_seen += ids.shape[1] - plen2
+                stoks += ids.shape[1] - plen2
+            # LoRA grad flow: at step 0 B (zero-init) gets grad through A while
+            # A's grad is exactly 0 (= B^T g); after B's first update A must flow.
+            gB = emods[0].elora_gu_B.grad
+            assert gB is not None and float(gB.abs().max()) > 0, "no grad on expert B"
+            if si == 1:
+                gA = emods[0].elora_gu_A.grad
+                assert gA is not None and float(gA.abs().max()) > 0,                     "no grad on expert A after B moved"
+            sopt.step()
+            torch.cuda.synchronize()
+            st = time.time() - t_step
+            print(f"[gce-smoke] step {si} loss {loss.item()*2:.4f} "
+                  f"{st:.1f}s ({stoks/st:.0f} tok/s)", flush=True)
+            if si >= 2:
+                steady_tok += stoks
+                steady_t += st
+        dt_ = time.time() - t0
+        print(f"[gce-smoke] STEADY (steps 2-5): {steady_tok/steady_t:.0f} tok/s | "
+              f"total {tok_seen} toks {dt_:.1f}s | peak mem "
+              f"{torch.cuda.max_memory_allocated()/2**30:.1f} GiB", flush=True)
+        # 3) save/reload roundtrip
+        named = {n: p.detach().cpu().clone() for n, p in model.named_parameters()
+                 if p.requires_grad}
+        torch.save({"tensors": named}, "/tmp/smoke_expert_adapter.pt")
+        ck = torch.load("/tmp/smoke_expert_adapter.pt", map_location="cpu",
+                        weights_only=False)
+        allp = dict(model.named_parameters())
+        miss = [n for n in ck["tensors"] if n not in allp]
+        assert not miss, f"roundtrip mismatch: {miss[:3]}"
+        n_e = sum(1 for n in ck["tensors"] if "elora" in n)
+        print(f"[gce-smoke] roundtrip OK ({len(ck['tensors'])} tensors, "
+              f"{n_e} expert-LoRA) -- SMOKE PASS", flush=True)
+        return
+
     if A.eval_only or A.merge_out:
         ck = torch.load(A.out, map_location="cpu", weights_only=False)
         named = dict(model.named_parameters())
@@ -108,6 +248,17 @@ def main():
                 named[n].data.copy_(t.to(named[n].dtype))
         print(f"[gce] adapter loaded (seen={ck['seen']/1e6:.2f}M)", flush=True)
         if A.merge_out:
+            with torch.no_grad():
+                for mod in model.modules():
+                    if hasattr(mod, "elora_gu_A"):
+                        for e in range(mod.gate_up_proj.shape[0]):
+                            mod.gate_up_proj[e] += mod.elora_scale * (
+                                mod.elora_gu_B[e] @ mod.elora_gu_A[e])
+                            mod.down_proj[e] += mod.elora_scale * (
+                                mod.elora_dp_B[e] @ mod.elora_dp_A[e])
+                        for nm in ("elora_gu_A", "elora_gu_B", "elora_dp_A",
+                                   "elora_dp_B"):
+                            delattr(mod, nm)
             m = model.merge_and_unload() if hasattr(model, "merge_and_unload") else model
             m.save_pretrained(A.merge_out, safe_serialization=True)
             tok.save_pretrained(A.merge_out)
@@ -149,7 +300,7 @@ def main():
                  if p.requires_grad}
         torch.save({"tensors": named, "seen": seen, "stack":
                     "unsloth" if use_unsloth else "hf+peft",
-                    "R": 0 if A.no_constraint else 8,
+                    "R": 0 if A.no_constraint else 8, "expert_lora_r": A.expert_lora_r,
                     "traj": A.traj, "lr": A.lr}, A.out)
 
     while seen < A.tokens:
