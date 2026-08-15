@@ -64,3 +64,11 @@ scr_dom_cand,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,2
 scr_dom_cand,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.760000,200,2048,63
 scr_dom_cand,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,1536,66
 scr_dom_cand,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,196
+scr_dom2_cand,128,8,free,,gsm8k_cot_zeroshot,sample_len,50.000000,200,2048,51
+scr_dom2_cand,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,51
+scr_dom2_cand,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.720000,200,2048,51
+scr_dom2_cand,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,50.000000,200,2048,69
+scr_dom2_cand,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,69
+scr_dom2_cand,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.740000,200,2048,69
+scr_dom2_cand,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,71
+scr_dom2_cand,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,1536,202
