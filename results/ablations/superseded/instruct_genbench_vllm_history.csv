@@ -1002,3 +1002,6 @@ gptoss_120b_high,128,4,R16,16,ifeval,"inst_level_loose_acc,none",0.792453,200,40
 gemma4_ce_adapted,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,46
 gemma4_ce_adapted,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,149
 gemma4_ce_adapted,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,138
+gemma4_ce_expert,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,78
+gemma4_ce_expert,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,136
+gemma4_ce_expert,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,119
