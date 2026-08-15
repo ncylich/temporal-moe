@@ -37,7 +37,12 @@ def extract(text):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", required=True)
-    ap.add_argument("--arm", required=True, choices=("free", "R8", "R16"))
+    ap.add_argument("--arm", default=None, choices=("free", "R8", "R16"),
+                    help="single arm (legacy)")
+    ap.add_argument("--arms", default=None,
+                    help="comma list run in ONE engine boot (e.g. free,R8,R16)")
+    ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
+                    help="screening runs use screening_genbench.csv")
     ap.add_argument("--tag", default=None, help="model column label; default from path")
     ap.add_argument("--think", choices=("on", "off"), default="off",
                     help="enable_thinking template kwarg (off pre-closes the channel)")
@@ -57,45 +62,49 @@ def main():
 
     vllm_glue.install()
     from vllm import LLM, SamplingParams
+    arms = A.arms.split(",") if A.arms else [A.arm]
+    assert all(a in ("free", "R8", "R16") for a in arms) and arms, "bad --arm(s)"
     llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=0.85,
               max_model_len=A.max_model_len, enable_prefix_caching=False)
-    DEC.update(on=A.arm != "free", R=16 if A.arm == "R16" else 8, swaps=1)
-    DEC["state"].clear()
     msgs = [[{"role": "user", "content":
               "Complete the following Python function. Provide the complete function "
               "in a single ```python code block.\n\n" + p["prompt"]}] for p in probs]
-    t0 = time.time()
     # sampling per gemma's shipped generation_config (greedy loops on long reasoning)
     import json as _json
-    _gc = _json.load(open(os.path.join(A.path, "generation_config.json")))
-    outs = llm.chat(msgs, SamplingParams(
-        temperature=_gc.get("temperature", 1.0), top_p=_gc.get("top_p", 1.0),
-        top_k=_gc.get("top_k") or -1, seed=1234, max_tokens=A.max_tokens),
-        chat_template_kwargs={"enable_thinking": A.think == "on"})
-
-    preds = [[extract(o.outputs[0].text)] for o in outs]
-    tests = [p["test"] + f"\ncheck({p['entry_point']})" for p in probs]
-    # code_eval forks sandbox workers, which is unsafe inside the live vLLM process:
-    # score in a clean subprocess instead.
-    import json as _json
     import subprocess
-    _json.dump({"preds": preds, "tests": tests}, open("/tmp/heg_preds.json", "w"))
-    out = subprocess.run(["/workspace/venv_fla/bin/python",
-                          os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                       "heg_scorer.py")],
-                         capture_output=True, text=True)
-    line = [l for l in out.stdout.splitlines() if l.startswith("PASS1")]
-    assert line, f"scorer failed: {out.stderr[-400:]}"
-    res = {"pass@1": float(line[0].split()[1])}
-    secs = time.time() - t0
-    print(f"[heg] {tag} {A.arm}: pass@1 = {res['pass@1']:.4f} "
-          f"({len(probs)} problems, {secs:.0f}s)", flush=True)
+    _gc = _json.load(open(os.path.join(A.path, "generation_config.json")))
+    for arm in arms:                       # all arms share ONE engine boot
+        DEC.update(on=arm != "free", R=16 if arm == "R16" else 8, swaps=1)
+        DEC["state"].clear()
+        t0 = time.time()
+        outs = llm.chat(msgs, SamplingParams(
+            temperature=_gc.get("temperature", 1.0), top_p=_gc.get("top_p", 1.0),
+            top_k=_gc.get("top_k") or -1, seed=1234, max_tokens=A.max_tokens),
+            chat_template_kwargs={"enable_thinking": A.think == "on"})
 
-    with open(os.path.join(ABLATIONS, "instruct_genbench_vllm.csv"), "a", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow([tag, 128, 8, A.arm, (16 if A.arm == "R16" else 8) if A.arm != "free" else "",
-                    "humaneval_gemma_fixed", "pass@1,channel-aware",
-                    f"{res['pass@1']:.6f}", A.limit or "full", A.max_tokens, f"{secs:.0f}"])
+        preds = [[extract(o.outputs[0].text)] for o in outs]
+        tests = [p["test"] + f"\ncheck({p['entry_point']})" for p in probs]
+        # code_eval forks sandbox workers, which is unsafe inside the live vLLM
+        # process: score in a clean subprocess instead.
+        _json.dump({"preds": preds, "tests": tests}, open("/tmp/heg_preds.json", "w"))
+        out = subprocess.run(["/workspace/venv_fla/bin/python",
+                              os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           "heg_scorer.py")],
+                             capture_output=True, text=True)
+        line = [l for l in out.stdout.splitlines() if l.startswith("PASS1")]
+        assert line, f"scorer failed: {out.stderr[-400:]}"
+        res = {"pass@1": float(line[0].split()[1])}
+        secs = time.time() - t0
+        print(f"[heg] {tag} {arm}: pass@1 = {res['pass@1']:.4f} "
+              f"({len(probs)} problems, {secs:.0f}s)", flush=True)
+
+        with open(os.path.join(ABLATIONS, A.csv_name), "a", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow([tag, 128, 8, arm,
+                        (16 if arm == "R16" else 8) if arm != "free" else "",
+                        "humaneval_gemma_fixed", "pass@1,channel-aware",
+                        f"{res['pass@1']:.6f}", A.limit or "full", A.max_tokens,
+                        f"{secs:.0f}"])
 
 
 if __name__ == "__main__":
