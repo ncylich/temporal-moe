@@ -25,10 +25,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def add_expert_lora(model, r):
-    """Per-expert LoRA on the fused 3D expert tensors (gate_up_proj (E,2I,H),
-    down_proj (E,H,I)). Deltas are computed per HIT expert inside the forward loop
-    ((2I,r)@(r,H) per hit) -- the full-tensor materialisation that produced the
-    93 tok/s Qwen3.5 figure never happens. B zero-init: delta starts at 0."""
+    """Per-expert LoRA on the 3D expert tensors via torch._grouped_mm.
+
+    The stock HF forward is a Python loop over hit experts (~1500 dispatches per
+    layer pass -- overhead-bound, 98 tok/s measured). Here (token, expert) pairs
+    are sorted by expert once per forward and each projection becomes ONE grouped
+    GEMM over all experts; LoRA deltas are two more grouped GEMMs. Base expert
+    weights are transposed IN PLACE to the grouped layout (E, in, out) -- they are
+    frozen, our forward is the only consumer, and merge transposes back.
+    B zero-init: delta starts at exactly 0."""
     import torch.nn as nn
     patched = 0
     for mod in model.modules():
@@ -37,47 +42,52 @@ def add_expert_lora(model, r):
         if not (isinstance(gu, nn.Parameter) and gu.dim() == 3
                 and isinstance(dp, nn.Parameter) and dp.dim() == 3):
             continue
-        E, twoI, H = gu.shape
-        _, H2, I = dp.shape
+        E, twoI, H = gu.shape                  # stored (E, 2I, H)
+        _, H2, I = dp.shape                    # stored (E, H, I)
+        with torch.no_grad():                  # -> grouped layout (E, in, out)
+            gu.data = gu.data.transpose(1, 2).contiguous()      # (E, H, 2I)
+            dp.data = dp.data.transpose(1, 2).contiguous()      # (E, I, H)
         dev, dt = gu.device, gu.dtype
-        mod.elora_gu_A = nn.Parameter(torch.randn(E, r, H, device=dev, dtype=dt) / r)
-        mod.elora_gu_B = nn.Parameter(torch.zeros(E, twoI, r, device=dev, dtype=dt))
-        mod.elora_dp_A = nn.Parameter(torch.randn(E, r, I, device=dev, dtype=dt) / r)
-        mod.elora_dp_B = nn.Parameter(torch.zeros(E, H2, r, device=dev, dtype=dt))
-        mod.elora_scale = 2.0                     # alpha/r with alpha = 2r
+        mod.elora_gu_A = nn.Parameter(torch.randn(E, H, r, device=dev, dtype=dt) / r)
+        mod.elora_gu_B = nn.Parameter(torch.zeros(E, r, twoI, device=dev, dtype=dt))
+        mod.elora_dp_A = nn.Parameter(torch.randn(E, I, r, device=dev, dtype=dt) / r)
+        mod.elora_dp_B = nn.Parameter(torch.zeros(E, r, H2, device=dev, dtype=dt))
+        mod.elora_scale = 2.0                  # alpha/r with alpha = 2r
 
         def fwd(self, hidden_states, top_k_index, top_k_weights):
-            # per-HIT deltas beat a single bmm here: full materialisation costs
-            # ~1.5 GiB of gradient traffic per layer per step (measured 52 vs
-            # 98 tok/s), while per-hit slices keep backward small.
-            final_hidden_states = torch.zeros_like(hidden_states)
-            with torch.no_grad():
-                expert_mask = nn.functional.one_hot(
-                    top_k_index, num_classes=self.num_experts).permute(2, 1, 0)
-                expert_hit = torch.greater(expert_mask.sum(dim=(-1, -2)), 0).nonzero()
-            for expert_idx in expert_hit:
-                e = expert_idx[0]
-                if e == self.num_experts:
-                    continue
-                top_k_pos, token_idx = torch.where(expert_mask[e])
-                current_state = hidden_states[token_idx]
-                w_gu = self.gate_up_proj[e] + self.elora_scale * (
-                    self.elora_gu_B[e] @ self.elora_gu_A[e])
-                w_dp = self.down_proj[e] + self.elora_scale * (
-                    self.elora_dp_B[e] @ self.elora_dp_A[e])
-                gate, up = nn.functional.linear(current_state, w_gu).chunk(2, dim=-1)
-                cur = self.act_fn(gate) * up
-                cur = nn.functional.linear(cur, w_dp)
-                cur = cur * top_k_weights[token_idx, top_k_pos, None]
-                final_hidden_states.index_add_(0, token_idx,
-                                               cur.to(final_hidden_states.dtype))
-            return final_hidden_states
+            T, k = top_k_index.shape
+            Emax = self.num_experts
+            flat_e = top_k_index.reshape(-1)
+            keep = flat_e < Emax               # sentinel guard (reference loop skips E)
+            if not bool(keep.all()):
+                flat_e = flat_e[keep]
+            order = torch.argsort(flat_e, stable=True)
+            src_idx = (torch.arange(T * k, device=flat_e.device)[keep]
+                       if not bool(keep.all())
+                       else torch.arange(T * k, device=flat_e.device))[order]
+            tok = src_idx // k
+            x = hidden_states.index_select(0, tok)
+            offs = torch.bincount(flat_e[order], minlength=Emax)                 .cumsum(0).to(torch.int32)
+            s = self.elora_scale
+            g = torch._grouped_mm
+            gate_up = g(x, self.gate_up_proj, offs=offs)                 + s * g(g(x, self.elora_gu_A, offs=offs), self.elora_gu_B, offs=offs)
+            gate, up = gate_up.chunk(2, dim=-1)
+            h = self.act_fn(gate) * up
+            down = g(h, self.down_proj, offs=offs)                 + s * g(g(h, self.elora_dp_A, offs=offs), self.elora_dp_B, offs=offs)
+            w = top_k_weights.reshape(-1)[src_idx].unsqueeze(1)
+            # deterministic combine: one unique slot per (token, expert-slot) pair
+            # (a single index_add_ over duplicate token ids would use atomics --
+            # nondeterministic run-to-run; the smoke restore-gate caught this)
+            contrib = torch.zeros(T * k, hidden_states.shape[1],
+                                  device=down.device, dtype=down.dtype)
+            contrib = contrib.index_copy(0, src_idx, down * w)
+            return contrib.view(T, k, -1).sum(1).to(hidden_states.dtype)
 
         import types
         mod.forward = types.MethodType(fwd, mod)
         patched += 1
     assert patched, "no 3D expert tensors found to patch"
-    print(f"[gce] expert LoRA r={r} on {patched} layers", flush=True)
+    print(f"[gce] expert LoRA r={r} (grouped_mm path) on {patched} layers", flush=True)
     return patched
 
 
@@ -135,7 +145,13 @@ def main():
 
     GL.patch_gemma4()
     GL.tag_gemma4(model)
+    smoke_ref = None
     if A.expert_lora_r:
+        if A.smoke:      # reference logits from the UNPATCHED forward, free routing
+            _probe = rows[0]["ids"][:256].to("cuda").long().unsqueeze(0)
+            with torch.no_grad():
+                GL.CFG.update(on=False, enforce_from=0)
+                smoke_ref = model(_probe).logits[:, -1].float()
         add_expert_lora(model, A.expert_lora_r)
 
     # router + norm gains trainable alongside the LoRA
@@ -168,6 +184,19 @@ def main():
         #    to base; bumping one B must change logits; restoring must restore.
         assert A.expert_lora_r, "--smoke requires --expert-lora-r"
         emods = [m_ for m_ in model.modules() if hasattr(m_, "elora_gu_B")]
+        # 0) PARITY: grouped path with B=0 must reproduce the unpatched forward
+        with torch.no_grad():
+            GL.CFG.update(on=False, enforce_from=0)
+            lp = model(probe).logits[:, -1].float()
+        pd = float((lp - smoke_ref).abs().max())
+        # single-module parity vs the eager loop is 1e-6 in fp32 / 0.008 in bf16;
+        # at model level bf16 accumulation reorder compounds over 30 layers, so the
+        # gate is semantic (top-1 identical) plus a drift bound.
+        top1_ok = bool((lp.argmax(-1) == smoke_ref.argmax(-1)).all())
+        assert top1_ok and pd < 2.0, \
+            f"grouped-path parity FAIL (top1_ok={top1_ok}, max logit diff {pd:.3f})"
+        print(f"[gce-smoke] grouped-path parity OK (top-1 identical, max logit "
+              f"drift {pd:.3f} bf16)", flush=True)
         with torch.no_grad():
             l0 = model(probe).logits[:, -1].float()
             emods[0].elora_gu_B.add_(0.05)
@@ -251,11 +280,14 @@ def main():
             with torch.no_grad():
                 for mod in model.modules():
                     if hasattr(mod, "elora_gu_A"):
-                        for e in range(mod.gate_up_proj.shape[0]):
-                            mod.gate_up_proj[e] += mod.elora_scale * (
-                                mod.elora_gu_B[e] @ mod.elora_gu_A[e])
-                            mod.down_proj[e] += mod.elora_scale * (
-                                mod.elora_dp_B[e] @ mod.elora_dp_A[e])
+                        # weights live in grouped layout (E, in, out); fold then
+                        # transpose back to the checkpoint layout (E, out, in)
+                        mod.gate_up_proj.data += mod.elora_scale * torch.bmm(
+                            mod.elora_gu_A.data, mod.elora_gu_B.data)
+                        mod.down_proj.data += mod.elora_scale * torch.bmm(
+                            mod.elora_dp_A.data, mod.elora_dp_B.data)
+                        mod.gate_up_proj.data =                             mod.gate_up_proj.data.transpose(1, 2).contiguous()
+                        mod.down_proj.data =                             mod.down_proj.data.transpose(1, 2).contiguous()
                         for nm in ("elora_gu_A", "elora_gu_B", "elora_dp_A",
                                    "elora_dp_B"):
                             delattr(mod, nm)
@@ -301,6 +333,7 @@ def main():
         torch.save({"tensors": named, "seen": seen, "stack":
                     "unsloth" if use_unsloth else "hf+peft",
                     "R": 0 if A.no_constraint else 8, "expert_lora_r": A.expert_lora_r,
+                    "elora_layout": "grouped(E,in,out)",
                     "traj": A.traj, "lr": A.lr}, A.out)
 
     while seen < A.tokens:
