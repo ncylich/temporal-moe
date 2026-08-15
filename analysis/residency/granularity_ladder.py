@@ -108,8 +108,18 @@ def patch_gemma4():
             rm = CFG.get("R_map")
             if rm is not None and li is not None:
                 R = rm.get(li, R)                # per-layer residency budget (allocation cells)
-            # eval runs batch 1, so [B*S, E] is [S, E]; scan wants [S, B, E]
-            lg = expert_scores.unsqueeze(1).float()
+            # scan wants [S, B, E] (seq-first, batch columns independent). Eval
+            # runs batch 1 ([B*S, E] == [S, E]); training may set CFG["batch"]=B
+            # with rows padded to equal S and per-row enforce_from.
+            Bn = CFG.get("batch", 1)
+            if Bn > 1:
+                assert not CFG.get("decode_mode") and not CFG.get("cold_start"), \
+                    "batched constraint supports the warm training path only"
+                T_, E_ = expert_scores.shape
+                S_ = T_ // Bn
+                lg = expert_scores.view(Bn, S_, E_).transpose(0, 1).float()
+            else:
+                lg = expert_scores.unsqueeze(1).float()
             if CFG.get("decode_mode"):  # generation: stateful rule across forwards, prefill free
                 import decode_state as _DS
                 mask = _DS.route(getattr(self, "_layer_idx", id(self)), lg)
@@ -119,10 +129,18 @@ def patch_gemma4():
                 with torch.no_grad():
                     mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
             ef = CFG.get("enforce_from", 0)
-            if ef:     # instruct protocol: prefill positions free, rule enforced from response
-                mask[:ef] = True
-            probs_for_topk = router_probabilities.masked_fill(
-                ~mask.squeeze(1), 0.0)
+            efs = list(ef) if hasattr(ef, "__len__") else [ef] * Bn
+            if Bn > 1:
+                for b_, e_ in enumerate(efs):
+                    if e_:     # prefill positions free, rule from first response token
+                        mask[:e_, b_] = True
+                probs_for_topk = router_probabilities.masked_fill(
+                    ~mask.transpose(0, 1).reshape(T_, E_), 0.0)
+            else:
+                if efs[0]:
+                    mask[:efs[0]] = True
+                probs_for_topk = router_probabilities.masked_fill(
+                    ~mask.squeeze(1), 0.0)
         else:
             probs_for_topk = router_probabilities
         top_k_weights, top_k_index = torch.topk(probs_for_topk, k=self.config.top_k_experts,

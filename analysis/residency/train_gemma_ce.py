@@ -4,14 +4,21 @@
 Plain cross-entropy on the model's OWN vLLM-generated responses (gemma's greedy outputs are
 low-entropy, so hard labels ~ soft labels and distillation buys nothing). The constraint is
 enforced exactly as served: prefill free (scan observes the prompt), R=8 from the first
-response token, warm. Loss on response tokens only. Surface: attention LoRA r32 + router
-projections + RMSNorm gains -- the 3D expert tensors have no LoRA plumbing on this arch.
+response token, warm; with --micro-batch > 1 rows are length-sorted, padded, and the rule
+is applied per row (scan batch columns are independent; trailing pads sit after each row's
+response and touch nothing scored). Loss on response tokens only.
 
-Loads via unsloth when its patches keep our Gemma4TextRouter hook alive (asserted before any
-step: constrained logits must differ from free); otherwise plain HF + peft. Saves the
-trainable tensors as gemma_ce_adapter.pt every save-every steps and at the end.
+Trainable surface: attention LoRA r32 + router projections + RMSNorm gains, plus optional
+per-expert LoRA on the 3D expert tensors (--expert-lora-r) via a grouped-GEMM forward
+(torch._grouped_mm; 98 -> 2900 tok/s vs the stock eager expert loop at micro-batch 8).
 
-    train_gemma_ce.py --traj gemma4_train5k --tokens 3400000
+Loads via unsloth when its patches keep our Gemma4TextRouter hook alive; every load asserts
+constraint engagement. --smoke runs the full regression gauntlet (grouped-path parity vs the
+eager loop, LoRA engagement/restore, batched-plumbing exactness, free/constrained batch
+parity, gradient flow, timed steps, save/reload) and exits.
+
+    train_gemma_ce.py --traj gemma4_train5k --tokens 3400000 \
+        --expert-lora-r 16 --out .../gemma_ce_expert_adapter.pt
 """
 import argparse
 import os
@@ -67,13 +74,16 @@ def add_expert_lora(model, r):
                        else torch.arange(T * k, device=flat_e.device))[order]
             tok = src_idx // k
             x = hidden_states.index_select(0, tok)
-            offs = torch.bincount(flat_e[order], minlength=Emax)                 .cumsum(0).to(torch.int32)
+            offs = torch.bincount(
+                flat_e[order], minlength=Emax).cumsum(0).to(torch.int32)
             s = self.elora_scale
             g = torch._grouped_mm
-            gate_up = g(x, self.gate_up_proj, offs=offs)                 + s * g(g(x, self.elora_gu_A, offs=offs), self.elora_gu_B, offs=offs)
+            gate_up = g(x, self.gate_up_proj, offs=offs) + s * g(
+                g(x, self.elora_gu_A, offs=offs), self.elora_gu_B, offs=offs)
             gate, up = gate_up.chunk(2, dim=-1)
             h = self.act_fn(gate) * up
-            down = g(h, self.down_proj, offs=offs)                 + s * g(g(h, self.elora_dp_A, offs=offs), self.elora_dp_B, offs=offs)
+            down = g(h, self.down_proj, offs=offs) + s * g(
+                g(h, self.elora_dp_A, offs=offs), self.elora_dp_B, offs=offs)
             w = top_k_weights.reshape(-1)[src_idx].unsqueeze(1)
             # deterministic combine: one unique slot per (token, expert-slot) pair
             # (a single index_add_ over duplicate token ids would use atomics --
@@ -111,12 +121,19 @@ def main():
                     help="per-expert LoRA rank on the 3D expert tensors (0 = off); "
                          "delta applied per HIT expert inside the loop -- never "
                          "materialises the full-tensor delta")
+    ap.add_argument("--micro-batch", type=int, default=8,
+                    help="rows per forward; rows are length-sorted into chunks and "
+                         "padded to the chunk max. Constraint applied per row via "
+                         "CFG batch/enforce_from-vector. 16 rows per optimizer "
+                         "step regardless (accum adjusts)")
     ap.add_argument("--smoke", action="store_true",
                     help="engagement checks + 2 timed steps + save/reload, then exit")
     ap.add_argument("--merge-out", default=None,
                     help="after loading the adapter, save the merged model to this dir and exit")
     A = ap.parse_args()
 
+    assert not (A.expert_lora_r and A.out.endswith("gemma_ce_adapter.pt")), \
+        "expert-LoRA run would overwrite the attention-only adapter; pass --out"
     rows = torch.load(f"/workspace/instruct-traj/{A.traj}.pt", weights_only=False)["rows"]
     print(f"[gce] {len(rows)} trajectories", flush=True)
 
@@ -145,9 +162,41 @@ def main():
 
     GL.patch_gemma4()
     GL.tag_gemma4(model)
+    PAD = tok.pad_token_id or 0
+
+    def make_batch(rs):
+        S = max(r["ids"].shape[0] for r in rs)
+        B = len(rs)
+        ids = torch.full((B, S), PAD, dtype=torch.long)
+        am = torch.zeros((B, S), dtype=torch.long)
+        tgt = torch.full((B, S), -100, dtype=torch.long)
+        plens, ntok = [], 0
+        for b, r_ in enumerate(rs):
+            L = r_["ids"].shape[0]
+            pl = int(r_["prompt_len"])
+            ids[b, :L] = r_["ids"]
+            am[b, :L] = 1
+            tgt[b, pl:L] = r_["ids"][pl:L]
+            plens.append(pl)
+            ntok += L - pl
+        return (ids.to("cuda"), am.to("cuda"), tgt.to("cuda"), plens, ntok)
+
+    def batch_ce(logits, tgt, scale):
+        """Mean response-token CE over a padded batch; per-row float() keeps the
+        [B,S,V] float materialisation bounded."""
+        targets = tgt[:, 1:]
+        num = den = 0
+        for b in range(targets.shape[0]):
+            m_ = targets[b] != -100
+            if bool(m_.any()):
+                num = num + torch.nn.functional.cross_entropy(
+                    logits[b][m_].float(), targets[b][m_], reduction="sum")
+                den += int(m_.sum())
+        return num / den / scale
+
     smoke_ref = None
     if A.expert_lora_r:
-        if A.smoke:      # reference logits from the UNPATCHED forward, free routing
+        if A.smoke:  # reference logits from the UNPATCHED forward, free routing
             _probe = rows[0]["ids"][:256].to("cuda").long().unsqueeze(0)
             with torch.no_grad():
                 GL.CFG.update(on=False, enforce_from=0)
@@ -208,7 +257,71 @@ def main():
         assert dr < 1e-4, f"expert LoRA restore failed (delta {dr:.2e})"
         print(f"[gce-smoke] expert LoRA engaged (bump delta {dd:.3f}, "
               f"restore {dr:.2e})", flush=True)
-        # 2) two timed optimiser steps on real rows
+        # 1b) BATCH PARITY: per-row response-CE at mb1 vs one padded batch
+        pr = [rows[i] for i in (0, 40, 200, 400)]
+
+        def parity(on):
+            def row_ce(r_):
+                ids = r_["ids"].to("cuda").long().unsqueeze(0)
+                pl = int(r_["prompt_len"])
+                GL.CFG.update(on=on, R=8, enforce_from=pl, batch=1,
+                              cold_start=False)
+                with torch.no_grad():   # attention_mask=ones: same kernel path
+                    lg_ = model(ids, attention_mask=torch.ones_like(ids)) \
+                        .logits[0, pl - 1:-1].float()
+                return float(torch.nn.functional.cross_entropy(
+                    lg_, ids[0, pl:], reduction="mean"))
+            ce1 = [row_ce(r_) for r_ in pr]
+            ids, am, tgt, plens, _ = make_batch(pr)
+            GL.CFG.update(on=on, R=8, enforce_from=plens, batch=len(pr),
+                          cold_start=False)
+            with torch.no_grad():
+                lgb = model(ids, attention_mask=am).logits[:, :-1]
+            ceb = []
+            for b in range(len(pr)):
+                m_ = tgt[b, 1:] != -100
+                ceb.append(float(torch.nn.functional.cross_entropy(
+                    lgb[b][m_].float(), tgt[b, 1:][m_], reduction="mean")))
+            GL.CFG.update(batch=1)
+            return ce1, ceb
+
+        # (a0) EXACT plumbing invariant: one row through the batched path
+        # (make_batch + CFG batch + enforce_from list) has identical shapes to
+        # mb1, so logits must match to numerical identity.
+        r0 = pr[1]
+        ids0 = r0["ids"].to("cuda").long().unsqueeze(0)
+        pl0 = int(r0["prompt_len"])
+        GL.CFG.update(on=True, R=8, enforce_from=pl0, batch=1, cold_start=False)
+        with torch.no_grad():
+            la = model(ids0, attention_mask=torch.ones_like(ids0)).logits.float()
+        idsb, amb, _, plb, _ = make_batch([r0])
+        GL.CFG.update(on=True, R=8, enforce_from=plb, batch=1, cold_start=False)
+        with torch.no_grad():
+            lb = model(idsb, attention_mask=amb).logits.float()
+        GL.CFG.update(batch=1)
+        d0 = float((la - lb).abs().max())
+        assert d0 < 1e-3, f"single-row batched-plumbing mismatch (diff {d0:.2e})"
+        print(f"[gce-smoke] batched-plumbing exactness OK (single row diff "
+              f"{d0:.2e})", flush=True)
+        # (a) constraint OFF, B=4: only batch-SHAPE bf16 drift may remain.
+        # Judge in absolute nats (baselines here are near zero).
+        c1, cb = parity(on=False)
+        ad = max(abs(a - b_) for a, b_ in zip(c1, cb))
+        assert ad < 0.01, \
+            f"FREE-mode batch parity FAIL (abs drift {ad:.4f} nats): {c1} vs {cb}"
+        print(f"[gce-smoke] batch parity, constraint OFF: max abs drift "
+              f"{ad:.4f} nats -- mechanics OK", flush=True)
+        # (b) constraint ON: resident-set ties flip under bf16 batch-shape drift
+        # and cascade discretely, so per-row CE cannot match exactly. Judge the
+        # objective in aggregate, report per row.
+        c1, cb = parity(on=True)
+        m1, mbt = sum(c1) / len(c1), sum(cb) / len(cb)
+        rel_on = abs(m1 - mbt) / m1
+        print(f"[gce-smoke] batch parity, constraint ON: per-row mb1 "
+              f"{['%.3f' % c for c in c1]} vs batched {['%.3f' % c for c in cb]}; "
+              f"mean {m1:.4f} vs {mbt:.4f} ({rel_on*100:+.2f}%)", flush=True)
+        assert rel_on < 0.02, f"batched constrained objective drifted: {m1} vs {mbt}"
+        # 2) timed optimiser steps, batched exactly like training
         tp = [p for p in model.parameters() if p.requires_grad]
         print(f"[gce-smoke] trainable {sum(p.numel() for p in tp)/1e6:.1f}M "
               f"(expert {sum(p.numel() for m_ in emods for p in (m_.elora_gu_A, m_.elora_gu_B, m_.elora_dp_A, m_.elora_dp_B))/1e6:.1f}M)",
@@ -218,22 +331,23 @@ def main():
         torch.cuda.reset_peak_memory_stats()
         tok_seen, t0 = 0, time.time()
         steady_tok, steady_t = 0, 0.0
+        mb_ = max(1, A.micro_batch)
+        sl = sorted(range(400), key=lambda i: rows[i]["ids"].shape[0])
         for si in range(6):
             sopt.zero_grad(set_to_none=True)
             t_step, stoks = time.time(), 0
-            for r in rows[si * 2:si * 2 + 2]:
-                ids = r["ids"].to("cuda").long().unsqueeze(0)
-                plen2 = int(r["prompt_len"])
-                GL.CFG.update(on=True, R=8, enforce_from=plen2, cold_start=False)
-                logits = model(ids).logits[:, :-1]
-                targets = ids[:, 1:].clone()
-                targets[:, : plen2 - 1] = -100
-                loss = torch.nn.functional.cross_entropy(
-                    logits.reshape(-1, logits.shape[-1]).float(),
-                    targets.reshape(-1), ignore_index=-100) / 2
+            for bi in range(max(1, 16 // mb_)):
+                rs = [rows[i] for i in
+                      sl[(si * 2 + bi) * mb_:(si * 2 + bi + 1) * mb_]]
+                ids, am, tgt, plens, ntok = make_batch(rs)
+                GL.CFG.update(on=True, R=8, enforce_from=plens, batch=len(rs),
+                              cold_start=False)
+                logits = model(ids, attention_mask=am).logits[:, :-1]
+                loss = batch_ce(logits, tgt, max(1, 16 // mb_))
                 loss.backward()
-                tok_seen += ids.shape[1] - plen2
-                stoks += ids.shape[1] - plen2
+                tok_seen += ntok
+                stoks += ntok
+            GL.CFG.update(batch=1)
             # LoRA grad flow: at step 0 B (zero-init) gets grad through A while
             # A's grad is exactly 0 (= B^T g); after B's first update A must flow.
             gB = emods[0].elora_gu_B.grad
@@ -324,7 +438,11 @@ def main():
     model.train()
     seen = step = 0
     t0 = time.time()
-    order = torch.randperm(len(rows), generator=torch.Generator().manual_seed(0)).tolist()
+    mb = max(1, A.micro_batch)
+    accum_batches = max(1, A.accum // mb)      # 16 rows per optimizer step
+    lidx = sorted(range(len(rows)), key=lambda i: rows[i]["ids"].shape[0])
+    chunks = [lidx[i:i + mb] for i in range(0, len(lidx), mb)]
+    order = torch.randperm(len(chunks), generator=torch.Generator().manual_seed(0)).tolist()
     oi = 0
 
     def save():
@@ -338,26 +456,22 @@ def main():
 
     while seen < A.tokens:
         opt.zero_grad(set_to_none=True)
-        for _ in range(A.accum):
-            r = rows[order[oi % len(order)]]
+        for _ in range(accum_batches):
+            rs = [rows[i] for i in chunks[order[oi % len(order)]]]
             oi += 1
-            ids = r["ids"].to("cuda").long().unsqueeze(0)
-            plen = int(r["prompt_len"])
-            GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plen,
-                          cold_start=False)
-            logits = model(ids).logits[:, :-1]
-            targets = ids[:, 1:].clone()
-            targets[:, : plen - 1] = -100
-            loss = torch.nn.functional.cross_entropy(
-                logits.reshape(-1, logits.shape[-1]).float(), targets.reshape(-1),
-                ignore_index=-100) / A.accum
+            ids, am, tgt, plens, ntok = make_batch(rs)
+            GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
+                          batch=len(rs), cold_start=False)
+            logits = model(ids, attention_mask=am).logits[:, :-1]
+            loss = batch_ce(logits, tgt, accum_batches)
             loss.backward()
-            seen += ids.shape[1] - plen
+            seen += ntok
+        GL.CFG.update(batch=1)
         torch.nn.utils.clip_grad_norm_(train_params, 1.0)
         opt.step()
         step += 1
         if step % 50 == 0:
-            print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*A.accum:.4f} "
+            print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*accum_batches:.4f} "
                   f"({seen/(time.time()-t0):.0f} tok/s)", flush=True)
         if step % A.save_every == 0:
             save()
