@@ -40,6 +40,14 @@ def main():
     ap.add_argument("--path", default=None)
     ap.add_argument("--record-as", default=None,
                     help="model column for the CSV rows (adapted/control variants)")
+    ap.add_argument("--samples-json", default=None,
+                    help="path to {task: [doc_ids]} for SCREENING runs: evaluate only "
+                         "these docs (lm_eval samples=). Screening rows are NOT "
+                         "protocol-comparable to full-task rows -- pair with "
+                         "--csv-name so they never enter the authoritative CSV")
+    ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
+                    help="output CSV under results/ablations (screening runs use "
+                         "screening_genbench.csv)")
     ap.add_argument("--think", choices=("default", "on", "off"), default="default",
                     help="chat-template thinking toggle (enable_thinking kwarg)")
 
@@ -135,7 +143,16 @@ def main():
     if M["arch"] == "gptoss":
         gen_kwargs += ",skip_special_tokens=False"   # channel markers must survive
 
-    out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
+    assert not (A.samples_json and A.csv_name == "instruct_genbench_vllm.csv"), \
+        "doc-subset screening rows must not enter the authoritative CSV"
+    sub = None
+    if A.samples_json:
+        import json as _sj
+        sub = {k: list(map(int, v)) for k, v in
+               _sj.load(open(A.samples_json)).items()}
+        print(f"[genbench] SCREENING subsets: "
+              f"{ {k: len(v) for k, v in sub.items()} }", flush=True)
+    out = os.path.join(ABLATIONS, A.csv_name)
     exists = os.path.exists(out)
     fh = open(out, "a", newline="")
     w = csv.writer(fh)
@@ -170,7 +187,9 @@ def main():
             res = simple_evaluate(model=lm, tasks=[task], limit=lim,
                                   apply_chat_template=True,
                                   gen_kwargs=gen_kwargs,
-                                  confirm_run_unsafe_code=True, log_samples=True)
+                                  confirm_run_unsafe_code=True, log_samples=True,
+                                  **({"samples": {task: sub[task]}}
+                                     if sub and task in sub else {}))
             secs = time.time() - t0
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
             for mk, mv in metrics.items():
@@ -182,7 +201,6 @@ def main():
             samp = (res.get("samples") or {}).get(task)
             if samp:
                 import json
-                import re as _re
                 sd = os.path.join(ABLATIONS, "genbench_samples")
                 os.makedirs(sd, exist_ok=True)
                 def _lens(x):
