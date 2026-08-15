@@ -126,6 +126,15 @@ def main():
                          "padded to the chunk max. Constraint applied per row via "
                          "CFG batch/enforce_from-vector. 16 rows per optimizer "
                          "step regardless (accum adjusts)")
+    ap.add_argument("--precompute-tokw", default=None,
+                    help="forward-only pass over all trajectories computing per-"
+                         "response-token CE under free and R8 routing; saves "
+                         "{row_index: (ce_free fp16, ce_r8 fp16)} to PATH, then "
+                         "exits. Feeds --tok-weights")
+    ap.add_argument("--tok-weights", default=None,
+                    help="path from --precompute-tokw: weight response-token CE by "
+                         "w = 1 + 2*clip(ce_R8 - ce_free, 0, 3) (constraint-"
+                         "disagreement weighting)")
     ap.add_argument("--smoke", action="store_true",
                     help="engagement checks + 2 timed steps + save/reload, then exit")
     ap.add_argument("--merge-out", default=None,
@@ -164,7 +173,7 @@ def main():
     GL.tag_gemma4(model)
     PAD = tok.pad_token_id or 0
 
-    def make_batch(rs):
+    def make_batch(rs, ridx=None):
         S = max(r["ids"].shape[0] for r in rs)
         B = len(rs)
         ids = torch.full((B, S), PAD, dtype=torch.long)
@@ -181,18 +190,74 @@ def main():
             ntok += L - pl
         return (ids.to("cuda"), am.to("cuda"), tgt.to("cuda"), plens, ntok)
 
-    def batch_ce(logits, tgt, scale):
+    TOKW = None
+    if A.tok_weights:
+        TOKW = torch.load(A.tok_weights, weights_only=False)
+        print(f"[gce] disagreement weights loaded for {len(TOKW)} rows "
+              f"(w = 1 + 2*clip(ce_R8 - ce_free, 0, 3))", flush=True)
+
+    def batch_ce(logits, tgt, scale, ridx=None):
         """Mean response-token CE over a padded batch; per-row float() keeps the
-        [B,S,V] float materialisation bounded."""
+        [B,S,V] float materialisation bounded. With --tok-weights, tokens where
+        the BASE model's constrained CE exceeds its free CE are upweighted."""
         targets = tgt[:, 1:]
         num = den = 0
         for b in range(targets.shape[0]):
             m_ = targets[b] != -100
-            if bool(m_.any()):
-                num = num + torch.nn.functional.cross_entropy(
-                    logits[b][m_].float(), targets[b][m_], reduction="sum")
+            if not bool(m_.any()):
+                continue
+            ce = torch.nn.functional.cross_entropy(
+                logits[b][m_].float(), targets[b][m_], reduction="none")
+            if TOKW is not None and ridx is not None:
+                cf, cr = TOKW[ridx[b]]
+                assert cf.shape[0] == ce.shape[0], \
+                    f"weight len {cf.shape[0]} vs resp len {ce.shape[0]} row {ridx[b]}"
+                w = 1.0 + 2.0 * (cr.float() - cf.float()).clamp(0, 3)
+                w = w.to(ce.device)
+                num = num + (ce * w).sum()
+                den += float(w.sum())
+            else:
+                num = num + ce.sum()
                 den += int(m_.sum())
         return num / den / scale
+
+    if A.precompute_tokw:
+        import shutil
+        model.eval()
+        mb = max(1, A.micro_batch)
+        lidx = sorted(range(len(rows)), key=lambda i: rows[i]["ids"].shape[0])
+        outw = {}
+        t0 = time.time()
+        with torch.no_grad():
+            for c0 in range(0, len(lidx), mb):
+                ridx = lidx[c0:c0 + mb]
+                rs = [rows[i] for i in ridx]
+                ids, am, tgt, plens, _ = make_batch(rs)
+                per = {}
+                for on in (False, True):
+                    GL.CFG.update(on=on, R=8, enforce_from=plens,
+                                  batch=len(rs), cold_start=False)
+                    lg = model(ids, attention_mask=am).logits[:, :-1]
+                    targets = tgt[:, 1:]
+                    for b, ri in enumerate(ridx):
+                        m_ = targets[b] != -100
+                        ce = torch.nn.functional.cross_entropy(
+                            lg[b][m_].float(), targets[b][m_],
+                            reduction="none").half().cpu()
+                        per.setdefault(ri, []).append(ce)
+                for ri, (cf, cr) in per.items():
+                    outw[ri] = (cf, cr)
+                if (c0 // mb) % 50 == 0:
+                    print(f"[gce-tokw] {c0}/{len(lidx)} rows "
+                          f"({(time.time()-t0):.0f}s)", flush=True)
+        GL.CFG.update(batch=1)
+        torch.save(outw, "/tmp/gce_tokw_tmp.pt")
+        shutil.move("/tmp/gce_tokw_tmp.pt", A.precompute_tokw)
+        up = sum(float(((cr.float()-cf.float()).clamp(0,3) > 0.1).float().mean())
+                 for cf, cr in outw.values()) / len(outw)
+        print(f"[gce-tokw] saved {len(outw)} rows -> {A.precompute_tokw}; "
+              f"mean frac tokens upweighted {up:.3f} -- DONE", flush=True)
+        return
 
     smoke_ref = None
     if A.expert_lora_r:
@@ -462,13 +527,14 @@ def main():
     while seen < A.tokens:
         opt.zero_grad(set_to_none=True)
         for _ in range(accum_batches):
-            rs = [rows[i] for i in chunks[order[oi % len(order)]]]
+            ridx = chunks[order[oi % len(order)]]
+            rs = [rows[i] for i in ridx]
             oi += 1
             ids, am, tgt, plens, ntok = make_batch(rs)
             GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
                           batch=len(rs), cold_start=False)
             logits = model(ids, attention_mask=am).logits[:, :-1]
-            loss = batch_ce(logits, tgt, accum_batches)
+            loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
             loss.backward()
             seen += ntok
         GL.CFG.update(batch=1)
