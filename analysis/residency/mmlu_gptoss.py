@@ -92,22 +92,38 @@ def main():
                               log_samples=True)
         n = hit = miss_extract = 0
         for task, samp in res["samples"].items():
+            dump = []
+            hit_strict = 0
             for x in samp:
                 resp = x["resps"][0][0] if x.get("resps") else ""
                 gold = re.search(r"\(([A-D])\)", str(x.get("target", "")))
                 pred = extract(resp)
                 if gold is None:
                     continue
+                sm = STRICT.search(resp)
                 n += 1
                 miss_extract += pred is None
                 hit += pred == gold.group(1)
+                hit_strict += bool(sm) and sm.group(1) == gold.group(1)
+                dump.append({"gold": gold.group(1), "pred_relaxed": pred,
+                             "pred_strict": sm.group(1) if sm else None,
+                             "text": resp})
         acc = hit / max(1, n)
+        acc_s = hit_strict / max(1, n)
         secs = time.time() - t0
-        print(f"  [{A.model}] {arm} mmlu_gptoss_relaxed: acc={acc:.4f} "
+        print(f"  [{A.model}] {arm} mmlu relaxed={acc:.4f} strict={acc_s:.4f} "
               f"({n} items, {miss_extract} unextracted, {secs:.0f}s)", flush=True)
-        w.writerow([A.record_as or A.model, M["E"], M["k"], arm, R or "", "mmlu_gptoss_relaxed",
-                    "acc,relaxed-extract", f"{acc:.6f}", A.limit, A.gen_cap,
-                    f"{secs:.0f}"])
+        # dual rows from the SAME generations + per-item dump: extraction questions
+        # become re-analysis, never regeneration (2026-08-16 format-drift finding)
+        import json as _dj
+        os.makedirs(os.path.join(ABLATIONS, "genbench_samples"), exist_ok=True)
+        _dj.dump({"items": dump}, open(os.path.join(
+            ABLATIONS, "genbench_samples",
+            f"{A.record_as or A.model}_{arm}_mmlu_dual.json"), "w"))
+        for met, val in (("acc,relaxed-extract", acc), ("acc,strict-flan", acc_s)):
+            w.writerow([A.record_as or A.model, M["E"], M["k"], arm, R or "",
+                        "mmlu_gptoss_relaxed", met, f"{val:.6f}", A.limit,
+                        A.gen_cap, f"{secs:.0f}"])
         fh.flush()
     fh.close()
     print(f"MMLU-GPTOSS {A.model} COMPLETE", flush=True)
