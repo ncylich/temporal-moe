@@ -241,3 +241,15 @@ scr_d6,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,15
 scr_d6,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,1536,198
 scr_d5_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,1198
 scr_d5_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.008772,4,2048,1198
+pair_base,128,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.947368,4,2048,117
+pair_base,128,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.539474,4,2048,117
+pair_base,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.934211,4,2048,1169
+pair_base,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.464912,4,2048,1169
+pair_base,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.951754,4,2048,1138
+pair_base,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.495614,4,2048,1138
+pair_d5,128,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,107
+pair_d5,128,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.381579,4,2048,107
+pair_d5,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,1092
+pair_d5,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.350877,4,2048,1092
+pair_d5,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.929825,4,2048,1066
+pair_d5,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.346491,4,2048,1066
