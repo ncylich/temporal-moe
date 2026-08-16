@@ -30,10 +30,18 @@ STRICT = re.compile(r"[Tt]he answer is \(?([A-D])\)?")
 RELAXED = re.compile(r"\(([A-D])\)|\*\*?\s*[Aa]nswer\s*[:\-]?\s*\(?([A-D])\)?")
 
 
+FINAL_LINE = re.compile(r"^\W*A(?:nswer)?\s*[:=]\s*\(?([A-D])\)?", re.I | re.M)
+
+
 def extract(text):
     m = STRICT.search(text)
     if m:
         return m.group(1)
+    fin = None                       # explicit final-answer lines beat trailing
+    for m2 in FINAL_LINE.finditer(text[-400:]):   # option-analysis mentions
+        fin = m2.group(1)
+    if fin:
+        return fin.upper()
     hits = RELAXED.findall(text)
     if hits:
         a, b = hits[-1]
