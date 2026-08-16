@@ -476,3 +476,6 @@ gemma4_ce_d5,128,8,R16,16,ifeval,"prompt_level_strict_acc,none",0.860000,200,204
 gemma4_ce_d5,128,8,R16,16,ifeval,"inst_level_strict_acc,none",0.905660,200,2048,133
 gemma4_ce_d5,128,8,R16,16,ifeval,"prompt_level_loose_acc,none",0.875000,200,2048,133
 gemma4_ce_d5,128,8,R16,16,ifeval,"inst_level_loose_acc,none",0.918239,200,2048,133
+gemma4_ce_d5,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.963415,full,1536,71
+gemma4_ce_d5,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.951220,full,1536,206
+gemma4_ce_d5,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,204
