@@ -140,6 +140,10 @@ def main():
                          "disagreement weighting)")
     ap.add_argument("--smoke", action="store_true",
                     help="engagement checks + 2 timed steps + save/reload, then exit")
+    ap.add_argument("--merge-scale", type=float, default=1.0,
+                    help="scale the adapter delta at merge: LoRA B tensors are "
+                         "multiplied by s; full-weight tensors (router/norm) are "
+                         "interpolated base*(1-s)+ckpt*s. 1.0 = full adapter")
     ap.add_argument("--merge-out", default=None,
                     help="after loading the adapter, save the merged model to this dir and exit")
     A = ap.parse_args()
@@ -454,9 +458,19 @@ def main():
         named = dict(model.named_parameters())
         miss = [n for n in ck["tensors"] if n not in named]
         assert not miss, f"{len(miss)} adapter tensors unmatched, e.g. {miss[:3]}"
+        s = A.merge_scale
         with torch.no_grad():
             for n, t in ck["tensors"].items():
-                named[n].data.copy_(t.to(named[n].dtype))
+                t = t.to(named[n].dtype)
+                if s != 1.0:
+                    if "lora_B" in n or "elora_gu_B" in n or "elora_dp_B" in n:
+                        t = t * s              # scales the low-rank delta linearly
+                    elif "lora_A" not in n and "elora" not in n:
+                        # full-weight tensors store absolutes: interpolate to base
+                        t = named[n].data * (1 - s) + t * s
+                named[n].data.copy_(t)
+        if s != 1.0:
+            print(f"[gce] adapter merged at scale {s}", flush=True)
         print(f"[gce] adapter loaded (seen={ck['seen']/1e6:.2f}M)", flush=True)
         if A.merge_out:
             with torch.no_grad():
