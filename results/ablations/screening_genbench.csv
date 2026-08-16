@@ -72,3 +72,7 @@ scr_dom2_cand,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,
 scr_dom2_cand,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.740000,200,2048,69
 scr_dom2_cand,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,71
 scr_dom2_cand,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,1536,202
+scr_dom2_mmlu,128,8,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,104
+scr_dom2_mmlu,128,8,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.605263,4,2048,104
+scr_dom2_mmlu,128,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1048
+scr_dom2_mmlu,128,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.605263,4,2048,1048
