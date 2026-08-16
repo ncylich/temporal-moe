@@ -91,9 +91,9 @@ def main():
                                          "seed=1234,skip_special_tokens=False",
                               log_samples=True)
         n = hit = miss_extract = 0
+        dump = []          # per ARM, across all subjects (was per-subject: dumps
+        hit_strict = 0     # held only the final subject's items; scores unaffected)
         for task, samp in res["samples"].items():
-            dump = []
-            hit_strict = 0
             for x in samp:
                 resp = x["resps"][0][0] if x.get("resps") else ""
                 gold = re.search(r"\(([A-D])\)", str(x.get("target", "")))
