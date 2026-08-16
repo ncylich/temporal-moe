@@ -461,7 +461,7 @@ def main():
         s = A.merge_scale
         with torch.no_grad():
             for n, t in ck["tensors"].items():
-                t = t.to(named[n].dtype)
+                t = t.to(named[n].data.device, named[n].dtype)
                 if s != 1.0:
                     if "lora_B" in n or "elora_gu_B" in n or "elora_dp_B" in n:
                         t = t * s              # scales the low-rank delta linearly
