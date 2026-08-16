@@ -76,3 +76,7 @@ scr_dom2_mmlu,128,8,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,104
 scr_dom2_mmlu,128,8,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.605263,4,2048,104
 scr_dom2_mmlu,128,8,R8,8,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1048
 scr_dom2_mmlu,128,8,R8,8,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.605263,4,2048,1048
+scr_d1_mmlu_relax,128,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.934211,4,2048,106
+scr_d1_mmlu_relax,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.934211,4,2048,1066
+scr_base_mmlu_relax,128,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.942982,4,2048,104
+scr_base_mmlu_relax,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,1147
