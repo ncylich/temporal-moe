@@ -1014,3 +1014,6 @@ gemma4_ce_domain,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.00
 gemma4_ce_domain2,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,49
 gemma4_ce_domain2,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,132
 gemma4_ce_domain2,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,123
+gemma4_ce_d5,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,57
+gemma4_ce_d5,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,114
+gemma4_ce_d5,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,120
