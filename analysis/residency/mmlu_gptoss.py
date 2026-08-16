@@ -52,8 +52,13 @@ def main():
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"))
     ap.add_argument("--record-as", default=None)
+    ap.add_argument("--path", default=None, help="override checkpoint dir (merged adapters)")
+    ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
+                    help="diagnostics use screening_genbench.csv")
     A = ap.parse_args()
     M = MODELS[A.model]
+    if A.path:
+        M = dict(M, path=A.path)
 
     vllm_glue.install()
     from lm_eval import simple_evaluate
@@ -72,7 +77,7 @@ def main():
     genprotocol.install(lm, cap=A.gen_cap,
                         think_marker="<|channel|>final<|message|>")
 
-    out = os.path.join(ABLATIONS, "instruct_genbench_vllm.csv")
+    out = os.path.join(ABLATIONS, A.csv_name)
     fh = open(out, "a", newline="")
     w = csv.writer(fh)
     for arm in A.arms.split(","):
