@@ -129,6 +129,15 @@ def main():
                          "padded to the chunk max. Constraint applied per row via "
                          "CFG batch/enforce_from-vector. 16 rows per optimizer "
                          "step regardless (accum adjusts)")
+    ap.add_argument("--precompute-kl", default=None,
+                    help="forward-only pass storing the BASE model's top-50 free-"
+                         "routing logprobs per response token over the trajectory "
+                         "set; feeds --kl-anchor. Run on the UNADAPTED model")
+    ap.add_argument("--kl-anchor", default=None,
+                    help="path from --precompute-kl: adds kl-weight * KL(student "
+                         "free-mode || base top-50) on response tokens (anti-"
+                         "forgetting anchor)")
+    ap.add_argument("--kl-weight", type=float, default=0.1)
     ap.add_argument("--precompute-tokw", default=None,
                     help="forward-only pass over all trajectories computing per-"
                          "response-token CE under free and R8 routing; saves "
@@ -197,6 +206,12 @@ def main():
             ntok += L - pl
         return (ids.to("cuda"), am.to("cuda"), tgt.to("cuda"), plens, ntok)
 
+    KLREF = None
+    if A.kl_anchor:
+        KLREF = torch.load(A.kl_anchor, weights_only=False)
+        print(f"[gce] KL anchor loaded for {len(KLREF)} rows "
+              f"(weight {A.kl_weight})", flush=True)
+
     TOKW = None
     if A.tok_weights:
         TOKW = torch.load(A.tok_weights, weights_only=False)
@@ -227,6 +242,35 @@ def main():
                 num = num + ce.sum()
                 den += int(m_.sum())
         return num / den / scale
+
+    if A.precompute_kl:
+        import shutil
+        model.eval()
+        mb = max(1, A.micro_batch)
+        lidx = sorted(range(len(rows)), key=lambda i: rows[i]["ids"].shape[0])
+        outk = {}
+        with torch.no_grad():
+            for c0 in range(0, len(lidx), mb):
+                ridx = lidx[c0:c0 + mb]
+                rs = [rows[i] for i in ridx]
+                ids, am, tgt, plens, _ = make_batch(rs)
+                GL.CFG.update(on=False, enforce_from=0, batch=len(rs))
+                lg = model(ids, attention_mask=am).logits[:, :-1]
+                targets = tgt[:, 1:]
+                for b, ri in enumerate(ridx):
+                    m_ = targets[b] != -100
+                    lp = torch.log_softmax(lg[b][m_].float(), -1)
+                    top = lp.topk(50, dim=-1)
+                    outk[ri] = (top.indices.to(torch.int32).cpu(),
+                                top.values.half().cpu())
+                if (c0 // mb) % 100 == 0:
+                    print(f"[gce-kl] {c0}/{len(lidx)}", flush=True)
+        GL.CFG.update(batch=1)
+        torch.save(outk, "/tmp/gce_kl_tmp.pt")
+        shutil.move("/tmp/gce_kl_tmp.pt", A.precompute_kl)
+        print(f"[gce-kl] saved {len(outk)} rows -> {A.precompute_kl} -- DONE",
+              flush=True)
+        return
 
     if A.precompute_tokw:
         import shutil
@@ -552,6 +596,28 @@ def main():
                           batch=len(rs), cold_start=False)
             logits = model(ids, attention_mask=am).logits[:, :-1]
             loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
+            if KLREF is not None:
+                GL.CFG.update(on=False, enforce_from=0, batch=len(rs))
+                lg_free = model(ids, attention_mask=am).logits[:, :-1]
+                targets = tgt[:, 1:]
+                kl_num = kl_den = 0
+                for b, ri in enumerate(ridx):
+                    if ri not in KLREF:
+                        continue
+                    m_ = targets[b] != -100
+                    tid, tlp = KLREF[ri]
+                    tid = tid.to(lg_free.device).long()
+                    tlp = tlp.to(lg_free.device).float()
+                    slp = torch.log_softmax(lg_free[b][m_].float(), -1)
+                    s_at = slp.gather(1, tid)
+                    p = tlp.exp()
+                    p = p / p.sum(1, keepdim=True)      # renormalise top-50
+                    kl_num = kl_num + (p * (tlp - s_at)).sum()
+                    kl_den += int(m_.sum())
+                if kl_den:
+                    loss = loss + A.kl_weight * kl_num / kl_den / accum_batches
+                GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
+                              batch=len(rs), cold_start=False)
             loss.backward()
             seen += ntok
         GL.CFG.update(batch=1)
