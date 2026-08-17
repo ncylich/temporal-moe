@@ -30,6 +30,10 @@ def main():
     ap.add_argument("--out", default="/workspace/instruct-traj")
     ap.add_argument("--think", choices=("default", "on", "off"), default="default",
                     help="chat-template thinking toggle for the generated data")
+    ap.add_argument("--gpu-mem", type=float, default=0.9,
+                    help="vllm gpu_memory_utilization (72GB-class models need ~0.97)")
+    ap.add_argument("--max-seqs", type=int, default=None,
+                    help="max_num_seqs cap (qwen3.5 hybrid: one Mamba block per decode seq)")
     A = ap.parse_args()
 
     prompts = [json.loads(l) for l in open(A.prompts)]
@@ -49,8 +53,9 @@ def main():
           f"pre-submission", flush=True)
     prompts = kept
     from vllm import LLM, SamplingParams
-    llm = LLM(model=A.model, enforce_eager=False, gpu_memory_utilization=0.9,
-              max_model_len=A.max_prompt_tok + A.max_new)
+    llm = LLM(model=A.model, enforce_eager=False, gpu_memory_utilization=A.gpu_mem,
+              max_model_len=A.max_prompt_tok + A.max_new,
+              **({"max_num_seqs": A.max_seqs} if A.max_seqs else {}))
     # sampling per the model's own generation_config (greedy loops on thinking models);
     # seeded so the trajectory set is reproducible
     import json as _json
