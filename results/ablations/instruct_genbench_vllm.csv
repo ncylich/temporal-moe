@@ -542,3 +542,9 @@ gemma4_ce_d12_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.412281,4
 gemma4_ce_d12,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,72
 gemma4_ce_d12,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,1536,201
 gemma4_ce_d12,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,1536,205
+gemma4_ce_d12_dual2,128,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.899123,4,2048,111
+gemma4_ce_d12_dual2,128,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.438596,4,2048,111
+gemma4_ce_d12_dual2,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,1061
+gemma4_ce_d12_dual2,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.478070,4,2048,1061
+gemma4_ce_d12_dual2,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,1090
+gemma4_ce_d12_dual2,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.442982,4,2048,1090
