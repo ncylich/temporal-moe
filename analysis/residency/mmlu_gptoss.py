@@ -59,6 +59,8 @@ def main():
     ap.add_argument("--gen-cap", type=int, default=2048)
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"))
+    ap.add_argument("--think", choices=("default", "on", "off"), default="default",
+                    help="chat-template thinking toggle (enable_thinking kwarg)")
     ap.add_argument("--record-as", default=None)
     ap.add_argument("--path", default=None, help="override checkpoint dir (merged adapters)")
     ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
@@ -75,11 +77,16 @@ def main():
               max_model_len=5632, gpu_memory_utilization=A.gpu_mem,
               enforce_eager=True, enable_prefix_caching=False, dtype="auto")
 
-    if A.reasoning_effort:
+    if A.reasoning_effort or A.think != "default":
         _tk = lm.tokenizer
         _orig_act = _tk.apply_chat_template
+        _extra = {}
+        if A.reasoning_effort:
+            _extra["reasoning_effort"] = A.reasoning_effort
+        if A.think != "default":
+            _extra["enable_thinking"] = A.think == "on"
         _tk.apply_chat_template = lambda *aa, **kk: _orig_act(
-            *aa, **{**kk, "reasoning_effort": A.reasoning_effort})
+            *aa, **{**kk, **_extra})
 
     import genprotocol
     genprotocol.install(lm, cap=A.gen_cap,

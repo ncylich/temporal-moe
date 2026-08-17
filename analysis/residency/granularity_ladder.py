@@ -163,6 +163,67 @@ def tag_gemma4(model):
     return n
 
 
+def patch_qwen35():
+    """qwen3.5 mirror of patch_gemma4: mask router logits to -inf before the stock
+    softmax->topk->renorm; shared expert untouched (always resident, as served)."""
+    from transformers.models.qwen3_5_moe import modeling_qwen3_5_moe as m
+    import torch.nn.functional as F
+
+    def fwd(self, hidden_states):
+        router_logits = F.linear(hidden_states, self.weight)         # [T, E]
+        li = getattr(self, "_layer_idx", None)
+        fs = CFG.get("free_set")
+        freed = not CFG["on"] or (fs is not None and li in fs)
+        logits_for_topk = router_logits
+        if not freed:
+            R = CFG["R"]
+            rm = CFG.get("R_map")
+            if rm is not None and li is not None:
+                R = rm.get(li, R)
+            Bn = CFG.get("batch", 1)
+            if Bn > 1:
+                assert not CFG.get("decode_mode") and not CFG.get("cold_start"), \
+                    "batched constraint supports the warm training path only"
+                T_, E_ = router_logits.shape
+                S_ = T_ // Bn
+                lg = router_logits.view(Bn, S_, E_).transpose(0, 1).float()
+            else:
+                T_, E_ = router_logits.shape
+                lg = router_logits.unsqueeze(1).float()
+            with torch.no_grad():
+                mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
+            ef = CFG.get("enforce_from", 0)
+            efs = list(ef) if hasattr(ef, "__len__") else [ef] * Bn
+            if Bn > 1:
+                for b_, e_ in enumerate(efs):
+                    if e_:     # prefill positions free, rule from first response token
+                        mask[:e_, b_] = True
+                logits_for_topk = router_logits.masked_fill(
+                    ~mask.transpose(0, 1).reshape(T_, E_), float("-inf"))
+            else:
+                if efs[0]:
+                    mask[:efs[0]] = True
+                logits_for_topk = router_logits.masked_fill(
+                    ~mask.squeeze(1), float("-inf"))
+        router_probs = F.softmax(logits_for_topk, dtype=torch.float, dim=-1)
+        router_top_value, router_indices = torch.topk(router_probs, self.top_k, dim=-1)
+        router_top_value /= router_top_value.sum(dim=-1, keepdim=True)
+        router_top_value = router_top_value.to(router_logits.dtype)
+        return router_logits, router_top_value, router_indices
+
+    m.Qwen3_5MoeTopKRouter.forward = fwd
+
+
+def tag_qwen35(model):
+    from transformers.models.qwen3_5_moe import modeling_qwen3_5_moe as m
+    n = 0
+    for mod in model.modules():
+        if isinstance(mod, m.Qwen3_5MoeTopKRouter):
+            mod._layer_idx = n
+            n += 1
+    return n
+
+
 R_LAYER = [8, 12, 16, 24]
 
 
