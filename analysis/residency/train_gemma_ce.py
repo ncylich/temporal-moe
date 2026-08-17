@@ -596,7 +596,9 @@ def main():
                           batch=len(rs), cold_start=False)
             logits = model(ids, attention_mask=am).logits[:, :-1]
             loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
-            if KLREF is not None:
+            loss.backward()          # free the constrained graph BEFORE the KL
+            if KLREF is not None:    # forward: two live graphs OOM'd at mb2/4096
+                del logits
                 GL.CFG.update(on=False, enforce_from=0, batch=len(rs))
                 lg_free = model(ids, attention_mask=am).logits[:, :-1]
                 targets = tgt[:, 1:]
@@ -608,17 +610,18 @@ def main():
                     tid, tlp = KLREF[ri]
                     tid = tid.to(lg_free.device).long()
                     tlp = tlp.to(lg_free.device).float()
-                    slp = torch.log_softmax(lg_free[b][m_].float(), -1)
-                    s_at = slp.gather(1, tid)
+                    lgb = lg_free[b][m_].float()
+                    s_at = lgb.gather(1, tid) - torch.logsumexp(lgb, -1, keepdim=True)
                     p = tlp.exp()
                     p = p / p.sum(1, keepdim=True)      # renormalise top-50
                     kl_num = kl_num + (p * (tlp - s_at)).sum()
                     kl_den += int(m_.sum())
                 if kl_den:
-                    loss = loss + A.kl_weight * kl_num / kl_den / accum_batches
+                    kl_loss = A.kl_weight * kl_num / kl_den / accum_batches
+                    kl_loss.backward()
+                    loss = loss.detach() + kl_loss.detach()
                 GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
                               batch=len(rs), cold_start=False)
-            loss.backward()
             seen += ntok
         GL.CFG.update(batch=1)
         torch.nn.utils.clip_grad_norm_(train_params, 1.0)
