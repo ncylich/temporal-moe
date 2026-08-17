@@ -161,6 +161,11 @@ def main():
                     help="after loading the adapter, save the merged model to this dir and exit")
     ap.add_argument("--family", default="gemma4", choices=("gemma4", "qwen35"),
                     help="router-patch family; everything else is layout-generic")
+    ap.add_argument("--opt", default="adamw", choices=("adamw", "adamw8bit", "paged8bit"),
+                    help="paged8bit: bnb paged 8-bit moments (crossmodel qwen precedent)")
+    ap.add_argument("--no-unsloth", action="store_true",
+                    help="force the HF+peft stack (qwen35: unsloth's batched constrained "
+                         "path drifts 4.9%% where plain HF shows 0.0-0.3%%)")
     A = ap.parse_args()
 
     assert not (A.expert_lora_r and A.out.endswith("gemma_ce_adapter.pt")), \
@@ -169,15 +174,22 @@ def main():
     print(f"[gce] {len(rows)} trajectories", flush=True)
 
     import granularity_ladder as GL
-    use_unsloth = True
+    use_unsloth = not A.no_unsloth
     try:
+        if A.no_unsloth:
+            raise ImportError("--no-unsloth: forcing HF+peft stack")
         from unsloth import FastModel
         model, tok = FastModel.from_pretrained(A.model, max_seq_length=A.max_seq,
                                                dtype=torch.bfloat16, load_in_4bit=False,
                                                full_finetuning=False)
         tok = getattr(tok, "tokenizer", tok)
         model = FastModel.get_peft_model(model, r=32, lora_alpha=64, lora_dropout=0.0,
-                                         use_gradient_checkpointing=True)
+                                         use_gradient_checkpointing=True,
+                                         **({"target_modules": ["q_proj", "k_proj",
+                                                                "v_proj", "o_proj"]}
+                                            if A.family == "qwen35" else {}))
+        # qwen3.5: unsloth's default targets hit the DeltaNet projections too
+        # (~1.9B extra trainable at r32 x 40 layers); gemma's surface is q/k/v/o
     except Exception as e:
         print(f"[gce] unsloth path failed ({type(e).__name__}: {e}); falling back to HF+peft",
               flush=True)
@@ -187,6 +199,10 @@ def main():
         tok = AutoTokenizer.from_pretrained(A.model)
         model = AutoModelForCausalLM.from_pretrained(A.model, dtype=torch.bfloat16).to("cuda")
         model.gradient_checkpointing_enable()
+        # cuDNN fused-attention backward needs a workspace it cannot get at
+        # <1GB headroom (mha_graph.execute failure at 81.1/81.6GB); flash/
+        # mem-efficient SDPA backends are leaner
+        torch.backends.cuda.enable_cudnn_sdp(False)
         model = get_peft_model(model, LoraConfig(
             r=32, lora_alpha=64, lora_dropout=0.0,
             target_modules=["q_proj", "k_proj", "v_proj", "o_proj"]))
@@ -238,6 +254,17 @@ def main():
         for b in range(targets.shape[0]):
             m_ = targets[b] != -100
             if not bool(m_.any()):
+                continue
+            if TOKW is None or ridx is None:
+                # chunked + checkpointed: the fp32 [resp,V] cast (2GB/row at
+                # 248k vocab) is recomputed per 512-token slice in backward
+                lgb_, tg_ = logits[b][m_], targets[b][m_]
+                for j in range(0, tg_.shape[0], 512):
+                    num = num + torch.utils.checkpoint.checkpoint(
+                        lambda lg_, t_: torch.nn.functional.cross_entropy(
+                            lg_.float(), t_, reduction="sum"),
+                        lgb_[j:j + 512], tg_[j:j + 512], use_reentrant=False)
+                den += int(m_.sum())
                 continue
             ce = torch.nn.functional.cross_entropy(
                 logits[b][m_].float(), targets[b][m_], reduction="none")
@@ -407,8 +434,11 @@ def main():
             ceb = []
             for b in range(len(pr)):
                 m_ = tgt[b, 1:] != -100
-                ceb.append(float(torch.nn.functional.cross_entropy(
-                    lgb[b][m_].float(), tgt[b, 1:][m_], reduction="mean")))
+                lgm_, tg_ = lgb[b][m_], tgt[b, 1:][m_]
+                s_ = sum(float(torch.nn.functional.cross_entropy(
+                    lgm_[j:j + 512].float(), tg_[j:j + 512], reduction="sum"))
+                    for j in range(0, tg_.shape[0], 512))
+                ceb.append(s_ / int(tg_.shape[0]))
             GL.CFG.update(batch=1)
             return ce1, ceb
 
@@ -568,7 +598,12 @@ def main():
 
     extra_ids = {id(p) for p in extra}
     lora_ps = [p for p in train_params if id(p) not in extra_ids]
-    opt = torch.optim.AdamW([{"params": lora_ps, "lr": A.lr},
+    opt_cls = torch.optim.AdamW
+    if A.opt != "adamw":            # 70GB-weight models: moments cannot live on-GPU
+        import bitsandbytes as bnb
+        opt_cls = {"adamw8bit": bnb.optim.AdamW8bit,
+                   "paged8bit": bnb.optim.PagedAdamW8bit}[A.opt]
+    opt = opt_cls([{"params": lora_ps, "lr": A.lr},
                              {"params": extra, "lr": A.lr / A.extra_lr_div}],
                             weight_decay=0.0)
     print(f"[gce] lr groups: lora {A.lr} | router/norm {A.lr / A.extra_lr_div}", flush=True)
@@ -621,33 +656,38 @@ def main():
             loss.backward()          # free the constrained graph BEFORE the KL
             if KLREF is not None:    # forward: two live graphs OOM'd at mb2/4096
                 del logits
-                GL.CFG.update(on=False, enforce_from=0, batch=len(rs))
-                lg_free = model(ids, attention_mask=am).logits[:, :-1]
+                GL.CFG.update(on=False, enforce_from=0, batch=1)
                 targets = tgt[:, 1:]
-                kl_num = kl_den = 0
+                # per-row free forward + immediate backward: KL is a per-row sum,
+                # so accumulation is exact while only ONE row's graph + [1,S,V]
+                # logits are live (the batched free forward OOM'd at 248k vocab)
+                kl_den = sum(int((targets[b] != -100).sum())
+                             for b, ri in enumerate(ridx) if ri in KLREF)
+                kl_tot = 0.0
                 for b, ri in enumerate(ridx):
                     if ri not in KLREF:
                         continue
                     m_ = targets[b] != -100
                     tid, tlp = KLREF[ri]
-                    tid = tid.to(lg_free.device).long()
-                    tlp = tlp.to(lg_free.device).float()
+                    tid = tid.to(ids.device).long()
+                    tlp = tlp.to(ids.device).float()
+                    lg_free_b = model(ids[b:b + 1],
+                                      attention_mask=am[b:b + 1]).logits[0, :-1]
                     def _row_kl(lg_row, tid_=tid, tlp_=tlp):
                         # checkpointed: the fp32 full-vocab intermediates
-                        # (~4.3GB/row at 4096x262k) are recomputed in backward
-                        # instead of pinned until kl_loss.backward()
+                        # (~2GB/row at 2048x248k) are recomputed in backward
                         lgb = lg_row.float()
                         s_at = lgb.gather(1, tid_) - torch.logsumexp(lgb, -1, keepdim=True)
                         p = tlp_.exp()
                         p = p / p.sum(1, keepdim=True)  # renormalise top-50
                         return (p * (tlp_ - s_at)).sum()
-                    kl_num = kl_num + torch.utils.checkpoint.checkpoint(
-                        _row_kl, lg_free[b][m_], use_reentrant=False)
-                    kl_den += int(m_.sum())
-                if kl_den:
-                    kl_loss = A.kl_weight * kl_num / kl_den / accum_batches
-                    kl_loss.backward()
-                    loss = loss.detach() + kl_loss.detach()
+                    kl_b = (A.kl_weight / kl_den / accum_batches
+                            ) * torch.utils.checkpoint.checkpoint(
+                        _row_kl, lg_free_b[m_], use_reentrant=False)
+                    kl_b.backward()
+                    kl_tot += float(kl_b)
+                    del lg_free_b
+                loss = loss.detach() + kl_tot
                 GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
                               batch=len(rs), cold_start=False)
             seen += ntok
