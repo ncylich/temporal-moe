@@ -112,6 +112,10 @@ def main():
     ap.add_argument("--accum", type=int, default=16)
     ap.add_argument("--save-every", type=int, default=400)
     ap.add_argument("--out", default="/workspace/olmoe-adapt/data/gemma_ce_adapter.pt")
+    ap.add_argument("--resume", action="store_true",
+                    help="load tensors+seen from --out and continue (fresh Adam)")
+    ap.add_argument("--resume-step", type=int, default=0,
+                    help="step counter for ckpts saved before 'step' was stored")
     ap.add_argument("--no-constraint", action="store_true",
                     help="CONTROL: identical run with residency OFF during training "
                          "(isolates constraint-aware adaptation from plain self-SFT)")
@@ -155,6 +159,8 @@ def main():
                          "interpolated base*(1-s)+ckpt*s. 1.0 = full adapter")
     ap.add_argument("--merge-out", default=None,
                     help="after loading the adapter, save the merged model to this dir and exit")
+    ap.add_argument("--family", default="gemma4", choices=("gemma4", "qwen35"),
+                    help="router-patch family; everything else is layout-generic")
     A = ap.parse_args()
 
     assert not (A.expert_lora_r and A.out.endswith("gemma_ce_adapter.pt")), \
@@ -185,8 +191,13 @@ def main():
             r=32, lora_alpha=64, lora_dropout=0.0,
             target_modules=["q_proj", "k_proj", "v_proj", "o_proj"]))
 
-    GL.patch_gemma4()
-    GL.tag_gemma4(model)
+    if A.family == "qwen35":
+        GL.patch_qwen35()
+        n_routers = GL.tag_qwen35(model)
+    else:
+        GL.patch_gemma4()
+        n_routers = GL.tag_gemma4(model)
+    assert n_routers, f"no routers tagged for family {A.family}"
     PAD = tok.pad_token_id or 0
 
     def make_batch(rs, ridx=None):
@@ -570,6 +581,17 @@ def main():
     chunks = [lidx[i:i + mb] for i in range(0, len(lidx), mb)]
     order = torch.randperm(len(chunks), generator=torch.Generator().manual_seed(0)).tolist()
     oi = 0
+    if A.resume:
+        ck = torch.load(A.out, map_location="cpu", weights_only=False)
+        rnamed = dict(model.named_parameters())
+        with torch.no_grad():
+            for n, t in ck["tensors"].items():
+                rnamed[n].data.copy_(t.to(rnamed[n].data.device, rnamed[n].dtype))
+        seen = ck["seen"]
+        step = ck.get("step", A.resume_step)
+        oi = step * accum_batches      # data order is deterministic (seed-0 perm)
+        print(f"[gce] resumed {A.out}: seen={seen/1e6:.2f}M step={step} "
+              f"(fresh Adam state)", flush=True)
 
     def save():
         # torch.save straight onto the quota-limited network mount produced a
@@ -578,7 +600,7 @@ def main():
         import shutil
         named = {n: p.detach().cpu().clone() for n, p in model.named_parameters()
                  if p.requires_grad}
-        torch.save({"tensors": named, "seen": seen, "stack":
+        torch.save({"tensors": named, "seen": seen, "step": step, "family": A.family, "stack":
                     "unsloth" if use_unsloth else "hf+peft",
                     "R": 0 if A.no_constraint else 8, "expert_lora_r": A.expert_lora_r,
                     "elora_layout": "grouped(E,in,out)",
@@ -610,11 +632,17 @@ def main():
                     tid, tlp = KLREF[ri]
                     tid = tid.to(lg_free.device).long()
                     tlp = tlp.to(lg_free.device).float()
-                    lgb = lg_free[b][m_].float()
-                    s_at = lgb.gather(1, tid) - torch.logsumexp(lgb, -1, keepdim=True)
-                    p = tlp.exp()
-                    p = p / p.sum(1, keepdim=True)      # renormalise top-50
-                    kl_num = kl_num + (p * (tlp - s_at)).sum()
+                    def _row_kl(lg_row, tid_=tid, tlp_=tlp):
+                        # checkpointed: the fp32 full-vocab intermediates
+                        # (~4.3GB/row at 4096x262k) are recomputed in backward
+                        # instead of pinned until kl_loss.backward()
+                        lgb = lg_row.float()
+                        s_at = lgb.gather(1, tid_) - torch.logsumexp(lgb, -1, keepdim=True)
+                        p = tlp_.exp()
+                        p = p / p.sum(1, keepdim=True)  # renormalise top-50
+                        return (p * (tlp_ - s_at)).sum()
+                    kl_num = kl_num + torch.utils.checkpoint.checkpoint(
+                        _row_kl, lg_free[b][m_], use_reentrant=False)
                     kl_den += int(m_.sum())
                 if kl_den:
                     kl_loss = A.kl_weight * kl_num / kl_den / accum_batches
