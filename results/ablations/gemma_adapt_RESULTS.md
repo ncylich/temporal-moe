@@ -77,7 +77,22 @@ Screening ladder: scr_d5..scr_d12 (+_dual) in screening_genbench.csv. Adapters:
 /workspace/olmoe-adapt/data/gemma_ce_d{5,7,8,9,10,11,12}_adapter.pt (d12 = the result).
 Think-on trajectory file for a future resized run: /workspace/instruct-traj/gemma4_d7think.pt.
 
+## Qwen3.5-35B-A3B replication (2026-08-17)
+
+The recipe transfers. Same pipeline on qwen (think-off, same-batch refs; records
+qwen35_ce_d12r / qwen35_val_base + duals in screening_genbench.csv): base R8 damage
+−9.5/−12.5/−2.5/0.0 (GSM8K/IFEval/HE/MMLU) becomes −3.0/−9.0/+0.6/−2.2 adapted —
+same-arm gains +6.5/+3.5/+3.0/−2.2, the gemma signature (constrained recovery, small
+MMLU cost) at matching magnitudes. Divergences: free-arm IFEval −5.5 (gemma gained);
+damage not fully eliminated. Single run. Documented accommodations forced by 70GB
+weights on an 80GB card: expert-LoRA r8 (capacity-matched to gemma's 1.4B), paged
+8-bit Adam, HF stack (unsloth's batched constrained path drifts 4.9% on qwen where
+plain HF shows 0.0–0.3%), chunked-checkpointed CE, per-row KL forward, cuDNN SDP off.
+
 ## Open
 
 - Free-arm MMLU cost (−2.8): untested lever = KL bracket 0.03/0.07.
-- Qwen3.5-35B-A3B replication of this exact recipe: in flight (qwen35_ce_d12r records).
+- Qwen free-arm IFEval regression (−5.5): unexplained; candidate suspects are the
+  r8/8-bit accommodations or qwen's larger baseline constraint damage.
+- Think-on variant: needs ≥6k generation cap + training-memory rework (35.7% of
+  think responses cap at 3072 on this pool).
