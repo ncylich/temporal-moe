@@ -89,25 +89,29 @@ weights on an 80GB card: expert-LoRA r8 (capacity-matched to gemma's 1.4B), page
 8-bit Adam, HF stack (unsloth's batched constrained path drifts 4.9% on qwen where
 plain HF shows 0.0–0.3%), chunked-checkpointed CE, per-row KL forward, cuDNN SDP off.
 
-## Qwen attribution square (2026-08-18)
+## Qwen result: r2 (COMMITTED 2026-08-18)
 
-Follow-ups on the replication (records qwen35_ce_d12r{,2,3,4} + duals; single
-screening runs, ±2pt noise). Fraction-matched arm first: at R16 (6.25% resident,
-gemma's R8 fraction) the r1 candidate reaches base-free parity on GSM8K/HE/MMLU —
-the R8 gap is mostly constraint tightness (R8-of-256 = 3.1% resident). The IFEval
-regression is arm-independent (training artifact). A 2×2 {old/clean pool} ×
-{KL 0.05/0.1} then attributed it (worst cell per config, all vs base-free):
+The committed qwen3.5 adaptation is **r2** — the D12 recipe on the truncation-free
+pool (3072-cap regen, rows >2560 dropped whole) at **KL 0.1** — chosen by the
+max-min criterion from a 2×2 attribution square {old/clean pool}×{KL .05/.1}
+(records qwen35_ce_d12r{,2,3,4} + duals; single screening runs, ±2pt noise).
+Adapter: /workspace/olmoe-adapt/data/qwen_ce_d12r2_adapter.pt.
 
-- r1 old+.05: worst −9.0 (R8 IFEval); best math/HE (free G+1.5 H+2.4)
-- **r2 clean+.1: worst −6.0 — max-min winner; free arm ~repaired (I−3.0, M+0.9)**
-- r3 clean+.05: worst −8.0
-- r4 old+.1: worst −9.5; best constrained math (R8 G−2.0)
+r2, all cells vs base-free (absolutes: G 84.5 / I 89.0 / H 92.1 / M 93.0):
 
-Effects are NOT additive: the KL-0.1 IFEval/MMLU repair only materialises on the
-clean (truncation-free) pool; the clean pool's dropped long rows cost 2–4 GSM8K
-points that only the old pool recovers. Recommendation: r2 for balanced serving,
-r1/r4 when constrained math dominates. Qwen-at-R8 remains a strictly harder
-problem than gemma-at-R8; fraction-matched comparisons are the fair headline.
+| arm  | GSM8K | IFEval | HumanEval | MMLU |
+|------|-------|--------|-----------|------|
+| free | −2.5  | −3.0   |  0.0      | +0.9 |
+| R8   | −3.5  | −6.0   | −1.2      | −0.4 |
+| R16  | −3.5  | −6.0   | −1.8      | −1.3 |
+
+Square findings: worst cell is constrained IFEval for every config; effects are
+NOT additive — KL-0.1's IFEval/MMLU repair only materialises on the clean pool,
+while the clean pool's dropped long rows cost 2–4 GSM8K points that only the old
+pool recovers (r1/r4 hold the positive math cells). Fraction-matched framing:
+at R16 (6.25% resident = gemma's R8 fraction) the r1-era candidate reached
+base-free parity on GSM8K/HE/MMLU; R8-of-256 (3.1%) is structurally harder than
+anything gemma faced — cross-model claims should quote matched fractions.
 
 ## Open
 
