@@ -317,14 +317,22 @@ def main():
                 rs = [rows[i] for i in ridx]
                 ids, am, tgt, plens, _ = make_batch(rs)
                 GL.CFG.update(on=False, enforce_from=0, batch=len(rs))
-                lg = model(ids, attention_mask=am).logits[:, :-1]
+                if DEC is not None:   # chunked head: full [B,S,V] logits OOM at 4608 seq
+                    x = DEC(ids, attention_mask=am).last_hidden_state[:, :-1]
+                else:
+                    x = model(ids, attention_mask=am).logits[:, :-1]
                 targets = tgt[:, 1:]
                 for b, ri in enumerate(ridx):
                     m_ = targets[b] != -100
-                    lp = torch.log_softmax(lg[b][m_].float(), -1)
-                    top = lp.topk(50, dim=-1)
-                    outk[ri] = (top.indices.to(torch.int32).cpu(),
-                                top.values.half().cpu())
+                    xb = x[b][m_]
+                    tis, tvs = [], []
+                    for j in range(0, xb.shape[0], 512):
+                        lg_ = HEAD(xb[j:j + 512]) if DEC is not None else xb[j:j + 512]
+                        lp = torch.log_softmax(lg_.float(), -1)
+                        top = lp.topk(50, dim=-1)
+                        tis.append(top.indices.to(torch.int32).cpu())
+                        tvs.append(top.values.half().cpu())
+                    outk[ri] = (torch.cat(tis), torch.cat(tvs))
                 if (c0 // mb) % 100 == 0:
                     print(f"[gce-kl] {c0}/{len(lidx)}", flush=True)
         GL.CFG.update(batch=1)
