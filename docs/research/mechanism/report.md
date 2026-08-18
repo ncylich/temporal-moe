@@ -146,3 +146,88 @@ Headline findings:
 - Every figure regenerates from a committed producer in `analysis/residency/`
   (`plot_length_story.py`, `think_tax_plot.py`, `d12_final_figure.py`,
   `qwen_d12r_figure.py`, `qwen_square_figure.py`).
+
+## Problems found and fixed
+
+Everything below was caught by a gate, an audit, or a paired re-measurement; every
+fix is in a committed producer.
+
+- **Measurement**
+  - **Early truncation inflated scores.** The truncate-and-retry generation ladder
+    quietly boosted accuracy **+2.6 points on average** (n=59 paired cells).
+    Replaced with single-pass-at-cap; caps sized per task (2048 plain, 4096
+    thinking, **8192 for thinking IFEval**).
+  - **Improper MMLU parsing.** The stock strict filter only accepts
+    "The answer is (X)" and scores format imitation, not knowledge (base models
+    sit at ~0.92 to 0.95 knowledge regardless of arm). Fixed with dual scoring
+    from the same generations plus a final-answer-line extractor; HumanEval moved
+    to channel-aware parsing.
+  - **Missing thinking specification.** Early qwen base rows ran with the chat
+    template's default thinking ON while candidates ran think-OFF, making the
+    references incomparable. `--think {on,off}` is now explicit in every driver,
+    including the MMLU dual scorer.
+  - **Reference gaps and batch sensitivity.** The base was never screened on the
+    IFEval active subset; recovered first from saved per-item dumps, then a
+    same-batch rerun. That rerun exposed **8.6 points** of batch-composition
+    sensitivity on constrained IFEval, so all screening deltas now use
+    same-batch references only.
+  - **Screens amplify.** Hard-item subsets overstate full-instrument deltas
+    (one candidate's +4 screening GSM8K compressed to +1 authoritative). Winners
+    get a full confirmation grid before citation.
+  - **Run variance vs determinism.** Free-arm MMLU at temperature 1.0 spreads up
+    to 3.5 points across runs, so headline MMLU uses multi-run means. Same-batch
+    seeded screens replay exactly, so repeats there confirm stability, not
+    variance.
+- **Training data**
+  - **Benchmark lineage.** An Orca-Math lane (GSM8K-train-seeded) faked +8 GSM8K
+    via style matching. Rule since: pools benchmark-free by construction
+    (real-user, OSS-seeded, or self-generated) plus 8-gram screens against all
+    four test sets.
+  - **Truncated training rows.** 11% of qwen rows cut mid-response taught
+    degenerate early endings (7 to 13-token IFEval answers). Gates now drop
+    over-length rows whole; no truncated row enters training.
+- **Systems**
+  - **Four distinct OOM classes** at 70GB weights on an 80GB card, each with a
+    structural fix rather than a batch-size retreat: CE and KL graphs made
+    sequential (backward CE before the anchor forward), full-vocab fp32 casts
+    replaced by **chunked-checkpointed CE**, the anchor forward made per-row with
+    immediate backward, and finally the **chunked LM head** (never materialise
+    248k-vocab logits), cutting the watermark **81 to 72.8GB** and unlocking r16
+    adapters and 4.6k sequences.
+  - **Stack bugs.** unsloth's batched constrained forward drifts **4.9%** where
+    plain HF shows 0.0 to 0.3% (isolated with an equal-length vs mixed-length
+    probe); cuDNN fused attention fails below ~1GB headroom (flash SDPA does
+    not); unsloth's default LoRA targets silently attached **1.9B** of adapters
+    to qwen's DeltaNet projections (pinned to q/k/v/o).
+  - **Serialization mismatch.** transformers saves the qwen text submodel with
+    unfused experts; vLLM requires the composite config with fused 3D expert
+    tensors. Fixed with a streaming patcher that applies adapter deltas
+    shard-by-shard in the original layout, verified against the trainer's merge
+    to bf16 rounding (max diff 5e-4).
+  - **Six disk-quota strikes.** Survived without data loss via
+    write-local-then-move checkpoints and an HF-recoverable-first deletion
+    policy; a `--resume` path (deterministic data-order offset) turned the one
+    mid-training crash into zero lost compute.
+
+## Extras that did real work
+
+- **KL-to-base anchor** (teacher distillation): an extra free-routing forward per
+  batch, KL against the base model's precomputed top-50 logprobs on response
+  tokens. The single most effective lever for protecting unconstrained behavior;
+  weight is a per-model dial (gemma 0.05, qwen 0.1) trading free-arm repair
+  against constrained math.
+- **Constraint-aware CE**: residency active on response tokens during training
+  (prefill free, per-row enforcement) is the active ingredient; plain self-SFT
+  on identical data does nothing.
+- **Grouped-GEMM expert LoRA**: per-expert adapters on the fused 3D tensors via
+  `torch._grouped_mm`, **98 to ~2,950 tok/s** over the stock per-expert loop, with
+  a deterministic index-copy combine.
+- **Fast relative screener**: hard-item subsets, one boot, under an hour per
+  candidate; validated against known deltas before use; authoritative
+  confirmation reserved for winners.
+- **Smoke gauntlet before every new configuration**: constraint engagement,
+  grouped-path parity, adapter bump/restore exactness, batched single-row
+  equivalence, free-mode drift, timed steps with a memory watermark. Caught the
+  unsloth drift and both adapter-size surprises before any GPU-hours burned.
+- **LR probes over inherited hyperparameters**: two short runs beat trusting the
+  prior era's mis-specified 3e-4 (3e-5 won by 17% at step 50).
