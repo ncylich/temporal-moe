@@ -89,10 +89,31 @@ weights on an 80GB card: expert-LoRA r8 (capacity-matched to gemma's 1.4B), page
 8-bit Adam, HF stack (unsloth's batched constrained path drifts 4.9% on qwen where
 plain HF shows 0.0–0.3%), chunked-checkpointed CE, per-row KL forward, cuDNN SDP off.
 
+## Qwen attribution square (2026-08-18)
+
+Follow-ups on the replication (records qwen35_ce_d12r{,2,3,4} + duals; single
+screening runs, ±2pt noise). Fraction-matched arm first: at R16 (6.25% resident,
+gemma's R8 fraction) the r1 candidate reaches base-free parity on GSM8K/HE/MMLU —
+the R8 gap is mostly constraint tightness (R8-of-256 = 3.1% resident). The IFEval
+regression is arm-independent (training artifact). A 2×2 {old/clean pool} ×
+{KL 0.05/0.1} then attributed it (worst cell per config, all vs base-free):
+
+- r1 old+.05: worst −9.0 (R8 IFEval); best math/HE (free G+1.5 H+2.4)
+- **r2 clean+.1: worst −6.0 — max-min winner; free arm ~repaired (I−3.0, M+0.9)**
+- r3 clean+.05: worst −8.0
+- r4 old+.1: worst −9.5; best constrained math (R8 G−2.0)
+
+Effects are NOT additive: the KL-0.1 IFEval/MMLU repair only materialises on the
+clean (truncation-free) pool; the clean pool's dropped long rows cost 2–4 GSM8K
+points that only the old pool recovers. Recommendation: r2 for balanced serving,
+r1/r4 when constrained math dominates. Qwen-at-R8 remains a strictly harder
+problem than gemma-at-R8; fraction-matched comparisons are the fair headline.
+
 ## Open
 
-- Free-arm MMLU cost (−2.8): untested lever = KL bracket 0.03/0.07.
-- Qwen free-arm IFEval regression (−5.5): unexplained; candidate suspects are the
-  r8/8-bit accommodations or qwen's larger baseline constraint damage.
-- Think-on variant: needs ≥6k generation cap + training-memory rework (35.7% of
-  think responses cap at 3072 on this pool).
+- Free-arm MMLU cost on gemma (−2.8): untested lever = KL bracket 0.03/0.07.
+- Qwen IFEval: even r2 sits −3.0/−6.0 below base-free; next lever is a pool
+  regen keeping long rows AND zero truncation (cap ≥4k + the chunked-head
+  trainer, which now has the memory headroom for it).
+- Think-on variant: needs ≥6k generation cap; the chunked-head rewrite removed
+  the main memory blocker (81→72.8GB watermark).

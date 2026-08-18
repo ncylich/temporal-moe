@@ -20,8 +20,8 @@ for r in csv.reader(open(f"{AB}/screening_genbench.csv")):
 DS = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
 bf = {ds: V[("qwen35_val_base", "free", ds)] for ds in DS}
 series = [("base under R8 constraint", "qwen35_val_base", "R8", "#b0b0b0"),
-          ("D12-recipe adapted, free", "qwen35_ce_d12r", "free", "#a9dfbf"),
-          ("D12-recipe adapted, under R8", "qwen35_ce_d12r", "R8", "#1e8449")]
+          ("r2 adapted (clean pool, KL 0.1), free", "qwen35_ce_d12r2", "free", "#a9dfbf"),
+          ("r2 adapted (clean pool, KL 0.1), under R8", "qwen35_ce_d12r2", "R8", "#1e8449")]
 
 fig, ax = plt.subplots(figsize=(9.5, 5.2))
 W = 0.26
@@ -39,7 +39,7 @@ ax.text(len(DS) - 0.42, 0.15, "unconstrained base = 0", fontsize=8.5,
 ax.set_xticks(range(len(DS)))
 ax.set_xticklabels([f"{ds}\n(base free {bf[ds]:.1f})" for ds in DS])
 ax.set_ylabel("accuracy delta vs unconstrained base (pts)")
-ax.set_title("Qwen3.5-35B-A3B: D12-recipe replication vs the R8 constraint\n"
+ax.set_title("Qwen3.5-35B-A3B: adaptation (r2, max-min winner of the 2x2) vs the R8 constraint\n"
              "(200-item screens, think-off, same-batch refs; SINGLE runs, noise ±2 pts)")
 ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.14), ncol=3)
 ax.spines[["top", "right"]].set_visible(False)
