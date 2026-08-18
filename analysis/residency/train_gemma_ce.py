@@ -245,6 +245,30 @@ def main():
         print(f"[gce] disagreement weights loaded for {len(TOKW)} rows "
               f"(w = 1 + 2*clip(ce_R8 - ce_free, 0, 3))", flush=True)
 
+    DEC = HEAD = None
+    if A.no_unsloth:
+        # chunked-head path: never materialise [B,S,V] logits (2.5GB bf16 at
+        # qwen's 248k vocab + graph). Decoder forward keeps [B,S,H] (~21MB);
+        # the head is applied inside checkpointed 512-token CE/KL slices.
+        _causal = model.base_model.model if hasattr(model, "base_model") else model
+        DEC, HEAD = _causal.model, _causal.lm_head
+
+    def batch_ce_hid(hid, tgt, scale):
+        targets = tgt[:, 1:]
+        num = den = 0
+        for b in range(targets.shape[0]):
+            m_ = targets[b] != -100
+            if not bool(m_.any()):
+                continue
+            hb, tb = hid[b][m_], targets[b][m_]
+            for j in range(0, tb.shape[0], 512):
+                num = num + torch.utils.checkpoint.checkpoint(
+                    lambda h_, t_: torch.nn.functional.cross_entropy(
+                        HEAD(h_).float(), t_, reduction="sum"),
+                    hb[j:j + 512], tb[j:j + 512], use_reentrant=False)
+            den += int(m_.sum())
+        return num / den / scale
+
     def batch_ce(logits, tgt, scale, ridx=None):
         """Mean response-token CE over a padded batch; per-row float() keeps the
         [B,S,V] float materialisation bounded. With --tok-weights, tokens where
@@ -651,11 +675,19 @@ def main():
             ids, am, tgt, plens, ntok = make_batch(rs)
             GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
                           batch=len(rs), cold_start=False)
-            logits = model(ids, attention_mask=am).logits[:, :-1]
-            loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
+            if DEC is not None:
+                assert TOKW is None, "tok-weights unsupported on the chunked-head path"
+                hid = DEC(ids, attention_mask=am).last_hidden_state[:, :-1]
+                loss = batch_ce_hid(hid, tgt, accum_batches)
+            else:
+                logits = model(ids, attention_mask=am).logits[:, :-1]
+                loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
             loss.backward()          # free the constrained graph BEFORE the KL
             if KLREF is not None:    # forward: two live graphs OOM'd at mb2/4096
-                del logits
+                if DEC is None:
+                    del logits
+                else:
+                    del hid
                 GL.CFG.update(on=False, enforce_from=0, batch=1)
                 targets = tgt[:, 1:]
                 # per-row free forward + immediate backward: KL is a per-row sum,
@@ -671,22 +703,30 @@ def main():
                     tid, tlp = KLREF[ri]
                     tid = tid.to(ids.device).long()
                     tlp = tlp.to(ids.device).float()
-                    lg_free_b = model(ids[b:b + 1],
-                                      attention_mask=am[b:b + 1]).logits[0, :-1]
-                    def _row_kl(lg_row, tid_=tid, tlp_=tlp):
-                        # checkpointed: the fp32 full-vocab intermediates
-                        # (~2GB/row at 2048x248k) are recomputed in backward
-                        lgb = lg_row.float()
+                    def _slice_kl(x_, tid_, tlp_):
+                        # x_ is hidden [n,H] on the chunked-head path, else
+                        # logits [n,V]; fp32 full-vocab intermediates are
+                        # recomputed in backward either way
+                        lgb = (HEAD(x_) if DEC is not None else x_).float()
                         s_at = lgb.gather(1, tid_) - torch.logsumexp(lgb, -1, keepdim=True)
                         p = tlp_.exp()
                         p = p / p.sum(1, keepdim=True)  # renormalise top-50
                         return (p * (tlp_ - s_at)).sum()
-                    kl_b = (A.kl_weight / kl_den / accum_batches
-                            ) * torch.utils.checkpoint.checkpoint(
-                        _row_kl, lg_free_b[m_], use_reentrant=False)
+                    if DEC is not None:
+                        row_x = DEC(ids[b:b + 1],
+                                    attention_mask=am[b:b + 1]).last_hidden_state[0, :-1][m_]
+                    else:
+                        row_x = model(ids[b:b + 1],
+                                      attention_mask=am[b:b + 1]).logits[0, :-1][m_]
+                    kl_sum = 0
+                    for j in range(0, row_x.shape[0], 512):
+                        kl_sum = kl_sum + torch.utils.checkpoint.checkpoint(
+                            _slice_kl, row_x[j:j + 512], tid[j:j + 512],
+                            tlp[j:j + 512], use_reentrant=False)
+                    kl_b = (A.kl_weight / kl_den / accum_batches) * kl_sum
                     kl_b.backward()
                     kl_tot += float(kl_b)
-                    del lg_free_b
+                    del row_x
                 loss = loss.detach() + kl_tot
                 GL.CFG.update(on=not A.no_constraint, R=8, enforce_from=plens,
                               batch=len(rs), cold_start=False)
