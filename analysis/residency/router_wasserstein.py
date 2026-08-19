@@ -45,6 +45,12 @@ def routers_of(model, family):
     if family == "lfm":
         from transformers.models.lfm2_moe import modeling_lfm2_moe as m
         return [mod for mod in model.modules() if isinstance(mod, m.Lfm2MoeSparseMoeBlock)]
+    if family == "olmoe":
+        from transformers.models.olmoe import modeling_olmoe as m
+        return [mod for mod in model.modules() if isinstance(mod, m.OlmoeTopKRouter)]
+    if family == "gptoss":
+        from transformers.models.gpt_oss import modeling_gpt_oss as m
+        return [mod for mod in model.modules() if isinstance(mod, m.GptOssTopKRouter)]
     raise ValueError(family)
 
 
@@ -59,10 +65,20 @@ def hook_capture(routers, family, store):
             h = r.register_forward_hook(
                 lambda _m, _i, out, li=li: store.setdefault(li, []).append(
                     out[0].detach().float()))
-        else:                                    # lfm: gate Linear inside the block
+        elif family == "lfm":                    # gate Linear inside the block
             h = r.gate.register_forward_hook(
                 lambda _m, _i, out, li=li: store.setdefault(li, []).append(
                     out.detach().float()))
+        elif family == "olmoe":                  # router returns (logits, w, idx)
+            h = r.register_forward_hook(
+                lambda _m, _i, out, li=li: store.setdefault(li, []).append(
+                    out[0].detach().float()))
+        else:                                    # gptoss: recompute logits from inputs
+            def _cap(_m, _i, _out, li=li):
+                x = _i[0].reshape(-1, _m.weight.shape[1])
+                lg = torch.nn.functional.linear(x.float(), _m.weight.float(), _m.bias.float())
+                store.setdefault(li, []).append(lg.detach())
+            h = r.register_forward_hook(_cap)
         handles.append(h)
     return handles
 
@@ -84,7 +100,9 @@ def masked_dist(lg, R, family):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--family", required=True, choices=("gemma4", "qwen35", "lfm"))
+    ap.add_argument("--family", required=True,
+                    choices=("gemma4", "qwen35", "lfm", "olmoe", "gptoss"))
+    ap.add_argument("--dequantize", action="store_true", help="gpt-oss: dequantize MXFP4 to bf16")
     ap.add_argument("--model-path", required=True)
     ap.add_argument("--R", type=int, required=True, help="residency budget (=k)")
     ap.add_argument("--n", type=int, default=200)
@@ -94,11 +112,25 @@ def main():
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(A.model_path)
+    kw = {}
+    if A.family == "gptoss" and A.dequantize:
+        from transformers import Mxfp4Config
+        kw["quantization_config"] = Mxfp4Config(dequantize=True)
+        kw["device_map"] = "auto"      # 120b dequantized (235GB) streams via offload
+    if A.family == "gptoss" and not A.dequantize:
+        kw["device_map"] = "cuda"
     model = AutoModelForCausalLM.from_pretrained(
-        A.model_path, dtype=torch.bfloat16).to("cuda").eval()
+        A.model_path, dtype=torch.bfloat16, **kw)
+    if "device_map" not in kw:
+        model = model.to("cuda")
+    assert routers_of(model, A.family), "no router modules found"
+    model = model.eval()
+    # olmoe/gptoss: imposed-only (no constrained-forward hook exists; the three
+    # patched models showed endtoend - imposed <= 0.005, so imposed suffices)
     patch = {"gemma4": GL.patch_gemma4, "qwen35": GL.patch_qwen35,
-             "lfm": GL.patch_lfm}[A.family]
-    patch()
+             "lfm": GL.patch_lfm}.get(A.family)
+    if patch:
+        patch()
     tag = {"gemma4": GL.tag_gemma4, "qwen35": GL.tag_qwen35}.get(A.family)
     if tag:
         tag(model)
@@ -116,28 +148,31 @@ def main():
                                       tokenize=True, return_dict=True)
         ids = torch.tensor([enc["input_ids"][: A.max_tok]], device="cuda")
         free_store, con_store = {}, {}
+        imposed_only = A.family in ("olmoe", "gptoss")
         with torch.no_grad():
             GL.CFG.update(on=False, enforce_from=0, batch=1)
             hs = hook_capture(routers, A.family, free_store)
             model(ids)
             for h in hs:
                 h.remove()
-            GL.CFG.update(on=True, R=A.R, enforce_from=0, batch=1,
-                          cold_start=False)
-            hs = hook_capture(routers, A.family, con_store)
-            model(ids)
-            for h in hs:
-                h.remove()
-            GL.CFG.update(on=False, batch=1)
+            if not imposed_only:
+                GL.CFG.update(on=True, R=A.R, enforce_from=0, batch=1,
+                              cold_start=False)
+                hs = hook_capture(routers, A.family, con_store)
+                model(ids)
+                for h in hs:
+                    h.remove()
+                GL.CFG.update(on=False, batch=1)
         T = ids.shape[1]
         for li in range(L):
             lf = free_store[li][0].reshape(T, -1)
-            lc = con_store[li][0].reshape(T, -1)
             pf = dist_from_logits(lf, A.family)
             q_imp = masked_dist(lf, A.R, A.family)
-            q_e2e = masked_dist(lc, A.R, A.family)
             sums_imp[li] += 0.5 * (pf - q_imp).abs().sum(-1).sum().cpu()
-            sums_e2e[li] += 0.5 * (pf - q_e2e).abs().sum(-1).sum().cpu()
+            if not imposed_only:
+                lc = con_store[li][0].reshape(T, -1)
+                q_e2e = masked_dist(lc, A.R, A.family)
+                sums_e2e[li] += 0.5 * (pf - q_e2e).abs().sum(-1).sum().cpu()
         ntok += T
         if pi % 25 == 0:
             print(f"[rw] {pi}/{len(prompts)}", flush=True)
@@ -154,9 +189,9 @@ def main():
                         "Producer: analysis/residency/router_wasserstein.py"])
             w.writerow(["model", "family", "R", "layer", "w1_imposed", "w1_endtoend", "n_tokens"])
         for li in range(L):
+            e2e = "" if A.family in ("olmoe", "gptoss") else f"{sums_e2e[li].item()/ntok:.5f}"
             w.writerow([os.path.basename(A.model_path.rstrip("/")), A.family, A.R, li,
-                        f"{sums_imp[li].item()/ntok:.5f}",
-                        f"{sums_e2e[li].item()/ntok:.5f}", ntok])
+                        f"{sums_imp[li].item()/ntok:.5f}", e2e, ntok])
     print(f"[rw] DONE {A.family}: mean imposed "
           f"{sums_imp.sum().item()/ntok/L:.4f}, endtoend "
           f"{sums_e2e.sum().item()/ntok/L:.4f} over {ntok} tokens", flush=True)
