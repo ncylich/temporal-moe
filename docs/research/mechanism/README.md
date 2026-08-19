@@ -1,11 +1,11 @@
 # Mechanism, what rolling residency does to MoE routing
 
-Five documents, numbered in reading order. (01 is being rewritten from the data
-layer — see its banner; until it lands, 03/04 are the citable references.)
+Five documents, numbered in reading order. (01 was rewritten 2026-08-19 from the
+data layer; the deprecated version and the probe-era content live in `archive/`.)
 
 | | | read it when |
 |---|---|---|
-| [`01-findings.md`](01-findings.md) | What we know, by claim | **Rewrite pending** (see its banner): being rewritten fresh from the data layer; do not cite until it lands. Its §-references below share that status |
+| [`01-findings.md`](01-findings.md) | What we know, by claim | Rewritten 2026-08-19 from committed sources: constraint costs, thinking/length, fluency, adaptation, measurement corrections |
 | [`02-corrections.md`](02-corrections.md) | What changed against the published write-up | You are revising the paper, or a number here disagrees with one you remember |
 | [`03-methods.md`](03-methods.md) | Every probe: metric, range, direction, controls, limits | You need to know exactly what a number measures, or to decode an identifier like `C8` or `N5` |
 | [`04-coverage.md`](04-coverage.md) | Which script produces which CSV, over which runs and layers | You are reproducing something, or checking whether a cell exists |
@@ -24,10 +24,10 @@ of three different quantities, so they live with the quantities they cut:
 
 | the depth result | lives in |
 |---|---|
-| The contextual share of routing rises with depth, clearly unconstrained and weakly constrained, so the regime gap narrows | `01-findings.md` §1 |
-| Routing demand becomes more cacheable with depth | `01-findings.md` §1 |
-| The last MoE layer costs the most to constrain, in seven of seven measurements; the first in two | `01-findings.md` §4 |
-| Single-layer damage does not predict which layers to free | `01-findings.md` §5 |
+| The contextual share of routing rises with depth, clearly unconstrained and weakly constrained, so the regime gap narrows | `archive/01-findings-deprecated-20260814.md` §1 (probe era; uncorrected) |
+| Routing demand becomes more cacheable with depth | `archive/01-findings-deprecated-20260814.md` §1 (probe era; uncorrected) |
+| The last MoE layer costs the most to constrain, in seven of seven measurements; the first in two | `archive/01-findings-deprecated-20260814.md` §4 (probe era; uncorrected) |
+| Single-layer damage does not predict which layers to free | `archive/01-findings-deprecated-20260814.md` §5 (probe era; uncorrected) |
 | Its hypotheses, what falsified them, and what was withdrawn | `05-notebook.md`; retractions in `02-corrections.md` §4 |
 | Its superseded plan documents | `archive/LAYER_LEXICALITY*.md` |
 

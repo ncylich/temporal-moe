@@ -137,6 +137,28 @@ Headline findings:
   at R8). Next lever: compliance-filtering the existing self-generated format lane;
   no new benchmark-styled prompts, per the lineage rule.
 
+## d) Fluency: WritingBench under the constraint
+
+New harness this week (`analysis/writingbench/`): the official WritingBench queries
+and critic model (arXiv 2503.05244), run fully locally through the project's
+constrained vLLM stack. Every cell = 3 disjoint 50-query English subsets; scores
+are critic points 1 to 10, higher better; deltas are paired within subset.
+Data: `results/ablations/writingbench/{summary,cell_stats}.csv`.
+
+- **The constraint's fluency cost is real but small, and shrinks with model
+  size**: LFM2.5-A1B **-0.31** at R=k (paired SD 0.08), oss-20b -0.17, qwen -0.15,
+  gpt-oss-120b -0.08, gemma -0.07. Compare the 6 to 12 point accuracy costs:
+  writing quality is the robust surface.
+- **Adaptation never pays a fluency tax**: gemma D12 is at-or-above base in every
+  cell (+0.04 at R8); qwen r2 within +-0.06 of base everywhere. The accuracy
+  repairs came free on prose.
+- **Absolute writing quality**: gpt-oss-120b leads at 8.52, qwen 7.97, oss-20b
+  7.63, gemma 7.53, LFM 7.38.
+- Design note: disjoint-subset SDs exposed query-mix sensitivity the single-run
+  SEs missed (subset C ran hot for gemma, cold for oss-20b), but paired deltas
+  stay tight (SD 0.05 to 0.15). Full-555 escalation not needed for any
+  conclusion above.
+
 ## Pointers
 
 - Grid + lengths: `instruct_genbench_vllm.csv` (authoritative),
