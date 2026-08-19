@@ -86,6 +86,27 @@ def bench():
             (task.startswith("humaneval") and met.startswith("pass@1"))
         if ok:
             vals[(rec, arm, task)] = float(r[7])
+    # 2026-08-19: strict mmlu_flan is a format-imitation artifact (see 01-findings §5);
+    # override gemma/qwen base MMLU with the dual-scored relaxed re-scores where they
+    # exist (screening_genbench.csv; base dual records are full-suite, same instrument).
+    # OLMoE has no dual re-score; its strict cell stays and the caption says so.
+    _dual = {}
+    for r in csv.reader(open(f"{ABLATIONS}/screening_genbench.csv")):
+        if len(r) > 7 and r[6] == "acc,relaxed-extract":
+            _dual.setdefault((r[0], r[3]), []).append(float(r[7]))
+    def _dm(recs, arm):
+        xs = [x for rec in recs for x in _dual.get((rec, arm), [])]
+        return sum(xs) / len(xs) if xs else None
+    for arm in ("free", "R8", "R16"):
+        v = _dm(("dual_base", "pair_base"), arm)
+        if v is not None:
+            vals[("gemma4_instruct", arm, "mmlu_flan_cot_fewshot")] = v
+    for arm in ("free", "R8", "R16", "R32"):
+        v = _dm(("qwen35_val_base_dual",), arm)
+        if v is not None:
+            vals[("qwen35_think_off", arm, "mmlu_flan_cot_fewshot")] = v
+        else:
+            vals.pop(("qwen35_think_off", arm, "mmlu_flan_cot_fewshot"), None)
 
     benches = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
 
@@ -133,6 +154,7 @@ def bench():
     ax.set_xticklabels(benches)
     ax.set_ylabel("accuracy change under residency, points")
     ax.set_title("Generative benchmarks under decode-time residency, no/low-thinking modes\n"
+                 "(MMLU relaxed-extraction for qwen/gemma/gpt-oss; OLMoE strict, no dual re-score exists)\n"
                  "(constrained − free, same items and stack per pair; single runs, "
                  "binomial SE 2-4 pts;\nOLMoE, LFM and gpt-oss-20b: k = 12.5%, one cell)",
                  fontsize=9)
