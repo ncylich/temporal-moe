@@ -663,3 +663,5 @@ qwen35_ce_d12r5_b_dual,256,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.9
 qwen35_ce_d12r5_b_dual,256,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.741228,4,2048,235
 qwen35_ce_d12r5_b_dual,256,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.899123,4,2048,1496
 qwen35_ce_d12r5_b_dual,256,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.640351,4,2048,1496
+qwen35_halfgrain_ce_diag,512,16,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.929825,4,2048,254
+qwen35_halfgrain_ce_diag,512,16,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.469298,4,2048,254
