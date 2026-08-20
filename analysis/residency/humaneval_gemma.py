@@ -63,7 +63,7 @@ def main():
     vllm_glue.install()
     from vllm import LLM, SamplingParams
     arms = A.arms.split(",") if A.arms else [A.arm]
-    assert all(a in ("free", "R8", "R16") for a in arms) and arms, "bad --arm(s)"
+    assert all(a == "free" or re.fullmatch(r"R\d+", a) for a in arms) and arms, "bad --arm(s)"
     llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=0.85,
               max_model_len=A.max_model_len, enable_prefix_caching=False)
     msgs = [[{"role": "user", "content":
