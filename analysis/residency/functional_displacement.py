@@ -114,6 +114,11 @@ def main():
                     help="gpt-oss: dequantize MXFP4 to bf16 (quantized load swaps "
                          "out GptOssExperts, breaking module discovery)")
     ap.add_argument("--R", type=int, required=True)
+    ap.add_argument("--swaps", type=int, default=1,
+                    help="swap budget per token for the scan (default 1; use 2 for "
+                         "byte-matched half-grain comparisons)")
+    ap.add_argument("--name-suffix", default="",
+                    help="appended to the model name in CSV/npz rows")
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--max-tok", type=int, default=512)
     ap.add_argument("--out", default=os.path.join(ABLATIONS, "functional_displacement.csv"))
@@ -196,7 +201,8 @@ def main():
                                       w_f.float().sort(-1).values[same], atol=0.05), \
                     f"weight reconstruction off at layer {li}"
                 mask = GL.compute_resident_mask_accel(
-                    lg.unsqueeze(1), A.R, evict="min_logit").squeeze(1).bool()
+                    lg.unsqueeze(1), A.R, evict="min_logit",
+                    swaps=A.swaps).squeeze(1).bool()
                 idx_m, w_m = route_from_logits(
                     lg, mask, A.family, routers[li], blocks[li] if blocks else None)
                 y_m = experts[li](x, idx_m, w_m.to(x.dtype)).float()
@@ -219,7 +225,7 @@ def main():
     um = (usage_mask / ntok).cpu().numpy()
     usage_tv = 0.5 * np.abs(uf - um).sum(-1)
 
-    name = os.path.basename(A.model_path.rstrip("/"))
+    name = os.path.basename(A.model_path.rstrip("/")) + A.name_suffix
     np.savez(os.path.join(ABLATIONS, f"functional_displacement_usage_{name}.npz"),
              usage_free=uf, usage_masked=um, R=A.R, n_tokens=ntok)
     new = not os.path.exists(A.out)
