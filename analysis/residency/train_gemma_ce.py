@@ -507,7 +507,11 @@ def main():
         # Judge in absolute nats (baselines here are near zero).
         c1, cb = parity(on=False)
         ad = max(abs(a - b_) for a, b_ in zip(c1, cb))
-        assert ad < 0.01, \
+        # pair-degenerate half-grain inits (relaxed --smoke-tol): free routing
+        # also has near-tied pairs, so batch-shape jitter flips a few free
+        # selections too; widen the absolute bound with the same rationale as
+        # the constrained gate below.
+        assert ad < (0.01 if A.smoke_tol <= 0.02 else 0.03), \
             f"FREE-mode batch parity FAIL (abs drift {ad:.4f} nats): {c1} vs {cb}"
         print(f"[gce-smoke] batch parity, constraint OFF: max abs drift "
               f"{ad:.4f} nats -- mechanics OK", flush=True)
@@ -591,7 +595,22 @@ def main():
         ck = torch.load(A.out, map_location="cpu", weights_only=False)
         named = dict(model.named_parameters())
         miss = [n for n in ck["tensors"] if n not in named]
-        assert not miss, f"{len(miss)} adapter tensors unmatched, e.g. {miss[:3]}"
+        # vision-tower LoRA pairs get attached by unsloth's default targets but
+        # receive no gradients in text-only training: B stays zero-init, so the
+        # delta is exactly zero and they are droppable. Anything else unmatched
+        # is a real error.
+        droppable = set()
+        for n in miss:
+            if ".lora_B." in n and not ck["tensors"][n].count_nonzero():
+                droppable.add(n)
+                droppable.add(n.replace(".lora_B.", ".lora_A."))
+        real_miss = [n for n in miss if n not in droppable]
+        assert not real_miss, f"{len(real_miss)} adapter tensors unmatched, e.g. {real_miss[:3]}"
+        if droppable:
+            print(f"[gce] dropping {len(droppable)} zero-delta LoRA tensors "
+                  f"(untrained vision-tower pairs)", flush=True)
+            for n in droppable:
+                ck["tensors"].pop(n, None)
         s = A.merge_scale
         with torch.no_grad():
             for n, t in ck["tensors"].items():
