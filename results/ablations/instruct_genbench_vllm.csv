@@ -824,3 +824,4 @@ gemma4_halfgrain_dz3,256,16,R48,48,ifeval,"inst_level_loose_acc,none",0.867925,2
 gemma4_halfgrain_dz3,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.957317,full,1536,67
 gemma4_halfgrain_dz3,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.524390,full,1536,479
 gemma4_halfgrain_dz3_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.634146,full,3072,745
+gemma4_halfgrain_dz3_cap6k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.628049,full,6144,1065
