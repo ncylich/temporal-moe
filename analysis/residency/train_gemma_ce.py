@@ -602,6 +602,26 @@ def main():
     if A.eval_only or A.merge_out:
         ck = torch.load(A.out, map_location="cpu", weights_only=False)
         named = dict(model.named_parameters())
+        # transformers exposes/hides the language_model prefix inconsistently
+        # across load paths; match adapter tensors to params by their stable
+        # tail (layers.N... / final norm), like the qwen streaming patcher.
+        import re as _re
+
+        def _tail(n):
+            m = _re.search(r"((?:layers\.\d+\.).*$)", n)
+            if m:
+                return m.group(1)
+            return "model.norm.weight" if n.endswith("model.norm.weight") else n
+        tail_map = {}
+        for n in named:
+            if "vision_tower" in n or "embed_vision" in n:
+                continue     # vision params share layers.N tails; never trained
+            t = _tail(n)
+            if t != n:
+                assert t not in tail_map, f"tail collision {t}"
+                tail_map[t] = n
+        ck["tensors"] = {(tail_map[_tail(n)] if _tail(n) in tail_map else n): v
+                         for n, v in ck["tensors"].items()}
         miss = [n for n in ck["tensors"] if n not in named]
         # vision-tower LoRA pairs get attached by unsloth's default targets but
         # receive no gradients in text-only training: B stays zero-init, so the
