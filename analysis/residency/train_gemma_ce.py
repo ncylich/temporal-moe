@@ -145,6 +145,14 @@ def main():
                          "free-mode || base top-50) on response tokens (anti-"
                          "forgetting anchor)")
     ap.add_argument("--kl-weight", type=float, default=0.1)
+    ap.add_argument("--kl-only", action="store_true",
+                    help="distillation phase: skip the CE term entirely; train on "
+                         "the KL-to-ref alone (use with self-generated trajectories)")
+    ap.add_argument("--kl-arm", choices=("free", "constrained"), default="free",
+                    help="which arm the KL forward runs on. 'free' anchors the "
+                         "unconstrained arm (adaptation default); 'constrained' "
+                         "distills the constrained-arm distribution toward the ref "
+                         "on the trajectory's own states")
     ap.add_argument("--precompute-tokw", default=None,
                     help="forward-only pass over all trajectories computing per-"
                          "response-token CE under free and R8 routing; saves "
@@ -719,20 +727,22 @@ def main():
             ids, am, tgt, plens, ntok = make_batch(rs)
             GL.CFG.update(on=not A.no_constraint, R=A.R, enforce_from=plens,
                           batch=len(rs), cold_start=False)
-            if DEC is not None:
+            if A.kl_only:
+                loss = torch.zeros((), device=ids.device)
+            elif DEC is not None:
                 assert TOKW is None, "tok-weights unsupported on the chunked-head path"
                 hid = DEC(ids, attention_mask=am).last_hidden_state[:, :-1]
                 loss = batch_ce_hid(hid, tgt, accum_batches)
+                loss.backward()      # free the constrained graph BEFORE the KL
+                del hid
             else:
                 logits = model(ids, attention_mask=am).logits[:, :-1]
                 loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
-            loss.backward()          # free the constrained graph BEFORE the KL
+                loss.backward()
+                del logits
             if KLREF is not None:    # forward: two live graphs OOM'd at mb2/4096
-                if DEC is None:
-                    del logits
-                else:
-                    del hid
-                GL.CFG.update(on=False, enforce_from=0, batch=1)
+                if A.kl_arm == "free":
+                    GL.CFG.update(on=False, enforce_from=0, batch=1)
                 targets = tgt[:, 1:]
                 # per-row free forward + immediate backward: KL is a per-row sum,
                 # so accumulation is exact while only ONE row's graph + [1,S,V]
@@ -743,6 +753,9 @@ def main():
                 for b, ri in enumerate(ridx):
                     if ri not in KLREF:
                         continue
+                    if A.kl_arm == "constrained":
+                        GL.CFG.update(on=True, R=A.R, enforce_from=int(plens[b]),
+                                      batch=1, cold_start=False)
                     m_ = targets[b] != -100
                     tid, tlp = KLREF[ri]
                     tid = tid.to(ids.device).long()
