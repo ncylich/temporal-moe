@@ -601,6 +601,10 @@ def main():
 
     if A.eval_only or A.merge_out:
         ck = torch.load(A.out, map_location="cpu", weights_only=False)
+        cur_stack = "unsloth" if use_unsloth else "hf+peft"
+        assert ck.get("stack") in (None, cur_stack), \
+            (f"merge stack mismatch: adapter trained on {ck.get('stack')} but this "
+             f"process is on {cur_stack} (transient unsloth failure? retry)")
         named = dict(model.named_parameters())
         # transformers exposes/hides the language_model prefix inconsistently
         # across load paths; match adapter tensors to params by their stable
