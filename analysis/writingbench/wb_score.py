@@ -18,6 +18,8 @@ import sys
 
 WB = "/workspace/writingbench"
 QUERIES = f"{WB}/upstream/benchmark_query/benchmark_all.jsonl"
+# committed home for per-item critic scores (cell means alone are not evidence)
+REPO_SCORES = "/workspace/temporal-moe/results/ablations/writingbench/scores"
 sys.path.insert(0, f"{WB}/upstream")
 from prompt import evaluate_system, evaluate_prompt  # noqa: E402
 
@@ -29,12 +31,18 @@ def main():
     ap.add_argument("--gpu-mem", type=float, default=0.9)
     A = ap.parse_args()
 
+    # fail-loud BEFORE the engine boots: both score homes must be writable
+    for d in (f"{WB}/scores", REPO_SCORES):
+        os.makedirs(d, exist_ok=True)
+        probe = os.path.join(d, ".write_probe")
+        open(probe, "w").close()
+        os.remove(probe)
+
     q = {json.loads(l)["index"]: json.loads(l) for l in open(QUERIES)}
     from vllm import LLM, SamplingParams
     llm = LLM(model=A.critic, gpu_memory_utilization=A.gpu_mem, max_model_len=16384)
     sp = SamplingParams(temperature=1.0, top_p=0.95, max_tokens=2048)
 
-    os.makedirs(f"{WB}/scores", exist_ok=True)
     for rf in A.responses:
         rec = os.path.basename(rf).replace(".jsonl", "")
         items = [json.loads(l) for l in open(rf)]
@@ -51,16 +59,20 @@ def main():
         outs = llm.chat(prompts, sp)
         per = {}
         unparsed = 0
-        with open(f"{WB}/scores/{rec}.jsonl", "w") as fh:
-            for (idx, ci), o in zip(meta, outs):
-                t = o.outputs[0].text
-                m = re.search(r'"score"\s*:\s*(\d+)', t)
-                s = int(m.group(1)) if m else None
-                if s is None:
-                    unparsed += 1
-                else:
-                    per.setdefault(idx, []).append(s)
-                fh.write(json.dumps({"index": idx, "criterion": ci, "score": s}) + "\n")
+        lines = []
+        for (idx, ci), o in zip(meta, outs):
+            t = o.outputs[0].text
+            m = re.search(r'"score"\s*:\s*(\d+)', t)
+            s = int(m.group(1)) if m else None
+            if s is None:
+                unparsed += 1
+            else:
+                per.setdefault(idx, []).append(s)
+            lines.append(json.dumps({"index": idx, "criterion": ci, "score": s}))
+        assert len(lines) == len(meta), f"{len(lines)} scores for {len(meta)} prompts"
+        for d in (f"{WB}/scores", REPO_SCORES):      # pod-local + committed home
+            with open(os.path.join(d, f"{rec}.jsonl"), "w") as fh:
+                fh.write("\n".join(lines) + "\n")
         item_means = [sum(v) / len(v) for v in per.values() if v]
         mean = sum(item_means) / len(item_means)
         n = len(item_means)

@@ -53,8 +53,13 @@ def main():
     ap.add_argument("--max-model-len", type=int, default=2560)
     A = ap.parse_args()
     tag = A.tag or ("gemma4_adapted" if "merged" in A.path else "gemma4_instruct")
+    # dump files are keyed (record, arm, task): think-on needs its own record name
+    # or it overwrites the think-off dumps
+    assert A.think == "off" or A.tag, "--think on requires an explicit --tag"
 
     os.environ["HF_ALLOW_CODE_EVAL"] = "1"
+    import genprotocol
+    genprotocol.check_dump_dir()      # dumps are default-on: fail before engine boot
     from datasets import load_dataset
     probs = list(load_dataset("openai/openai_humaneval", split="test"))
     if A.limit:
@@ -73,8 +78,10 @@ def main():
     import json as _json
     import subprocess
     _gc = _json.load(open(os.path.join(A.path, "generation_config.json")))
+    tk = llm.get_tokenizer()
     for arm in arms:                       # all arms share ONE engine boot
-        DEC.update(on=arm != "free", R=16 if arm == "R16" else 8, swaps=1)
+        R = None if arm == "free" else int(arm.lstrip("R"))
+        DEC.update(on=R is not None, R=R or 0, swaps=1)
         DEC["state"].clear()
         t0 = time.time()
         outs = llm.chat(msgs, SamplingParams(
@@ -94,14 +101,26 @@ def main():
         line = [l for l in out.stdout.splitlines() if l.startswith("PASS1")]
         assert line, f"scorer failed: {out.stderr[-400:]}"
         res = {"pass@1": float(line[0].split()[1])}
+        iline = [l for l in out.stdout.splitlines() if l.startswith("ITEMS")]
+        passed = [c == "1" for c in iline[0].split()[1]] if iline else [None] * len(outs)
         secs = time.time() - t0
         print(f"[heg] {tag} {arm}: pass@1 = {res['pass@1']:.4f} "
               f"({len(probs)} problems, {secs:.0f}s)", flush=True)
 
+        def _ntok(t):
+            return len(tk(t, add_special_tokens=False).input_ids)
+        # think_toks: token mass of the channel spans (raw minus channel-stripped)
+        genprotocol.write_dump(tag, arm, "humaneval_gemma_fixed", [
+            {"doc": p["task_id"], "raw": o.outputs[0].text,
+             "gen_toks": len(o.outputs[0].token_ids),
+             "think_toks": _ntok(o.outputs[0].text)
+             - _ntok(CHANNEL.sub("", o.outputs[0].text)),
+             "pass": ps}
+            for p, o, ps in zip(probs, outs, passed)], len(probs))
+
         with open(os.path.join(ABLATIONS, A.csv_name), "a", newline="") as fh:
             w = csv.writer(fh)
-            w.writerow([tag, 128, 8, arm,
-                        (16 if arm == "R16" else 8) if arm != "free" else "",
+            w.writerow([tag, 128, 8, arm, R or "",
                         "humaneval_gemma_fixed", "pass@1,channel-aware",
                         f"{res['pass@1']:.6f}", A.limit or "full", A.max_tokens,
                         f"{secs:.0f}"])

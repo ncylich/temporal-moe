@@ -20,3 +20,4 @@ pairs = [(p[0], t) for p, t in zip(d["preds"], d["tests"])]
 with ThreadPoolExecutor(max_workers=16) as ex:
     results = list(ex.map(run_one, pairs))
 print("PASS1", sum(results) / len(results))
+print("ITEMS", "".join("1" if r else "0" for r in results))

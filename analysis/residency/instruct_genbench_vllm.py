@@ -65,6 +65,9 @@ def main():
     if A.path:
         M = dict(M, path=A.path)
 
+    import genprotocol
+    genprotocol.check_dump_dir()      # dumps are default-on: fail before engine boot
+
     vllm_glue.install()
     from lm_eval import simple_evaluate
     from lm_eval.models.vllm_causallms import VLLM
@@ -200,53 +203,51 @@ def main():
                                 mk, f"{mv:.6f}", lim or "full", A.gen_cap,
                                 f"{secs:.0f}"])
             fh.flush()
-            samp = (res.get("samples") or {}).get(task)
-            if samp:
-                import json
-                sd = os.path.join(ABLATIONS, "genbench_samples")
-                os.makedirs(sd, exist_ok=True)
-                def _lens(x):
-                    # x["resps"] is the POST-STRIP scoring text: valid for gen_toks
-                    # of the scored answer only. Think lengths come exclusively from
-                    # the raw doc-keyed capture (think_toks_by_doc below); a per-item
-                    # think_toks measured here was a defect (0 for closed blocks,
-                    # full length for cap-truncated ones) and is deliberately gone.
-                    resp = (x.get("resps") or [[""]])[0]
-                    resp = resp[0] if resp else ""
-                    return {"gen_toks": len(lm.tokenizer(
-                        resp, add_special_tokens=False).input_ids)}
+            samp = res.get("samples") or {}
+            # grouped suites (mmlu_*) log samples under per-subject keys, never the
+            # group name; flatten with the subtask carried so doc keys stay unique
+            # (bare doc_id restarts at 0 per subject)
+            flat = ([(task, x) for x in samp[task]] if task in samp else
+                    [(st, x) for st in sorted(samp) for x in samp[st]])
+            assert flat, f"no samples logged for {task}: cannot write dump"
 
-                slim = [{"doc_id": x.get("doc_id"), **_lens(x),
-                         **{mk: x[mk] for mk in x
-                            if mk in ("exact_match", "pass@1", "prompt_level_strict_acc",
-                                      "inst_level_strict_acc", "acc")}}
-                        for x in samp]
-                blob = {"items": slim}
-                if THINK_MARK and genprotocol.FINALS:
-                    # doc-aligned, one entry per item (continuation era)
-                    blob["think_toks_by_doc"] = {
-                        str(d): len(lm.tokenizer(
-                            t.rsplit(THINK_MARK, 1)[0] if THINK_MARK in t else t,
-                            add_special_tokens=False).input_ids)
-                        for d, t in genprotocol.FINALS.items()}
-                json.dump(blob, open(os.path.join(
-                    sd, f"{A.record_as or A.model}_{arm_name}_{task}.json"), "w"))
-                # full response token ids (re-tokenized; INSTRUCT_ANALYSIS_PLAN.md) --
-                # workspace only, never committed
-                import torch as _torch
-                td = "/workspace/instruct-traj/genbench_tokens"
-                os.makedirs(td, exist_ok=True)
-                def _raw_or_resp(x):
-                    if x.get("doc_id") in genprotocol.FINALS:
-                        return genprotocol.FINALS[x["doc_id"]]
-                    r = (x.get("resps") or [[""]])[0]
-                    return r[0] if r else ""
-                _torch.save({"items": [
-                    {"doc_id": x.get("doc_id"),
-                     "ids": lm.tokenizer(_raw_or_resp(x),
-                                         add_special_tokens=False).input_ids}
-                    for x in samp]},
-                    os.path.join(td, f"{A.record_as or A.model}_{arm_name}_{task}.pt"))
+            def _resp(x):
+                r = (x.get("resps") or [[""]])[0]
+                return r[0] if r else ""
+
+            def _ntok(t):
+                return len(lm.tokenizer(t, add_special_tokens=False).input_ids)
+
+            items, think_by_doc = [], {}
+            for st, x in flat:
+                doc = str(x.get("doc_id")) if st == task else f"{st}:{x.get('doc_id')}"
+                # raw = pre-strip text (think/channel markers intact); resp = the
+                # post-strip scored answer, whose length keeps the historic
+                # gen_toks semantic. raw_toks is the full generation.
+                raw = genprotocol.FINALS.get((st, x.get("doc_id")), _resp(x))
+                items.append({"doc": doc, "doc_id": x.get("doc_id"), "raw": raw,
+                              "raw_toks": _ntok(raw), "gen_toks": _ntok(_resp(x)),
+                              **{mk: x[mk] for mk in x
+                                 if mk in ("exact_match", "pass@1",
+                                           "prompt_level_strict_acc",
+                                           "inst_level_strict_acc", "acc")}})
+                if THINK_MARK:
+                    # marker absent => cap-truncated inside thinking: all think
+                    think_by_doc[doc] = _ntok(
+                        raw.rsplit(THINK_MARK, 1)[0] if THINK_MARK in raw else raw)
+            genprotocol.write_dump(
+                A.record_as or A.model, arm_name, task, items, len(flat),
+                extra={"think_toks_by_doc": think_by_doc} if THINK_MARK else None)
+            # full response token ids (re-tokenized; INSTRUCT_ANALYSIS_PLAN.md) --
+            # workspace only, never committed
+            import torch as _torch
+            td = "/workspace/instruct-traj/genbench_tokens"
+            os.makedirs(td, exist_ok=True)
+            _torch.save({"items": [
+                {"doc": it["doc"], "doc_id": it["doc_id"],
+                 "ids": lm.tokenizer(it["raw"], add_special_tokens=False).input_ids}
+                for it in items]},
+                os.path.join(td, f"{A.record_as or A.model}_{arm_name}_{task}.pt"))
             show = {k: round(v, 4) for k, v in metrics.items() if isinstance(v, (int, float))}
             print(f"  [{A.model}] {arm_name} {task}: {show} ({secs:.0f}s)", flush=True)
     fh.close()

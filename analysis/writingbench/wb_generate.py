@@ -18,6 +18,8 @@ sys.path.insert(0, "/workspace/temporal-moe/analysis")
 
 WB = "/workspace/writingbench"
 QUERIES = f"{WB}/upstream/benchmark_query/benchmark_all.jsonl"
+# committed home for responses: pod-local files are one reimage from gone
+REPO_RESP = "/workspace/temporal-moe/results/ablations/writingbench/responses"
 
 
 def main():
@@ -33,6 +35,13 @@ def main():
     ap.add_argument("--max-seqs", type=int, default=256)
     ap.add_argument("--think", choices=("default", "on", "off"), default="off")
     A = ap.parse_args()
+
+    # fail-loud BEFORE the engine boots: both response homes must be writable
+    for d in (f"{WB}/responses", REPO_RESP):
+        os.makedirs(d, exist_ok=True)
+        probe = os.path.join(d, ".write_probe")
+        open(probe, "w").close()
+        os.remove(probe)
 
     rows = [json.loads(l) for l in open(QUERIES)]
     en = [r for r in rows if r.get("lang") == "en"][A.offset: A.offset + A.n]
@@ -57,15 +66,18 @@ def main():
            else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}})
     outs = llm.chat(msgs, sp, **ctk)
 
-    os.makedirs(f"{WB}/responses", exist_ok=True)
-    out = f"{WB}/responses/{A.record}_{A.arm}{A.suffix}.jsonl"
-    with open(out, "w") as fh:
-        for r, o in zip(en, outs):
-            fh.write(json.dumps({"index": r["index"],
-                                 "response": o.outputs[0].text}) + "\n")
+    name = f"{A.record}_{A.arm}{A.suffix}.jsonl"
+    lines = [json.dumps({"index": r["index"], "response": o.outputs[0].text,
+                         "gen_toks": len(o.outputs[0].token_ids)})
+             for r, o in zip(en, outs)]
+    assert len(lines) == len(en), f"{len(lines)} responses for {len(en)} queries"
+    for d in (f"{WB}/responses", REPO_RESP):     # pod-local + committed home
+        with open(os.path.join(d, name), "w") as fh:
+            fh.write("\n".join(lines) + "\n")
     lens = [len(o.outputs[0].token_ids) for o in outs]
-    print(f"[wb-gen] DONE {out}: {len(en)} responses, mean {sum(lens)/len(lens):.0f} "
-          f"tokens, {sum(x >= A.max_new for x in lens)} capped", flush=True)
+    print(f"[wb-gen] DONE {name} (-> {REPO_RESP}): {len(en)} responses, "
+          f"mean {sum(lens)/len(lens):.0f} tokens, "
+          f"{sum(x >= A.max_new for x in lens)} capped", flush=True)
 
 
 if __name__ == "__main__":

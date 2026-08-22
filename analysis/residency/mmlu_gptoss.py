@@ -57,6 +57,8 @@ def main():
 
     ap.add_argument("--gpu-mem", type=float, default=0.92)
     ap.add_argument("--gen-cap", type=int, default=2048)
+    ap.add_argument("--max-model-len", type=int, default=5632,
+                    help="thinking arms need prompt + 4096: use 8192")
     ap.add_argument("--reasoning-effort", default=None,
                     choices=("low", "medium", "high"))
     ap.add_argument("--think", choices=("default", "on", "off"), default="default",
@@ -70,12 +72,20 @@ def main():
     if A.path:
         M = dict(M, path=A.path)
 
+    import genprotocol
+    genprotocol.check_dump_dir()      # dumps are default-on: fail before engine boot
+
     vllm_glue.install()
     from lm_eval import simple_evaluate
     from lm_eval.models.vllm_causallms import VLLM
+    kw = {}
+    if M["arch"] == "gemma4":
+        # transformers 5.15 marks head_dim per-layer on gemma4; vLLM reads it
+        # globally (same accommodation as instruct_genbench_vllm)
+        kw["hf_overrides"] = {"allow_global_per_layer_attribute_access": True}
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.gen_cap,
-              max_model_len=5632, gpu_memory_utilization=A.gpu_mem,
-              enforce_eager=True, enable_prefix_caching=False, dtype="auto")
+              max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
+              enforce_eager=True, enable_prefix_caching=False, dtype="auto", **kw)
 
     if A.reasoning_effort or A.think != "default":
         _tk = lm.tokenizer
@@ -88,9 +98,36 @@ def main():
         _tk.apply_chat_template = lambda *aa, **kk: _orig_act(
             *aa, **{**kk, **_extra})
 
+    # arch-appropriate think marker (this harness now serves every model's
+    # relaxed-extraction MMLU, not only gpt-oss)
+    THINK_MARK = {"qwen3_5": "</think>", "lfm": "</think>",
+                  "gemma4": "<channel|>",
+                  "gptoss": "<|channel|>final<|message|>"}.get(M["arch"])
+    if M["arch"] == "qwen3_5" and A.think == "off":
+        THINK_MARK = None
     import genprotocol
-    genprotocol.install(lm, cap=A.gen_cap,
-                        think_marker="<|channel|>final<|message|>")
+    genprotocol.install(lm, cap=A.gen_cap, think_marker=THINK_MARK)
+
+    # card-recipe sampling, as instruct_genbench_vllm (greedy never; 1.0/1.0 only
+    # when the model ships that): recipe from the shipped generation_config
+    import json as _json
+    try:
+        _gc = _json.load(open(os.path.join(M["path"], "generation_config.json")))
+    except (FileNotFoundError, ValueError):
+        _gc = {}
+    _has_recipe = any(k in _gc for k in ("temperature", "top_p", "top_k"))
+    _dt, _dp = (1.0, 1.0) if _has_recipe else (0.7, 0.95)
+    _t, _p = _gc.get("temperature", _dt), _gc.get("top_p", _dp)
+    _k = _gc.get("top_k") or -1
+    gen_kwargs = f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
+    if _gc.get("presence_penalty"):
+        gen_kwargs += f",presence_penalty={_gc['presence_penalty']}"
+    if _gc.get("min_p"):
+        gen_kwargs += f",min_p={_gc['min_p']}"
+    if M["arch"] == "gptoss":
+        gen_kwargs += ",skip_special_tokens=False"   # channel markers must survive
+    print(f"[mmlu] sampling: temp={_t} top_p={_p} top_k={_k} (model config)",
+          flush=True)
 
     out = os.path.join(ABLATIONS, A.csv_name)
     fh = open(out, "a", newline="")
@@ -102,27 +139,38 @@ def main():
         t0 = time.time()
         res = simple_evaluate(model=lm, tasks=["mmlu_flan_cot_fewshot"], limit=A.limit,
                               apply_chat_template=True,
-                              gen_kwargs="do_sample=True,temperature=1.0,top_p=1.0,"
-                                         "seed=1234,skip_special_tokens=False",
+                              gen_kwargs=gen_kwargs,
                               log_samples=True)
-        n = hit = miss_extract = 0
+        n = hit = miss_extract = n_eval = 0
         dump = []          # per ARM, across all subjects (was per-subject: dumps
         hit_strict = 0     # held only the final subject's items; scores unaffected)
         for task, samp in res["samples"].items():
             for x in samp:
+                n_eval += 1
                 resp = x["resps"][0][0] if x.get("resps") else ""
+                # raw = pre-strip (channels/think intact); resp = post-strip scored
+                raw = genprotocol.FINALS.get((task, x.get("doc_id")), resp)
                 gold = re.search(r"\(([A-D])\)", str(x.get("target", "")))
                 pred = extract(resp)
-                if gold is None:
-                    continue
                 sm = STRICT.search(resp)
+                it = {"doc": f"{task}:{x.get('doc_id')}", "raw": raw,
+                      "gen_toks": len(lm.tokenizer(
+                          raw, add_special_tokens=False).input_ids),
+                      "think_toks": (len(lm.tokenizer(
+                          raw.rsplit(THINK_MARK, 1)[0] if THINK_MARK in raw else raw,
+                          add_special_tokens=False).input_ids)
+                          if THINK_MARK else 0),
+                      "gold": gold.group(1) if gold else None,
+                      "pred_relaxed": pred,
+                      "pred_strict": sm.group(1) if sm else None,
+                      "text": resp}
+                dump.append(it)
+                if gold is None:
+                    continue           # unscoreable target: dumped, not scored
                 n += 1
                 miss_extract += pred is None
                 hit += pred == gold.group(1)
                 hit_strict += bool(sm) and sm.group(1) == gold.group(1)
-                dump.append({"gold": gold.group(1), "pred_relaxed": pred,
-                             "pred_strict": sm.group(1) if sm else None,
-                             "text": resp})
         acc = hit / max(1, n)
         acc_s = hit_strict / max(1, n)
         secs = time.time() - t0
@@ -130,11 +178,8 @@ def main():
               f"({n} items, {miss_extract} unextracted, {secs:.0f}s)", flush=True)
         # dual rows from the SAME generations + per-item dump: extraction questions
         # become re-analysis, never regeneration (2026-08-16 format-drift finding)
-        import json as _dj
-        os.makedirs(os.path.join(ABLATIONS, "genbench_samples"), exist_ok=True)
-        _dj.dump({"items": dump}, open(os.path.join(
-            ABLATIONS, "genbench_samples",
-            f"{A.record_as or A.model}_{arm}_mmlu_dual.json"), "w"))
+        genprotocol.write_dump(A.record_as or A.model, arm, "mmlu_dual",
+                               dump, n_eval)
         for met, val in (("acc,relaxed-extract", acc), ("acc,strict-flan", acc_s)):
             w.writerow([A.record_as or A.model, M["E"], M["k"], arm, R or "",
                         "mmlu_gptoss_relaxed", met, f"{val:.6f}", A.limit,

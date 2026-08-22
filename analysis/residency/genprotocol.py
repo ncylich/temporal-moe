@@ -10,12 +10,14 @@ One component owns the generation lifecycle:
    the task's stops are applied after the think-strip.
 3. SCORING TEXT: think segment stripped (text after the LAST `think_marker`; marker
    absent => whole text), then task stops applied.
-4. CAPTURE: FINALS maps doc_id -> final raw text, one entry per item.
+4. CAPTURE: FINALS maps (task_name, doc_id) -> final raw text, one entry per item.
+   The task_name component is load-bearing: grouped suites (mmlu_*) restart doc_id
+   at 0 per subject, so a bare-doc_id key silently overwrites across subjects.
 """
 import copy
 
 HARD_CAP = 2048
-FINALS = {}          # doc_id -> final raw response text for the current cell
+FINALS = {}          # (task_name, doc_id) -> final raw response text, current cell
 
 
 def install(lm, cap=HARD_CAP, think_marker=None):
@@ -60,7 +62,48 @@ def install(lm, cap=HARD_CAP, think_marker=None):
 
         FINALS.clear()
         for r, raw in zip(requests, outs):
-            FINALS[getattr(r, "doc_id", None)] = raw
+            FINALS[(getattr(r, "task_name", None), getattr(r, "doc_id", None))] = raw
         return [_score_text(raw, u) for raw, u in zip(outs, untils)]
 
     lm.generate_until = gu
+
+
+# --- per-item trajectory dumps: default-on, verified ---------------------------
+DUMP_DIR = None
+
+
+def check_dump_dir():
+    """Startup gate, called BEFORE the engine boots: the dump directory must be
+    writable or the run must not start. A benchmark run without its trajectory
+    dump is unrepeatable evidence loss."""
+    global DUMP_DIR
+    import os
+    from paths import ABLATIONS
+    d = os.path.join(ABLATIONS, "genbench_samples")
+    os.makedirs(d, exist_ok=True)
+    probe = os.path.join(d, ".write_probe")
+    open(probe, "w").close()
+    os.remove(probe)
+    DUMP_DIR = d
+    return d
+
+
+def write_dump(record, arm, task, items, expected_n, extra=None):
+    """Write the (record, arm, task) per-item dump and verify the round-trip count.
+    Items must carry a doc key ("doc") and the raw pre-strip text ("raw", thinking
+    markers / channels intact). expected_n is the number of items evaluated; a
+    mismatch is a hard failure (a per-subject overwrite once silently kept 4 of
+    228 items -- this makes that bug class detected, not survivable)."""
+    import json
+    import os
+    d = DUMP_DIR or check_dump_dir()
+    assert items and len(items) == expected_n, \
+        f"dump has {len(items)} items, evaluated {expected_n} ({record} {arm} {task})"
+    missing = [i for i, x in enumerate(items) if "doc" not in x or "raw" not in x]
+    assert not missing, f"items missing doc/raw keys at idx {missing[:5]}"
+    path = os.path.join(d, f"{record}_{arm}_{task}.json")
+    json.dump({"items": items, **(extra or {})}, open(path, "w"))
+    n_back = len(json.load(open(path))["items"])
+    assert n_back == expected_n, f"dump verify failed ({n_back} != {expected_n}): {path}"
+    print(f"  [dump] {path}: {n_back} items verified", flush=True)
+    return path

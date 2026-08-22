@@ -53,8 +53,13 @@ def main():
     if A.path:
         M = dict(M, path=A.path)
     tag = A.tag or A.model
+    # dump files are keyed (record, arm, task): a non-default think mode needs its
+    # own record name or it overwrites the default-mode dumps
+    assert A.think == "default" or A.tag, "--think off requires an explicit --tag"
 
     os.environ["HF_ALLOW_CODE_EVAL"] = "1"
+    import genprotocol
+    genprotocol.check_dump_dir()      # dumps are default-on: fail before engine boot
     from datasets import load_dataset
     probs = list(load_dataset("openai/openai_humaneval", split="test"))
     if A.limit:
@@ -103,6 +108,8 @@ def main():
     line = [ln for ln in out.stdout.splitlines() if ln.startswith("PASS1")]
     assert line, f"scorer failed: {out.stderr[-400:]}"
     p1 = float(line[0].split()[1])
+    iline = [ln for ln in out.stdout.splitlines() if ln.startswith("ITEMS")]
+    passed = [c == "1" for c in iline[0].split()[1]] if iline else [None] * len(raws)
     secs = time.time() - t0
     capped = sum(len(o.outputs[0].token_ids) >= A.max_tokens - 8 for o in outs)
     print(f"[hvt] {tag} {A.arm} think={A.think}: pass@1 = {p1:.4f} "
@@ -113,6 +120,17 @@ def main():
     os.makedirs(td, exist_ok=True)
     from transformers import AutoTokenizer
     tk = AutoTokenizer.from_pretrained(M["path"])
+
+    def _ntok(t):
+        return len(tk(t, add_special_tokens=False).input_ids)
+    # think_toks: text before </think>; open block (marker absent while thinking
+    # was on) => cap-truncated inside thinking: all think
+    genprotocol.write_dump(tag, A.arm, "humaneval_think", [
+        {"doc": p["task_id"], "raw": r, "gen_toks": len(o.outputs[0].token_ids),
+         "think_toks": _ntok(r.rsplit("</think>", 1)[0]) if "</think>" in r
+         else (_ntok(r) if A.think != "off" else 0),
+         "pass": ps}
+        for p, r, o, ps in zip(probs, raws, outs, passed)], len(probs))
     torch.save({"items": [{"doc_id": i, "ids": tk(r, add_special_tokens=False).input_ids}
                           for i, r in enumerate(raws)]},
                os.path.join(td, f"{tag}_{A.arm}_humaneval_think.pt"))
