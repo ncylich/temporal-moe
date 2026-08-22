@@ -102,46 +102,44 @@ print(f"wrote {out}")
 
 
 
-# ---- wide scatter: cap-carried change vs total change, one point per configuration ----
-figs, axs = plt.subplots(figsize=(8.8, 3.4) if PAPER else (8.8, 3.8))
-for lab, think, tot, capd in cells:
-    axs.scatter(tot, capd, s=52, color="#d1605e" if think else "#4878b0",
+# ---- component scatter: cap-carried vs never-capped change, one point per config ----
+xb = np.array([c[2] - c[3] for c in cells])          # broad = total - cap part
+yc = np.array([c[3] for c in cells])                 # cap-carried
+r2c = np.corrcoef(xb, yc)[0, 1] ** 2
+figs, axs = plt.subplots(figsize=(8.8, 3.6) if PAPER else (8.8, 4.0))
+for (lab, think, tot, capd) in cells:
+    axs.scatter(tot - capd, capd, s=52, color="#d1605e" if think else "#4878b0",
                 edgecolor="black", lw=0.6, zorder=3)
-lo_, hi_ = min(x.min(), y.min()) - 40, max(x.max(), y.max()) + 40
-axs.plot([lo_, hi_], [lo_, hi_], "k--", lw=0.9, alpha=0.6)
-axs.axhline(0, color="grey", lw=0.6, alpha=0.6)
-axs.axvline(0, color="grey", lw=0.6, alpha=0.6)
-ANNOT = {"Qwen on\nIFEval": (8, -4), "gemma on\nIFEval": (8, -4),
-         "20b high\nIFEval": (8, 4), "120b high\nIFEval": (10, 8),
-         "Qwen on\nGSM8K": (8, -12), "gemma on\nGSM8K": (8, 6)}
+axs.axhline(0, color="grey", lw=0.7, alpha=0.7)
+axs.axvline(0, color="grey", lw=0.7, alpha=0.7)
+ANNOT = {"Qwen on\nIFEval": (8, -3), "gemma on\nIFEval": (8, -3),
+         "20b high\nIFEval": (8, 3), "120b high\nIFEval": (6, -12),
+         "Qwen on\nGSM8K": (8, 6), "LFM\nIFEval": (6, -13),
+         "gemma on\nGSM8K": (8, 3)}
 for lab, think, tot, capd in cells:
     if lab in ANNOT:
         dx, dy = ANNOT[lab]
-        axs.annotate(lab.replace("\n", " "), (tot, capd), textcoords="offset points",
-                     xytext=(dx, dy), fontsize=9.5 if PAPER else 8,
-                     ha="left" if dx > 0 else "right")
+        axs.annotate(lab.replace("\n", " "), (tot - capd, capd),
+                     textcoords="offset points", xytext=(dx, dy),
+                     fontsize=9.5 if PAPER else 8, ha="left" if dx > 0 else "right")
 axs.scatter([], [], s=52, color="#d1605e", edgecolor="black", lw=0.6,
             label="thinking on / high effort")
 axs.scatter([], [], s=52, color="#4878b0", edgecolor="black", lw=0.6,
             label="thinking off / low effort")
-axs.plot([], [], "k--", lw=0.9, label="fully cap-carried (y = x)")
-axs.legend(loc="upper left", fontsize=10 if PAPER else 8.5, framealpha=0.95)
-axs.set_xlim(lo_, hi_)
-axs.set_ylim(min(y.min(), 0) - 60, max(y.max(), 0) + 60)
-axs.set_xlabel("total mean length change, tokens per item (constrained − free)")
-axs.set_ylabel("part from items at the cap\nunder either setting")
-axs.annotate(f"slope {b[0]:.2f}, $R^2$ = {r2:.2f}", (0.985, 0.06),
-             xycoords="axes fraction", ha="right", va="bottom",
+axs.legend(loc="upper right", fontsize=10 if PAPER else 8.5, framealpha=0.95)
+axs.set_xlabel("change among never-capped items, tokens per item (broad component)")
+axs.set_ylabel("change from items at the cap\n(cap component)")
+axs.annotate(f"components across configurations: $R^2$ = {r2c:.2f}", (0.40, 0.93),
+             xycoords="axes fraction", ha="center", va="top",
              fontsize=10.5 if PAPER else 9,
              bbox=dict(facecolor="white", alpha=0.85, edgecolor="0.6"))
 if not PAPER:
-    axs.set_title("Cap-carried vs total length change: on the diagonal the cap traffic "
-                  "IS the change; below it, broad lengthening among never-capped items",
-                  fontsize=9.5)
+    axs.set_title("The two components of the length change are nearly independent: "
+                  "configurations occupy every quadrant", fontsize=9.5)
 figs.tight_layout()
-outs = f"{FIG}/length_blowup_scatter{'_nocaption' if PAPER else ''}.png"
+outs = f"{FIG}/length_components{'_nocaption' if PAPER else ''}.png"
 figs.savefig(outs, dpi=170)
-print(f"wrote {outs}")
+print(f"wrote {outs}, component R2 = {r2c:.3f}")
 
 # ---- flip-direction strip: wrongness rides the length extremes in both directions ----
 def acc(i):

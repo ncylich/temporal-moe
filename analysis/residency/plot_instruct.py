@@ -282,11 +282,11 @@ def combined_row():
     plt.rcParams.update({"font.size": 16, "axes.labelsize": 15.5,
                          "xtick.labelsize": 13.5, "ytick.labelsize": 13,
                          "legend.fontsize": 10.5})
-    fig, (axl, axr) = plt.subplots(1, 2, figsize=(14.2, 4.6),
+    fig, (axl, axr) = plt.subplots(1, 2, figsize=(15.6, 4.6),
                                    gridspec_kw={"width_ratios": [1.15, 1],
-                                                "wspace": 0.14})
+                                                "wspace": 0.16})
     # ---- left: per model ----
-    w = 0.19
+    w = 0.17
     for i, spec in enumerate(SPEC):
         nbars = 2 * len(spec[1])
         for s, mode in enumerate(spec[1]):
@@ -323,7 +323,7 @@ def combined_row():
     # ---- right: per benchmark, mode-mean bars + per-model dots ----
     groups = TASKS + ["WB"]
     glabel = {"WB": "WritingB.\n(x10)"}
-    w = 0.19
+    w = 0.17
     for j, b in enumerate(groups):
         combos = [("off", 0), ("off", 1), ("on", 0), ("on", 1)]
         for c, (role, arm_idx) in enumerate(combos):

@@ -936,3 +936,5 @@ qwen35_halfgrain_dzm_off,512,16,R96,96,humaneval_instruct,sample_len,164.000000,
 qwen35_halfgrain_dzm_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",0.890244,full,2048,524
 qwen35_halfgrain_dzm_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1419
 qwen35_halfgrain_dzm_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.578947,4,2048,1419
+olmoe_instruct,64,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.552632,4,2048,57
+olmoe_instruct,64,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.460526,4,2048,57
