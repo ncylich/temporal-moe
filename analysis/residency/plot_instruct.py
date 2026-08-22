@@ -52,7 +52,7 @@ def selfce():
     per = {}
     for r in rows:
         per.setdefault(r[0], {})[r[3]] = float(r[6])
-    fig, ax = plt.subplots(figsize=(6.4, 4.8) if PAPER else (7, 5))
+    fig, ax = plt.subplots(figsize=(5.8, 4.6) if PAPER else (7, 5))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
     for i, m in enumerate([m for m in SIZE_ORDER if m in per]):
         d = per[m]
@@ -210,7 +210,7 @@ def bench():
     _save(fig, "instruct_bench_damage")
 
     # ---- per-model figure, think_tax style: mode color, arm alpha, dots per surface ----
-    figm, axm = plt.subplots(figsize=(11.8, 4.8) if PAPER else (11, 5))
+    figm, axm = plt.subplots(figsize=(11.8, 4.1) if PAPER else (11, 5))
     w = 0.19
     means = {}
     for i, spec in enumerate(SPEC):

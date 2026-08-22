@@ -111,7 +111,7 @@ FLIPC = CELLS + [("gptoss_120b_low", "R4", "120b low", False),
                  ("gptoss_20b_low", "R4", "20b low", False),
                  ("olmoe_instruct", "R8", "OLMoE", False)]
 rng = np.random.default_rng(7)
-fig2, ax2 = plt.subplots(figsize=(7.6, 4.6) if PAPER else (7.6, 5))
+fig2, ax2 = plt.subplots(figsize=(6.2, 4.8) if PAPER else (7.6, 5))
 for rec, arm, nm, think in FLIPC:
     for task, tnm in TASKS:
         fr, cn = blob(rec, "free", task), blob(rec, arm, task)

@@ -93,7 +93,7 @@ PANELS = [
       ("adapted, under R=16 (6.25%)", "R16", "adapted", "#145a32")]),
 ]
 
-fig, axes = plt.subplots(1, 2, figsize=(13, 4.6) if PAPER else (13, 5.2), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.9) if PAPER else (13, 5.2), sharey=True)
 for ax, (title, val, baserec, adrec, series) in zip(axes, PANELS):
     bf = {ds: val(baserec, "free", ds) for ds in DS}
     n = len(series)

@@ -294,8 +294,16 @@ lo.text(0.012, 0.08, "token-dominated (unconstrained MoE)", transform=lo.transAx
 hh, ll = hi.get_legend_handles_labels()
 h2, l2 = lo.get_legend_handles_labels()
 LEGEND_NCOL, LEGEND_Y = 2, -0.28
-lo.legend(hh + h2, ll + l2, loc="upper center", bbox_to_anchor=(0.5, LEGEND_Y),
-          framealpha=0.95, ncol=LEGEND_NCOL, handlelength=2.6, columnspacing=1.4)
+if PAPER:
+    # colour/shade/marker encoding is carried by the caption (isoFLOP standard);
+    # only the two control series need naming in-figure
+    keep = [(h, l) for h, l in zip(hh + h2, ll + l2)
+            if "sigmoid" in l or "widest" in l]
+    lo.legend([h for h, _ in keep], [l for _, l in keep], loc="lower right",
+              fontsize=10, framealpha=0.95)
+else:
+    lo.legend(hh + h2, ll + l2, loc="upper center", bbox_to_anchor=(0.5, LEGEND_Y),
+              framealpha=0.95, ncol=LEGEND_NCOL, handlelength=2.6, columnspacing=1.4)
 
 # The caption sits below the legend, so its offset has to follow the legend's height rather than be a
 # constant. It was a constant, tuned when SERIES held 8 entries (4 rows); adding the four 1e18 arms
