@@ -330,7 +330,8 @@ def combined_row():
     axl.set_xticks(range(len(SPEC)))
     axl.set_xticklabels(SHORT)
     axl.set_ylabel("damage, points")
-    axl.set_title("Per model  (bars: mean over benchmarks)", loc="left", fontsize=16)
+    axl.set_title("Per model  (bars: mean over benchmarks)", loc="left",
+                  fontsize=17, fontweight="bold", pad=8)
     axl.grid(alpha=0.25, axis="y")
 
     # ---- right: per benchmark, mode-mean bars + per-model dots ----
@@ -365,7 +366,8 @@ def combined_row():
     axr.set_xticks(range(len(groups)))
     axr.set_xticklabels([glabel.get(b, b) for b in groups])
     axr.set_ylabel("damage, points")
-    axr.set_title("Per benchmark  (bars: mean over models)", loc="left", fontsize=16)
+    axr.set_title("Per benchmark  (bars: mean over models)", loc="left",
+                  fontsize=17, fontweight="bold", pad=8)
     axr.grid(alpha=0.25, axis="y")
 
     # ---- per-panel keys on the right ----
@@ -387,7 +389,7 @@ def combined_row():
         ax.legend(handles=H, loc="center left", bbox_to_anchor=(1.015, 0.5),
                   frameon=False, handletextpad=0.5, labelspacing=0.55)
     fig.subplots_adjust(left=0.06, right=0.785, top=0.92, bottom=0.10,
-                        hspace=0.45)
+                        hspace=0.60)
     _save(fig, "instruct_damage_row")
 
 
