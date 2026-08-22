@@ -1,0 +1,9 @@
+"# Single-half reconstruction error by partition family (lower better; oracle = best rank-d/2 linear bottleneck, unreachable by permutations). Producer: analysis/residency/partition_screen.py"
+family,model,mean_err,median_err,n_experts
+naive,gemma4-halfgrain,0.8646,0.8751,3610
+spectral,gemma4-halfgrain,0.8656,0.8763,3610
+interleave,gemma4-halfgrain,0.8625,0.8740,3610
+snake,gemma4-halfgrain,0.8598,0.8721,3610
+rand1,gemma4-halfgrain,0.8648,0.8750,3610
+rand2,gemma4-halfgrain,0.8654,0.8765,3610
+oracle,gemma4-halfgrain,0.0002,0.0000,3610
