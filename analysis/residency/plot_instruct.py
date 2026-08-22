@@ -330,6 +330,7 @@ def combined_row():
     axl.set_xticks(range(len(SPEC)))
     axl.set_xticklabels(SHORT)
     axl.set_ylabel("damage, points")
+    axl.set_title("Per model  (bars: mean over benchmarks)", loc="left", fontsize=16)
     axl.grid(alpha=0.25, axis="y")
 
     # ---- right: per benchmark, mode-mean bars + per-model dots ----
@@ -364,30 +365,29 @@ def combined_row():
     axr.set_xticks(range(len(groups)))
     axr.set_xticklabels([glabel.get(b, b) for b in groups])
     axr.set_ylabel("damage, points")
+    axr.set_title("Per benchmark  (bars: mean over models)", loc="left", fontsize=16)
     axr.grid(alpha=0.25, axis="y")
 
-    # ---- one legend strip above both panels ----
+    # ---- per-panel keys on the right ----
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch as _P
+
     def dot(color, label, star=False):
         return Line2D([], [], marker="*" if star else "o", ls="",
-                      ms=10 if star else 6, color=color, markeredgecolor="black",
+                      ms=11 if star else 7, color=color, markeredgecolor="black",
                       markeredgewidth=0.35, label=label)
-    blank = Line2D([], [], ls="", label=" ")
-    # column-major fill with ncol=8 and 2 rows: build thematic column pairs
-    H = [dot(DCOL["GSM8K"], "GSM8K"), dot(DCOL["IFEval"], "IFEval"),
-         dot(DCOL["HumanEval"], "HumanEval"), dot(DCOL["MMLU"], "MMLU"),
-         dot(DCOL["WB"], "WritingBench (x10)", star=True), blank,
-         dot(MCOL[0], "OLMoE"), dot(MCOL[1], "LFM2.5"),
-         dot(MCOL[2], "GPT-OSS 20B"), dot(MCOL[3], "gemma4"),
-         dot(MCOL[4], "Qwen3.5"), dot(MCOL[5], "GPT-OSS 120B"),
-         _P(facecolor=MODE_COL["off"], edgecolor="black", label="think off / low"),
-         _P(facecolor=MODE_COL["on"], edgecolor="black", label="think on / high"),
-         _P(facecolor="0.25", edgecolor="black", label="dark: R = k"),
-         _P(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")]
-    fig.legend(handles=H, loc="upper center", ncol=8, frameon=False,
-               bbox_to_anchor=(0.5, 1.005), columnspacing=1.3, handletextpad=0.4)
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    shade = [_P(facecolor=MODE_COL["off"], edgecolor="black", label="think off / low"),
+             _P(facecolor=MODE_COL["on"], edgecolor="black", label="think on / high"),
+             _P(facecolor="0.25", edgecolor="black", label="dark: R = k"),
+             _P(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")]
+    Hl = shade + [dot(DCOL[b], b) for b in TASKS] + \
+        [dot(DCOL["WB"], "WritingBench (x10)", star=True)]
+    Hr = shade + [dot(MCOL[i], nm) for i, nm in enumerate(SHORT)]
+    for ax, H in ((axl, Hl), (axr, Hr)):
+        ax.legend(handles=H, loc="center left", bbox_to_anchor=(1.015, 0.5),
+                  frameon=False, handletextpad=0.5, labelspacing=0.55)
+    fig.subplots_adjust(left=0.06, right=0.785, top=0.92, bottom=0.10,
+                        hspace=0.45)
     _save(fig, "instruct_damage_row")
 
 
