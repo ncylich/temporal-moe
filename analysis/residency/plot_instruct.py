@@ -273,57 +273,69 @@ def bench():
 
 def combined_row():
     """Paper variant: per-model and per-benchmark damage side by side in ONE row.
-    Right panel restyled like the left: mode-colored mean bars (over models) with
-    per-model dots, instead of 20 per-model bars per group."""
+    All legends live in a strip above the axes; per-item dots fan horizontally inside
+    each bar instead of stacking on its centerline."""
     SPEC, TASKS, delta = load_damage()
     DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.75, 5))))
     MCOL = plt.cm.tab10(np.linspace(0, 1, 10))
     SHORT = ["OLMoE", "LFM2.5", "20b", "gemma4", "Qwen3.5", "120b"]
     plt.rcParams.update({"font.size": 16, "axes.labelsize": 15.5,
                          "xtick.labelsize": 13.5, "ytick.labelsize": 13,
-                         "legend.fontsize": 10.5})
-    fig, (axl, axr) = plt.subplots(1, 2, figsize=(15.6, 4.6),
-                                   gridspec_kw={"width_ratios": [1.15, 1],
-                                                "wspace": 0.16})
+                         "legend.fontsize": 11})
+    fig, (axl, axr) = plt.subplots(1, 2, figsize=(15.6, 5.0),
+                                   gridspec_kw={"width_ratios": [1.12, 1],
+                                                "wspace": 0.13})
+    W = 0.15          # bar width; 4 bars + mode gap span ~0.66 of unit pitch
+    GAPM = 0.05       # extra gap between the off-pair and the on-pair
+    EK = dict(elinewidth=0.9, capsize=1.5, ecolor="0.25")
+
+    def bx(c, nbars):
+        # bar centre for combo index c of nbars, with a mode gap after the first pair
+        off = (c - (nbars - 1) / 2) * W
+        if nbars == 4:
+            off += (GAPM / 2) if c >= 2 else (-GAPM / 2)
+        return off
+
     # ---- left: per model ----
-    w = 0.17
     for i, spec in enumerate(SPEC):
         nbars = 2 * len(spec[1])
-        for s, mode in enumerate(spec[1]):
+        c = 0
+        for mode in spec[1]:
             for arm_idx in (0, 1):
                 ds = [delta(spec, mode, arm_idx, b) for b in TASKS]
                 got = [d for d in ds if d is not None]
                 if not got:
+                    c += 1
                     continue
                 m = sum(got) / len(got)
                 se = (sum((d - m) ** 2 for d in got) / max(1, len(got) - 1)) ** 0.5 \
                     / len(got) ** 0.5
-                x = i + (2 * s + arm_idx - (nbars - 1) / 2) * w
-                axl.bar(x, m, width=w * 0.9, yerr=se, capsize=2,
-                        color=MODE_COL[mode[1]], alpha=1.0 if arm_idx == 0 else 0.5,
-                        edgecolor="black", lw=0.5, zorder=2)
-                for b, d in zip(TASKS, ds):
-                    if d is not None:
-                        axl.scatter(x, d, s=26, color=DCOL[b], edgecolor="black",
-                                    lw=0.4, zorder=3)
+                x = i + bx(c, nbars)
+                axl.bar(x, m, width=W * 0.9, yerr=se, color=MODE_COL[mode[1]],
+                        alpha=1.0 if arm_idx == 0 else 0.5, edgecolor="black",
+                        lw=0.5, zorder=2, error_kw=EK)
+                pts = [(b, d) for b, d in zip(TASKS, ds) if d is not None]
                 dwb = delta(spec, mode, arm_idx, "WB")
                 if dwb is not None:
-                    axl.scatter(x, dwb, s=62, marker="*", color=DCOL["WB"],
-                                edgecolor="black", lw=0.4, zorder=3)
-    for b in TASKS:
-        axl.scatter([], [], s=34, color=DCOL[b], edgecolor="black", lw=0.4, label=b)
-    axl.scatter([], [], s=66, marker="*", color=DCOL["WB"], edgecolor="black",
-                lw=0.4, label="WritingBench (x10)")
+                    pts.append(("WB", dwb))
+                for j, (b, d) in enumerate(pts):
+                    xo = x + (j - (len(pts) - 1) / 2) * 0.030
+                    if b == "WB":
+                        axl.scatter(xo, d, s=46, marker="*", color=DCOL["WB"],
+                                    edgecolor="black", lw=0.35, zorder=3)
+                    else:
+                        axl.scatter(xo, d, s=17, color=DCOL[b], edgecolor="black",
+                                    lw=0.35, zorder=3)
+                c += 1
     axl.axhline(0, color="black", lw=0.8)
     axl.set_xticks(range(len(SPEC)))
     axl.set_xticklabels(SHORT)
     axl.set_ylabel("damage under residency, points")
-    axl.legend(ncol=2, loc="lower right", framealpha=0.95)
     axl.grid(alpha=0.25, axis="y")
+
     # ---- right: per benchmark, mode-mean bars + per-model dots ----
     groups = TASKS + ["WB"]
     glabel = {"WB": "WritingB.\n(x10)"}
-    w = 0.17
     for j, b in enumerate(groups):
         combos = [("off", 0), ("off", 1), ("on", 0), ("on", 1)]
         for c, (role, arm_idx) in enumerate(combos):
@@ -341,27 +353,41 @@ def combined_row():
             m = sum(vals) / len(vals)
             se = (sum((d - m) ** 2 for d in vals) / max(1, len(vals) - 1)) ** 0.5 \
                 / len(vals) ** 0.5
-            x = j + (c - 1.5) * w
-            axr.bar(x, m, width=w * 0.9, yerr=se, capsize=2, color=MODE_COL[role],
+            x = j + bx(c, 4)
+            axr.bar(x, m, width=W * 0.9, yerr=se, color=MODE_COL[role],
                     alpha=1.0 if arm_idx == 0 else 0.5, edgecolor="black", lw=0.5,
-                    zorder=2)
-            for d, i in zip(vals, mods):
-                axr.scatter(x, d, s=26, color=MCOL[i], edgecolor="black", lw=0.4,
+                    zorder=2, error_kw=EK)
+            for jj, (d, i) in enumerate(zip(vals, mods)):
+                xo = x + (jj - (len(vals) - 1) / 2) * 0.026
+                axr.scatter(xo, d, s=17, color=MCOL[i], edgecolor="black", lw=0.35,
                             zorder=3)
-    for i, nm in enumerate(SHORT):
-        axr.scatter([], [], s=34, color=MCOL[i], edgecolor="black", lw=0.4, label=nm)
-    from matplotlib.patches import Patch as _P
-    axr.legend(handles=axr.get_legend_handles_labels()[0] +
-               [_P(facecolor=MODE_COL["off"], edgecolor="black", label="think off/low"),
-                _P(facecolor=MODE_COL["on"], edgecolor="black", label="think on/high"),
-                _P(facecolor="0.25", edgecolor="black", label="dark: R = k"),
-                _P(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")],
-               ncol=2, loc="upper right", framealpha=0.95, fontsize=9.5)
     axr.axhline(0, color="black", lw=0.8)
     axr.set_xticks(range(len(groups)))
     axr.set_xticklabels([glabel.get(b, b) for b in groups])
     axr.grid(alpha=0.25, axis="y")
-    fig.tight_layout()
+
+    # ---- one legend strip above both panels ----
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch as _P
+    def dot(color, label, star=False):
+        return Line2D([], [], marker="*" if star else "o", ls="",
+                      ms=10 if star else 6, color=color, markeredgecolor="black",
+                      markeredgewidth=0.35, label=label)
+    blank = Line2D([], [], ls="", label=" ")
+    # column-major fill with ncol=8 and 2 rows: build thematic column pairs
+    H = [dot(DCOL["GSM8K"], "GSM8K"), dot(DCOL["IFEval"], "IFEval"),
+         dot(DCOL["HumanEval"], "HumanEval"), dot(DCOL["MMLU"], "MMLU"),
+         dot(DCOL["WB"], "WritingBench (x10)", star=True), blank,
+         dot(MCOL[0], "OLMoE"), dot(MCOL[1], "LFM2.5"),
+         dot(MCOL[2], "20b"), dot(MCOL[3], "gemma4"),
+         dot(MCOL[4], "Qwen3.5"), dot(MCOL[5], "120b"),
+         _P(facecolor=MODE_COL["off"], edgecolor="black", label="think off / low"),
+         _P(facecolor=MODE_COL["on"], edgecolor="black", label="think on / high"),
+         _P(facecolor="0.25", edgecolor="black", label="dark: R = k"),
+         _P(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")]
+    fig.legend(handles=H, loc="upper center", ncol=8, frameon=False,
+               bbox_to_anchor=(0.5, 1.02), columnspacing=1.1, handletextpad=0.4)
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
     _save(fig, "instruct_damage_row")
 
 
