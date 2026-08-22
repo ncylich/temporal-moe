@@ -40,17 +40,25 @@ PAIRS = {
                      "default": "medium", "arms": ["R4", "R16"]},
     "LFM2.5-A1B": {"modes": {"on": "lfm25_instruct"},        # no toggle: lengths only
                    "default": "on", "arms": ["R4"]},
+    "OLMoE-1B-7B": {"modes": {"off": "olmoe_instruct"},      # no thinking mode
+                    "default": "off", "arms": ["R8"]},
 }
-# per-record task->metric map; channel-native variants override per family
-TASKS = {"GSM8K": ("gsm8k_cot_zeroshot", "exact_match,flexible-extract"),
-         "IFEval": ("ifeval", "prompt_level_strict_acc,none"),
-         "HumanEval": ("humaneval_instruct", "pass@1,create_test"),
-         "MMLU": ("mmlu_flan_cot_fewshot", "exact_match,get-answer")}
-OVERRIDES = {"gemma4": {"HumanEval": ("humaneval_gemma_fixed", "pass@1,channel-aware")},
-             "lfm": {"HumanEval": ("humaneval_think", "pass@1,channel-aware")},
-             "qwen35": {"HumanEval": ("humaneval_think", "pass@1,channel-aware")},
-             "gptoss": {"HumanEval": ("humaneval_gptoss", "pass@1,channel-aware"),
-                        "MMLU": ("mmlu_gptoss_relaxed", "acc,relaxed-extract")}}
+# per-record task->metric candidates, first pair where BOTH arms have a row wins.
+# MMLU: relaxed extraction (extractor v2, mmlu_gptoss.py) is the reported metric
+# wherever the relaxed harness has run (gemma_adapt_RESULTS.md convention: strict
+# measures few-shot format imitation, not knowledge); strict flan-CoT cells are
+# the fallback for modes not regenerated under the relaxed harness.
+MMLU_CAND = [("mmlu_gptoss_relaxed", "acc,relaxed-extract"),
+             ("mmlu_flan_cot_fewshot", "exact_match,get-answer")]
+TASKS = {"GSM8K": [("gsm8k_cot_zeroshot", "exact_match,flexible-extract")],
+         "IFEval": [("ifeval", "prompt_level_strict_acc,none")],
+         "HumanEval": [("humaneval_instruct", "pass@1,create_test")],
+         "MMLU": MMLU_CAND}
+OVERRIDES = {"gemma4": {"HumanEval": [("humaneval_gemma_fixed", "pass@1,channel-aware")]},
+             "lfm": {"HumanEval": [("humaneval_think", "pass@1,channel-aware")]},
+             "qwen35": {"HumanEval": [("humaneval_think", "pass@1,channel-aware")]},
+             "gptoss": {"HumanEval": [("humaneval_gptoss", "pass@1,channel-aware")],
+                        "MMLU": [("mmlu_gptoss_relaxed", "acc,relaxed-extract")]}}
 
 
 def task_map(record):
@@ -76,6 +84,9 @@ def load_cells():
 
 def load_lengths(record, arm, task):
     p = os.path.join(SAMP, f"{record}_{arm}_{task}.json")
+    if not os.path.exists(p) and task.startswith("mmlu"):
+        # the relaxed harness writes its dual-scored dump as *_mmlu_dual.json
+        p = os.path.join(SAMP, f"{record}_{arm}_mmlu_dual.json")
     if not os.path.exists(p):
         return None
     b = json.load(open(p))
@@ -83,18 +94,23 @@ def load_lengths(record, arm, task):
         b = {"items": b}
     seen, rows = set(), []
     for i in b.get("items", []):
-        if i["doc_id"] in seen:
+        key = i.get("doc", i.get("doc_id"))      # new dumps carry doc (str) keys
+        if key in seen:
             continue
-        seen.add(i["doc_id"])
+        seen.add(key)
         rows.append(i)
     rows = [i for i in rows if "gen_toks" in i]  # pre-capture-era dumps lack lengths
     if not rows:
         return None
-    # ONLY valid think source: doc-keyed raw capture (pre-strip). The per-item
-    # think_toks field measured the post-strip scoring text (0 for closed blocks,
-    # full length for cap-truncated ones) -- a defect, never read it.
+    # Valid think sources: (1) the doc-keyed raw capture think_toks_by_doc;
+    # (2) per-item think_toks in NEW-format dumps (marker: "raw" present), which
+    # are computed from the pre-strip raw text. The OLD per-item think_toks field
+    # (no "raw" alongside) measured post-strip text -- a defect, never read it.
     bd = b.get("think_toks_by_doc") or {}
-    tk = [bd[str(i["doc_id"])] for i in rows if str(i["doc_id"]) in bd]
+    tk = [bd[str(i.get("doc", i.get("doc_id")))] for i in rows
+          if str(i.get("doc", i.get("doc_id"))) in bd]
+    if not tk and all("raw" in i and "think_toks" in i for i in rows):
+        tk = [i["think_toks"] for i in rows]
     out = {"n": len(rows),
            "gen": np.mean([i["gen_toks"] for i in rows]),
            "think": np.mean(tk) if len(tk) == len(rows) else None,
@@ -118,10 +134,16 @@ def main():
     for model, cfg in PAIRS.items():
         for mode, rec in cfg["modes"].items():
             tm = task_map(rec)
-            for tname, (task, metric) in tm.items():
-                free = cells.get((rec, "free", task, metric))
+            for tname, cands in tm.items():
                 for arm in cfg["arms"]:
-                    con = cells.get((rec, arm, task, metric))
+                    # first candidate task with BOTH arms present (never mixes
+                    # extraction protocols between free and constrained)
+                    free = con = None
+                    for task, metric in cands:
+                        free = cells.get((rec, "free", task, metric))
+                        con = cells.get((rec, arm, task, metric))
+                        if free is not None and con is not None:
+                            break
                     if free is None or con is None:
                         continue
                     d = 100 * (con - free)
@@ -184,8 +206,12 @@ def main():
     for model, cfg in PAIRS.items():
         for mode, rec in cfg["modes"].items():
             tm = task_map(rec)
-            for tname, (task, _) in tm.items():
-                lf = load_lengths(rec, "free", task)
+            for tname, cands in tm.items():
+                lf = task = None
+                for task, _ in cands:            # first candidate with a dump
+                    lf = load_lengths(rec, "free", task)
+                    if lf:
+                        break
                 if not lf or not lf["think"]:
                     continue
                 for arm in cfg["arms"]:
