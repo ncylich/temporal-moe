@@ -21,9 +21,9 @@ OUT = os.path.join(REPO, "results", "phase0", "figures",
 FS = 15 if PAPER else 11.5
 LIGHT, EDGE, DARK, GREY = "#cfe3f5", "#4a7fb5", "#0d3b66", "#666666"
 
-fig, ax = plt.subplots(figsize=(9.0, 2.7) if PAPER else (10.0, 3.4))
+fig, ax = plt.subplots(figsize=(9.0, 2.2) if PAPER else (10.0, 3.4))
 ax.set_xlim(0, 10.0)
-ax.set_ylim(0, 3.2)
+ax.set_ylim(0, 3.05)
 ax.axis("off")
 
 # k-1 = 5 resident-expert reads from fast memory, back to back.

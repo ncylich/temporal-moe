@@ -29,7 +29,7 @@ P18 = [
 ]
 
 plt.rcParams.update({"font.size": 9.5, "axes.titlesize": 11, "axes.labelsize": 10})
-fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
+fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.4))
 for ax, data, title in [(axes[0], P19, "$10^{19}$ FLOPs"), (axes[1], P18, "$10^{18}$ FLOPs · 38M")]:
     for label, color, ys in data:
         ax.plot(range(len(BITS)), ys, "-o", color=color, ms=5, lw=1.8)
