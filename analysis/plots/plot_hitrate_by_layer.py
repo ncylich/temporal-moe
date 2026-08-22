@@ -72,8 +72,9 @@ for run, (lab, col) in PAIR.items():
 ax.plot([], [], color=TMP, alpha=0.32, lw=1.4, marker="o", ms=3.5,
         label="other temporal arms (1e17, 1e18, 1e19)")
 
-ax.set_xlabel("MoE layer  (layer 1 is a dense FFN in every config)")
-ax.set_ylabel("cache hit rate  (share of demanded top-k already resident)")
+ax.set_xlabel("MoE layer" if PAPER else "MoE layer  (layer 1 is a dense FFN in every config)")
+ax.set_ylabel("cache hit rate" if PAPER else
+              "cache hit rate  (share of demanded top-k already resident)")
 ax.set_xticks(range(2, 15))
 ax.set_ylim(0.05, 0.50)
 ax.grid(alpha=0.25, lw=0.6)

@@ -199,10 +199,19 @@ def main():
                           f"(x{lc['think']/max(1, lf['think']):.2f})"
                           f"{'' if exact else '  ~approx (retry-inclusive)'}")
     if pts:
-        fig, ax = plt.subplots(figsize=(6.5, 5.5))
+        PAPER = "--no-caption" in sys.argv
+        if PAPER:
+            plt.rcParams.update({"font.size": 13, "axes.labelsize": 13,
+                                 "xtick.labelsize": 11.5, "ytick.labelsize": 11.5,
+                                 "legend.fontsize": 10})
+        fig, ax = plt.subplots(figsize=(6.4, 5.4) if PAPER else (6.5, 5.5))
         cols = {m: c for m, c in zip(PAIRS, plt.cm.tab10.colors)}
+        # filled = free-form thinking on / high effort (the amplified modes),
+        # hollow = thinking off / low effort. The mode split IS the claim.
         for model, mode, arm, tname, f, c in pts:
-            ax.scatter(f, c, color=cols[model], s=45)
+            amp = mode not in ("off", "low")
+            ax.scatter(f, c, s=52, color=cols[model] if amp else "none",
+                       edgecolor=cols[model], lw=1.6, zorder=3)
         seen = set()
         handles = []
         for model, *_ in pts:
@@ -211,18 +220,29 @@ def main():
             seen.add(model)
             handles.append(plt.Line2D([], [], marker="o", ls="", color=cols[model],
                                       label=model))
-        lim = max(max(p[4] for p in pts), max(p[5] for p in pts)) * 1.1
-        ax.plot([0, lim], [0, lim], "k--", lw=0.8, alpha=0.6)
+        handles += [plt.Line2D([], [], marker="o", ls="", color="0.3",
+                               label="thinking on / high effort"),
+                    plt.Line2D([], [], marker="o", ls="", markerfacecolor="none",
+                               color="0.3", label="thinking off / low effort")]
+        lo = min(min(p[4] for p in pts), min(p[5] for p in pts)) * 0.8
+        lim = max(max(p[4] for p in pts), max(p[5] for p in pts)) * 1.2
+        ax.plot([lo, lim], [lo, lim], "k--", lw=0.8, alpha=0.6)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlim(lo, lim)
+        ax.set_ylim(lo, lim)
         ax.set_xlabel("mean think tokens, free")
         ax.set_ylabel("mean think tokens, constrained")
-        ax.set_title("Does the residency constraint lengthen thinking?\n"
-                     "(points above the diagonal think longer under the constraint)",
-                     fontsize=10)
-        ax.legend(handles=handles, fontsize=8)
-        ax.grid(alpha=0.25)
+        if not PAPER:
+            ax.set_title("Does the residency constraint lengthen thinking?\n"
+                         "(points above the diagonal think longer under the constraint)",
+                         fontsize=10)
+        ax.legend(handles=handles, fontsize=9 if PAPER else 8, loc="upper left")
+        ax.grid(alpha=0.25, which="both")
         fig.tight_layout()
-        fig.savefig(f"{FIG}/think_length_shift.png", dpi=150)
-        print(f"wrote {FIG}/think_length_shift.png")
+        out = f"{FIG}/think_length_shift{'_nocaption' if PAPER else ''}.png"
+        fig.savefig(out, dpi=170)
+        print(f"wrote {out}")
 
 
 if __name__ == "__main__":

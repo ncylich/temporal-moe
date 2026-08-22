@@ -58,21 +58,28 @@ def spearman(xs, ys):
     n = len(xs)
     return 1 - 6 * sum((a - b) ** 2 for a, b in zip(rx, ry)) / (n * (n * n - 1))
 
-fig, axes = plt.subplots(1, 3, figsize=(15, 4.6),
-                         gridspec_kw={"width_ratios": [1.6, 1, 1]})
-ax = axes[0]
-for m, (lab, c) in STYLE.items():
-    ys = rel[m]
-    ax.plot(range(len(ys)), ys, color=c, label=lab, lw=1.8)
-ax.set_xlabel("MoE layer")
-ax.set_ylabel("relative output error of routed experts\n(‖y_masked − y_free‖ / ‖y_free‖, same inputs)")
-ax.set_title("Per-layer functional displacement under R=k")
-ax.legend(frameon=False, fontsize=8)
-ax.spines[["top", "right"]].set_visible(False)
+PAPER = "--no-caption" in sys.argv
+if PAPER:   # paper variant: the two correlation panels only, larger fonts
+    plt.rcParams.update({"font.size": 12.5, "axes.labelsize": 12, "xtick.labelsize": 11,
+                         "ytick.labelsize": 11, "axes.titlesize": 12.5})
+    fig, saxes = plt.subplots(1, 2, figsize=(10.5, 4.3))
+else:
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.6),
+                             gridspec_kw={"width_ratios": [1.6, 1, 1]})
+    ax = axes[0]
+    for m, (lab, c) in STYLE.items():
+        ys = rel[m]
+        ax.plot(range(len(ys)), ys, color=c, label=lab, lw=1.8)
+    ax.set_xlabel("MoE layer")
+    ax.set_ylabel("relative output error of routed experts\n(‖y_masked − y_free‖ / ‖y_free‖, same inputs)")
+    ax.set_title("Per-layer functional displacement under R=k")
+    ax.legend(frameon=False, fontsize=8)
+    ax.spines[["top", "right"]].set_visible(False)
+    saxes = axes[1:]
 
 for ax, data, xlabel, name in (
-        (axes[1], w1, "mean router W1 (probability displacement)", "router W1"),
-        (axes[2], rel, "mean relative output error", "functional error")):
+        (saxes[0], w1, "mean router W1 (probability displacement)", "router W1"),
+        (saxes[1], rel, "mean relative output error", "functional error")):
     xs = [sum(data[m]) / len(data[m]) for m in STYLE]
     ys = [DAMAGE[m] for m in STYLE]
     rho = spearman(xs, [-y for y in ys])   # vs damage magnitude
@@ -81,18 +88,21 @@ for ax, data, xlabel, name in (
         ax.scatter(x, y, color=c, s=60, zorder=3, marker=FRACMARK[frac_of(m)])
         short = lab.split(" (")[0] + ("*" if m == "lfm25-8b-a1b" else "")
         ax.annotate(short, (x, y), textcoords="offset points",
-                    xytext=(6, -3), fontsize=8)
+                    xytext=(6, -3), fontsize=9 if PAPER else 8)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("mean benchmark damage at R=k (points)")
-    ax.set_title(f"{name} vs damage magnitude: Spearman ρ = {rho:+.2f}", fontsize=10)
+    ax.set_title(f"{name}: Spearman ρ = {rho:+.2f}" if PAPER else
+                 f"{name} vs damage magnitude: Spearman ρ = {rho:+.2f}", fontsize=None if PAPER else 10)
     ax.axhline(0, color="#bbbbbb", lw=0.7, zorder=0)
     ax.spines[["top", "right"]].set_visible(False)
-axes[2].set_xlim(left=0)
-fig.text(0.995, 0.01, "marker = residency fraction (○ 3.1%  □ 6.25%  △ 12.5%); "
-         "within each fraction, functional error orders damage exactly. "
-         "*LFM: thinking-on damage (no off mode)",
-         ha="right", fontsize=7, color="#666666")
+saxes[1].set_xlim(left=0)
+if not PAPER:
+    fig.text(0.995, 0.01, "marker = residency fraction (○ 3.1%  □ 6.25%  △ 12.5%); "
+             "within each fraction, functional error orders damage exactly. "
+             "*LFM: thinking-on damage (no off mode)",
+             ha="right", fontsize=7, color="#666666")
 plt.tight_layout()
-out = sys.argv[1] if len(sys.argv) > 1 else f"{ABL}/figures/functional_displacement.png"
+out = (f"{ABL}/figures/functional_displacement_nocaption.png" if PAPER else
+       (sys.argv[1] if len(sys.argv) > 1 else f"{ABL}/figures/functional_displacement.png"))
 plt.savefig(out, dpi=160)
 print("wrote", out)

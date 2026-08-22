@@ -89,8 +89,8 @@ SERIES = [
     ("mechinterp_locus_1e19.csv", "temporal_fine_1e19",   "kfull", TMP_FINE,   "1e19", "temporal 18/192", "-"),
     ("mechinterp_locus.csv",      "s2_TEMPORAL",          "kfull", TMP_COARSE, "1e17", "temporal 6/64",   "-"),
     ("mechinterp_locus_1e19.csv", "temporal_coarse_1e19", "kfull", TMP_COARSE, "1e19", "temporal 6/64",   "-"),
-    ("mechinterp_locus.csv",      "s0_FULL",              "kfull", MOE_FINE,   "1e16", "full MoE 18/192 (sigmoid)", "-"),
-    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "full MoE 18/192 (w=32 only)", "--"),
+    ("mechinterp_locus.csv",      "s0_FULL",              "kfull", MOE_FINE,   "1e16", "full MoE 18/192 (sigmoid router)", "-"),
+    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "full MoE 18/192 (widest window only)", "--"),
     ("mechinterp_locus.csv",      "s2_FULL",              "kfull", MOE_COARSE, "1e17", "full MoE 6/64",   "-"),
     ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",      "kfull", MOE_COARSE, "1e19", "full MoE 6/64",   "-"),
     # 1e18, the budget at which the temporal model wins and where no capture-based measurement existed
@@ -239,7 +239,7 @@ for fname, label, variant, color, budget, legend, ls in SERIES:
     ax.fill_between(x, ylo, yhi, color=color, alpha=0.18, linewidth=0)
     ax.plot(x, med, ls, color=color, marker=BUDGET_MARKER[budget], markersize=7,
             linewidth=1.8, markeredgecolor="white", markeredgewidth=0.8,
-            label=f"{legend} @ {budget}")
+            label=f"{legend} at $10^{{{budget[2:]}}}$")
     # slopes in both units: per unit normalized depth (comparable across models) and per layer
     # index (comparable with the published table), then the shape statistics that a slope hides
     s_nd = boot_stat(g, xs, SLOPE)
@@ -282,7 +282,10 @@ for ax in (hi, lo):
     ax.grid(alpha=0.25, linewidth=0.6)
     ax.set_xlim(0.0, 1.05)
 lo.set_xlabel("normalized depth  $l/L$   (layer 1 is a dense FFN in every config)")
-fig.supylabel("median over experts:  context AUC $-$ token AUC", x=0.035, fontsize=13)
+fig.supylabel("median over experts:  context AUC $-$ token AUC",
+              x=0.012 if PAPER else 0.035, fontsize=13)
+if PAPER:
+    fig.subplots_adjust(left=0.17)
 hi.text(0.012, 0.90, "context-dominated (temporal)", transform=hi.transAxes,
         fontsize=10, color="#145a14", weight="bold")
 lo.text(0.012, 0.08, "token-dominated (unconstrained MoE)", transform=lo.transAxes,

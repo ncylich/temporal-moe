@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
-"""Instruct-program figures: self-CE damage vs residency fraction, and per-benchmark
-damage at matched fraction. Reads instruct_selfce.csv and instruct_genbench*.csv only.
-Writes results/ablations/figures/{instruct_selfce_damage,instruct_bench_damage}.png."""
+"""Instruct-program figures: self-CE damage vs residency fraction, per-benchmark damage at
+matched fraction, and per-model mean damage, both damage figures carrying the thinking axis
+(blue = thinking off / low effort, red = on / high effort) and WritingBench (critic-point
+deltas x10 onto the 100-point accuracy axis; WritingBench ran think-off, so its dots attach
+to the off-mode bars, LFM's to its native mode). Reads instruct_selfce.csv,
+instruct_genbench_vllm.csv, screening_genbench.csv, think_ablation_summary.csv and
+writingbench/cell_stats.csv.
+Writes results/ablations/figures/{instruct_selfce_damage,instruct_bench_damage,
+instruct_model_damage}.png; --no-caption writes the paper variants (short labels, no titles).
+Model order everywhere: total parameters ascending. Bar means use the four accuracy
+benchmarks (uniform basis across modes and models); WritingBench appears as dots only.
+"""
 import csv
 import os
 import sys
@@ -10,15 +19,31 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS                                          # noqa: E402
 
 FIG = os.path.join(ABLATIONS, "figures")
+PAPER = "--no-caption" in sys.argv
+if PAPER:                       # paper mode: larger in-figure text survives column downscaling
+    plt.rcParams.update({"font.size": 13, "axes.labelsize": 13, "xtick.labelsize": 11.5,
+                         "ytick.labelsize": 11.5, "legend.fontsize": 10})
+
+MODE_COL = {"off": "#4878b0", "on": "#d1605e"}
+
+
+def _save(fig, name):
+    fig.savefig(f"{FIG}/{name}{'_nocaption' if PAPER else ''}.png", dpi=170)
+    print(f"wrote {name}{'_nocaption' if PAPER else ''}.png")
+
+
+# total-parameter ascending order, used for every figure in this file
 NAMES = {"olmoe_instruct": "OLMoE-Instruct (64 experts)",
          "lfm25_instruct": "LFM2.5-A1B (32 experts)",
          "gemma4_instruct": "gemma4-26B-IT (128 experts)",
          "qwen35_instruct": "Qwen3.5-35B (256 experts)"}
+SIZE_ORDER = ["olmoe_instruct", "lfm25_instruct", "gemma4_instruct", "qwen35_instruct"]
 
 
 def selfce():
@@ -27,10 +52,11 @@ def selfce():
     per = {}
     for r in rows:
         per.setdefault(r[0], {})[r[3]] = float(r[6])
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(6.4, 4.8) if PAPER else (7, 5))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
-    for i, (m, d) in enumerate(per.items()):
-        E = int(rows[0][1]) if False else int([r[1] for r in rows if r[0] == m][0])
+    for i, m in enumerate([m for m in SIZE_ORDER if m in per]):
+        d = per[m]
+        E = int([r[1] for r in rows if r[0] == m][0])
         k = int([r[2] for r in rows if r[0] == m][0])
         free = d["free"]
         pts = sorted((100 * int(a[1:]) / E, d[a] - free) for a in d
@@ -46,37 +72,25 @@ def selfce():
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
     ax.set_xlabel("resident experts, % of total experts")
-    ax.set_ylabel("self-CE damage, nats/token (constrained − free)")
-    ax.set_title("Instruct models: damage on their own responses\n"
-                 "(prefill free, rule on generated tokens; lower is better)", fontsize=10)
-    ax.legend(fontsize=8)
+    if PAPER:
+        ax.set_ylabel("self-CE damage, nats/token")
+        ax.legend(fontsize=10.5)
+    else:
+        ax.set_ylabel("self-CE damage, nats/token (constrained − free)")
+        ax.set_title("Instruct models: damage on their own responses\n"
+                     "(prefill free, rule on generated tokens; lower is better)", fontsize=10)
+        ax.legend(fontsize=8)
     ax.grid(alpha=0.25)
     fig.tight_layout()
-    fig.savefig(f"{FIG}/instruct_selfce_damage.png", dpi=150)
-    print("wrote instruct_selfce_damage.png")
+    _save(fig, "instruct_selfce_damage")
 
 
-def bench():
-    # per-benchmark damage, all six models, no/low-thinking modes, both R levels
-    # (record, label, R=k arm, 12.5% arm, humaneval task, mmlu task; None = floor)
-    SPEC = [
-        ("olmoe_instruct", "OLMoE-Instruct (64E, k=8)", "R8", "R8",
-         "humaneval_instruct", "mmlu_flan_cot_fewshot"),
-        ("lfm25_instruct", "LFM2.5-A1B, native mode -- no toggle (32E, k=4)", "R4", "R4",
-         "humaneval_think", None),
-        ("qwen35_think_off", "Qwen3.5-35B, think off (256E, k=8)", "R8", "R32",
-         "humaneval_instruct", "mmlu_flan_cot_fewshot"),
-        ("gemma4_instruct", "gemma4-26B-IT, think off (128E, k=8)", "R8", "R16",
-         "humaneval_gemma_fixed", "mmlu_flan_cot_fewshot"),
-        ("gptoss_20b_low", "gpt-oss-20b, low effort (32E, k=4)", "R4", "R4",
-         "humaneval_gptoss", "mmlu_gptoss_relaxed"),
-        ("gptoss_120b_low", "gpt-oss-120b, low effort (128E, k=4)", "R4", "R16",
-         "humaneval_gptoss", "mmlu_gptoss_relaxed"),
-    ]
+def load_damage():
+    """One accessor for every (model, mode-role, arm, surface) damage cell, in points."""
+    # genbench values (OLMoE, the one model outside the thinking summary)
     METRIC = {"gsm8k_cot_zeroshot": ("exact_match,flexible-extract",),
               "ifeval": ("prompt_level_strict_acc,none",),
-              "mmlu_flan_cot_fewshot": ("exact_match,get-answer",),
-              "mmlu_gptoss_relaxed": ("acc,relaxed-extract",)}
+              "mmlu_flan_cot_fewshot": ("exact_match,get-answer",)}
     vals = {}
     for r in csv.reader(open(f"{ABLATIONS}/instruct_genbench_vllm.csv")):
         if len(r) < 10 or r[0].startswith("#") or r[0] == "model":
@@ -86,85 +100,173 @@ def bench():
             (task.startswith("humaneval") and met.startswith("pass@1"))
         if ok:
             vals[(rec, arm, task)] = float(r[7])
-    # 2026-08-19: strict mmlu_flan is a format-imitation artifact (see 01-findings §5);
-    # override gemma/qwen base MMLU with the dual-scored relaxed re-scores where they
-    # exist (screening_genbench.csv; base dual records are full-suite, same instrument).
-    # OLMoE has no dual re-score; its strict cell stays and the caption says so.
-    _dual = {}
-    for r in csv.reader(open(f"{ABLATIONS}/screening_genbench.csv")):
-        if len(r) > 7 and r[6] == "acc,relaxed-extract":
-            _dual.setdefault((r[0], r[3]), []).append(float(r[7]))
-    def _dm(recs, arm):
-        xs = [x for rec in recs for x in _dual.get((rec, arm), [])]
-        return sum(xs) / len(xs) if xs else None
-    for arm in ("free", "R8", "R16"):
-        v = _dm(("dual_base", "pair_base"), arm)
-        if v is not None:
-            vals[("gemma4_instruct", arm, "mmlu_flan_cot_fewshot")] = v
-    for arm in ("free", "R8", "R16", "R32"):
-        v = _dm(("qwen35_val_base_dual",), arm)
-        if v is not None:
-            vals[("qwen35_think_off", arm, "mmlu_flan_cot_fewshot")] = v
-        else:
-            vals.pop(("qwen35_think_off", arm, "mmlu_flan_cot_fewshot"), None)
+    # thinking-ablation damage cells, already in points (5 models, both modes where a
+    # toggle exists), MMLU relaxed where a dual re-score exists
+    tcells = {}
+    for r in csv.reader(open(f"{ABLATIONS}/think_ablation_summary.csv")):
+        if len(r) > 7 and r[0] != "model" and not r[0].startswith("#"):
+            tcells[(r[0], r[1], r[2], r[3])] = float(r[6])
+    wb = {r[0]: float(r[1]) for r in csv.reader(
+        open(f"{ABLATIONS}/writingbench/cell_stats.csv")) if r and r[0] != "cell"}
 
-    benches = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
+    # (display, [(mode label, role, source)], (R=k arm, 12.5% arm), WB cells, WB role)
+    # source: ("think", model key) uses tcells[(key, mode label, arm, task)];
+    #         ("vals", record, humaneval task, mmlu task) uses genbench accuracies.
+    SPEC = [
+        ("OLMoE-Instruct 7B", [("none", "off",
+          ("vals", "olmoe_instruct", "humaneval_instruct", "mmlu_flan_cot_fewshot"))],
+         ("R8", "R8"), None, None),
+        ("LFM2.5-8B-A1B", [("on", "on", ("think", "LFM2.5-A1B"))],
+         ("R4", "R4"), ("lfm25_free", "lfm25_R4", "lfm25_R4"), "on"),
+        ("gpt-oss-20b", [("low", "off", ("think", "gpt-oss-20b")),
+                         ("high", "on", ("think", "gpt-oss-20b"))],
+         ("R4", "R4"), ("oss20_free", "oss20_R4", "oss20_R4"), "off"),
+        ("gemma4-26B-IT", [("off", "off", ("think", "gemma4-26B-IT")),
+                           ("on", "on", ("think", "gemma4-26B-IT"))],
+         ("R8", "R16"), ("gemma4_base_free", "gemma4_base_R8", "gemma4_base_R16"), "off"),
+        ("Qwen3.5-35B", [("off", "off", ("think", "Qwen3.5-35B")),
+                         ("on", "on", ("think", "Qwen3.5-35B"))],
+         ("R8", "R32"), ("qwen35_base_free", "qwen35_base_R8", "qwen35_base_R32"), "off"),
+        ("gpt-oss-120b", [("low", "off", ("think", "gpt-oss-120b")),
+                          ("high", "on", ("think", "gpt-oss-120b"))],
+         ("R4", "R16"), ("oss120_free", "oss120_R4", "oss120_R16"), "off"),
+    ]
+    TASKS = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
 
-    def task_for(spec, b):
-        return {"GSM8K": "gsm8k_cot_zeroshot", "IFEval": "ifeval",
-                "HumanEval": spec[4], "MMLU": spec[5]}[b]
+    def delta(spec, mode, arm_idx, bench):
+        name, modes, arms, wbcells, wbrole = spec
+        label, role, src = mode
+        if bench == "WB":
+            if wbcells is None or role != wbrole:
+                return None
+            fr, cn = wb.get(wbcells[0]), wb.get(wbcells[1 + arm_idx])
+            return None if fr is None or cn is None else 10 * (cn - fr)
+        arm = arms[arm_idx]
+        if src[0] == "think":
+            return tcells.get((src[1], label, arm, bench))
+        rec, he, mm = src[1], src[2], src[3]
+        task = {"GSM8K": "gsm8k_cot_zeroshot", "IFEval": "ifeval",
+                "HumanEval": he, "MMLU": mm}[bench]
+        fr, cn = vals.get((rec, "free", task)), vals.get((rec, arm, task))
+        return None if fr is None or cn is None else 100 * (cn - fr)
 
-    fig, ax = plt.subplots(figsize=(9.5, 5))
+    return SPEC, TASKS, delta
+
+
+def bench():
+    SPEC, TASKS, delta = load_damage()
+    DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.75, 5))))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
-    w = 0.08
-    GX = 1.45                                    # group spacing factor
-    for i, spec in enumerate(SPEC):
-        rec, label = spec[0], spec[1]
-        for shade, (arm, tag) in enumerate(((spec[2], "R=k"), (spec[3], "12.5%"))):
-            xs, ys = [], []
-            for j, b in enumerate(benches):
-                x = j * GX + (i - 2.5) * 2.1 * w + (shade - 0.5) * w
-                task = task_for(spec, b)
-                if task is None:
-                    if shade == 0:
-                        ax.annotate("floor", (j * GX + (i - 2.5) * 2.1 * w, 0.3),
-                                    fontsize=7, rotation=90, ha="center", color="grey")
-                    continue
-                fr, cn = vals.get((rec, "free", task)), vals.get((rec, arm, task))
-                if fr is None or cn is None:
-                    continue
-                d = 100 * (cn - fr)
-                if abs(d) < 0.05:                # zero-damage results must stay visible
-                    ax.annotate("0", (x, 0.35), fontsize=7, ha="center", color=cols[i],
-                                fontweight="bold")
-                xs.append(x)
-                ys.append(d)
-            ax.bar(xs, ys, width=w, color=cols[i], edgecolor="black", lw=0.4,
-                   alpha=1.0 if shade == 0 else 0.55,
-                   label=label if shade == 0 else None)
-    for j in range(len(benches) - 1):
-        ax.axvline((j + 0.5) * GX, color="grey", lw=0.6, alpha=0.4)
-    from matplotlib.patches import Patch
-    shade_handles = [Patch(facecolor="0.25", edgecolor="black",
-                           label="dark: R = k (active params)"),
-                     Patch(facecolor="0.85", edgecolor="black",
-                           label="light: R = 12.5% of total experts")]
+
+    # ---- per-benchmark figure: color = model, hue overlay = mode via hatch, alpha = arm ----
+    groups = TASKS + ["WB"]
+    glabel = {"WB": "WritingBench\n(critic pts x10)"}
+    fig, ax = plt.subplots(figsize=(12.5, 5) if not PAPER else (12.5, 4.6))
+    w = 0.075
+    GX = 1.9
+    for j, b in enumerate(groups):
+        pos = 0.0
+        for i, spec in enumerate(SPEC):
+            for mode in spec[1]:
+                for arm_idx in (0, 1):
+                    d = delta(spec, mode, arm_idx, b)
+                    if d is None:
+                        if b == "MMLU" and spec[0].startswith("LFM") and arm_idx == 0:
+                            ax.annotate("floor", (j * GX - 0.75 + pos, 0.3), fontsize=7,
+                                        rotation=90, ha="center", color="grey")
+                        continue
+                    x = j * GX - 0.75 + pos
+                    pos += w
+                    if abs(d) < 0.05:
+                        ax.annotate("0", (x, 0.35), fontsize=7, ha="center",
+                                    color=cols[i], fontweight="bold")
+                    ax.bar(x, d, width=w * 0.94, color=cols[i],
+                           alpha=1.0 if arm_idx == 0 else 0.55,
+                           hatch="///" if mode[1] == "on" else None,
+                           edgecolor="black", lw=0.4)
+            pos += w * 0.5
+    for j in range(len(groups) - 1):
+        ax.axvline((j + 0.55) * GX - 0.11, color="grey", lw=0.6, alpha=0.4)
     ax.axhline(0, color="black", lw=0.8)
-    ax.set_xticks([j * GX for j in range(len(benches))])
-    ax.set_xticklabels(benches)
-    ax.set_ylabel("accuracy change under residency, points")
-    ax.set_title("Generative benchmarks under decode-time residency, no/low-thinking modes\n"
-                 "(MMLU relaxed-extraction for qwen/gemma/gpt-oss; OLMoE strict, no dual re-score exists)\n"
-                 "(constrained − free, same items and stack per pair; single runs, "
-                 "binomial SE 2-4 pts;\nOLMoE, LFM and gpt-oss-20b: k = 12.5%, one cell)",
-                 fontsize=9)
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles + shade_handles, labels + [h.get_label() for h in shade_handles],
-              fontsize=7.5, ncol=2)
+    ax.set_xticks([j * GX for j in range(len(groups))])
+    ax.set_xticklabels([glabel.get(b, b) for b in groups])
+    ax.set_ylabel("damage under residency, points")
+    handles = [Patch(facecolor=cols[i], edgecolor="black", label=s[0])
+               for i, s in enumerate(SPEC)]
+    handles += [Patch(facecolor="0.85", edgecolor="black", hatch="///",
+                      label="hatched: thinking on / high"),
+                Patch(facecolor="0.25", edgecolor="black", label="dark: R = k"),
+                Patch(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")]
+    ax.legend(handles=handles, fontsize=8.5 if PAPER else 7.5, ncol=5,
+              loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False)
+    if not PAPER:
+        ax.set_title("Benchmarks under decode-time residency, both thinking modes; "
+                     "WritingBench critic deltas x10, think-off runs\n"
+                     "(constrained − free, same items and stack per pair; single runs, "
+                     "binomial SE 2-4 pts; OLMoE has no thinking mode or WritingBench cell)",
+                     fontsize=9)
     ax.grid(alpha=0.25, axis="y")
     fig.tight_layout()
-    fig.savefig(f"{FIG}/instruct_bench_damage.png", dpi=150)
-    print("wrote instruct_bench_damage.png")
+    _save(fig, "instruct_bench_damage")
+
+    # ---- per-model figure, think_tax style: mode color, arm alpha, dots per surface ----
+    figm, axm = plt.subplots(figsize=(11.8, 4.8) if PAPER else (11, 5))
+    w = 0.19
+    means = {}
+    for i, spec in enumerate(SPEC):
+        nbars = 2 * len(spec[1])
+        for s, mode in enumerate(spec[1]):
+            for arm_idx in (0, 1):
+                ds = [delta(spec, mode, arm_idx, b) for b in TASKS]
+                got = [d for d in ds if d is not None]
+                if not got:
+                    continue
+                m = sum(got) / len(got)
+                se = (sum((d - m) ** 2 for d in got) / max(1, len(got) - 1)) ** 0.5 \
+                    / len(got) ** 0.5
+                means[(spec[0], mode[0], arm_idx)] = round(m, 1)
+                x = i + (2 * s + arm_idx - (nbars - 1) / 2) * w
+                axm.bar(x, m, width=w * 0.9, yerr=se, capsize=3, color=MODE_COL[mode[1]],
+                        alpha=1.0 if arm_idx == 0 else 0.5, edgecolor="black", lw=0.5,
+                        zorder=2)
+                for b, d in zip(TASKS, ds):
+                    if d is not None:
+                        axm.scatter(x, d, s=34, color=DCOL[b], edgecolor="black", lw=0.5,
+                                    zorder=3)
+                dwb = delta(spec, mode, arm_idx, "WB")
+                if dwb is not None:
+                    axm.scatter(x, dwb, s=80, marker="*", color=DCOL["WB"],
+                                edgecolor="black", lw=0.5, zorder=3)
+    for b in TASKS:
+        axm.scatter([], [], s=42, color=DCOL[b], edgecolor="black", lw=0.5, label=b)
+    axm.scatter([], [], s=85, marker="*", color=DCOL["WB"], edgecolor="black", lw=0.5,
+                label="WritingBench (x10)")
+    axm.axhline(0, color="black", lw=0.8)
+    axm.set_xticks(range(len(SPEC)))
+    _r = lambda a: a.replace("R", "R=")
+    axm.set_xticklabels(
+        [s[0] + ("\n(k: %s = 12.5%%)" % _r(s[2][0]) if s[2][0] == s[2][1] else
+                 "\n(k: %s, 12.5%%: %s)" % (_r(s[2][0]), _r(s[2][1]))) for s in SPEC],
+        fontsize=9 if PAPER else 8.5)
+    axm.set_ylabel("damage under residency, points")
+    h, l = axm.get_legend_handles_labels()
+    h += [Patch(facecolor=MODE_COL["off"], edgecolor="black",
+                label="thinking off / low effort"),
+          Patch(facecolor=MODE_COL["on"], edgecolor="black",
+                label="thinking on / high effort"),
+          Patch(facecolor="0.25", edgecolor="black", label="dark: R = k"),
+          Patch(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")]
+    axm.legend(handles=h, fontsize=9 if PAPER else 8, ncol=3, loc="lower right")
+    if not PAPER:
+        axm.set_title("Damage per model and thinking mode: bar = mean over the four "
+                      "accuracy benchmarks (whisker = SE of mean from the surface spread)\n"
+                      "dots = per-surface deltas, star = WritingBench x10 (think-off runs, "
+                      "dots only, not in the mean); OLMoE has neither", fontsize=9)
+    axm.grid(alpha=0.25, axis="y")
+    figm.tight_layout()
+    _save(figm, "instruct_model_damage")
+    for k, v in sorted(means.items()):
+        print("mean", k, v)
 
 
 if __name__ == "__main__":

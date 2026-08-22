@@ -106,7 +106,7 @@ for (reg, g), pts in series.items():
 seen = set()
 for run, (reg, bud, t, c, dom) in sorted(A.items()):
     col = TMP if reg == "temporal" else MOE
-    lab = f"{'temporal' if reg=='temporal' else 'unconstrained'} @ {bud}"
+    lab = f"{'temporal' if reg=='temporal' else 'unconstrained'} at $10^{{{bud[2:]}}}$"
     ax.scatter(t, c, s=70, color=col, marker=MARKER.get(bud, "o"), alpha=0.85,
                edgecolor="white", linewidth=0.8, zorder=3,
                label=lab if lab not in seen else None)
@@ -116,7 +116,7 @@ tok_t = [v[2] for v in A.values() if v[0] == "temporal"]
 tok_f = [v[2] for v in A.values() if v[0] != "temporal"]
 gap_lo, gap_hi = max(tok_t), min(tok_f)
 ax.axvspan(gap_lo, gap_hi, color="#f2c14e", alpha=0.18, zorder=0)
-ax.text((gap_lo + gap_hi) / 2, 0.545, f"no arm here\n{gap_hi - gap_lo:.3f} wide",
+ax.text((gap_lo + gap_hi) / 2, 0.545, f"no model here\n{gap_hi - gap_lo:.3f} wide",
         ha="center", va="bottom", fontsize=9, color="#8a6d1f")
 
 ax.set_xlim(lo, hi)
@@ -125,7 +125,7 @@ ax.set_xlabel("token probe AUC  (current token alone)")
 ax.set_ylabel("context probe AUC  (neighbours, token excluded)")
 ax.grid(alpha=0.25, lw=0.6)
 h, l = ax.get_legend_handles_labels()
-order = sorted(range(len(l)), key=lambda i: (l[i].split(" @ ")[1], l[i]))
+order = sorted(range(len(l)), key=lambda i: (l[i].split("10^{")[1], l[i]))
 ax.legend([h[i] for i in order], [l[i] for i in order],
           loc="upper left", fontsize=9, framealpha=0.95, ncol=2)
 
