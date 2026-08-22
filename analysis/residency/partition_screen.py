@@ -90,16 +90,17 @@ def main():
                 x = xs[li].reshape(-1, xs[li].shape[-1])
                 orig_e = torch.unique(ws[li].reshape(-1)[ws[li].reshape(-1) < E2] // 2)
                 for e in orig_e.tolist():
-                    if len(H[li][e]) >= NSAMP:
-                        continue
                     sel = ((ws[li].reshape(x.shape[0], -1) // 2) == e).any(-1)
-                    xt = x[sel][:8].cpu().float()
+                    xt = x[sel][:24].cpu().float()
                     g = torch.nn.functional.linear(xt, UG[li][e].float())
                     u = torch.nn.functional.linear(xt, UU[li][e].float())
                     hset = (act(g) * u).float()
-                    H[li][e].append(hset)
+                    # covariance accumulates UNCAPPED (oracle needs full rank);
+                    # permutation scoring keeps a bounded sample
                     CH[li, e] += hset.T @ hset
                     CN[li, e] += hset.shape[0]
+                    if len(H[li][e]) * 8 < NSAMP:
+                        H[li][e].append(hset[:8])
         if pi % 20 == 0:
             print(f"[ps] {pi}/{len(prompts)}", flush=True)
 
@@ -153,7 +154,9 @@ def main():
             G = Wde.T @ Wde
             M = Chalf @ G @ Chalf
             lam = torch.linalg.eigvalsh(M).clamp_min(0)
-            errs["oracle"].append(float(lam[: D - D // 2].sum() / lam.sum().clamp_min(1e-12)))
+            if float(CN[li, e]) >= 2 * D:   # full-rank covariance only: below
+                # this the trailing eigen mass is rank-shadowed (reads ~0)
+                errs["oracle"].append(float(lam[: D - D // 2].sum() / lam.sum().clamp_min(1e-12)))
             # near-duplicate gate rows (exact gauge freedom)
             gn = torch.nn.functional.normalize(UG[li][e].float().cuda(), dim=1)
             sim = (gn @ gn.T).fill_diagonal_(0)
