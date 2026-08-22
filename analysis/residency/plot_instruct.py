@@ -278,15 +278,14 @@ def combined_row():
     SPEC, TASKS, delta = load_damage()
     DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.75, 5))))
     MCOL = plt.cm.tab10(np.linspace(0, 1, 10))
-    SHORT = ["OLMoE", "LFM2.5", "20b", "gemma4", "Qwen3.5", "120b"]
-    plt.rcParams.update({"font.size": 16, "axes.labelsize": 15.5,
-                         "xtick.labelsize": 13.5, "ytick.labelsize": 13,
-                         "legend.fontsize": 11})
-    fig, (axl, axr) = plt.subplots(1, 2, figsize=(15.6, 5.0),
-                                   gridspec_kw={"width_ratios": [1.12, 1],
-                                                "wspace": 0.13})
-    W = 0.15          # bar width; 4 bars + mode gap span ~0.66 of unit pitch
-    GAPM = 0.05       # extra gap between the off-pair and the on-pair
+    SHORT = ["OLMoE", "LFM2.5", "GPT-OSS 20B", "gemma4", "Qwen3.5", "GPT-OSS 120B"]
+    plt.rcParams.update({"font.size": 17, "axes.labelsize": 16,
+                         "xtick.labelsize": 15, "ytick.labelsize": 14,
+                         "legend.fontsize": 12.5})
+    fig, (axl, axr) = plt.subplots(2, 1, figsize=(15.6, 6.6),
+                                   gridspec_kw={"hspace": 0.30})
+    W = 0.16          # bar width; 4 bars + mode gap span ~0.66 of unit pitch
+    GAPM = 0.06       # extra gap between the off-pair and the on-pair
     EK = dict(elinewidth=0.9, capsize=1.5, ecolor="0.25")
 
     def bx(c, nbars):
@@ -319,23 +318,23 @@ def combined_row():
                 if dwb is not None:
                     pts.append(("WB", dwb))
                 for j, (b, d) in enumerate(pts):
-                    xo = x + (j - (len(pts) - 1) / 2) * 0.030
+                    xo = x + (j - (len(pts) - 1) / 2) * 0.042
                     if b == "WB":
-                        axl.scatter(xo, d, s=46, marker="*", color=DCOL["WB"],
+                        axl.scatter(xo, d, s=60, marker="*", color=DCOL["WB"],
                                     edgecolor="black", lw=0.35, zorder=3)
                     else:
-                        axl.scatter(xo, d, s=17, color=DCOL[b], edgecolor="black",
+                        axl.scatter(xo, d, s=24, color=DCOL[b], edgecolor="black",
                                     lw=0.35, zorder=3)
                 c += 1
     axl.axhline(0, color="black", lw=0.8)
     axl.set_xticks(range(len(SPEC)))
     axl.set_xticklabels(SHORT)
-    axl.set_ylabel("damage under residency, points")
+    axl.set_ylabel("damage, points")
     axl.grid(alpha=0.25, axis="y")
 
     # ---- right: per benchmark, mode-mean bars + per-model dots ----
     groups = TASKS + ["WB"]
-    glabel = {"WB": "WritingB.\n(x10)"}
+    glabel = {"WB": "WritingBench (x10)"}
     for j, b in enumerate(groups):
         combos = [("off", 0), ("off", 1), ("on", 0), ("on", 1)]
         for c, (role, arm_idx) in enumerate(combos):
@@ -358,12 +357,13 @@ def combined_row():
                     alpha=1.0 if arm_idx == 0 else 0.5, edgecolor="black", lw=0.5,
                     zorder=2, error_kw=EK)
             for jj, (d, i) in enumerate(zip(vals, mods)):
-                xo = x + (jj - (len(vals) - 1) / 2) * 0.026
-                axr.scatter(xo, d, s=17, color=MCOL[i], edgecolor="black", lw=0.35,
+                xo = x + (jj - (len(vals) - 1) / 2) * 0.036
+                axr.scatter(xo, d, s=24, color=MCOL[i], edgecolor="black", lw=0.35,
                             zorder=3)
     axr.axhline(0, color="black", lw=0.8)
     axr.set_xticks(range(len(groups)))
     axr.set_xticklabels([glabel.get(b, b) for b in groups])
+    axr.set_ylabel("damage, points")
     axr.grid(alpha=0.25, axis="y")
 
     # ---- one legend strip above both panels ----
@@ -379,15 +379,15 @@ def combined_row():
          dot(DCOL["HumanEval"], "HumanEval"), dot(DCOL["MMLU"], "MMLU"),
          dot(DCOL["WB"], "WritingBench (x10)", star=True), blank,
          dot(MCOL[0], "OLMoE"), dot(MCOL[1], "LFM2.5"),
-         dot(MCOL[2], "20b"), dot(MCOL[3], "gemma4"),
-         dot(MCOL[4], "Qwen3.5"), dot(MCOL[5], "120b"),
+         dot(MCOL[2], "GPT-OSS 20B"), dot(MCOL[3], "gemma4"),
+         dot(MCOL[4], "Qwen3.5"), dot(MCOL[5], "GPT-OSS 120B"),
          _P(facecolor=MODE_COL["off"], edgecolor="black", label="think off / low"),
          _P(facecolor=MODE_COL["on"], edgecolor="black", label="think on / high"),
          _P(facecolor="0.25", edgecolor="black", label="dark: R = k"),
          _P(facecolor="0.85", edgecolor="black", label="light: R = 12.5%")]
     fig.legend(handles=H, loc="upper center", ncol=8, frameon=False,
-               bbox_to_anchor=(0.5, 1.02), columnspacing=1.1, handletextpad=0.4)
-    fig.tight_layout(rect=(0, 0, 1, 0.90))
+               bbox_to_anchor=(0.5, 1.005), columnspacing=1.3, handletextpad=0.4)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
     _save(fig, "instruct_damage_row")
 
 
