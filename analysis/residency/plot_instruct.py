@@ -283,7 +283,7 @@ def combined_row():
                          "xtick.labelsize": 15, "ytick.labelsize": 14,
                          "legend.fontsize": 12.5})
     fig, (axl, axr) = plt.subplots(2, 1, figsize=(15.6, 6.6),
-                                   gridspec_kw={"hspace": 0.30})
+                                   gridspec_kw={"hspace": 0.52})
     W = 0.16          # bar width; 4 bars + mode gap span ~0.66 of unit pitch
     GAPM = 0.06       # extra gap between the off-pair and the on-pair
     EK = dict(elinewidth=0.9, capsize=1.5, ecolor="0.25")
@@ -388,8 +388,7 @@ def combined_row():
     for ax, H in ((axl, Hl), (axr, Hr)):
         ax.legend(handles=H, loc="center left", bbox_to_anchor=(1.015, 0.5),
                   frameon=False, handletextpad=0.5, labelspacing=0.55)
-    fig.subplots_adjust(left=0.06, right=0.785, top=0.92, bottom=0.10,
-                        hspace=0.60)
+    fig.subplots_adjust(left=0.06, right=0.785, top=0.92, bottom=0.10)
     _save(fig, "instruct_damage_row")
 
 
