@@ -31,6 +31,13 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--family", required=True, choices=("qwen35", "gemma4"))
 ap.add_argument("--src", required=True)
 ap.add_argument("--dst", required=True)
+ap.add_argument("--rotate", default=None,
+                help="npz from partition_screen --save-rotations: per-expert "
+                     "eigenbasis folded into gate/up rows and down columns "
+                     "BEFORE halving. LOSSY (elementwise gate acts in the "
+                     "rotated basis): free arm no longer equals base - measure "
+                     "fidelity, and adapt afterward. Mutually exclusive with "
+                     "--partition.")
 ap.add_argument("--partition", default=None,
                 help="npz from split_stats.py: per-layer per-expert channel "
                      "permutations; halves become the top/bottom halves of the "
@@ -47,6 +54,16 @@ assert D % 2 == 0
 tc["num_experts"], tc[TOPK_FIELD], tc["moe_intermediate_size"] = 2 * E, 2 * K, D // 2
 json.dump(cfg, open(os.path.join(A.dst, "config.json"), "w"), indent=2)
 print(f"[split] E {E}->{2*E}, k {K}->{2*K}, d_i {D}->{D//2}", flush=True)
+
+ROTS = None
+if A.rotate:
+    import numpy as np
+    import re as _re2
+    assert not A.partition, "--rotate and --partition are mutually exclusive"
+    ROTS = torch.from_numpy(np.load(A.rotate)["rotations"]).float()
+
+    def layer_of_r(key):
+        return int(_re2.search(r"layers\.(\d+)\.", key).group(1))
 
 PERMS = None
 if A.partition:
@@ -68,6 +85,10 @@ for shard in sorted(set(ix["weight_map"].values())):
             e, twod, h = v.shape
             assert e == E and twod == 2 * D
             gate, up = v[:, :D], v[:, D:]
+            if ROTS is not None:
+                Rl = ROTS[layer_of_r(k)]                    # [E, D, D]
+                gate = torch.bmm(Rl, gate.float()).to(gate.dtype)
+                up = torch.bmm(Rl, up.float()).to(up.dtype)
             if PERMS is not None:
                 p = PERMS[layer_of(k)][:, :, None].expand(-1, -1, h)
                 gate = gate.gather(1, p)
@@ -78,6 +99,9 @@ for shard in sorted(set(ix["weight_map"].values())):
         elif k.endswith("experts.down_proj"):
             e, h, d = v.shape
             assert e == E and d == D
+            if ROTS is not None:
+                Rl = ROTS[layer_of_r(k)]
+                v = torch.bmm(v.float(), Rl.transpose(1, 2)).to(v.dtype)
             if PERMS is not None:
                 p = PERMS[layer_of(k)][:, None, :].expand(-1, h, -1)
                 v = v.gather(2, p)

@@ -41,6 +41,10 @@ def main():
     ap.add_argument("--n", type=int, default=80)
     ap.add_argument("--max-tok", type=int, default=512)
     ap.add_argument("--out", default=os.path.join(ABLATIONS, "partition_screen.csv"))
+    ap.add_argument("--save-rotations", default=None,
+                    help="npz path: per-expert eigenbasis of the h-covariance "
+                         "(descending eigenvalue order), consumed by "
+                         "split_experts.py --rotate for lossy rotated re-basing")
     A = ap.parse_args()
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -162,6 +166,16 @@ def main():
             sim = (gn @ gn.T).fill_diagonal_(0)
             if float(sim.max()) > 0.99:
                 dup_pairs += 1
+
+    if A.save_rotations:
+        R = np.zeros((L, E, D, D), dtype=np.float16)
+        for li in range(L):
+            for e in range(E):
+                Ch = (CH[li, e] / max(float(CN[li, e]), 1.0)).cuda()
+                ev, Q = torch.linalg.eigh(Ch)          # ascending
+                R[li, e] = Q.flip(-1).T.cpu().numpy()  # rows = descending eigvecs
+        np.savez(A.save_rotations, rotations=R)
+        print(f"[ps] rotations saved -> {A.save_rotations}", flush=True)
 
     new = not os.path.exists(A.out)
     import csv
