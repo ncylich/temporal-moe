@@ -670,3 +670,13 @@ dumpsmoke_olmoe,64,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.00000
 dumpsmoke_olmoe,64,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.700000,10,2048,8
 dumpsmoke_olmoe,64,8,free,,mmlu_flan_cot_fewshot,sample_len,57.000000,1,2048,47
 dumpsmoke_olmoe,64,8,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.578947,1,2048,47
+abdecode_baseline,64,8,R8,8,gsm8k_cot_zeroshot,sample_len,100.000000,100,2048,71
+abdecode_baseline,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.160000,100,2048,71
+abdecode_baseline,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.490000,100,2048,71
+abdecode_fast,64,8,R8,8,gsm8k_cot_zeroshot,sample_len,100.000000,100,2048,58
+abdecode_fast,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.160000,100,2048,58
+abdecode_fast,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.490000,100,2048,58
+abdecode_basecheck,64,8,R8,8,gsm8k_cot_zeroshot,sample_len,100.000000,100,2048,71
+abdecode_basecheck,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.160000,100,2048,71
+abdecode_basecheck,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.490000,100,2048,71
+qwen35_instruct_gm92,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.890244,full,4096,971

@@ -149,12 +149,25 @@ regenerated with dumps and dual-scored:
   was spent on them. Sampling is unchanged for every other model (they all ship
   recipes), so this explanation applies to gpt-oss MMLU only.
 - **Flagged, both rows kept, old row not overwritten:**
-  - `qwen35_instruct` HumanEval R8 **0.8902 vs 0.8110** (z = 2.0) and R32
-    **0.9634 vs 0.8841** (z = 2.7), while the free arm reproduced (0.9512 vs
-    0.9573). Only the constrained arms moved, both upward by 7.9 points. The
-    regeneration used `--gpu-mem 0.94` against the original's 0.92, which changes
-    batch shapes and therefore constrained-arm trajectories; a protocol-default
-    rerun is queued to adjudicate.
+  - `qwen35_instruct` HumanEval R8 **0.8902 vs 0.8110** and R32 **0.9634 vs
+    0.8841**, while the free arm reproduced (0.9512 vs 0.9573). Adjudicated: the
+    memory-fraction hypothesis is **refuted**. Rerunning R8 at the protocol
+    default (0.92, against the regeneration's 0.94) gives **0.8902 again, to four
+    decimals** — yet **0 of 164 generations are textually identical between the
+    two runs** and 26 items flip pass/fail. Constrained-arm trajectories are
+    simply not reproducible run to run (batch-shape jitter rewrites every one);
+    only the aggregate is. Everything else recoverable is identical across eras:
+    the harness that wrote the old rows differs from today's only by dump code,
+    the model is the same upstream revision (re-downloaded 2026-08-17, but
+    upstream's latest commit predates both runs), and vLLM/torch/transformers
+    were installed before either. With ~26 unstable items the run-to-run SD on
+    pass@1 is about 1.5 points, so 0.8110 sits ~5 SD below two agreeing draws —
+    too far for jitter, and **not further diagnosable, because that run saved no
+    trajectories**. The new value is kept as reproduced-twice; the old is marked
+    unverifiable rather than wrong.
+  - **Protocol consequence:** per-item analysis on a constrained arm must use
+    that run's own dump. A re-run reproduces the score but not the generations,
+    so pairing items across runs is invalid.
 - **Withdrawn flag: qwen thinking-on MMLU.** An earlier draft flagged this cell
   at z = 2.1 using `mmlu_flan_rescore.py`. That comparison was wrong, and the
   fault is in the rescore, not the run. lm_eval's filter takes the FIRST
