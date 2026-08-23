@@ -13,10 +13,14 @@ new_cap tokens over every item.
 
 Two things make the continuation faithful, and both are load-bearing:
 
-  1. The prefix is the ENGINE's token IDs, not a re-tokenization of the text. The
-     same text has many valid token sequences (' answer' == ' '+'answer'), so a
-     text-rebuilt prefix is a sequence the model never produced. Dumps written
-     before token IDs were persisted CANNOT be resumed -- this refuses them.
+  1. The prefix should be the ENGINE's token IDs. The same text has many valid
+     token sequences (' answer' == ' '+'answer'), so a text-rebuilt prefix is
+     A valid tokenization of what the model wrote, but not necessarily THE one it
+     emitted. Dumps written before token IDs were persisted therefore resume in
+     BEST-EFFORT mode (--allow-retokenized-prefix): the continuation is conditioned
+     on byte-identical text, and every item records which prefix it used in
+     `prefix_source`. That is a far better use of 3000 already-generated tokens
+     than throwing them away, but it is an approximation and is labelled as one.
   2. The residency state is rebuilt by re-walking the generated prefix under the
      rule, since the resident set is path-dependent. The original prompt stays
      free (protocol); the previously-generated tokens carry the rule because that
@@ -42,6 +46,29 @@ from decode_state import DEC                                         # noqa: E40
 SAMP = os.path.join(ABLATIONS, "genbench_samples")
 
 
+def _rebuild_prompts(A, tk):
+    """Reconstruct prompt_ids for dumps that predate prompt-id capture.
+
+    Unlike the generated tail, the prompt IS exactly recoverable: it is the dataset
+    item through the model's chat template, and templates tokenize deterministically
+    (verified per family in tests/test_tokenizer_families.py). --think must match
+    the original run or the rebuilt prefix is simply the wrong prompt."""
+    from datasets import load_dataset
+    probs = list(load_dataset("openai/openai_humaneval", split="test"))
+    instr = ("Complete the following Python function. Provide the complete function "
+             "in a single ```python code block.\n\n")
+    ck = {} if A.think == "default" else {"enable_thinking": A.think == "on"}
+    out = {}
+    for p in probs:
+        text = tk.apply_chat_template(
+            [{"role": "user", "content": instr + p["prompt"]}],
+            tokenize=False, add_generation_prompt=True, **ck)
+        out[p["task_id"]] = tk(text, add_special_tokens=False).input_ids
+    print(f"[resume] rebuilt {len(out)} prompts via the chat template "
+          f"(think={A.think})", flush=True)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dump", required=True,
@@ -53,6 +80,18 @@ def main():
     ap.add_argument("--arm", default=None, help="free or R<n>; default: parsed from --dump")
     ap.add_argument("--gpu-mem", type=float, default=0.90)
     ap.add_argument("--max-model-len", type=int, default=None)
+    ap.add_argument("--allow-retokenized-prefix", action="store_true",
+                    help="resume items that lack engine token IDs by re-tokenizing "
+                         "their saved text. Byte-identical text, possibly different "
+                         "segmentation; each item is labelled prefix_source=retokenized")
+    ap.add_argument("--rebuild-prompt", default=None,
+                    choices=("humaneval_gemma", "humaneval_gptoss", "humaneval_think"),
+                    help="reconstruct prompt_ids for dumps that predate prompt-id "
+                         "capture. The prompt IS exactly recoverable: it is the "
+                         "dataset item through the model's chat template")
+    ap.add_argument("--think", choices=("on", "off", "default"), default="default",
+                    help="template thinking flag used by the ORIGINAL run "
+                         "(must match, or the rebuilt prompt is the wrong prefix)")
     A = ap.parse_args()
 
     import genprotocol
@@ -63,12 +102,12 @@ def main():
     old_cap = max(i["gen_toks"] for i in items)
 
     missing = [i for i in items if not i.get("gen_ids")]
-    if missing:
+    if missing and not A.allow_retokenized_prefix:
         sys.exit(f"REFUSING: {len(missing)}/{len(items)} items carry no engine token "
-                 f"IDs, so their prefixes cannot be reproduced (a re-tokenized "
-                 f"prefix is a different sequence -- see test_tokenizer_families.py). "
-                 f"Re-run this cell once on the current harness, which persists IDs, "
-                 f"and every later budget increase becomes a cheap resume.")
+                 f"IDs. Pass --allow-retokenized-prefix to resume them from their "
+                 f"saved text instead (byte-identical text, possibly different "
+                 f"segmentation; see test_tokenizer_families.py), or re-run this "
+                 f"cell once on the current harness, which persists IDs.")
 
     trunc = [i for i in items if i["gen_toks"] >= old_cap - 8]
     done = [i for i in items if i["gen_toks"] < old_cap - 8]
@@ -100,14 +139,27 @@ def main():
 
     # Build the resume prompts: original prompt + everything generated so far. The
     # boundary tells the walker which part stays free.
-    prompts, meta = [], []
+    tk = llm.get_tokenizer()
+    rebuilt = _rebuild_prompts(A, tk) if A.rebuild_prompt else None
+
+    prompts, meta, src_count = [], [], {"engine_ids": 0, "retokenized": 0}
     DEC["resume_map"].clear()
     DEC["enforce_from"].clear()
     for it in trunc:
+        if it.get("gen_ids"):
+            gids, src = list(it["gen_ids"]), "engine_ids"
+        else:
+            # best effort: a valid tokenization of exactly the text the model wrote
+            gids = tk(it["raw"], add_special_tokens=False).input_ids
+            src = "retokenized"
+        src_count[src] += 1
         pids = list(it.get("prompt_ids") or [])
-        gids = list(it["gen_ids"])
-        assert pids, ("dump has gen_ids but no prompt_ids; both are needed to place "
-                      "the free/enforced boundary")
+        if not pids and rebuilt is not None:
+            pids = rebuilt.get(it["doc"])
+        assert pids, ("no prompt_ids in the dump and none rebuilt; pass "
+                      "--rebuild-prompt (with the original --think) so the "
+                      "free/enforced boundary can be placed")
+        it["_prefix_source"] = src
         ids = pids + gids
         key = (len(ids), hash(tuple(ids[:16])), hash(tuple(ids[-16:])))
         DEC["resume_map"][key] = len(pids)
@@ -136,11 +188,12 @@ def main():
     for it, o in zip(meta, outs):
         tail = o.outputs[0]
         new_ids = list(it["gen_ids"]) + list(tail.token_ids)
-        merged.append({**it,
+        merged.append({**{k: v for k, v in it.items() if k != "_prefix_source"},
                        "raw": it["raw"] + tail.text,
                        "gen_ids": new_ids,
                        "gen_toks": len(new_ids),
-                       "resumed_from": it["gen_toks"]})
+                       "resumed_from": it["gen_toks"],
+                       "prefix_source": it["_prefix_source"]})
         still += len(new_ids) >= A.new_cap - 8
     order = {i["doc"]: n for n, i in enumerate(items)}
     merged.sort(key=lambda x: order.get(x["doc"], 1 << 30))
@@ -148,6 +201,8 @@ def main():
     # under the same task the original cell used
     task = A.dump.split(f"_{arm}_", 1)[1] if f"_{arm}_" in A.dump else "resumed"
     genprotocol.write_dump(A.record_as, arm, task, merged, len(items))
+    print(f"[resume] prefixes: {src_count['engine_ids']} exact (engine ids), "
+          f"{src_count['retokenized']} best-effort (re-tokenized text)", flush=True)
     print(f"[resume] continued {len(trunc)} items in {secs:.0f}s; "
           f"{still} still at the new cap ({100*still/len(items):.1f}% of the cell)",
           flush=True)
