@@ -122,6 +122,8 @@ def main():
     MARK = "<|channel|>final<|message|>"
     genprotocol.write_dump(tag, A.arm, "humaneval_gptoss", [
         {"doc": p["task_id"], "raw": r, "gen_toks": len(o.outputs[0].token_ids),
+         "gen_ids": list(o.outputs[0].token_ids),
+         "prompt_ids": list(o.prompt_token_ids or []),
          "think_toks": _ntok(r.rsplit(MARK, 1)[0]) if MARK in r
          else (_ntok(r) if "<|channel|>" in r else 0),
          "pass": ps}

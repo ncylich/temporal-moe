@@ -121,6 +121,8 @@ def main():
         genprotocol.write_dump(tag, arm, "humaneval_gemma_fixed", [
             {"doc": p["task_id"], "raw": o.outputs[0].text,
              "gen_toks": len(o.outputs[0].token_ids),
+             "gen_ids": list(o.outputs[0].token_ids),
+             "prompt_ids": list(o.prompt_token_ids or []),
              "think_toks": _ntok(o.outputs[0].text)
              - _ntok(CHANNEL.sub("", o.outputs[0].text)),
              "pass": ps, "unfinished": u}

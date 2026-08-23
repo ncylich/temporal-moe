@@ -139,6 +139,10 @@ def main():
     # was on) => cap-truncated inside thinking: all think
     genprotocol.write_dump(tag, A.arm, "humaneval_think", [
         {"doc": p["task_id"], "raw": r, "gen_toks": len(o.outputs[0].token_ids),
+         # engine token IDs: the ONLY faithful prefix for a resume (re-tokenizing
+         # `raw` drifts 1-2 tokens on think/channel markers -- test T1)
+         "gen_ids": list(o.outputs[0].token_ids),
+         "prompt_ids": list(o.prompt_token_ids or []),
          "think_toks": _ntok(r.rsplit("</think>", 1)[0]) if "</think>" in r
          else (_ntok(r) if A.think != "off" else 0),
          "pass": ps, "unfinished": u}

@@ -38,7 +38,11 @@ except Exception:                                           # triton missing -> 
 
 def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
                           tau: float = 0.0, ema_beta: float = 1.0,
-                          swaps: int = 1) -> torch.Tensor:
+                          swaps: int = 1,
+                          init_resident: torch.Tensor = None,
+                          init_refresh: torch.Tensor = None,
+                          t0: int = 0,
+                          return_state: dict = None) -> torch.Tensor:
     """Rolling-residency expert selection.
 
     Args:
@@ -93,6 +97,42 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
     refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert ("lru" only)
     out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
 
+    # --- RESUME: continue a walk already in progress -------------------------
+    # With init_resident given, this call is the tail of a longer sequence, so
+    # there is no cold fill: token 0 of this chunk is an ordinary swap step
+    # against the incoming set. The resident set is path-dependent, so resuming
+    # from anything other than the true S_t is a different run wearing the same
+    # prefix -- that is why the state is passed in rather than re-derived.
+    # test_resume_residency.py holds splice == continuous run to BIT equality.
+    if return_state is not None and not isinstance(return_state, dict):
+        raise TypeError("return_state must be a dict to receive the final state")
+    if init_resident is not None:
+        resident = init_resident.clone()
+        refresh = (init_refresh.clone() if init_refresh is not None
+                   else torch.full((B, E), NEG, device=dev))
+        assert resident.shape == (B, E), \
+            f"init_resident {tuple(resident.shape)} != (B,E) {(B, E)}"
+        assert bool((resident.sum(-1) == k).all()), \
+            "init_resident must hold exactly k experts per row"
+        for t in range(S):                                  # every token is a swap step
+            lt = trig[t]
+            for _sw in range(swaps):
+                nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
+                worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
+                do_swap = (nom_val > worst_val + tau).unsqueeze(-1)
+                evict_key = refresh if use_lru else lt
+                evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)
+                evicted = F.one_hot(evict_i, E).bool() & do_swap
+                nominee = F.one_hot(nom_i, E).bool() & do_swap
+                resident = (resident & ~evicted) | nominee
+                # absolute position: LRU compares refresh times across the whole
+                # walk, so a resumed chunk must keep counting from t0, not restart
+                refresh = refresh.masked_fill(nominee, float(k + t0 + t))
+            out[t] = resident
+        if return_state is not None:
+            return_state["resident"], return_state["refresh"] = resident, refresh
+        return out
+
     # --- t=0 cold fill: R_0 = top-k(trig[0]) (== top-k(logits[0]): EMA is identity at t=0) ---
     resident = torch.zeros(B, E, dtype=torch.bool, device=dev)
     _, top_i = trig[0].topk(k, dim=-1)                      # [B,k], descending by logit
@@ -116,6 +156,8 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
             refresh = refresh.masked_fill(nominee, float(k + t))        # newest ("lru" only)
         out[t] = resident
 
+    if return_state is not None:      # hand-off point for a resumed continuation
+        return_state["resident"], return_state["refresh"] = resident, refresh
     return out
 
 
