@@ -134,6 +134,20 @@ regenerated with dumps and dual-scored:
   0.6707), gemma think-off HumanEval (z ≤ 0.7), gemma think-on HumanEval
   (z ≤ 1.1), gpt-oss-20b HumanEval across three efforts (z ≤ 1.3), qwen MMLU
   strict (z ≤ 1.0), OLMoE (z ≤ 1.5).
+- **Resolved, not variance: every gpt-oss MMLU cell moved because the sampling
+  was fixed.** The old `mmlu_gptoss.py` hardcoded `temperature=1.0, top_p=1.0`
+  into its `gen_kwargs`. The rewritten harness reads the model's shipped recipe,
+  and gpt-oss ships **no** temperature/top_p — so the documented no-recipe
+  fallback applies (`PROTOCOL_ERAS.md`: "no-recipe fallback 0.7/0.95"). The run
+  logs confirm every new gpt-oss MMLU cell ran at temp 0.7 / top_p 0.95 against
+  the old rows' ancestral 1.0/1.0. The old rows therefore violated the sampling
+  protocol, which exists precisely because ancestral sampling was measured to
+  depress scores (5–30 points across tasks on OLMoE). The new numbers are the
+  protocol-correct ones and supersede the old; the largest move,
+  `gptoss_20b_high` MMLU free **0.7763 → 0.8640**, is the expected direction and
+  is largest on the noisiest model. No rerun is needed to explain these, and none
+  was spent on them. Sampling is unchanged for every other model (they all ship
+  recipes), so this explanation applies to gpt-oss MMLU only.
 - **Flagged, both rows kept, old row not overwritten:**
   - `qwen35_instruct` HumanEval R8 **0.8902 vs 0.8110** (z = 2.0) and R32
     **0.9634 vs 0.8841** (z = 2.7), while the free arm reproduced (0.9512 vs
@@ -141,10 +155,13 @@ regenerated with dumps and dual-scored:
     regeneration used `--gpu-mem 0.94` against the original's 0.92, which changes
     batch shapes and therefore constrained-arm trajectories; a protocol-default
     rerun is queued to adjudicate.
-  - `gptoss_20b_high` MMLU free **0.8640 vs 0.7763** relaxed (z = 2.5).
   - Qwen thinking-on MMLU under the era-comparable filter (free 0.7456 vs 0.8246,
-    z = 2.1; R8 0.6667 vs 0.7807, z = 2.7) — the cell where 28–34% of items
-    saturate the cap, so trajectory variance is expected to be large.
+    z = 2.1; R8 0.6667 vs 0.7807, z = 2.7). Sampling is identical here (qwen ships
+    a recipe, so both eras ran temp 1.0 / top_p 0.95 / top_k 20) and the
+    extraction difference is already accounted for by `mmlu_flan_rescore.py`, so
+    what remains is trajectory variance in a cell where 28–34% of items saturate
+    the 4096-token cap. Seed-varied replicates give the multi-run mean the
+    protocol asks for on free-routing MMLU.
 - **An extraction trap worth recording.** The relaxed MMLU harness reports its
   own `acc,strict-flan` metric, whose regex requires the literal "the answer is".
   lm_eval's flan-CoT filter is `(?<=answer is )(.*)`, which also accepts "the

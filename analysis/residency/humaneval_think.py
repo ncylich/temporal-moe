@@ -48,6 +48,9 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--gpu-mem", type=float, default=0.92)
     ap.add_argument("--path", default=None)
+    ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
+                    help="diagnostic/adjudication runs use screening_genbench.csv "
+                         "so they never enter the authoritative one-row-per-cell file")
     A = ap.parse_args()
     M = MODELS[A.model]
     if A.path:
@@ -135,7 +138,7 @@ def main():
                           for i, r in enumerate(raws)]},
                os.path.join(td, f"{tag}_{A.arm}_humaneval_think.pt"))
 
-    with open(os.path.join(ABLATIONS, "instruct_genbench_vllm.csv"), "a",
+    with open(os.path.join(ABLATIONS, A.csv_name), "a",
               newline="") as fh:
         csv.writer(fh).writerow(
             [tag, M["E"], M["k"], A.arm, R or "", "humaneval_think",
