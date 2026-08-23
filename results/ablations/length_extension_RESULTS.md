@@ -155,13 +155,23 @@ regenerated with dumps and dual-scored:
     regeneration used `--gpu-mem 0.94` against the original's 0.92, which changes
     batch shapes and therefore constrained-arm trajectories; a protocol-default
     rerun is queued to adjudicate.
-  - Qwen thinking-on MMLU under the era-comparable filter (free 0.7456 vs 0.8246,
-    z = 2.1; R8 0.6667 vs 0.7807, z = 2.7). Sampling is identical here (qwen ships
-    a recipe, so both eras ran temp 1.0 / top_p 0.95 / top_k 20) and the
-    extraction difference is already accounted for by `mmlu_flan_rescore.py`, so
-    what remains is trajectory variance in a cell where 28–34% of items saturate
-    the 4096-token cap. Seed-varied replicates give the multi-run mean the
-    protocol asks for on free-routing MMLU.
+- **Withdrawn flag: qwen thinking-on MMLU.** An earlier draft flagged this cell
+  at z = 2.1 using `mmlu_flan_rescore.py`. That comparison was wrong, and the
+  fault is in the rescore, not the run. lm_eval's filter takes the FIRST
+  "answer is" in the text; in qwen's long thinking traces that is routinely a
+  mid-reasoning aside, so the rescore extracts a stray letter or none at all. On
+  the same 228 items the harness's own strict metric and the rescore disagree on
+  **26 items in both directions** (strict finds an answer the rescore misses on
+  the ones whose first "answer is" carries no letter; the rescore finds one
+  strict misses on "the *correct* answer is (D)"). Two extractors, two failure
+  modes — the gap measures the extractors, not the model. The like-for-like
+  check is the harness's own `acc,strict-flan` against the old strict grid row:
+  **0.8421 vs 0.8246 (z = 0.5), within gate**, and sampling is identical across
+  eras here (qwen ships a recipe, both ran temp 1.0 / top_p 0.95 / top_k 20).
+  `mmlu_flan_rescore.csv` remains useful for what it was built for — showing
+  that stock extraction floors harmony-format answers (gpt-oss 0.05–0.11 against
+  0.56–0.86 relaxed) — but its absolute values are not an era-comparable metric
+  for think-in-text models and must not be cited as one.
 - **An extraction trap worth recording.** The relaxed MMLU harness reports its
   own `acc,strict-flan` metric, whose regex requires the literal "the answer is".
   lm_eval's flan-CoT filter is `(?<=answer is )(.*)`, which also accepts "the

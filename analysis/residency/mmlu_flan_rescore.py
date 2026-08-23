@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """Re-score mmlu_dual dumps with lm_eval's own flan-CoT `get-answer` filter.
 
+CAVEAT, READ BEFORE CITING: this filter takes the FIRST "answer is" in the text.
+On think-in-text models whose traces argue with themselves ("...the answer is not
+simply X..."), that first hit is a mid-reasoning aside, so the extracted letter is
+stray or absent. On qwen thinking-on it disagrees with the harness's own strict
+metric on 26 of 228 items IN BOTH DIRECTIONS. The numbers here are therefore a
+diagnostic of EXTRACTION, not an era-comparable accuracy for such models -- use
+them to show that stock extraction floors harmony/thinking formats (which they do,
+decisively, on gpt-oss), and use the harness's own acc,strict-flan when checking a
+regenerated cell against a mmlu_flan_cot_fewshot grid row.
+
 The relaxed harness (mmlu_gptoss.py) writes two metrics: `acc,relaxed-extract`
 (the reported one) and `acc,strict-flan` (its own "The answer is (X)" regex).
 Neither is the metric behind the older `mmlu_flan_cot_fewshot` grid rows, whose
