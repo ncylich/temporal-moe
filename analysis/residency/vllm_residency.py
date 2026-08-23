@@ -34,7 +34,7 @@ def set_step(spans):
     STEP["spans"] = spans
     STEP["plan"] = None                         # rebuilt lazily by the slotted path
     if spans is not None:                       # prune state of departed requests (safe:
-        live = {r for r, _, _ in spans}         # preemption replays the prefill)
+        live = {sp[0] for sp in spans}          # preemption replays the prefill)
         # tuple keys only: state is keyed (req_id, layer); the slotted path parks a
         # non-tuple epoch marker here and `k[0]` on a str is its first CHARACTER,
         # which silently matched nothing and pruned the marker every step
@@ -121,7 +121,8 @@ def _plan(device):
     dec_rows, dec_slots, pre, cold, replay = [], [], [], [], []
     fresh = []
     o = 0
-    for req, n, is_prefill in STEP["spans"]:
+    for sp in STEP["spans"]:
+        req, n, is_prefill = sp[0], sp[1], sp[2]
         seeded = req in SL["seeded"]
         if is_prefill:
             pre.append((req, o, n, seeded))
@@ -224,15 +225,43 @@ def apply(layer, router_logits):
     if os.environ.get("TEMPORAL_WALKER", "dict") == "slots":
         return _apply_slots(layer, router_logits)
     N = router_logits.shape[0]
-    total = sum(n for _, n, _ in STEP["spans"])
+    total = sum(sp[1] for sp in STEP["spans"])
     assert total == N, f"span/token mismatch: spans cover {total}, logits have {N}"
     out = router_logits.clone()
     dec_rows, dec_keys, cold, replay = [], [], [], []
     o = 0
-    for req_id, n, is_prefill in STEP["spans"]:
+    for sp in STEP["spans"]:
+        req_id, n, is_prefill = sp[0], sp[1], sp[2]
+        start = sp[3] if len(sp) > 3 else 0     # absolute offset of this span
         key = (req_id, layer)
         if is_prefill:
-            DS.observe_chunk(key, router_logits[o:o + n].unsqueeze(1))
+            # partial residency prefill: the original prompt is observed FREE, but
+            # previously-generated tokens carry the rule (they were generated under
+            # it, so their KV must be built the same way and the walk must advance
+            # through them to rebuild the resident set)
+            ef = DEC["enforce_from"].get(req_id)
+            if ef is not None and start + n > ef:
+                nfree = max(0, ef - start)
+                if nfree:
+                    DS.observe_chunk(key, router_logits[o:o + nfree].unsqueeze(1))
+                res = DEC["state"].get(key)
+                if res is None:
+                    lt0 = router_logits[o + nfree:o + nfree + 1].float()
+                    r0 = torch.zeros_like(lt0, dtype=torch.bool)
+                    r0.scatter_(1, lt0.topk(DEC["R"], dim=-1).indices, True)
+                    f0 = torch.zeros_like(lt0)
+                    DEC["state"][key] = (r0, f0)
+                resident, refresh = DEC["state"][key]
+                with torch.no_grad():
+                    for j in range(nfree, n):
+                        lt = router_logits[o + j:o + j + 1].float()
+                        for _ in range(DEC["swaps"]):
+                            resident, refresh = DS.step_accel(lt, resident, refresh,
+                                                              use_lru=False)
+                        out[o + j] = out[o + j].masked_fill(~resident[0], float("-inf"))
+                DEC["state"][key] = (resident, refresh)
+            else:
+                DS.observe_chunk(key, router_logits[o:o + n].unsqueeze(1))
         elif n > 1:
             # preemption replay: vLLM discarded KV and recomputes the generated
             # tokens as one chunk. Logits are deterministic, so stepping the scan

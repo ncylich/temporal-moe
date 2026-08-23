@@ -27,7 +27,13 @@ from temporal.temporal_router import (  # noqa: E402
     compute_resident_mask, compute_resident_mask_accel, _step, step_accel,
 )
 
-DEC = {"on": False, "R": 8, "swaps": 1, "state": {}}   # state[layer] = (resident[B,E], refresh)
+DEC = {"on": False, "R": 8, "swaps": 1, "state": {},
+       # RESUME support: resume_map keys a submitted prompt (len, hash of head,
+       # hash of tail) -> number of leading tokens that are the ORIGINAL prompt
+       # and stay free. enforce_from is the per-request boundary the glue resolves
+       # from it; tokens at or beyond it are previously-generated and must be
+       # walked under the rule, because that is how they were produced.
+       "resume_map": {}, "enforce_from": {}}   # state[layer] = (resident, refresh)
 
 
 def reset():

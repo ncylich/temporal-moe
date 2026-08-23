@@ -59,7 +59,17 @@ def install():
                     continue
                 computed = int(self.input_batch.num_computed_tokens_cpu[i])
                 prompt = int(self.requests[req_id].num_prompt_tokens)
-                spans.append((req_id, n, computed < prompt))
+                # RESUME: when a submitted "prompt" is original-prompt + previously
+                # generated tokens, the generated part must be walked under the rule
+                # (it was generated under it), while the original prompt stays free.
+                # Keyed off the prompt token IDs themselves, so it does not depend on
+                # how vLLM assigns request ids.
+                if _DEC.get("resume_map") and req_id not in _DEC["enforce_from"]:
+                    ids = tuple(self.requests[req_id].prompt_token_ids)
+                    key = (len(ids), hash(ids[:16]), hash(ids[-16:]))
+                    if key in _DEC["resume_map"]:
+                        _DEC["enforce_from"][req_id] = _DEC["resume_map"][key]
+                spans.append((req_id, n, computed < prompt, computed))
         VR.set_step(spans)
         return ret
 
