@@ -28,6 +28,16 @@ def install(lm, cap=HARD_CAP, think_marker=None):
         return len(tok(text, add_special_tokens=False).input_ids)
 
     def _score_text(raw, until):
+        # A response that ran out of budget INSIDE its thinking block never emitted
+        # an answer. Splitting on an absent marker returns the whole trace, which
+        # hands the raw deliberation to the answer extractor -- and deliberation is
+        # full of "the answer is (D)... or (B)" asides, so the extractor scores a
+        # coin flip on the model's own scratch work (measured on qwen MMLU: 27% of
+        # items unfinished, 0.66 accuracy on them against 0.96 on finished ones).
+        # Unfinished => no answer. Only cap-truncated responses count as unfinished;
+        # a short response with no marker simply did not think.
+        if think_marker and think_marker not in raw and _ntoks(raw) >= cap - 8:
+            return ""
         text = raw.split(think_marker)[-1] if think_marker else raw
         for term in until or []:
             if term:

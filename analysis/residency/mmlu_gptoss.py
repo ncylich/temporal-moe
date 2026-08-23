@@ -158,11 +158,14 @@ def main():
                 # raw = pre-strip (channels/think intact); resp = post-strip scored
                 raw = genprotocol.FINALS.get((task, x.get("doc_id")), resp)
                 gold = re.search(r"\(([A-D])\)", str(x.get("target", "")))
-                pred = extract(resp)
-                sm = STRICT.search(resp)
+                # unfinished thinking is not an answer (see genprotocol._score_text)
+                ntok = len(lm.tokenizer(raw, add_special_tokens=False).input_ids)
+                unfinished = bool(THINK_MARK) and THINK_MARK not in raw \
+                    and ntok >= A.gen_cap - 8
+                pred = None if unfinished else extract(resp)
+                sm = None if unfinished else STRICT.search(resp)
                 it = {"doc": f"{task}:{x.get('doc_id')}", "raw": raw,
-                      "gen_toks": len(lm.tokenizer(
-                          raw, add_special_tokens=False).input_ids),
+                      "gen_toks": ntok, "unfinished": unfinished,
                       "think_toks": (len(lm.tokenizer(
                           raw.rsplit(THINK_MARK, 1)[0] if THINK_MARK in raw else raw,
                           add_special_tokens=False).input_ids)

@@ -1,0 +1,27 @@
+"# MMLU re-scored from committed dumps under the corrected policy: a response that hit the generation cap while still inside its thinking block emitted no answer, so the extractor must not read its deliberation. reported = extractor ran on everything (the contaminated number); honest = unfinished count as unanswered; finished = accuracy over the finished subset only (n_finished = n - n_unfinished). Producer: analysis/residency/mmlu_unfinished_rescore.py"
+record,arm,n,n_unfinished,acc_reported,acc_honest,acc_finished
+gemma4_think_on,R16,228,5,0.929825,0.925439,0.946188
+gemma4_think_on,R8,228,11,0.894737,0.881579,0.926267
+gemma4_think_on,free,228,5,0.938596,0.934211,0.955157
+gptoss_120b,R16,228,0,0.868421,0.868421,0.868421
+gptoss_120b,R4,228,0,0.859649,0.859649,0.859649
+gptoss_120b,free,228,0,0.868421,0.868421,0.868421
+gptoss_120b_high,R16,228,3,0.907895,0.903509,0.915556
+gptoss_120b_high,R4,228,3,0.903509,0.899123,0.911111
+gptoss_120b_high,free,228,2,0.912281,0.907895,0.915929
+gptoss_120b_low,R16,228,0,0.894737,0.894737,0.894737
+gptoss_120b_low,R4,228,0,0.903509,0.903509,0.903509
+gptoss_120b_low,free,228,0,0.894737,0.894737,0.894737
+gptoss_20b,R4,228,1,0.793860,0.793860,0.797357
+gptoss_20b,free,228,0,0.807018,0.807018,0.807018
+gptoss_20b_high,R4,228,3,0.807018,0.807018,0.817778
+gptoss_20b_high,free,228,3,0.864035,0.864035,0.875556
+gptoss_20b_low,R4,228,0,0.815789,0.815789,0.815789
+gptoss_20b_low,free,228,0,0.824561,0.824561,0.824561
+lfm25_instruct,R4,228,5,0.557018,0.548246,0.560538
+lfm25_instruct,free,228,4,0.596491,0.592105,0.602679
+qwen35_instruct,R32,228,49,0.877193,0.728070,0.927374
+qwen35_instruct,R8,228,63,0.815789,0.644737,0.890909
+qwen35_instruct,free,228,61,0.881579,0.706140,0.964072
+qwen35_instruct_s11,free,228,49,0.868421,0.732456,0.932961
+qwen35_instruct_s7,free,228,37,0.864035,0.771930,0.921466
