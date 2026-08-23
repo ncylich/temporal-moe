@@ -476,6 +476,28 @@ def step_accel(lt, resident, refresh, use_lru=False):
     return _graph_step(lt, resident).clone(), refresh
 
 
+def step_accel_mask(lt, resident):
+    """min_logit `_step` returning the resident mask alone (no refresh), for the
+    slotted serving walker. Same env switch and same one-time hard equality gate
+    as `step_accel`; returns a fresh tensor (safe to index_copy_ into a bank)."""
+    global _step_path
+    if not lt.is_cuda or os.environ.get("TEMPORAL_DECODE", "eager") == "eager":
+        if _step_path is None:
+            _step_path = "eager"
+            print("[temporal] decode step path: eager")
+        return _minlogit_step(lt, resident)
+    if _step_path is None:                       # one-time bit-exactness gate (hard)
+        probe = _graph_step(lt, resident).clone()
+        ref = _minlogit_step(lt, resident)
+        if not torch.equal(probe, ref):
+            raise RuntimeError(
+                "[temporal] DECODE FAST PATH DISAGREES WITH REFERENCE on "
+                f"{(probe != ref).any(dim=-1).sum().item()} rows — aborting.")
+        _step_path = "cuda-graph"
+        print("[temporal] decode step path: cuda-graph (verified == reference)")
+    return _graph_step(lt, resident).clone()
+
+
 def temporal_forward(self, input: torch.Tensor):
     """Drop-in replacement for TopKRouter.forward: restrict selection to the resident set.
 
