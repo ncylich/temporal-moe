@@ -985,3 +985,12 @@ gemma4_think_on,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.894737,4,
 gemma4_think_on,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.495614,4,4096,1457
 gemma4_think_on,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.929825,4,4096,1388
 gemma4_think_on,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.600877,4,4096,1388
+gptoss_120b_low,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,2048,57
+gptoss_120b,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.951220,full,2048,100
+gptoss_120b_high,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.926829,full,4096,191
+gptoss_120b_low,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.951220,full,2048,247
+gptoss_120b,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.969512,full,2048,309
+gptoss_120b_high,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.902439,full,4096,482
+gptoss_120b_low,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,2048,243
+gptoss_120b,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,2048,311
+gptoss_120b_high,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,4096,464
