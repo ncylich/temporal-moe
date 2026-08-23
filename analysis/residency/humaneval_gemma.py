@@ -28,7 +28,13 @@ CHANNEL = re.compile(r"<\|channel>.*?(?:<channel\|>|\Z)", re.S)
 FENCE = re.compile(r"```(?:python)?\n(.*?)```", re.S)
 
 
-def extract(text):
+def extract(text, unfinished=False):
+    """Last fenced block outside the reasoning channels. A response that ran out
+    of budget mid-channel never left its reasoning, so it submitted nothing --
+    scoring the trace would credit code it was still deliberating over. On gemma
+    thinking-on this is 21-30% of items, and they are the whole score gap."""
+    if unfinished:
+        return ""
     text = CHANNEL.sub("", text)
     blocks = FENCE.findall(text)
     return blocks[-1] if blocks else text
@@ -89,7 +95,9 @@ def main():
             top_k=_gc.get("top_k") or -1, seed=1234, max_tokens=A.max_tokens),
             chat_template_kwargs={"enable_thinking": A.think == "on"})
 
-        preds = [[extract(o.outputs[0].text)] for o in outs]
+        unfin = [len(o.outputs[0].token_ids) >= A.max_tokens - 8
+                 and "<channel|>" not in o.outputs[0].text for o in outs]
+        preds = [[extract(o.outputs[0].text, u)] for o, u in zip(outs, unfin)]
         tests = [p["test"] + f"\ncheck({p['entry_point']})" for p in probs]
         # code_eval forks sandbox workers, which is unsafe inside the live vLLM
         # process: score in a clean subprocess instead.
@@ -115,8 +123,8 @@ def main():
              "gen_toks": len(o.outputs[0].token_ids),
              "think_toks": _ntok(o.outputs[0].text)
              - _ntok(CHANNEL.sub("", o.outputs[0].text)),
-             "pass": ps}
-            for p, o, ps in zip(probs, outs, passed)], len(probs))
+             "pass": ps, "unfinished": u}
+            for p, o, ps, u in zip(probs, outs, passed, unfin)], len(probs))
 
         with open(os.path.join(ABLATIONS, A.csv_name), "a", newline="") as fh:
             w = csv.writer(fh)

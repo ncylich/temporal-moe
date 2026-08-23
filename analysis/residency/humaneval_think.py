@@ -30,7 +30,13 @@ from decode_state import DEC                                         # noqa: E40
 FENCE = re.compile(r"```(?:python)?\n(.*?)```", re.S)
 
 
-def answer_part(text):
+def answer_part(text, unfinished=False):
+    """Text after the think block. A response that exhausted its budget INSIDE
+    thinking emitted no answer: scoring its trace would let a fenced block that
+    the model was still deliberating over count as a submission (measured: 3 of 5
+    such items 'passed' on qwen R32). Unfinished => empty."""
+    if unfinished:
+        return ""
     return text.split("</think>", 1)[1] if "</think>" in text else text
 
 
@@ -100,7 +106,10 @@ def main():
     outs = llm.chat(msgs, sp, **ck)
 
     raws = [o.outputs[0].text for o in outs]
-    finals = [answer_part(t) for t in raws]
+    # unfinished := hit the cap with the think block still open (see answer_part)
+    unfin = [len(o.outputs[0].token_ids) >= A.max_tokens - 8 and "</think>" not in r
+             for r, o in zip(raws, outs)]
+    finals = [answer_part(t, u) for t, u in zip(raws, unfin)]
     preds = [[(FENCE.findall(f) or [f])[-1]] for f in finals]
     tests = [p["test"] + f"\ncheck({p['entry_point']})" for p in probs]
     json.dump({"preds": preds, "tests": tests}, open("/tmp/heg_preds.json", "w"))
@@ -132,8 +141,8 @@ def main():
         {"doc": p["task_id"], "raw": r, "gen_toks": len(o.outputs[0].token_ids),
          "think_toks": _ntok(r.rsplit("</think>", 1)[0]) if "</think>" in r
          else (_ntok(r) if A.think != "off" else 0),
-         "pass": ps}
-        for p, r, o, ps in zip(probs, raws, outs, passed)], len(probs))
+         "pass": ps, "unfinished": u}
+        for p, r, o, ps, u in zip(probs, raws, outs, passed, unfin)], len(probs))
     torch.save({"items": [{"doc_id": i, "ids": tk(r, add_special_tokens=False).input_ids}
                           for i, r in enumerate(raws)]},
                os.path.join(td, f"{tag}_{A.arm}_humaneval_think.pt"))
