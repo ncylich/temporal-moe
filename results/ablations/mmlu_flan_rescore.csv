@@ -12,6 +12,15 @@ gemma4_ce_d8_dual,free,228,0.605263,86
 gemma4_think_on,R16,228,0.815789,34
 gemma4_think_on,R8,228,0.719298,49
 gemma4_think_on,free,228,0.868421,22
+gptoss_120b,R16,228,0.083333,207
+gptoss_120b,R4,228,0.052632,212
+gptoss_120b,free,228,0.065789,212
+gptoss_120b_high,R16,228,0.100877,200
+gptoss_120b_high,R4,228,0.100877,202
+gptoss_120b_high,free,228,0.118421,199
+gptoss_120b_low,R16,228,0.114035,198
+gptoss_120b_low,R4,228,0.135965,194
+gptoss_120b_low,free,228,0.109649,198
 gptoss_20b,R4,228,0.061404,211
 gptoss_20b,free,228,0.052632,214
 gptoss_20b_high,R4,228,0.061404,212

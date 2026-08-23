@@ -26,8 +26,8 @@ Producers: `analysis/residency/length_extension.py` (table + figure),
 
 | surface | wrong \| blow-up | wrong \| normal length | ratio | cells agreeing |
 |---|---|---|---|---|
-| HumanEval | **0.545** (163/299) | **0.059** (79/1341) | 9.2× | 9 of 10 |
-| MMLU | **0.352** (200/568) | **0.181** (268/1484) | 1.9× | 8 of 9 |
+| HumanEval | **0.526** (195/371) | **0.047** (107/2253) | 11.1× | 13 of 16 |
+| MMLU | **0.300** (223/744) | **0.148** (396/2676) | 2.0× | 10 of 15 |
 
 - **Code is the extreme case.** A HumanEval item that blows up under the
   constraint is wrong more than half the time; one that keeps a normal length is
@@ -51,23 +51,25 @@ individual cells.
 
 | surface | cells | flips to wrong | of those, blow-up | rescues (to right) | of those, blow-up |
 |---|---|---|---|---|---|
-| HumanEval | 10 | **126** | 74 (59%) | 51 | 34 (67%) |
-| MMLU | 9 | **224** | 104 (46%) | 147 | 65 (44%) |
+| HumanEval | 16 | **155** | 87 (56%) | 78 | 45 (58%) |
+| MMLU | 15 | **287** | 111 (39%) | 207 | 73 (35%) |
 | WritingBench | 12 | **273** | 78 (29%) | 152 | 36 (24%) |
-| **total (new surfaces)** | **31** | **623** | 256 (41%) | 350 | 135 (39%) |
+| **total (new surfaces)** | **43** | **715** | 276 (39%) | 437 | 154 (35%) |
 
-- **Damage is asymmetric everywhere**: 623 flips to wrong against 350 rescues,
-  1.8:1 pooled. Direction holds on all three surfaces separately (2.5:1 code,
-  1.5:1 knowledge, 1.8:1 writing).
+- **Damage is asymmetric everywhere**: 715 flips to wrong against 437 rescues,
+  1.64:1 pooled. Direction holds on all three surfaces separately (2.0:1 code,
+  1.4:1 knowledge, 1.8:1 writing).
 - **The original IFEval-era headline was 174 flips-to-wrong against 85 rescues**
   (2.0:1) on the thinking/non-thinking generative cells. The new surfaces
-  **reproduce the asymmetry at a similar ratio on a 3.6× larger flip sample**;
-  they do not reproduce the "blow-up wrongness direction 20 of 20" clean sweep,
-  which becomes **17 of 19** here (9/10 HumanEval, 8/9 MMLU). Both dissenting
-  cells are the same configuration — gpt-oss-20b at **low** effort, on HumanEval
-  (0 of 5 blown items wrong against 8% of normal ones) and on MMLU (0.18 against
-  0.19, a tie). Low effort is the mode that barely deliberates, so it produces
-  few blow-ups and no deliberation spiral to punish.
+  **reproduce the asymmetry on a 4.1× larger flip sample** at a slightly milder
+  ratio (1.64:1); the direction is not in doubt, its magnitude softens as
+  easier surfaces enter the pool.
+- They do **not** reproduce the "blow-up wrongness direction 20 of 20" clean
+  sweep, which becomes **23 of 31** here (13/16 HumanEval, 10/15 MMLU). The
+  dissenters are concentrated in the configurations that barely deliberate and
+  therefore barely blow up — gpt-oss at **low** effort and the gemma think-off
+  cells, where a handful of blown items (as few as 5) decide the comparison.
+  On the deliberation-heavy cells the direction is unanimous.
 - **Blow-up is not the whole story.** It is involved in 41% of flips-to-wrong,
   and it is *equally* common among rescues (39%). Blow-up marks an item as
   high-variance under the constraint; conditional wrongness (the table above) is
@@ -78,10 +80,10 @@ individual cells.
 Mean paired length change (constrained − free) and the part contributed by
 cap-hit items:
 
-- **HumanEval: +138 tokens per item on average, of which +40 is cap traffic.**
+- **HumanEval: +110 tokens per item on average, of which +28 is cap traffic.**
   Most of the lengthening is broad — the constrained model writes longer code and
   longer commentary on items that never approach the budget.
-- **MMLU: +15 tokens, of which +11 is cap traffic.** Knowledge answers barely
+- **MMLU: +23 tokens, of which +9 is cap traffic.** Knowledge answers barely
   lengthen on average; what movement exists is concentrated in the few items that
   saturate.
 - **WritingBench: −22 tokens on average**, i.e. no systematic lengthening at all
