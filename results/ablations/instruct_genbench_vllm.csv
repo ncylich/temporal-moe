@@ -1,31 +1,5 @@
 "# AUTHORITATIVE ROWS ONLY: one row per (record, arm, task, metric), all from the single-pass sampled protocol (never greedy; eos-only stops; thinking stripped before scoring; budgets in max_gen_toks) or the bespoke producers listed in DATA_CONTRACT.md. Full history: superseded/instruct_genbench_vllm_history.csv"
 model,E,k,arm,R,task,metric,value,limit,max_gen_toks,secs
-gptoss_20b,32,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.939024,full,2048,70
-gptoss_20b,32,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,2048,217
-gptoss_120b,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.957317,full,2048,98
-gptoss_120b,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,2048,310
-gptoss_120b,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.963415,full,2048,320
-gemma4_instruct,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,1536,69
-gemma4_instruct,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.926829,full,1536,206
-gemma4_instruct,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,203
-gemma4_think_on,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.835366,full,3072,223
-gemma4_think_on,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.713415,full,3072,856
-gemma4_think_on,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.737805,full,3072,812
-gptoss_20b_low,32,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,2048,47
-gptoss_20b_low,32,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,2048,165
-gptoss_120b_low,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.951220,full,2048,49
-gptoss_120b_low,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.939024,full,2048,278
-gptoss_120b_low,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.957317,full,2048,247
-gptoss_120b_high,128,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,4096,190
-gptoss_120b_high,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.902439,full,4096,473
-gptoss_120b_high,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.914634,full,4096,467
-gptoss_20b_high,32,4,free,,humaneval_gptoss,"pass@1,channel-aware",0.847561,full,4096,138
-gptoss_20b_high,32,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.853659,full,4096,312
-qwen35_instruct,256,8,free,,humaneval_think,"pass@1,channel-aware",0.957317,full,4096,349
-qwen35_instruct,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.810976,full,4096,711
-qwen35_instruct,256,8,R32,32,humaneval_think,"pass@1,channel-aware",0.884146,full,4096,677
-lfm25_instruct,32,4,free,,humaneval_think,"pass@1,channel-aware",0.829268,full,4096,90
-lfm25_instruct,32,4,R4,4,humaneval_think,"pass@1,channel-aware",0.670732,full,4096,230
 qwen35_instruct,256,8,R32,32,ifeval,sample_len,200.000000,200,8192,2911
 qwen35_instruct,256,8,R32,32,ifeval,"prompt_level_strict_acc,none",0.815000,200,8192,2911
 qwen35_instruct,256,8,R32,32,ifeval,"inst_level_strict_acc,none",0.858491,200,8192,2911
@@ -175,12 +149,6 @@ gptoss_20b_low,32,4,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,4096,29
 gptoss_20b_low,32,4,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,4096,29
 gptoss_20b_low,32,4,R4,4,gsm8k_cot_zeroshot,sample_len,200.000000,200,4096,125
 gptoss_20b_low,32,4,R4,4,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.840000,200,4096,125
-gptoss_20b_low,32,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.820175,4,4096,109
-gptoss_20b_low,32,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.750000,4,4096,740
-gptoss_20b,32,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.776316,4,4096,113
-gptoss_20b,32,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.723684,4,4096,815
-gptoss_20b_high,32,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.776316,4,4096,174
-gptoss_20b_high,32,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.780702,4,4096,845
 gptoss_120b,128,4,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,4096,65
 gptoss_120b,128,4,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,4096,65
 gptoss_120b,128,4,R4,4,gsm8k_cot_zeroshot,sample_len,200.000000,200,4096,255
@@ -193,15 +161,6 @@ gptoss_120b_low,128,4,R4,4,gsm8k_cot_zeroshot,sample_len,200.000000,200,4096,186
 gptoss_120b_low,128,4,R4,4,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.875000,200,4096,186
 gptoss_120b_low,128,4,R16,16,gsm8k_cot_zeroshot,sample_len,200.000000,200,4096,214
 gptoss_120b_low,128,4,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.820000,200,4096,214
-gptoss_120b_low,128,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.877193,4,4096,115
-gptoss_120b_low,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.894737,4,4096,1099
-gptoss_120b_low,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.899123,4,4096,1090
-gptoss_120b,128,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.850877,4,4096,141
-gptoss_120b,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.859649,4,4096,1185
-gptoss_120b,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.877193,4,4096,1258
-gptoss_120b_high,128,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.907895,4,4096,257
-gptoss_120b_high,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.907895,4,4096,1666
-gptoss_120b_high,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.885965,4,4096,1661
 qwen35_instruct,256,8,free,,ifeval,sample_len,200.000000,200,8192,2354
 qwen35_instruct,256,8,free,,ifeval,"prompt_level_strict_acc,none",0.865000,200,8192,2354
 qwen35_instruct,256,8,free,,ifeval,"inst_level_strict_acc,none",0.896226,200,8192,2354
@@ -477,7 +436,6 @@ gemma4_ce_d5,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.963415,f
 gemma4_ce_d5,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.951220,full,1536,206
 gemma4_ce_d5,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,1536,204
 gemma4_ce_d8,128,8,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,68
-gemma4_ce_d8,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,68
 gemma4_ce_d8,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.885000,200,2048,68
 gemma4_ce_d8,128,8,free,,ifeval,sample_len,200.000000,200,2048,88
 gemma4_ce_d8,128,8,free,,ifeval,"prompt_level_strict_acc,none",0.860000,200,2048,88
@@ -485,7 +443,6 @@ gemma4_ce_d8,128,8,free,,ifeval,"inst_level_strict_acc,none",0.908805,200,2048,8
 gemma4_ce_d8,128,8,free,,ifeval,"prompt_level_loose_acc,none",0.875000,200,2048,88
 gemma4_ce_d8,128,8,free,,ifeval,"inst_level_loose_acc,none",0.918239,200,2048,88
 gemma4_ce_d8,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,117
-gemma4_ce_d8,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,117
 gemma4_ce_d8,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.805000,200,2048,117
 gemma4_ce_d8,128,8,R8,8,ifeval,sample_len,200.000000,200,2048,178
 gemma4_ce_d8,128,8,R8,8,ifeval,"prompt_level_strict_acc,none",0.835000,200,2048,178
@@ -493,7 +450,6 @@ gemma4_ce_d8,128,8,R8,8,ifeval,"inst_level_strict_acc,none",0.886792,200,2048,17
 gemma4_ce_d8,128,8,R8,8,ifeval,"prompt_level_loose_acc,none",0.860000,200,2048,178
 gemma4_ce_d8,128,8,R8,8,ifeval,"inst_level_loose_acc,none",0.908805,200,2048,178
 gemma4_ce_d8,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,124
-gemma4_ce_d8,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,124
 gemma4_ce_d8,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.855000,200,2048,124
 gemma4_ce_d8,128,8,R16,16,ifeval,sample_len,200.000000,200,2048,142
 gemma4_ce_d8,128,8,R16,16,ifeval,"prompt_level_strict_acc,none",0.860000,200,2048,142
@@ -510,7 +466,6 @@ gemma4_ce_d8,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,f
 gemma4_ce_d8,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.951220,full,1536,203
 gemma4_ce_d8,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,1536,203
 gemma4_ce_d12,128,8,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,46
-gemma4_ce_d12,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,46
 gemma4_ce_d12,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.860000,200,2048,46
 gemma4_ce_d12,128,8,free,,ifeval,sample_len,200.000000,200,2048,87
 gemma4_ce_d12,128,8,free,,ifeval,"prompt_level_strict_acc,none",0.875000,200,2048,87
@@ -518,7 +473,6 @@ gemma4_ce_d12,128,8,free,,ifeval,"inst_level_strict_acc,none",0.915094,200,2048,
 gemma4_ce_d12,128,8,free,,ifeval,"prompt_level_loose_acc,none",0.880000,200,2048,87
 gemma4_ce_d12,128,8,free,,ifeval,"inst_level_loose_acc,none",0.921384,200,2048,87
 gemma4_ce_d12,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,120
-gemma4_ce_d12,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,120
 gemma4_ce_d12,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.855000,200,2048,120
 gemma4_ce_d12,128,8,R8,8,ifeval,sample_len,200.000000,200,2048,170
 gemma4_ce_d12,128,8,R8,8,ifeval,"prompt_level_strict_acc,none",0.850000,200,2048,170
@@ -526,7 +480,6 @@ gemma4_ce_d12,128,8,R8,8,ifeval,"inst_level_strict_acc,none",0.902516,200,2048,1
 gemma4_ce_d12,128,8,R8,8,ifeval,"prompt_level_loose_acc,none",0.875000,200,2048,170
 gemma4_ce_d12,128,8,R8,8,ifeval,"inst_level_loose_acc,none",0.915094,200,2048,170
 gemma4_ce_d12,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,129
-gemma4_ce_d12,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,129
 gemma4_ce_d12,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.870000,200,2048,129
 gemma4_ce_d12,128,8,R16,16,ifeval,sample_len,200.000000,200,2048,145
 gemma4_ce_d12,128,8,R16,16,ifeval,"prompt_level_strict_acc,none",0.835000,200,2048,145
@@ -549,7 +502,6 @@ gemma4_ce_d12_dual2,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.478070,4,
 gemma4_ce_d12_dual2,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.921053,4,2048,1090
 gemma4_ce_d12_dual2,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.442982,4,2048,1090
 qwen35_halfgrain_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,124
-qwen35_halfgrain_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,124
 qwen35_halfgrain_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,124
 qwen35_halfgrain_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,113
 qwen35_halfgrain_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.860000,200,2048,113
@@ -561,7 +513,6 @@ qwen35_halfgrain_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0.9390
 qwen35_halfgrain_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,205
 qwen35_halfgrain_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.793860,4,2048,205
 qwen35_halfgrain_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,270
-qwen35_halfgrain_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,270
 qwen35_halfgrain_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.580000,200,2048,270
 qwen35_halfgrain_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,257
 qwen35_halfgrain_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.795000,200,2048,257
@@ -573,15 +524,6 @@ qwen35_halfgrain_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",0.835
 qwen35_halfgrain_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1358
 qwen35_halfgrain_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.859649,4,2048,1358
 gemma4_halfgrain,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,50
-gemma4_halfgrain,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,50
-gemma4_halfgrain,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.870000,200,2048,50
-gemma4_halfgrain,256,16,free,,ifeval,sample_len,200.000000,200,2048,61
-gemma4_halfgrain,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.875000,200,2048,61
-gemma4_halfgrain,256,16,free,,ifeval,"inst_level_strict_acc,none",0.915094,200,2048,61
-gemma4_halfgrain,256,16,free,,ifeval,"prompt_level_loose_acc,none",0.880000,200,2048,61
-gemma4_halfgrain,256,16,free,,ifeval,"inst_level_loose_acc,none",0.921384,200,2048,61
-gemma4_halfgrain,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,50
-gemma4_halfgrain,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,50
 gemma4_halfgrain,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.870000,200,2048,50
 gemma4_halfgrain,256,16,free,,ifeval,sample_len,200.000000,200,2048,64
 gemma4_halfgrain,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.865000,200,2048,64
@@ -591,7 +533,6 @@ gemma4_halfgrain,256,16,free,,ifeval,"inst_level_loose_acc,none",0.915094,200,20
 gemma4_halfgrain,256,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,104
 gemma4_halfgrain,256,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.679825,4,2048,104
 gemma4_halfgrain,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,117
-gemma4_halfgrain,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,117
 gemma4_halfgrain,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.825000,200,2048,117
 gemma4_halfgrain,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,170
 gemma4_halfgrain,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.860000,200,2048,170
@@ -604,7 +545,6 @@ gemma4_halfgrain,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.9939
 gemma4_halfgrain,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.481707,full,1536,509
 gemma4_halfgrain_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.621951,full,3072,714
 gemma4_halfgrain_ce,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,44
-gemma4_halfgrain_ce,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,44
 gemma4_halfgrain_ce,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.860000,200,2048,44
 gemma4_halfgrain_ce,256,16,free,,ifeval,sample_len,200.000000,200,2048,63
 gemma4_halfgrain_ce,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.890000,200,2048,63
@@ -614,7 +554,6 @@ gemma4_halfgrain_ce,256,16,free,,ifeval,"inst_level_loose_acc,none",0.940252,200
 gemma4_halfgrain_ce,256,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,111
 gemma4_halfgrain_ce,256,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.618421,4,2048,111
 gemma4_halfgrain_ce,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,125
-gemma4_halfgrain_ce,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,125
 gemma4_halfgrain_ce,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.855000,200,2048,125
 gemma4_halfgrain_ce,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,135
 gemma4_halfgrain_ce,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.845000,200,2048,135
@@ -627,7 +566,6 @@ gemma4_halfgrain_ce,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.9
 gemma4_halfgrain_ce,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.414634,full,1536,495
 gemma4_halfgrain_ce_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.518293,full,3072,736
 qwen35_halfgrain_ce_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,152
-qwen35_halfgrain_ce_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,152
 qwen35_halfgrain_ce_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.860000,200,2048,152
 qwen35_halfgrain_ce_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,151
 qwen35_halfgrain_ce_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.845000,200,2048,151
@@ -639,7 +577,6 @@ qwen35_halfgrain_ce_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0.9
 qwen35_halfgrain_ce_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,188
 qwen35_halfgrain_ce_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.653509,4,2048,188
 qwen35_halfgrain_ce_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,263
-qwen35_halfgrain_ce_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.005000,200,2048,263
 qwen35_halfgrain_ce_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.680000,200,2048,263
 qwen35_halfgrain_ce_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,256
 qwen35_halfgrain_ce_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.800000,200,2048,256
@@ -651,7 +588,6 @@ qwen35_halfgrain_ce_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",0.
 qwen35_halfgrain_ce_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1309
 qwen35_halfgrain_ce_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.679825,4,2048,1309
 gemma4_halfgrain_ce2,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,49
-gemma4_halfgrain_ce2,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,49
 gemma4_halfgrain_ce2,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,49
 gemma4_halfgrain_ce2,256,16,free,,ifeval,sample_len,200.000000,200,2048,69
 gemma4_halfgrain_ce2,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.865000,200,2048,69
@@ -661,7 +597,6 @@ gemma4_halfgrain_ce2,256,16,free,,ifeval,"inst_level_loose_acc,none",0.921384,20
 gemma4_halfgrain_ce2,256,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,104
 gemma4_halfgrain_ce2,256,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.600877,4,2048,104
 gemma4_halfgrain_ce2,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,141
-gemma4_halfgrain_ce2,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,141
 gemma4_halfgrain_ce2,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.860000,200,2048,141
 gemma4_halfgrain_ce2,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,161
 gemma4_halfgrain_ce2,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.805000,200,2048,161
@@ -674,7 +609,6 @@ gemma4_halfgrain_ce2,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.
 gemma4_halfgrain_ce2,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.451220,full,1536,523
 gemma4_halfgrain_ce2_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.603659,full,3072,740
 gemma4_halfgrain_ce3,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,46
-gemma4_halfgrain_ce3,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,46
 gemma4_halfgrain_ce3,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,46
 gemma4_halfgrain_ce3,256,16,free,,ifeval,sample_len,200.000000,200,2048,61
 gemma4_halfgrain_ce3,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.865000,200,2048,61
@@ -684,7 +618,6 @@ gemma4_halfgrain_ce3,256,16,free,,ifeval,"inst_level_loose_acc,none",0.915094,20
 gemma4_halfgrain_ce3,256,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,118
 gemma4_halfgrain_ce3,256,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.653509,4,2048,118
 gemma4_halfgrain_ce3,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,121
-gemma4_halfgrain_ce3,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.005000,200,2048,121
 gemma4_halfgrain_ce3,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.830000,200,2048,121
 gemma4_halfgrain_ce3,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,144
 gemma4_halfgrain_ce3,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.805000,200,2048,144
@@ -697,7 +630,6 @@ gemma4_halfgrain_ce3,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.
 gemma4_halfgrain_ce3,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.451220,full,1536,478
 gemma4_halfgrain_ce3_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.554878,full,3072,704
 qwen35_halfgrain_ce2_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,137
-qwen35_halfgrain_ce2_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,137
 qwen35_halfgrain_ce2_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.835000,200,2048,137
 qwen35_halfgrain_ce2_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,145
 qwen35_halfgrain_ce2_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.830000,200,2048,145
@@ -709,7 +641,6 @@ qwen35_halfgrain_ce2_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0.
 qwen35_halfgrain_ce2_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,215
 qwen35_halfgrain_ce2_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.701754,4,2048,215
 qwen35_halfgrain_ce2_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,270
-qwen35_halfgrain_ce2_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,270
 qwen35_halfgrain_ce2_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.675000,200,2048,270
 qwen35_halfgrain_ce2_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,255
 qwen35_halfgrain_ce2_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.825000,200,2048,255
@@ -721,7 +652,6 @@ qwen35_halfgrain_ce2_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",0
 qwen35_halfgrain_ce2_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1344
 qwen35_halfgrain_ce2_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.706140,4,2048,1344
 gemma4_halfgrain_sp,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,49
-gemma4_halfgrain_sp,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,49
 gemma4_halfgrain_sp,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.855000,200,2048,49
 gemma4_halfgrain_sp,256,16,free,,ifeval,sample_len,200.000000,200,2048,60
 gemma4_halfgrain_sp,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.865000,200,2048,60
@@ -731,7 +661,6 @@ gemma4_halfgrain_sp,256,16,free,,ifeval,"inst_level_loose_acc,none",0.915094,200
 gemma4_halfgrain_sp,256,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,104
 gemma4_halfgrain_sp,256,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.635965,4,2048,104
 gemma4_halfgrain_sp,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,178
-gemma4_halfgrain_sp,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,178
 gemma4_halfgrain_sp,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,178
 gemma4_halfgrain_sp,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,140
 gemma4_halfgrain_sp,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.800000,200,2048,140
@@ -744,7 +673,6 @@ gemma4_halfgrain_sp,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.9
 gemma4_halfgrain_sp,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.481707,full,1536,463
 gemma4_halfgrain_sp_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.579268,full,3072,707
 qwen35_halfgrain_sp_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,143
-qwen35_halfgrain_sp_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,143
 qwen35_halfgrain_sp_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.865000,200,2048,143
 qwen35_halfgrain_sp_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,153
 qwen35_halfgrain_sp_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.785000,200,2048,153
@@ -756,7 +684,6 @@ qwen35_halfgrain_sp_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0.9
 qwen35_halfgrain_sp_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,222
 qwen35_halfgrain_sp_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.679825,4,2048,222
 qwen35_halfgrain_sp_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,274
-qwen35_halfgrain_sp_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,274
 qwen35_halfgrain_sp_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.665000,200,2048,274
 qwen35_halfgrain_sp_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,260
 qwen35_halfgrain_sp_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.820000,200,2048,260
@@ -768,7 +695,6 @@ qwen35_halfgrain_sp_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",0.
 qwen35_halfgrain_sp_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1537
 qwen35_halfgrain_sp_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.692982,4,2048,1537
 gemma4_halfgrain_dz,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,48
-gemma4_halfgrain_dz,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,48
 gemma4_halfgrain_dz,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.845000,200,2048,48
 gemma4_halfgrain_dz,256,16,free,,ifeval,sample_len,200.000000,200,2048,60
 gemma4_halfgrain_dz,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.875000,200,2048,60
@@ -776,7 +702,6 @@ gemma4_halfgrain_dz,256,16,free,,ifeval,"inst_level_strict_acc,none",0.918239,20
 gemma4_halfgrain_dz,256,16,free,,ifeval,"prompt_level_loose_acc,none",0.880000,200,2048,60
 gemma4_halfgrain_dz,256,16,free,,ifeval,"inst_level_loose_acc,none",0.921384,200,2048,60
 gemma4_halfgrain_dz,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,132
-gemma4_halfgrain_dz,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,132
 gemma4_halfgrain_dz,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.835000,200,2048,132
 gemma4_halfgrain_dz,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,133
 gemma4_halfgrain_dz,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.805000,200,2048,133
@@ -787,7 +712,6 @@ gemma4_halfgrain_dz,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.9
 gemma4_halfgrain_dz,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.524390,full,1536,494
 gemma4_halfgrain_dz_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.554878,full,3072,733
 gemma4_halfgrain_dz2,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,48
-gemma4_halfgrain_dz2,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,48
 gemma4_halfgrain_dz2,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.855000,200,2048,48
 gemma4_halfgrain_dz2,256,16,free,,ifeval,sample_len,200.000000,200,2048,70
 gemma4_halfgrain_dz2,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.870000,200,2048,70
@@ -795,7 +719,6 @@ gemma4_halfgrain_dz2,256,16,free,,ifeval,"inst_level_strict_acc,none",0.915094,2
 gemma4_halfgrain_dz2,256,16,free,,ifeval,"prompt_level_loose_acc,none",0.890000,200,2048,70
 gemma4_halfgrain_dz2,256,16,free,,ifeval,"inst_level_loose_acc,none",0.927673,200,2048,70
 gemma4_halfgrain_dz2,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,115
-gemma4_halfgrain_dz2,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,115
 gemma4_halfgrain_dz2,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.870000,200,2048,115
 gemma4_halfgrain_dz2,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,153
 gemma4_halfgrain_dz2,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.820000,200,2048,153
@@ -806,7 +729,6 @@ gemma4_halfgrain_dz2,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.
 gemma4_halfgrain_dz2,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.524390,full,1536,488
 gemma4_halfgrain_dz2_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.567073,full,3072,688
 gemma4_halfgrain_dz3,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,58
-gemma4_halfgrain_dz3,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,58
 gemma4_halfgrain_dz3,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.845000,200,2048,58
 gemma4_halfgrain_dz3,256,16,free,,ifeval,sample_len,200.000000,200,2048,62
 gemma4_halfgrain_dz3,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.860000,200,2048,62
@@ -814,7 +736,6 @@ gemma4_halfgrain_dz3,256,16,free,,ifeval,"inst_level_strict_acc,none",0.911950,2
 gemma4_halfgrain_dz3,256,16,free,,ifeval,"prompt_level_loose_acc,none",0.900000,200,2048,62
 gemma4_halfgrain_dz3,256,16,free,,ifeval,"inst_level_loose_acc,none",0.937107,200,2048,62
 gemma4_halfgrain_dz3,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,153
-gemma4_halfgrain_dz3,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.005000,200,2048,153
 gemma4_halfgrain_dz3,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,153
 gemma4_halfgrain_dz3,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,139
 gemma4_halfgrain_dz3,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.770000,200,2048,139
@@ -826,7 +747,6 @@ gemma4_halfgrain_dz3,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.
 gemma4_halfgrain_dz3_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.634146,full,3072,745
 gemma4_halfgrain_dz3_cap6k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.628049,full,6144,1065
 qwen35_halfgrain_dzq_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,132
-qwen35_halfgrain_dzq_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,132
 qwen35_halfgrain_dzq_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.885000,200,2048,132
 qwen35_halfgrain_dzq_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,145
 qwen35_halfgrain_dzq_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.830000,200,2048,145
@@ -838,7 +758,6 @@ qwen35_halfgrain_dzq_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0.
 qwen35_halfgrain_dzq_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,209
 qwen35_halfgrain_dzq_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.570175,4,2048,209
 qwen35_halfgrain_dzq_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,301
-qwen35_halfgrain_dzq_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,301
 qwen35_halfgrain_dzq_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.725000,200,2048,301
 qwen35_halfgrain_dzq_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,257
 qwen35_halfgrain_dzq_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.815000,200,2048,257
@@ -850,7 +769,6 @@ qwen35_halfgrain_dzq_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",0
 qwen35_halfgrain_dzq_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1597
 qwen35_halfgrain_dzq_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.631579,4,2048,1597
 gemma4_halfgrain_dzh,256,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,73
-gemma4_halfgrain_dzh,256,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,73
 gemma4_halfgrain_dzh,256,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,73
 gemma4_halfgrain_dzh,256,16,free,,ifeval,sample_len,200.000000,200,2048,60
 gemma4_halfgrain_dzh,256,16,free,,ifeval,"prompt_level_strict_acc,none",0.875000,200,2048,60
@@ -858,7 +776,6 @@ gemma4_halfgrain_dzh,256,16,free,,ifeval,"inst_level_strict_acc,none",0.918239,2
 gemma4_halfgrain_dzh,256,16,free,,ifeval,"prompt_level_loose_acc,none",0.895000,200,2048,60
 gemma4_halfgrain_dzh,256,16,free,,ifeval,"inst_level_loose_acc,none",0.927673,200,2048,60
 gemma4_halfgrain_dzh,256,16,R48,48,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,149
-gemma4_halfgrain_dzh,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,149
 gemma4_halfgrain_dzh,256,16,R48,48,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.835000,200,2048,149
 gemma4_halfgrain_dzh,256,16,R48,48,ifeval,sample_len,200.000000,200,2048,167
 gemma4_halfgrain_dzh,256,16,R48,48,ifeval,"prompt_level_strict_acc,none",0.810000,200,2048,167
@@ -869,7 +786,6 @@ gemma4_halfgrain_dzh,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.
 gemma4_halfgrain_dzh,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.506098,full,1536,476
 gemma4_halfgrain_dzh_cap3k,128,8,R48,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.512195,full,3072,699
 qwen35_halfgrain_dzq2_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,145
-qwen35_halfgrain_dzq2_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,145
 qwen35_halfgrain_dzq2_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.850000,200,2048,145
 qwen35_halfgrain_dzq2_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,145
 qwen35_halfgrain_dzq2_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.805000,200,2048,145
@@ -881,7 +797,6 @@ qwen35_halfgrain_dzq2_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0
 qwen35_halfgrain_dzq2_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,226
 qwen35_halfgrain_dzq2_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.552632,4,2048,226
 qwen35_halfgrain_dzq2_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,261
-qwen35_halfgrain_dzq2_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,261
 qwen35_halfgrain_dzq2_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.690000,200,2048,261
 qwen35_halfgrain_dzq2_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,257
 qwen35_halfgrain_dzq2_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.795000,200,2048,257
@@ -893,7 +808,6 @@ qwen35_halfgrain_dzq2_off,512,16,R96,96,humaneval_instruct,"pass@1,create_test",
 qwen35_halfgrain_dzq2_off,512,16,R96,96,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,1425
 qwen35_halfgrain_dzq2_off,512,16,R96,96,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.609649,4,2048,1425
 qwen35_halfgrain_dzq_off,512,16,R64,64,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,267
-qwen35_halfgrain_dzq_off,512,16,R64,64,gsm8k_cot_zeroshot,"exact_match,strict-match",0.005000,200,2048,267
 qwen35_halfgrain_dzq_off,512,16,R64,64,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.690000,200,2048,267
 qwen35_halfgrain_dzq_off,512,16,R64,64,ifeval,sample_len,200.000000,200,2048,232
 qwen35_halfgrain_dzq_off,512,16,R64,64,ifeval,"prompt_level_strict_acc,none",0.785000,200,2048,232
@@ -903,7 +817,6 @@ qwen35_halfgrain_dzq_off,512,16,R64,64,ifeval,"inst_level_loose_acc,none",0.8930
 qwen35_halfgrain_dzq_off,512,16,R64,64,humaneval_instruct,sample_len,164.000000,full,2048,503
 qwen35_halfgrain_dzq_off,512,16,R64,64,humaneval_instruct,"pass@1,create_test",0.871951,full,2048,503
 qwen35_halfgrain_dzq_off,512,16,R128,128,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,294
-qwen35_halfgrain_dzq_off,512,16,R128,128,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,294
 qwen35_halfgrain_dzq_off,512,16,R128,128,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.735000,200,2048,294
 qwen35_halfgrain_dzq_off,512,16,R128,128,ifeval,sample_len,200.000000,200,2048,259
 qwen35_halfgrain_dzq_off,512,16,R128,128,ifeval,"prompt_level_strict_acc,none",0.765000,200,2048,259
@@ -913,7 +826,6 @@ qwen35_halfgrain_dzq_off,512,16,R128,128,ifeval,"inst_level_loose_acc,none",0.88
 qwen35_halfgrain_dzq_off,512,16,R128,128,humaneval_instruct,sample_len,164.000000,full,2048,503
 qwen35_halfgrain_dzq_off,512,16,R128,128,humaneval_instruct,"pass@1,create_test",0.890244,full,2048,503
 qwen35_halfgrain_dzm_off,512,16,free,,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,130
-qwen35_halfgrain_dzm_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,200,2048,130
 qwen35_halfgrain_dzm_off,512,16,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.835000,200,2048,130
 qwen35_halfgrain_dzm_off,512,16,free,,ifeval,sample_len,200.000000,200,2048,132
 qwen35_halfgrain_dzm_off,512,16,free,,ifeval,"prompt_level_strict_acc,none",0.825000,200,2048,132
@@ -925,7 +837,6 @@ qwen35_halfgrain_dzm_off,512,16,free,,humaneval_instruct,"pass@1,create_test",0.
 qwen35_halfgrain_dzm_off,512,16,free,,mmlu_flan_cot_fewshot,sample_len,228.000000,4,2048,213
 qwen35_halfgrain_dzm_off,512,16,free,,mmlu_flan_cot_fewshot,"exact_match,get-answer",0.592105,4,2048,213
 qwen35_halfgrain_dzm_off,512,16,R96,96,gsm8k_cot_zeroshot,sample_len,200.000000,200,2048,263
-qwen35_halfgrain_dzm_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,strict-match",0.005000,200,2048,263
 qwen35_halfgrain_dzm_off,512,16,R96,96,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.710000,200,2048,263
 qwen35_halfgrain_dzm_off,512,16,R96,96,ifeval,sample_len,200.000000,200,2048,254
 qwen35_halfgrain_dzm_off,512,16,R96,96,ifeval,"prompt_level_strict_acc,none",0.790000,200,2048,254
