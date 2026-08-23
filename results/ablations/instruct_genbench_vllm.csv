@@ -943,3 +943,9 @@ olmoe_instruct,64,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.350877,4,2048,5
 qwen35_instruct,256,8,free,,humaneval_think,"pass@1,channel-aware",0.951220,full,4096,282
 qwen35_instruct,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.890244,full,4096,761
 qwen35_instruct,256,8,R32,32,humaneval_think,"pass@1,channel-aware",0.963415,full,4096,691
+qwen35_instruct,256,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.881579,4,4096,1025
+qwen35_instruct,256,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.842105,4,4096,1025
+qwen35_instruct,256,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.815789,4,4096,3179
+qwen35_instruct,256,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.741228,4,4096,3179
+qwen35_instruct,256,8,R32,32,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.877193,4,4096,2867
+qwen35_instruct,256,8,R32,32,mmlu_gptoss_relaxed,"acc,strict-flan",0.850877,4,4096,2867
