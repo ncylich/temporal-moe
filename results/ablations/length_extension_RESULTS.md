@@ -151,10 +151,12 @@ regenerated with dumps and dual-scored:
 - **Flagged, both rows kept, old row not overwritten:**
   - `qwen35_instruct` HumanEval R8 **0.8902 vs 0.8110** and R32 **0.9634 vs
     0.8841**, while the free arm reproduced (0.9512 vs 0.9573). Adjudicated: the
-    memory-fraction hypothesis is **refuted**. Rerunning R8 at the protocol
-    default (0.92, against the regeneration's 0.94) gives **0.8902 again, to four
-    decimals** — yet **0 of 164 generations are textually identical between the
-    two runs** and 26 items flip pass/fail. Constrained-arm trajectories are
+    memory-fraction hypothesis is **refuted**. Rerunning at the protocol default
+    (0.92, against the regeneration's 0.94) gives **R8 0.8902 again, to four
+    decimals**, and R32 0.9512 against 0.9634 (a 2-item difference) — both arms
+    far above the old rows, which sit 11–13 items lower. Yet **0 of 164
+    generations are textually identical between the two R8 runs** and 26 items
+    flip pass/fail. Constrained-arm trajectories are
     simply not reproducible run to run (batch-shape jitter rewrites every one);
     only the aggregate is. Everything else recoverable is identical across eras:
     the harness that wrote the old rows differs from today's only by dump code,
