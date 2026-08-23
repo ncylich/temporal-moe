@@ -281,15 +281,16 @@ lo.plot([0, 1], [1, 1], transform=lo.transAxes, **kw)
 for ax in (hi, lo):
     ax.grid(alpha=0.25, linewidth=0.6)
     ax.set_xlim(0.0, 1.05)
-lo.set_xlabel("normalized depth  $l/L$   (layer 1 is a dense FFN in every config)")
+lo.set_xlabel("normalized depth  $l/L$" if PAPER else
+              "normalized depth  $l/L$   (layer 1 is a dense FFN in every config)")
 fig.supylabel("median over experts:  context AUC $-$ token AUC",
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
     fig.subplots_adjust(left=0.17)
 hi.text(0.012, 0.90, "context-dominated (temporal)", transform=hi.transAxes,
         fontsize=10, color="#145a14", weight="bold")
-lo.text(0.012, 0.08, "token-dominated (unconstrained MoE)", transform=lo.transAxes,
-        fontsize=10, color="#0d3b66", weight="bold")
+lo.text(0.012, 0.88 if PAPER else 0.08, "token-dominated (unconstrained MoE)",
+        transform=lo.transAxes, fontsize=10, color="#0d3b66", weight="bold")
 
 hh, ll = hi.get_legend_handles_labels()
 h2, l2 = lo.get_legend_handles_labels()

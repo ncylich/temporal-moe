@@ -56,7 +56,7 @@ handles += [plt.Line2D([], [], marker=mk, ls="", color="grey", label=t)
             for t, mk in MARK.items()]
 ax.set_xscale("log")
 ax.axhline(0, color="black", lw=0.8)
-ax.set_xlabel("mean generated tokens, free arm (exact token counts)")
+ax.set_xlabel("mean generated tokens, free routing (exact token counts)")
 ax.set_ylabel("accuracy change at tightest residency, points")
 if not PAPER:
     ax.set_title("Damage against response length, corrected protocol\n"

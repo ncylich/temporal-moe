@@ -161,19 +161,23 @@ for rec, arm, nm, think in FLIPC:
         a0 = np.array([acc(fr[d]) for d in cm], float)
         a1 = np.array([acc(cn[d]) for d in cm], float)
         dl = np.array([cn[d]["gen_toks"] - fr[d]["gen_toks"] for d in cm], float)
-        for sel, base_x in (((a0 == 1) & (a1 == 0), 1 if think else 0),
-                            ((a0 == 0) & (a1 == 1), 3.35 if think else 2.5)):
+        for sel, base_x in (((a0 == 1) & (a1 == 0), 1.15 if think else 0),
+                            ((a0 == 0) & (a1 == 1), 3.9 if think else 2.75)):
             if sel.sum() < 5:
                 continue
             ax2.plot(base_x + rng.uniform(-0.13, 0.13), dl[sel].mean(), "o", ms=8,
                      color="#c23b3b" if think else "#4878b0", mec="black", mew=0.5,
                      alpha=0.9)
-ax2.set_xlim(-0.6, 4.05)
-ax2.set_xticks([0, 1, 2.5, 3.35])
-ax2.set_xticklabels(["non-thinking\nflip to WRONG", "thinking\nflip to WRONG",
-                     "non-thinking\nflip to RIGHT", "thinking\nflip to RIGHT"],
-                    fontsize=10.5 if PAPER else 8)
-ax2.axvline(1.85, color="grey", lw=0.8, ls=":")
+ax2.set_xlim(-0.7, 4.6)
+ax2.set_xticks([0, 1.15, 2.75, 3.9])
+# Group name goes under the axis rather than into every tick label: at the printed width the
+# four two-word labels ran into each other.
+ax2.set_xticklabels(["non-\nthinking", "thinking", "non-\nthinking", "thinking"],
+                    fontsize=10 if PAPER else 8)
+for cx, grp in ((0.575, "flip to WRONG"), (3.325, "flip to RIGHT")):
+    ax2.text(cx, -0.20, grp, transform=ax2.get_xaxis_transform(), ha="center", va="top",
+             fontsize=10.5 if PAPER else 8.5, weight="bold")
+ax2.axvline(1.95, color="grey", lw=0.8, ls=":")
 ax2.set_yscale("symlog", linthresh=300)
 ax2.set_ylim(-7000, 7000)
 ax2.set_yticks([-5000, -1000, -300, 0, 300, 1000, 5000])
@@ -186,6 +190,7 @@ if not PAPER:
                   "are length-silent", fontsize=9.5)
 ax2.grid(alpha=0.25, axis="y")
 fig2.tight_layout()
+fig2.subplots_adjust(bottom=0.26)          # room for the group names under the tick labels
 out2 = f"{FIG}/length_flips{'_nocaption' if PAPER else ''}.png"
 fig2.savefig(out2, dpi=170)
 print(f"wrote {out2}")

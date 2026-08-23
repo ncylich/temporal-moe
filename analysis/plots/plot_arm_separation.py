@@ -120,7 +120,7 @@ ax.text((gap_lo + gap_hi) / 2, 0.545, f"no model here\n{gap_hi - gap_lo:.3f} wid
         ha="center", va="bottom", fontsize=9, color="#8a6d1f")
 
 ax.set_xlim(lo, hi)
-ax.set_ylim(0.52, 0.82)
+ax.set_ylim(0.52, 0.86)      # headroom so the two-column legend clears the "probes tie" label
 ax.set_xlabel("token probe AUC  (current token alone)")
 ax.set_ylabel("context probe AUC  (neighbours, token excluded)")
 ax.grid(alpha=0.25, lw=0.6)

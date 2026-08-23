@@ -68,9 +68,11 @@ for run, (lab, col) in PAIR.items():
     ls = sorted(rows[run])
     ax.plot(ls, [rows[run][l] for l in ls], color=col, lw=2.6, marker="o", ms=7,
             markeredgecolor="white", markeredgewidth=0.9, zorder=4,
-            label=f"{lab} — 1e19, 6 of 64 (matched pair)")
+            label=(f"{lab}, 6 of 64 at $10^{{19}}$ (matched pair)" if PAPER
+                   else f"{lab} — 1e19, 6 of 64 (matched pair)"))
 ax.plot([], [], color=TMP, alpha=0.32, lw=1.4, marker="o", ms=3.5,
-        label="other temporal arms (1e17, 1e18, 1e19)")
+        label=("other temporal models, $10^{17}$ to $10^{19}$" if PAPER
+               else "other temporal arms (1e17, 1e18, 1e19)"))
 
 ax.set_xlabel("MoE layer" if PAPER else "MoE layer  (layer 1 is a dense FFN in every config)")
 ax.set_ylabel("cache hit rate" if PAPER else
