@@ -91,9 +91,8 @@ def apply(layer, router_logits):
             resident = torch.cat([DEC["state"][k][0] for k in dec_keys])
             refresh = torch.cat([DEC["state"][k][1] for k in dec_keys])
             for _ in range(DEC["swaps"]):
-                resident, refresh = DS._step(lt, resident, refresh,
-                                             torch.zeros((), device=lt.device),
-                                             use_lru=False)
+                resident, refresh = DS.step_accel(lt, resident, refresh,
+                                                  use_lru=False)
         for j, k in enumerate(dec_keys):
             DEC["state"][k] = (resident[j:j + 1], refresh[j:j + 1])
         out[dec_rows] = out[dec_rows].masked_fill(~resident, float("-inf"))

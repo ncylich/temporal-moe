@@ -377,6 +377,105 @@ def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0, s
     return out
 
 
+# ---------------------------------------------------------------------------
+# Decode-time single-step fast path (serving, S == 1).
+#
+# The scan fast paths above all take a whole sequence [S,B,E]. Generation through
+# a KV cache sees ONE token per forward, so decode_state.step calls the eager
+# `_step` once per MoE layer per token: ~16 tiny kernels on a [B,E] tensor,
+# ~700 launches per decode step on a 36-layer model, which measured 5.5 ms of
+# pure launch overhead per step and costs constrained arms 3-6x throughput
+# against free ones (worst on the SMALLEST model -- the signature of a fixed
+# per-step cost). This captures the same `_step` into a CUDA graph keyed by
+# (B,E,dtype,policy) and replays it: 1 graph launch + 2 state copies per layer.
+#
+# Identical by construction, not by reimplementation: the graph records the very
+# ops the reference issues, in order. `step_accel` still gates on a bit-exactness
+# check against eager the first time each shape is used, and RAISES HARD on any
+# mismatch (house rule: a correctness bug crashes loudly rather than degrading).
+# ---------------------------------------------------------------------------
+_step_graph_cache = {}
+_step_path = None
+
+
+def _minlogit_step(lt, resident):
+    """`_step` specialized to min_logit eviction (use_lru=False), refresh dropped.
+
+    For min_logit the evict key IS the logit tensor, and refresh is only ever read
+    by the LRU branch. decode carries tval=0 and refresh starts at zeros, so
+    `torch.where(nominee, 0, refresh)` is the identity on a zero tensor: refresh
+    is provably dead state. Dropping it removes two per-call device copies and one
+    kernel from the captured body. Equality with `_step` is asserted in step_accel."""
+    E = lt.shape[-1]
+    NEG, POS = float("-inf"), float("inf")
+    nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
+    worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
+    do_swap = (nom_val > worst_val).unsqueeze(-1)
+    evict_i = lt.masked_fill(~resident, POS).argmin(dim=-1)
+    evicted = F.one_hot(evict_i, E).bool() & do_swap
+    nominee = F.one_hot(nom_i, E).bool() & do_swap
+    return (resident & ~evicted) | nominee
+
+
+def _graph_step(lt, resident):
+    """One min_logit `_step` via a replayed CUDA graph. Returns the new resident
+    mask (a view of the graph's static output buffer -- callers must consume or
+    clone it before the next replay of the same shape)."""
+    B, E = lt.shape
+    key = (B, E, lt.dtype)
+    g = _step_graph_cache.get(key)
+    if g is None:
+        lt_s = torch.zeros(B, E, device=lt.device, dtype=lt.dtype)
+        res_s = torch.zeros(B, E, dtype=torch.bool, device=lt.device)
+        torch.cuda.synchronize()
+        warm = torch.cuda.Stream()
+        warm.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(warm):
+            for _ in range(3):
+                res_s.copy_(_minlogit_step(lt_s, res_s))
+        torch.cuda.current_stream().wait_stream(warm)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            res_s.copy_(_minlogit_step(lt_s, res_s))
+        g = (lt_s, res_s, graph)
+        _step_graph_cache[key] = g
+    lt_s, res_s, graph = g
+    lt_s.copy_(lt); res_s.copy_(resident)
+    graph.replay()
+    return res_s
+
+
+def step_accel(lt, resident, refresh, use_lru=False):
+    """Decode-time `_step` with the CUDA-graph fast path (TEMPORAL_DECODE=graph,
+    the default on CUDA; "eager" forces the reference). tval is zeros: min_logit
+    eviction ignores refresh, and the LRU variant is not served from here."""
+    global _step_path
+    # DEFAULT EAGER until the end-to-end A/B lands: every constrained row in the
+    # grid was produced on the eager path, and a results chain must not change
+    # instrument underneath itself just because a file on disk changed (each cell
+    # is a fresh process). Opt in with TEMPORAL_DECODE=graph.
+    mode = os.environ.get("TEMPORAL_DECODE", "eager")
+    tval = torch.zeros((), device=lt.device, dtype=lt.dtype)
+    if not lt.is_cuda or mode == "eager" or use_lru:
+        if _step_path is None:
+            _step_path = "eager"
+            print("[temporal] decode step path: eager")
+        return _step(lt, resident, refresh, tval, use_lru)
+    if _step_path is None:                       # one-time bit-exactness gate (hard)
+        probe = _graph_step(lt, resident).clone()
+        ref, _ = _step(lt, resident, refresh, tval, use_lru)
+        if not torch.equal(probe, ref):
+            bad = (probe != ref).any(dim=-1).sum().item()
+            raise RuntimeError(
+                "[temporal] DECODE FAST PATH DISAGREES WITH REFERENCE on "
+                f"{bad} rows — aborting (do not trust results). "
+                "Set TEMPORAL_DECODE=eager to bypass.")
+        _step_path = "cuda-graph"
+        print("[temporal] decode step path: cuda-graph (verified == reference)")
+    # refresh is dead state under min_logit (see _minlogit_step): passed through
+    return _graph_step(lt, resident).clone(), refresh
+
+
 def temporal_forward(self, input: torch.Tensor):
     """Drop-in replacement for TopKRouter.forward: restrict selection to the resident set.
 

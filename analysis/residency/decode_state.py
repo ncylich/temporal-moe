@@ -24,7 +24,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from temporal.temporal_router import (  # noqa: E402
-    compute_resident_mask, compute_resident_mask_accel, _step,
+    compute_resident_mask, compute_resident_mask_accel, _step, step_accel,
 )
 
 DEC = {"on": False, "R": 8, "swaps": 1, "state": {}}   # state[layer] = (resident[B,E], refresh)
@@ -54,9 +54,9 @@ def step(layer, lt):
             refresh = torch.zeros_like(lt, dtype=torch.float)
         else:
             resident, refresh = st
+            ltf = lt.float()
             for _ in range(DEC["swaps"]):
-                resident, refresh = _step(lt.float(), resident, refresh,
-                                          torch.zeros((), device=lt.device), use_lru=False)
+                resident, refresh = step_accel(ltf, resident, refresh, use_lru=False)
     DEC["state"][layer] = (resident, refresh)
     return resident
 
