@@ -18,6 +18,11 @@ import copy
 
 HARD_CAP = 2048
 FINALS = {}          # (task_name, doc_id) -> final raw response text, current cell
+GEN_IDS = {}         # (task_name, doc_id) -> engine token IDs for that response
+# Engine IDs are the ONLY faithful prefix for resuming a truncated generation:
+# the same text has many valid token sequences (a gemma item measured 3072 engine
+# tokens against 3061 from re-tokenizing its own byte-identical text), and text
+# alone cannot say which the sampler took.
 
 
 def install(lm, cap=HARD_CAP, think_marker=None):
@@ -44,6 +49,13 @@ def install(lm, cap=HARD_CAP, think_marker=None):
                 text = text.split(term)[0]
         return text
 
+    def _stash_ids(outs_raw):
+        """vLLM RequestOutputs -> per-request token IDs, in submission order."""
+        try:
+            return [list(o.outputs[0].token_ids) for o in outs_raw]
+        except Exception:
+            return None
+
     def gu(requests, **kw):
         # eos-only stops during generation; remember task stops for post-strip
         reqs, untils = [], []
@@ -64,6 +76,17 @@ def install(lm, cap=HARD_CAP, think_marker=None):
             ctx, gk = rr.args[0], dict(rr.args[1])
             gk["max_gen_toks"] = cap
             rr.arguments = (ctx, gk)
+        _cap_ids = []
+        _mg = getattr(lm, "_model_generate", None)
+        if _mg is not None and not getattr(lm, "_gp_wrapped", False):
+            def _wrap(*a, **k):
+                r = _mg(*a, **k)
+                ids = _stash_ids(r)
+                if ids:
+                    _cap_ids.extend(ids)
+                return r
+            lm._model_generate = _wrap
+            lm._gp_wrapped = True
         outs = orig(reqs, **kw)
         capped = sum(_ntoks(o) >= cap - 8 for o in outs)
         if capped:
@@ -71,8 +94,12 @@ def install(lm, cap=HARD_CAP, think_marker=None):
                   f"(degeneracy suspects, scored as-is)", flush=True)
 
         FINALS.clear()
-        for r, raw in zip(requests, outs):
-            FINALS[(getattr(r, "task_name", None), getattr(r, "doc_id", None))] = raw
+        GEN_IDS.clear()
+        for idx, (r, raw) in enumerate(zip(requests, outs)):
+            key = (getattr(r, "task_name", None), getattr(r, "doc_id", None))
+            FINALS[key] = raw
+            if idx < len(_cap_ids):
+                GEN_IDS[key] = _cap_ids[idx]
         return [_score_text(raw, u) for raw, u in zip(outs, untils)]
 
     lm.generate_until = gu

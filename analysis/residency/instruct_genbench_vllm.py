@@ -227,6 +227,9 @@ def main():
                 raw = genprotocol.FINALS.get((st, x.get("doc_id")), _resp(x))
                 items.append({"doc": doc, "doc_id": x.get("doc_id"), "raw": raw,
                               "raw_toks": _ntok(raw), "gen_toks": _ntok(_resp(x)),
+                              # engine IDs: the faithful prefix for resuming this item
+                              "gen_ids": genprotocol.GEN_IDS.get(
+                                  (st, x.get("doc_id"))),
                               **{mk: x[mk] for mk in x
                                  if mk in ("exact_match", "pass@1",
                                            "prompt_level_strict_acc",

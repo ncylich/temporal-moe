@@ -166,6 +166,8 @@ def main():
                 sm = None if unfinished else STRICT.search(resp)
                 it = {"doc": f"{task}:{x.get('doc_id')}", "raw": raw,
                       "gen_toks": ntok, "unfinished": unfinished,
+                      # engine IDs: the faithful prefix for resuming this item
+                      "gen_ids": genprotocol.GEN_IDS.get((task, x.get("doc_id"))),
                       "think_toks": (len(lm.tokenizer(
                           raw.rsplit(THINK_MARK, 1)[0] if THINK_MARK in raw else raw,
                           add_special_tokens=False).input_ids)
