@@ -994,3 +994,9 @@ gptoss_120b_high,128,4,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.902439,ful
 gptoss_120b_low,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,2048,243
 gptoss_120b,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,2048,311
 gptoss_120b_high,128,4,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.932927,full,4096,464
+gptoss_120b_low,128,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.894737,4,4096,129
+gptoss_120b_low,128,4,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.000000,4,4096,129
+gptoss_120b_low,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.903509,4,4096,1147
+gptoss_120b_low,128,4,R4,4,mmlu_gptoss_relaxed,"acc,strict-flan",0.000000,4,4096,1147
+gptoss_120b_low,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.894737,4,4096,1156
+gptoss_120b_low,128,4,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.000000,4,4096,1156

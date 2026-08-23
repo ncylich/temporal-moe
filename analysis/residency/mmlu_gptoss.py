@@ -64,6 +64,12 @@ def main():
     ap.add_argument("--think", choices=("default", "on", "off"), default="default",
                     help="chat-template thinking toggle (enable_thinking kwarg)")
     ap.add_argument("--record-as", default=None)
+    ap.add_argument("--seed", type=int, default=1234,
+                    help="sampling seed; the protocol seed is 1234. Replicate runs "
+                         "(free-routing MMLU spreads ~3.5pt at temperature 1.0, so "
+                         "flagged cells need a multi-run mean) must use a different "
+                         "seed AND their own --record-as/--csv-name so they never "
+                         "collide with the authoritative single row per cell")
     ap.add_argument("--path", default=None, help="override checkpoint dir (merged adapters)")
     ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
                     help="diagnostics use screening_genbench.csv")
@@ -119,7 +125,8 @@ def main():
     _dt, _dp = (1.0, 1.0) if _has_recipe else (0.7, 0.95)
     _t, _p = _gc.get("temperature", _dt), _gc.get("top_p", _dp)
     _k = _gc.get("top_k") or -1
-    gen_kwargs = f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},seed=1234"
+    gen_kwargs = (f"do_sample=True,temperature={_t},top_p={_p},top_k={_k},"
+                  f"seed={A.seed}")
     if _gc.get("presence_penalty"):
         gen_kwargs += f",presence_penalty={_gc['presence_penalty']}"
     if _gc.get("min_p"):
