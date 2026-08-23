@@ -1006,3 +1006,9 @@ gptoss_120b,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.859649,4,4096
 gptoss_120b,128,4,R4,4,mmlu_gptoss_relaxed,"acc,strict-flan",0.000000,4,4096,1282
 gptoss_120b,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.868421,4,4096,1277
 gptoss_120b,128,4,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.021930,4,4096,1277
+gptoss_120b_high,128,4,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.912281,4,4096,256
+gptoss_120b_high,128,4,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.057018,4,4096,256
+gptoss_120b_high,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.903509,4,4096,1593
+gptoss_120b_high,128,4,R4,4,mmlu_gptoss_relaxed,"acc,strict-flan",0.017544,4,4096,1593
+gptoss_120b_high,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.907895,4,4096,1586
+gptoss_120b_high,128,4,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.030702,4,4096,1586
