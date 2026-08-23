@@ -941,3 +941,4 @@ olmoe_instruct,64,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.460526,4,2048,
 olmoe_instruct,64,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.456140,4,2048,504
 olmoe_instruct,64,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.350877,4,2048,504
 qwen35_instruct,256,8,free,,humaneval_think,"pass@1,channel-aware",0.951220,full,4096,282
+qwen35_instruct,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.890244,full,4096,761

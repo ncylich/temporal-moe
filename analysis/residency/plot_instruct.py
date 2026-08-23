@@ -52,7 +52,7 @@ def selfce():
     per = {}
     for r in rows:
         per.setdefault(r[0], {})[r[3]] = float(r[6])
-    fig, ax = plt.subplots(figsize=(5.8, 4.2) if PAPER else (7, 5))
+    fig, ax = plt.subplots(figsize=(7.6, 3.2) if PAPER else (7, 5))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
     for i, m in enumerate([m for m in SIZE_ORDER if m in per]):
         d = per[m]

@@ -106,13 +106,13 @@ print(f"wrote {out}")
 xb = np.array([c[2] - c[3] for c in cells])          # broad = total - cap part
 yc = np.array([c[3] for c in cells])                 # cap-carried
 r2c = np.corrcoef(xb, yc)[0, 1] ** 2
-figs, axs = plt.subplots(figsize=(8.8, 3.6) if PAPER else (8.8, 4.0))
+figs, axs = plt.subplots(figsize=(6.6, 4.6) if PAPER else (8.8, 4.0))
 for (lab, think, tot, capd) in cells:
     axs.scatter(tot - capd, capd, s=52, color="#d1605e" if think else "#4878b0",
                 edgecolor="black", lw=0.6, zorder=3)
 axs.axhline(0, color="grey", lw=0.7, alpha=0.7)
 axs.axvline(0, color="grey", lw=0.7, alpha=0.7)
-ANNOT = {"Qwen on\nIFEval": (8, -3), "gemma on\nIFEval": (8, -3),
+ANNOT = {"Qwen on\nIFEval": (-8, 8), "gemma on\nIFEval": (8, -3),
          "20b high\nIFEval": (8, 3), "120b high\nIFEval": (6, -12),
          "Qwen on\nGSM8K": (8, 6), "LFM\nIFEval": (6, -13),
          "gemma on\nGSM8K": (8, 3)}
@@ -127,10 +127,10 @@ axs.scatter([], [], s=52, color="#d1605e", edgecolor="black", lw=0.6,
 axs.scatter([], [], s=52, color="#4878b0", edgecolor="black", lw=0.6,
             label="thinking off / low effort")
 axs.legend(loc="upper right", fontsize=10 if PAPER else 8.5, framealpha=0.95)
-axs.set_xlabel("change among never-capped items, tokens per item (broad component)")
-axs.set_ylabel("change from items at the cap\n(cap component)")
-axs.annotate(f"components across configurations: $R^2$ = {r2c:.2f}", (0.40, 0.93),
-             xycoords="axes fraction", ha="center", va="top",
+axs.set_xlabel("broad component: never-capped items, tokens/item")
+axs.set_ylabel("cap component: change from\nitems at the cap, tokens/item")
+axs.annotate(f"components across\nconfigurations: $R^2$ = {r2c:.2f}", (0.97, 0.42),
+             xycoords="axes fraction", ha="right", va="center",
              fontsize=10.5 if PAPER else 9,
              bbox=dict(facecolor="white", alpha=0.85, edgecolor="0.6"))
 if not PAPER:
