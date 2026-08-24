@@ -1,0 +1,18 @@
+shape,arm,R,E,mem_cut_x,ctx_depth,decode_tps,stddev_tps,ceiling_tps,pct_of_ceiling,evictions,fetched_mib,experts_swapped_per_layer_per_token,peak_swap_mb,throttled,phase
+fine,ceiling (fully resident),80,80,1.0,0,32.416,,32.416,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+fine,temporal (streamed),18,192,10.7,0,20.701,0.412429,32.416,63.9,51840,11447.6,1.05,0,False,validate
+fine,temporal (streamed),36,192,5.3,0,20.512,0.556971,32.416,63.3,51840,11447.6,1.05,0,False,control_R_inert
+fine,ceiling (fully resident),80,80,1.0,1024,25.440,,25.440,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+fine,temporal (streamed),18,192,10.7,1024,17.804,0.386183,25.440,70.0,51843,11600.1,1.06,0,False,ctx_sweep
+fine,ceiling (fully resident),80,80,1.0,2048,20.223,,20.223,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+fine,temporal (streamed),18,192,10.7,2048,15.656,0.487436,20.223,77.4,51843,11605.1,1.06,0,False,ctx_sweep
+fine,ceiling (fully resident),80,80,1.0,4096,14.578,,14.578,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+fine,temporal (streamed),18,192,10.7,4096,12.158,0.160503,14.578,83.4,51846,11611.5,1.06,0,False,ctx_sweep
+k24,ceiling (fully resident),100,100,1.0,0,31.205,,31.205,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+k24,temporal (streamed),24,256,10.7,0,20.443,0.232086,31.205,65.5,51840,8713.8,1.06,0,False,ctx_sweep
+k24,ceiling (fully resident),100,100,1.0,1024,24.661,,24.661,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+k24,temporal (streamed),24,256,10.7,1024,17.608,0.67136,24.661,71.4,51843,9000.0,1.10,0,False,ctx_sweep
+k24,ceiling (fully resident),100,100,1.0,2048,20.309,,20.309,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+k24,temporal (streamed),24,256,10.7,2048,15.207,0.165055,20.309,74.9,51843,9014.3,1.10,0,False,ctx_sweep
+k24,ceiling (fully resident),100,100,1.0,4096,13.828,,13.828,100.0,0,0.0,0.00,0,False,ceilplain (no TWOPASS)
+k24,temporal (streamed),24,256,10.7,4096,12.170,0.218767,13.828,88.0,51846,9032.8,1.10,0,False,ctx_sweep
