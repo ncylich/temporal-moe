@@ -43,23 +43,20 @@ PAIRS = {
     "OLMoE-1B-7B": {"modes": {"off": "olmoe_instruct"},      # no thinking mode
                     "default": "off", "arms": ["R8"]},
 }
-# fair-budget (8192-cap) resumed cells from the truncation-fix sweep (TODO.md).
-# NOT merged into PAIRS: only used when --out targets a non-default file, so the
-# default think_ablation_summary.csv output is byte-for-byte unchanged.
-PAIRS_CAP8K = {
-    "gemma4-26B-IT": {"modes": {"off_8k": "gemma4_instruct_cap8k",
-                                "on_8k": "gemma4_think_on_cap8k"},
-                      "default": "off_8k", "arms": ["R8", "R16"]},
-    "Qwen3.5-35B": {"modes": {"on_8k": "qwen35_instruct_cap8k"},
-                    "default": "on_8k", "arms": ["R8", "R32"]},
-    "gpt-oss-20b": {"modes": {"medium_8k": "gptoss_20b_cap8k",
-                              "high_8k": "gptoss_20b_high_cap8k"},
-                    "default": "medium_8k", "arms": ["R4"]},
-    "gpt-oss-120b": {"modes": {"medium_8k": "gptoss_120b_cap8k",
-                               "high_8k": "gptoss_120b_high_cap8k"},
-                     "default": "medium_8k", "arms": ["R4", "R16"]},
-    "LFM2.5-A1B": {"modes": {"on_8k": "lfm25_instruct_cap8k"},
-                   "default": "on_8k", "arms": ["R4"]},
+# Fair-budget re-measurements (TRUNCATION_RERUN_PLAN.md). Each entry lists the
+# re-run records for a mode's parent record, largest budget first. A re-run
+# supersedes its parent for one task only when BOTH the free arm and the
+# constrained arm were measured there, so a reported cell never mixes budgets
+# across arms; where that fails the chain falls back to the parent record.
+FAIR = {
+    "gemma4_instruct":  ["gemma4_instruct_cap8k"],
+    "gemma4_think_on":  ["gemma4_think_on_cap8k"],
+    "qwen35_instruct":  ["qwen35_instruct_cap16k", "qwen35_instruct_cap8k"],
+    "lfm25_instruct":   ["lfm25_instruct_cap8k"],
+    "gptoss_20b":       ["gptoss_20b_cap8k"],
+    "gptoss_20b_high":  ["gptoss_20b_high_cap16k", "gptoss_20b_high_cap8k"],
+    "gptoss_120b":      ["gptoss_120b_cap8k"],
+    "gptoss_120b_high": ["gptoss_120b_high_cap16k", "gptoss_120b_high_cap8k"],
 }
 # per-record task->metric candidates, first pair where BOTH arms have a row wins.
 # MMLU: relaxed extraction (extractor v2, mmlu_gptoss.py) is the reported metric
@@ -90,33 +87,66 @@ def task_map(record):
 
 
 def load_cells():
-    cells = {}                                    # (record, arm, task, metric) -> value
-    for r in csv.reader(open(f"{ABLATIONS}/instruct_genbench_vllm.csv")):
-        if len(r) > 7 and not r[0].startswith(("#", "smoke", "model")):
-            try:
-                cells[(r[0], r[3], r[5], r[6])] = float(r[7])
-            except ValueError:
-                pass
-    return cells
-
-
-def load_cap8k_cells():
-    """Fair-budget (8192-cap) rows from screening_genbench.csv, record suffix
-    _cap8k only -- screening rows are NOT protocol-comparable in general, but
-    the _cap8k ones are a deliberate exception: same protocol, doubled budget,
-    written for exactly this comparison (TODO.md)."""
+    """(record, arm, task, metric) -> (value, budget). The authoritative grid,
+    plus the fair-budget re-runs, which live in screening_genbench.csv because
+    the budget is the variable under test and both budgets have to stay
+    independently visible; only records named in FAIR are taken from there."""
+    fair_recs = {r for chain in FAIR.values() for r in chain}
     cells = {}
-    for r in csv.reader(open(f"{ABLATIONS}/screening_genbench.csv")):
-        if len(r) > 7 and not r[0].startswith(("#", "smoke", "model")) \
-                and r[0].endswith("_cap8k"):
-            try:
-                cells[(r[0], r[3], r[5], r[6])] = float(r[7])
-            except ValueError:
-                pass
+    for f in ("instruct_genbench_vllm.csv", "screening_genbench.csv"):
+        screening = f.startswith("screening")
+        for r in csv.reader(open(f"{ABLATIONS}/{f}")):
+            if len(r) > 9 and not r[0].startswith(("#", "smoke", "model")) \
+                    and (not screening or r[0] in fair_recs):
+                try:
+                    cells[(r[0], r[3], r[5], r[6])] = (float(r[7]), int(r[9]))
+                except ValueError:
+                    pass
     return cells
 
 
-def load_lengths(record, arm, task):
+CLEAN = 2.0     # cap-hit %, at or below which a budget increase cannot move a cell
+
+
+def cap_hit(rec, arm, task, budget):
+    """Percent of a cell's generations that ended within 8 tokens of its budget.
+    Measured against the DECLARED budget, never the observed maximum: a single
+    over-cap outlier shifts a max-based reference past the cap pile-up and hides
+    it (qwen35 free IFEval reads 0.5% by observed max and 8.0% by declared)."""
+    rows = _dump_rows(rec, arm, task)
+    if not rows:
+        return None
+    return 100 * sum(1 for i in rows if i["gen_toks"] >= budget - 8) / len(rows)
+
+
+def resolve(cells, rec, arm, cands):
+    """Pick the record, task and metric for one cell at the largest budget that is
+    fair to both arms, as (record, task, metric, free, con, budget_free, budget_con).
+
+    A re-run supersedes its parent when the constrained arm was re-measured there.
+    The free arm comes from the re-run too when it exists; when it does not, the
+    parent's free arm is still admissible if it is budget-clean, since generations
+    that all stopped on their own cannot move when the budget grows. A free arm
+    that was itself hitting the cap is not admissible, so that cell falls back to
+    the parent record and stays matched, if truncated, on both arms."""
+    for r in FAIR.get(rec, []) + [rec]:
+        for task, metric in cands:
+            con = cells.get((r, arm, task, metric))
+            if con is None:
+                continue
+            free = cells.get((r, "free", task, metric))
+            if free is not None:
+                return r, task, metric, free[0], con[0], free[1], con[1]
+            if r != rec:
+                pfree = cells.get((rec, "free", task, metric))
+                if pfree is not None:
+                    t = cap_hit(rec, "free", task, pfree[1])
+                    if t is not None and t <= CLEAN:
+                        return r, task, metric, pfree[0], con[0], pfree[1], con[1]
+    return None
+
+
+def _load_dump(record, arm, task):
     p = os.path.join(SAMP, f"{record}_{arm}_{task}.json")
     if not os.path.exists(p) and task.startswith("mmlu"):
         # the relaxed harness writes its dual-scored dump as *_mmlu_dual.json
@@ -134,8 +164,19 @@ def load_lengths(record, arm, task):
         seen.add(key)
         rows.append(i)
     rows = [i for i in rows if "gen_toks" in i]  # pre-capture-era dumps lack lengths
-    if not rows:
+    return (b, rows) if rows else None
+
+
+def _dump_rows(record, arm, task):
+    d = _load_dump(record, arm, task)
+    return d[1] if d else None
+
+
+def load_lengths(record, arm, task):
+    d = _load_dump(record, arm, task)
+    if d is None:
         return None
+    b, rows = d
     # Valid think sources: (1) the doc-keyed raw capture think_toks_by_doc;
     # (2) per-item think_toks in NEW-format dumps (marker: "raw" present), which
     # are computed from the pre-strip raw text. The OLD per-item think_toks field
@@ -159,34 +200,21 @@ def main():
             out_name = a.split("=", 1)[1]
     cells = load_cells()
     pairs = {m: dict(cfg) for m, cfg in PAIRS.items()}   # shallow copy, never mutate PAIRS
-    if out_name != "think_ablation_summary.csv":
-        cells = {**cells, **load_cap8k_cells()}
-        for m, cap_cfg in PAIRS_CAP8K.items():
-            pairs[m]["modes"] = {**pairs[m]["modes"], **cap_cfg["modes"]}
     sm = open(os.path.join(ABLATIONS, out_name), "w", newline="")
     w = csv.writer(sm)
     sm.write('"# Thinking ablation summary: damage (constrained-free; damage_se = '
              'UNPAIRED binomial SE of the difference, n per task) and lengths per '
              'model/mode/arm/task. Producer: analysis/residency/think_analysis.py"\n')
-    if out_name != "think_ablation_summary.csv":
-        sm.write('"# LOWER CONFIDENCE than think_ablation_summary.csv (which this file '
-                 'does NOT overwrite, by request). Regenerated 2026-08-24 by an agent '
-                 'session that was not the original process/model that produced the '
-                 'committed think_ablation_summary.csv, using the SAME unmodified '
-                 'aggregation logic (task_map/PAIRS/candidate-task selection below) but '
-                 'over a data mix that session did not independently author end to end: '
-                 'the original grid rows, plus this session\\\'s Task-3 regeneration, plus '
-                 'the fair-budget (8192-cap) resumed cells from the truncation-fix sweep '
-                 '(see TODO.md). The new _cap8k rows specifically are single-run, use a '
-                 'resume+retokenize+rescore pipeline that had one bug already found and '
-                 'fixed mid-sweep (stale per-item pass -- see TODO.md section 1.8), and '
-                 'have not had an independent review pass beyond the checks in TODO.md '
-                 'section 4. Treat rows sourced from _cap8k records as provisional; cross-'
-                 'check against genbench_samples/*_cap8k_*.json and screening_genbench.csv '
-                 'before citing."\n')
+    sm.write('"# Every cell is reported at the largest generation budget fair to both of '
+             'its arms (see FAIR and resolve). budget_free and budget_con are the budgets '
+             'actually used, caphit_free and caphit_con the percent of that arms '
+             'generations ending within 8 tokens of it, and record names the source '
+             'record. A cap-hit above 2 percent means the cell is still budget-limited '
+             'and its damage carries a truncation component."\n')
     w.writerow(["model", "mode", "arm", "task", "free", "constrained", "damage",
                 "damage_se",
-                "gen_free", "gen_con", "think_free", "think_con"])
+                "gen_free", "gen_con", "think_free", "think_con",
+                "budget_free", "budget_con", "caphit_free", "caphit_con", "record"])
 
     print("=== 1. damage x thinking mode (points, constrained - free) ===")
     dam = {}
@@ -195,32 +223,36 @@ def main():
             tm = task_map(rec)
             for tname, cands in tm.items():
                 for arm in cfg["arms"]:
-                    # first candidate task with BOTH arms present (never mixes
+                    # the reported record is the largest budget fair to both arms,
+                    # and the first candidate task present there (never mixes
                     # extraction protocols between free and constrained)
-                    free = con = None
-                    for task, metric in cands:
-                        free = cells.get((rec, "free", task, metric))
-                        con = cells.get((rec, arm, task, metric))
-                        if free is not None and con is not None:
-                            break
-                    if free is None or con is None:
+                    got = resolve(cells, rec, arm, cands)
+                    if got is None:
                         continue
+                    src, task, metric, free, con, bud_f, bud_c = got
+                    fsrc = src if (src, "free", task, metric) in cells else rec
                     d = 100 * (con - free)
                     dam[(model, mode, arm, tname)] = d
-                    lf = load_lengths(rec, "free", task) or {}
-                    lc = load_lengths(rec, arm, task) or {}
+                    lf = load_lengths(fsrc, "free", task) or {}
+                    lc = load_lengths(src, arm, task) or {}
                     n_task = {"HumanEval": 164, "MMLU": 228}.get(tname, 200)
                     n_f = (lf or {}).get("n") or n_task
                     n_c = (lc or {}).get("n") or n_task
                     se = 100 * ((free * (1 - free) / n_f) +
                                 (con * (1 - con) / n_c)) ** 0.5
+                    tf = cap_hit(fsrc, "free", task, bud_f)
+                    tc = cap_hit(src, arm, task, bud_c)
                     fmt = lambda v: f"{v:.0f}" if v is not None else ""
+                    pct = lambda v: f"{v:.1f}" if v is not None else ""
                     w.writerow([model, mode, arm, tname, f"{free:.4f}", f"{con:.4f}",
                                 f"{d:+.1f}", f"{se:.1f}",
                                 fmt(lf.get("gen")), fmt(lc.get("gen")),
-                                fmt(lf.get("think")), fmt(lc.get("think"))])
+                                fmt(lf.get("think")), fmt(lc.get("think")),
+                                bud_f, bud_c, pct(tf), pct(tc), src])
+                    flag = "" if max(tf or 0, tc or 0) <= CLEAN else \
+                        f"   [cap-hit {max(tf or 0, tc or 0):.1f}%]"
                     print(f"  {model:14s} {mode:6s} {arm:4s} {tname:9s} "
-                          f"{free:.3f} -> {con:.3f}  ({d:+.1f})")
+                          f"{free:.3f} -> {con:.3f}  ({d:+.1f})  @{bud_c}{flag}")
     sm.close()
 
     # figure 1: damage by mode

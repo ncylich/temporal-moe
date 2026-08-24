@@ -78,7 +78,10 @@ def cells():
     return out
 
 
-def main():
+def decompose():
+    """(pooled groups, per-cell rows). Groups are {surface: {group: [n, n_wrong]}}
+    pooled over every constrained cell. Split out of main so a figure producer can
+    read exactly the numbers this file prints, with no chance of the two drifting."""
     groups = {s: {g: [0, 0] for g in "ABCD"} | {"N": [0, 0]}
               for s in ("HumanEval", "MMLU")}          # [n, n_wrong]
     rows = []
@@ -121,6 +124,11 @@ def main():
         if n:
             rows.append((surf, rec, arm, n, unfin, ok_all / n,
                          ok_fin / n, ok_fin / max(1, n_fin), n_fin))
+    return groups, rows
+
+
+def main():
+    groups, rows = decompose()
     out = os.path.join(ABLATIONS, "truncation_decomp.csv")
     with open(out, "w", newline="") as fh:
         fh.write('"# Truncation decomposition per constrained cell (TRUNCATION_RERUN_PLAN '

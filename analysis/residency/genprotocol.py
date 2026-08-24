@@ -13,6 +13,47 @@ One component owns the generation lifecycle:
 4. CAPTURE: FINALS maps (task_name, doc_id) -> final raw text, one entry per item.
    The task_name component is load-bearing: grouped suites (mmlu_*) restart doc_id
    at 0 per subject, so a bare-doc_id key silently overwrites across subjects.
+
+HOW TO COUNT GENERATION LENGTH FROM A DUMP
+------------------------------------------
+`gen_toks` does NOT mean the same thing in every dump, and reading it as the total
+is wrong. It is the POST-STRIP scored answer of step 3; the thinking segment is
+counted separately. Dumps also differ by era in which fields they carry, so decide
+the route per dump, from the fields present, in this order:
+
+  1. `raw_toks` present            total    = raw_toks           (authoritative)
+                                   answer   = gen_toks
+                                   thinking = raw_toks - gen_toks
+  2. `raw` text present            total    = gen_toks           (this era's
+                                   gen_toks already spans the whole generation)
+                                   thinking = per-item `think_toks`
+  3. `think_toks_by_doc` present   total    = gen_toks + think_by_doc
+                                   answer   = gen_toks
+     EXCEPT when think_by_doc == gen_toks. That is the marker-absent case: the
+     generation ended inside its thinking block, so the producer stored the whole
+     generation in think_by_doc and the strip removed nothing. The two fields are
+     then ONE number and adding them double-counts. Use total = gen_toks.
+  4. none of the above             total = gen_toks (surface has no thinking)
+
+Two traps this rule exists to avoid. Both produced confident, wrong numbers before
+being caught:
+
+  * The per-item `think_toks` field is trustworthy ONLY alongside `raw`. In older
+    dumps it measured post-strip text and reads near zero, so using it as a
+    denominator reported a thinking ratio of 3.0x where the truth is 1.19x.
+  * Item keys are `doc_id` (int) in older dumps and `doc` (str) in newer ones. Cast
+    to str before pairing, or an old-to-new comparison silently intersects to
+    nothing and the cell vanishes with no error.
+
+Validated on the 3800 items whose dumps carry both `raw_toks` and
+`think_toks_by_doc`: 49% are the marker-absent case, 51% satisfy
+answer + thinking = total within 2%, together 100%, median ratio 1.000.
+Reference implementation: `lengths()` in analysis/residency/length_figs.py.
+
+Cap-hit (truncation) is measured against the cell's DECLARED budget, never the
+observed maximum: one over-cap outlier shifts a max-based reference past the
+pile-up at the cap and hides it. One arm read 0.5% truncated by observed max and
+8.0% against its declared 8192.
 """
 import copy
 
