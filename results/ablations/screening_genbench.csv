@@ -685,3 +685,5 @@ qwen35_instruct_cap8k,256,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.93
 qwen35_instruct_cap8k,256,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.916667,4,8192,1399
 qwen35_instruct_cap8k,256,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.916667,4,8192,4242
 qwen35_instruct_cap8k,256,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.872807,4,8192,4242
+qwen35_instruct_cap8k,256,8,R32,32,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.925439,4,8192,3248
+qwen35_instruct_cap8k,256,8,R32,32,mmlu_gptoss_relaxed,"acc,strict-flan",0.912281,4,8192,3248
