@@ -923,3 +923,13 @@ gptoss_120b_high,128,4,R4,4,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.903509,4
 gptoss_120b_high,128,4,R4,4,mmlu_gptoss_relaxed,"acc,strict-flan",0.017544,4,4096,1593
 gptoss_120b_high,128,4,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.907895,4,4096,1586
 gptoss_120b_high,128,4,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.030702,4,4096,1586
+gptoss_20b_high_cap16k,32,4,free,,ifeval,sample_len,200.000000,200,16384,560
+gptoss_20b_high_cap16k,32,4,free,,ifeval,"prompt_level_strict_acc,none",0.860000,200,16384,560
+gptoss_20b_high_cap16k,32,4,free,,ifeval,"inst_level_strict_acc,none",0.886792,200,16384,560
+gptoss_20b_high_cap16k,32,4,free,,ifeval,"prompt_level_loose_acc,none",0.870000,200,16384,560
+gptoss_20b_high_cap16k,32,4,free,,ifeval,"inst_level_loose_acc,none",0.893082,200,16384,560
+gptoss_20b_high_cap16k,32,4,R4,4,ifeval,sample_len,200.000000,200,16384,723
+gptoss_20b_high_cap16k,32,4,R4,4,ifeval,"prompt_level_strict_acc,none",0.875000,200,16384,723
+gptoss_20b_high_cap16k,32,4,R4,4,ifeval,"inst_level_strict_acc,none",0.886792,200,16384,723
+gptoss_20b_high_cap16k,32,4,R4,4,ifeval,"prompt_level_loose_acc,none",0.880000,200,16384,723
+gptoss_20b_high_cap16k,32,4,R4,4,ifeval,"inst_level_loose_acc,none",0.889937,200,16384,723
