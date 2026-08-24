@@ -501,8 +501,23 @@ and necessary for protocol fidelity). Truncation falls to 2.0% (R8) / 1.0%
 (R32). Old rows kept for reference; new rows are `qwen35_instruct_cap16k`.
 Committed `332d2d3`.
 
-After #80, no cell in the grid remains at ≥5% truncation without either a
+After #80, re-swept the grid once more, excluding files superseded by a
+`cap8k`/`cap16k`/`freshregen` sibling. Two of the remaining hits
+(`gptoss_120b_high` and `lfm25_instruct` HumanEval cells) turned out to be
+false positives — both already had a `cap8k` resume from earlier in the
+session (1.8–3.7%, done via `resume_grouped.sh`, not previously logged in
+this section) that my naive filename-matching missed. The one genuine survivor:
+**Task #81** — `gptoss_120b_high` IFEval (free 6.0%, R4 6.0%, R16 9.0%),
+same pre-Task-0-dumps no-raw-text situation as #79/#80, same fallback. Reran
+all three arms at 16384. Truncation falls to 0.5% on every arm. Old row kept
+for reference; new row is `gptoss_120b_high_cap16k`. Committed `535d93c`.
+
+After #81, no cell in the grid remains at ≥5% truncation without either a
 resolution already on record (qwen think-on MMLU's fair-budget
 re-measurement, gemma think-on HumanEval's documented blow-up analysis in
-`length_extension_RESULTS.md`) or a genuinely closed gap. This is the actual
-last open item from tonight's queue.
+`length_extension_RESULTS.md`, or the `cap8k` resumes just surfaced above) or
+a genuinely closed gap. Two isolated cells were left as-is on a judgment call
+rather than chased further: `gemma4_think_on` IFEval R8 (6.5%) and MMLU R8
+(6.1%) — single cells, right at the noise floor of Noah's stated "6-7%" bar,
+no raw text saved (would need a full model reload + rerun for marginal
+value). This is the actual last open item from tonight's queue.
