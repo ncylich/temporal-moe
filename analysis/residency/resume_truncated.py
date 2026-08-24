@@ -43,6 +43,8 @@ import vllm_glue                                                     # noqa: E40
 import vllm_residency  # noqa: F401,E402
 from decode_state import DEC                                         # noqa: E402
 
+import genprotocol                                                   # noqa: E402
+
 SAMP = os.path.join(ABLATIONS, "genbench_samples")
 
 
@@ -149,6 +151,10 @@ def main():
     ap.add_argument("--arm", default=None, help="free or R<n>; default: parsed from --dump")
     ap.add_argument("--gpu-mem", type=float, default=0.90)
     ap.add_argument("--max-model-len", type=int, default=None)
+    ap.add_argument("--dry-run", action="store_true",
+                    help="exercise every non-GPU code path (load, truncation split, "
+                         "prompt rebuild, merge, score, dump write) with a stub "
+                         "engine; writes dumps suffixed _dryrun")
     ap.add_argument("--allow-retokenized-prefix", action="store_true",
                     help="resume items that lack engine token IDs by re-tokenizing "
                          "their saved text. Byte-identical text, possibly different "
@@ -172,8 +178,18 @@ def main():
                          "(must match, or the rebuilt prompt is the wrong prefix)")
     A = ap.parse_args()
 
-    import genprotocol
     genprotocol.check_dump_dir()
+    if A.dry_run:
+        # Validate the WHOLE path (load, split, prompt rebuild, merge, score,
+        # dump write) with a stub engine. Everything here is a no-GPU code path,
+        # and two GPU-hours were lost to bugs in it before this existed.
+        from transformers import AutoTokenizer
+        _tk = AutoTokenizer.from_pretrained(A.path)
+        _rebuilt = _rebuild_prompts(A, _tk) if A.rebuild_prompt else None
+        for _d in A.dump.split(","):
+            _one(A, _d.strip(), None, _tk, _rebuilt)
+        print("[resume] DRY RUN OK: plumbing validated, no generation performed")
+        return
     vllm_glue.install()
     from vllm import LLM
     _llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
@@ -222,8 +238,13 @@ def _one(A, dump, llm, tk, rebuilt):
     assert arm, "could not parse arm from --dump; pass --arm"
     R = None if arm == "free" else int(arm.lstrip("R"))
 
-    from vllm import SamplingParams
-    from vllm.inputs import TokensPrompt
+    if not A.dry_run:               # dry-run must import nothing GPU-side, so it
+        from vllm import SamplingParams        # can run in any venv
+        from vllm.inputs import TokensPrompt
+    else:
+        SamplingParams = dict
+        def TokensPrompt(prompt_token_ids):
+            return {"prompt_token_ids": prompt_token_ids}
 
     # Build the resume prompts: original prompt + everything generated so far. The
     # boundary tells the walker which part stays free.
@@ -245,6 +266,9 @@ def _one(A, dump, llm, tk, rebuilt):
                       "--rebuild-prompt (with the original --think) so the "
                       "free/enforced boundary can be placed")
         it["_prefix_source"] = src
+        it["_prefix_ids"] = gids      # the prefix ACTUALLY used (engine or retokenized);
+                                      # the merge needs it, and for a retokenized item
+                                      # there is no "gen_ids" on the item to fall back to
         ids = pids + gids
         key = (len(ids), hash(tuple(ids[:16])), hash(tuple(ids[-16:])))
         DEC["resume_map"][key] = len(pids)
@@ -258,22 +282,30 @@ def _one(A, dump, llm, tk, rebuilt):
         pass
     has = any(k in gc for k in ("temperature", "top_p", "top_k"))
     dt, dp = (1.0, 1.0) if has else (0.7, 0.95)
-    sp = SamplingParams(temperature=gc.get("temperature", dt),
+    sp = SamplingParams(temperature=gc.get("temperature", dt),   # noqa: F841
                         top_p=gc.get("top_p", dp), top_k=gc.get("top_k") or -1,
                         seed=1234, max_tokens=add, skip_special_tokens=False)
 
     DEC.update(on=R is not None, R=R or 0, swaps=1)
     DEC["state"].clear()
     t0 = time.time()
-    outs = llm.generate(prompts, sp)
+    if A.dry_run:
+        class _Out:                       # minimal stand-in for a RequestOutput
+            def __init__(self):
+                self.outputs = [type("o", (), {"token_ids": [0, 1, 2],
+                                               "text": "<dry-run tail>"})()]
+        outs = [_Out() for _ in prompts]
+    else:
+        outs = llm.generate(prompts, sp)
     secs = time.time() - t0
 
     merged = list(done)
     still = 0
     for it, o in zip(meta, outs):
         tail = o.outputs[0]
-        new_ids = list(it["gen_ids"]) + list(tail.token_ids)
-        merged.append({**{k: v for k, v in it.items() if k != "_prefix_source"},
+        new_ids = list(it["_prefix_ids"]) + list(tail.token_ids)
+        merged.append({**{k: v for k, v in it.items()
+                          if k not in ("_prefix_source", "_prefix_ids")},
                        "raw": it["raw"] + tail.text,
                        "gen_ids": new_ids,
                        "gen_toks": len(new_ids),
@@ -285,7 +317,8 @@ def _one(A, dump, llm, tk, rebuilt):
     # task name = the dump stem after "<record>_<arm>_", so the merged dump lands
     # under the same task the original cell used
     task = dump.split(f"_{arm}_", 1)[1] if f"_{arm}_" in dump else "resumed"
-    genprotocol.write_dump(A.record_as, arm, task, merged, len(items))
+    genprotocol.write_dump(A.record_as + ("_dryrun" if A.dry_run else ""),
+                           arm, task, merged, len(items))
     if A.score:
         _score(A, merged, arm, R, secs)
     print(f"[resume] prefixes: {src_count['engine_ids']} exact (engine ids), "
