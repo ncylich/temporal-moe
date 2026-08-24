@@ -687,3 +687,6 @@ qwen35_instruct_cap8k,256,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.916
 qwen35_instruct_cap8k,256,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.872807,4,8192,4242
 qwen35_instruct_cap8k,256,8,R32,32,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.925439,4,8192,3248
 qwen35_instruct_cap8k,256,8,R32,32,mmlu_gptoss_relaxed,"acc,strict-flan",0.912281,4,8192,3248
+gemma4_think_on_cap8k,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.945122,full,8192,1019
+gemma4_think_on_cap8k,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,8192,850
+gemma4_think_on_cap8k,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,8192,187
