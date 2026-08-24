@@ -35,6 +35,29 @@ WB = os.path.join(ABLATIONS, "writingbench")
 FIG = os.path.join(ABLATIONS, "figures")
 PAPER = "--no-caption" in sys.argv
 
+# FAIR-BUDGET cells: the same cells resumed to 8192 so no generation is scored as
+# wrong merely for running out of room. Kept ALONGSIDE the original-budget cells,
+# never replacing them -- the budget is the variable under test.
+HUMANEVAL_CAP8K = [
+    ("gemma off 8k", "gemma4_instruct_cap8k", "humaneval_gemma_fixed", "R8", 8192),
+    ("gemma off R16 8k", "gemma4_instruct_cap8k", "humaneval_gemma_fixed", "R16", 8192),
+    ("gemma on 8k", "gemma4_think_on_cap8k", "humaneval_gemma_fixed", "R8", 8192),
+    ("gemma on R16 8k", "gemma4_think_on_cap8k", "humaneval_gemma_fixed", "R16", 8192),
+    ("Qwen on 8k", "qwen35_instruct_cap8k", "humaneval_think", "R8", 8192),
+    ("Qwen on R32 8k", "qwen35_instruct_cap8k", "humaneval_think", "R32", 8192),
+    ("LFM 8k", "lfm25_instruct_cap8k", "humaneval_think", "R4", 8192),
+    ("20b high 8k", "gptoss_20b_high_cap8k", "humaneval_gptoss", "R4", 8192),
+    ("20b med 8k", "gptoss_20b_cap8k", "humaneval_gptoss", "R4", 8192),
+    ("120b high 8k", "gptoss_120b_high_cap8k", "humaneval_gptoss", "R4", 8192),
+    ("120b high R16 8k", "gptoss_120b_high_cap8k", "humaneval_gptoss", "R16", 8192),
+    ("120b med 8k", "gptoss_120b_cap8k", "humaneval_gptoss", "R4", 8192),
+    ("120b med R16 8k", "gptoss_120b_cap8k", "humaneval_gptoss", "R16", 8192),
+]
+MMLU_CAP8K = [
+    ("Qwen on 8k", "qwen35_instruct_cap8k", "R8", 8192),
+    ("Qwen on R32 8k", "qwen35_instruct_cap8k", "R32", 8192),
+]
+
 # (label, record, task-file, arm, cap)
 HUMANEVAL = [
     ("gemma off", "gemma4_instruct", "humaneval_gemma_fixed", "R8", 1536),
@@ -188,18 +211,22 @@ def wb_cells():
 
 def main():
     rows = []                       # (surface, label, stats)
-    for lab, rec, task, arm, cap in HUMANEVAL:
+    for lab, rec, task, arm, cap in HUMANEVAL + [
+            c for c in HUMANEVAL_CAP8K
+            if os.path.exists(f"{SAMP}/{c[1]}_{c[3]}_{c[2]}.json")]:
         fr, cn = dump_items(rec, "free", task), dump_items(rec, arm, task)
         if fr and cn:
             s = pair_stats(fr, cn, cap, he_correct)
             if s:
-                rows.append(("HumanEval", lab, s))
-    for lab, rec, arm, cap in MMLU:
+                rows.append(("HumanEval-8k" if "8k" in lab else "HumanEval", lab, s))
+    for lab, rec, arm, cap in MMLU + [
+            c for c in MMLU_CAP8K
+            if os.path.exists(f"{SAMP}/{c[1]}_{c[2]}_mmlu_dual.json")]:
         fr, cn = dump_items(rec, "free", "mmlu_dual"), dump_items(rec, arm, "mmlu_dual")
         if fr and cn:
             s = pair_stats(fr, cn, cap, mmlu_correct)
             if s:
-                rows.append(("MMLU", lab, s))
+                rows.append(("MMLU-8k" if "8k" in lab else "MMLU", lab, s))
     for lab, o in wb_cells():
         s = dict(o)
         s["wrong_bw"] = -sum(o["drop_bw"]) / max(1, len(o["drop_bw"]))  # mean drop
@@ -234,7 +261,7 @@ def main():
                         (f"{s['wrong_nb']:.3f}" if surf == "WritingBench"
                          else s["wrong_nb"]), s["n_nb"]])
     print("wrote", out, f"({len(rows)} cells)")
-    for surf in ("HumanEval", "MMLU", "WritingBench"):
+    for surf in ("HumanEval", "HumanEval-8k", "MMLU", "MMLU-8k", "WritingBench"):
         sub = [s for sf, _, s in rows if sf == surf]
         if not sub:
             continue
