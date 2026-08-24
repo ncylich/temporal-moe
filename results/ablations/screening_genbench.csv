@@ -693,3 +693,7 @@ gemma4_think_on_cap8k,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0
 gemma4_instruct_cap8k,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.951220,full,8192,110
 gemma4_instruct_cap8k,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,8192,215
 gemma4_instruct_cap8k,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.993902,full,8192,106
+gptoss_20b_high_cap8k,128,8,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.896341,full,8192,622
+gptoss_20b_high_cap8k,128,8,free,,humaneval_gptoss,"pass@1,channel-aware",0.908537,full,8192,123
+gptoss_20b_cap8k,128,8,free,,humaneval_gptoss,"pass@1,channel-aware",0.957317,full,8192,57
+gptoss_20b_cap8k,128,8,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,8192,100
