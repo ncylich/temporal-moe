@@ -697,3 +697,5 @@ gptoss_20b_high_cap8k,128,8,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.89634
 gptoss_20b_high_cap8k,128,8,free,,humaneval_gptoss,"pass@1,channel-aware",0.908537,full,8192,123
 gptoss_20b_cap8k,128,8,free,,humaneval_gptoss,"pass@1,channel-aware",0.957317,full,8192,57
 gptoss_20b_cap8k,128,8,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,8192,100
+lfm25_instruct_cap8k,128,8,R4,4,humaneval_think,"pass@1,channel-aware",0.676829,full,8192,309
+lfm25_instruct_cap8k,128,8,free,,humaneval_think,"pass@1,channel-aware",0.829268,full,8192,78
