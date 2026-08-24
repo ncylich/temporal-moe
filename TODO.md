@@ -374,3 +374,28 @@ rather than starting from scratch), verify it produces a checkpoint whose
 `model.safetensors.index.json` key set is a strict superset of the base's
 (vision tower present, text-side tensors patched), then rerun Phase 2/3 for
 qwen35_ce_d12r2 only — gemma does not need to be touched again.
+
+**Phase 4 — decode-step CUDA-graph speedup, cross-architecture validation
+(task #72).** Previously validated on OLMoE only (bit-exact, 18% real
+end-to-end win). Same protocol repeated on a second, structurally different
+architecture — qwen3.5-35B (256 experts / 40 layers vs OLMoE's 64/16),
+R8 GSM8K=100, think off:
+
+| arm | wall time | exact_match | text vs baseline |
+|---|---|---|---|
+| baseline (dict walker + eager step) | 234s | 0.7600 | — |
+| **fast (slots walker + graph step)** | **202s** | **0.7600** | **100/100 bit-identical** |
+| baseline again (run-to-run floor) | 229s | 0.7600 | 100/100 bit-identical |
+
+Bit-exact again, real ~13% wall-clock win (smaller than OLMoE's 18%, consistent
+with the already-diagnosed pattern: walker overhead is roughly fixed per step,
+so it's a smaller fraction of a bigger model's per-step compute). One
+operational note: the first attempt at this failed instantly (`ValueError: No
+available memory for the cache blocks`) because the quick A/B script omitted
+`--gpu-mem` — qwen35 is a ~70GB-class model that needs the elevated values
+(0.92-0.95) used everywhere else tonight; the harness's 0.85 default isn't
+enough headroom. Not a walker/decode bug; fixed by adding the flag and
+rerunning (no real generation time was wasted, the failure was at engine boot).
+
+Two architectures now confirmed clean. A third (gpt-oss, the MXFP4-quantized
+family) is queued next before deciding whether to flip either default.
