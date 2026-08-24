@@ -675,16 +675,21 @@ def main():
             m = model.merge_and_unload() if hasattr(model, "merge_and_unload") else model
             m.save_pretrained(A.merge_out, safe_serialization=True)
             tok.save_pretrained(A.merge_out)
-            # save_pretrained does not carry processor_config.json (gemma4's
-            # multimodal processor class needs it even for text-only serving;
-            # vLLM fails at engine boot without it) -- copy it from the source
-            # checkpoint if present, so the merged dir is directly vLLM-servable
+            # save_pretrained does not carry the multimodal processor config
+            # every family in this program ships under its OWN filename
+            # (gemma4: processor_config.json; qwen3.5: preprocessor_config.json
+            # + video_preprocessor_config.json) -- vLLM's engine boot fails
+            # without it even for text-only serving. Copy whichever exist from
+            # the source checkpoint, so the merged dir is directly vLLM-servable
+            # regardless of family (found the gemma4 case the hard way; checked
+            # qwen3.5's filenames before it could repeat under a different name).
             import shutil
-            src_proc = os.path.join(A.model, "processor_config.json")
-            if os.path.exists(src_proc):
-                shutil.copy(src_proc, A.merge_out)
-                print(f"[gce] copied processor_config.json -> {A.merge_out}",
-                      flush=True)
+            for fname in ("processor_config.json", "preprocessor_config.json",
+                         "video_preprocessor_config.json"):
+                src = os.path.join(A.model, fname)
+                if os.path.exists(src):
+                    shutil.copy(src, A.merge_out)
+                    print(f"[gce] copied {fname} -> {A.merge_out}", flush=True)
             print(f"[gce] merged model -> {A.merge_out}", flush=True)
             return
         ev = torch.load("/workspace/instruct-traj/gemma4_instruct.pt",
