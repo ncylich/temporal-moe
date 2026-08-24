@@ -33,6 +33,17 @@ conclusions and cites no results.
   `humaneval_gemma.py` (1536 off / 3072 on), `humaneval_gptoss.py` (2048 low-med /
   4096 high), `humaneval_think.py` (4096), `mmlu_gptoss.py` (relaxed extraction).
 
+## Fair-budget re-runs (`*_cap16k`, 2026-08-24)
+Records suffixed `_cap16k` are the SAME cell re-measured at 16384 because the
+original was budget-limited (≥5% of items finishing at the cap). They SUPERSEDE
+their unsuffixed twin for that (arm, task); the twin is retained un-edited for
+era comparison and must not be cited as the current number. Both carry their own
+`max_gen_toks`. Pairs (all IFEval, all `prompt_level_strict_acc`):
+`gptoss_20b_high` free/R4, `gptoss_120b_high` free/R4/R16 (all @8192),
+`qwen35_instruct` R8/R32 (@8192; its free arm was already unsaturated at 0.5%
+and was NOT re-run, so free@8192 is the correct paired baseline for both).
+Earlier `_cap8k` records follow the same supersede-not-overwrite convention.
+
 ## Noise floor
 Cells are single runs, n=200 (MMLU 228, HumanEval 164), seed 1234. Binomial SE per
 arm ~1.6-3.5 points; paired damage SE ~1.3-3.4 where per-item dumps allow pairing.

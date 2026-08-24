@@ -119,6 +119,63 @@ everything else unchanged (single run per arm):
   +0.8). Measuring at a budget the model can finish in lands at −2.2 instead of
   dropping the inconvenient items.
 
+## Fair budget, second surface: IFEval reproduces the MMLU result
+
+Every IFEval cell that was still budget-limited was re-measured at 16384 (double).
+Metric is `prompt_level_strict_acc` (fraction of prompts satisfying every
+instruction; 0-1, higher is better), n=200, single run per arm. "Trunc" is the
+share of items finishing within 8 tokens of the cap — the thing being fixed.
+Flips are paired on the same document; z is McNemar with continuity correction on
+the discordant pairs, so **|z| > 2 is a real move, below that is rerun noise**.
+
+| cell | trunc @8192 → @16384 | acc @8192 → @16384 | Δ | →right | →wrong | z |
+|---|---|---|---|---|---|---|
+| gpt-oss-20b high, free | 17.0% → 1.0% | 0.790 → 0.860 | +7.0 | 23 | 9 | 2.30 |
+| gpt-oss-20b high, R=4 | 19.0% → 0.5% | 0.760 → 0.875 | +11.5 | 28 | 5 | 3.83 |
+| qwen3.5-35B, R=8 | 10.0% → 2.0% | 0.700 → 0.800 | +10.0 | 33 | 13 | 2.80 |
+| qwen3.5-35B, R=32 | 8.5% → 1.0% | 0.815 → 0.840 | +2.5 | 12 | 7 | 0.92 |
+| gpt-oss-120b high, free | 6.0% → 0.5% | 0.845 → 0.885 | +4.0 | 17 | 9 | 1.37 |
+| gpt-oss-120b high, R=4 | 6.0% → 0.5% | 0.840 → 0.890 | +5.0 | 18 | 8 | 1.77 |
+| gpt-oss-120b high, R=16 | 9.0% → 0.5% | 0.835 → 0.895 | +6.0 | 21 | 9 | 2.01 |
+
+**The gain is carried by exactly the items that were being cut off.** Splitting
+each cell's net flips by whether the item was truncated in the 8192 run:
+
+| cell | net gain from previously-truncated | from never-truncated |
+|---|---|---|
+| gpt-oss-20b high free / R4 | +15 / +21 | −1 / +2 |
+| gpt-oss-120b high free / R4 / R16 | +7 / +7 / +12 | +1 / +3 / 0 |
+| qwen3.5-35B R8 / R32 | +9 / +4 | **+11** / +1 |
+
+For both gpt-oss models the never-truncated items are flat (−1 to +3 net across
+five cells) while the truncated ones carry everything — the budget was the whole
+story. **qwen R=8 is the exception and is flagged, not explained away**: half its
+gain (+11 of +20) comes from items that never hit the cap, which the budget
+cannot account for. That is consistent with the already-recorded finding that
+qwen constrained-arm trajectories are not reproducible run-to-run (see "Flagged"
+below) — so qwen's +10.0 is part fair-budget correction, part rerun draw, and
+should not be read as a pure budget effect.
+
+**Consequence for the damage numbers** (damage = constrained − free, negative =
+residency hurts):
+
+| cell | damage @8192 | damage @fair budget |
+|---|---|---|
+| gpt-oss-20b high, R=4 | −3.0 pts | **+1.5 pts** |
+| gpt-oss-120b high, R=4 | −0.5 pts | **+0.5 pts** |
+| gpt-oss-120b high, R=16 | −1.0 pts | **+1.0 pts** |
+| qwen3.5-35B, R=8 | −16.5 pts | **−6.5 pts** |
+| qwen3.5-35B, R=32 | −5.0 pts | **−2.5 pts** |
+
+All three gpt-oss IFEval damages were already inside the noise floor and land on
+the other side of zero at a fair budget: **there is no measurable residency damage
+on gpt-oss IFEval, at either model size.** qwen's damage survives but shrinks by
+roughly 60% — the same ratio, on a different surface, as the MMLU result above,
+where two thirds of the damage was the budget. The pattern that generalizes is
+not "residency costs N points"; it is that a budget-limited cell overstates
+residency damage, because the constrained arm runs longer and therefore eats the
+truncation penalty more often.
+
 ## Per-surface detail worth naming
 
 - **Qwen thinking-on MMLU saturates its budget**: 63 of 228 free-arm items and 78
