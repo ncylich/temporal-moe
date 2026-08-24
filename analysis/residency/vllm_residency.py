@@ -222,7 +222,11 @@ def apply(layer, router_logits):
     kernel-launch-bound -- the exact pathology this stack exists to escape."""
     if not DEC["on"] or STEP["spans"] is None:
         return router_logits
-    if os.environ.get("TEMPORAL_WALKER", "dict") == "slots":
+    # DEFAULT SLOTS as of 2026-08-24: validated bit-exact + real wall-clock win
+    # on three architecturally distinct models (see temporal_router.step_accel
+    # and TODO.md section 6). TEMPORAL_WALKER=dict opts back into the path
+    # every pre-2026-08-24 grid row was produced on, if a comparison needs it.
+    if os.environ.get("TEMPORAL_WALKER", "slots") != "dict":
         return _apply_slots(layer, router_logits)
     N = router_logits.shape[0]
     total = sum(sp[1] for sp in STEP["spans"])

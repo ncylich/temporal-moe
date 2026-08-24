@@ -492,11 +492,14 @@ def step_accel(lt, resident, refresh, use_lru=False):
     the default on CUDA; "eager" forces the reference). tval is zeros: min_logit
     eviction ignores refresh, and the LRU variant is not served from here."""
     global _step_path
-    # DEFAULT EAGER until the end-to-end A/B lands: every constrained row in the
-    # grid was produced on the eager path, and a results chain must not change
-    # instrument underneath itself just because a file on disk changed (each cell
-    # is a fresh process). Opt in with TEMPORAL_DECODE=graph.
-    mode = os.environ.get("TEMPORAL_DECODE", "eager")
+    # DEFAULT GRAPH as of 2026-08-24: validated bit-exact and a real end-to-end
+    # win on three architecturally distinct models (OLMoE, qwen3.5-35B,
+    # gpt-oss-20b/MXFP4) -- baseline run twice for the noise floor, fast path
+    # once, generations 100% textually identical in every case, wall-clock
+    # -13% to -18%. TODO.md section 6 has the full protocol and numbers. Every
+    # row in the grid before this date was produced on the eager path; opt back
+    # into that with TEMPORAL_DECODE=eager if a future comparison needs it.
+    mode = os.environ.get("TEMPORAL_DECODE", "graph")
     tval = torch.zeros((), device=lt.device, dtype=lt.dtype)
     if not lt.is_cuda or mode == "eager" or use_lru:
         if _step_path is None:
@@ -523,7 +526,7 @@ def step_accel_mask(lt, resident):
     slotted serving walker. Same env switch and same one-time hard equality gate
     as `step_accel`; returns a fresh tensor (safe to index_copy_ into a bank)."""
     global _step_path
-    if not lt.is_cuda or os.environ.get("TEMPORAL_DECODE", "eager") == "eager":
+    if not lt.is_cuda or os.environ.get("TEMPORAL_DECODE", "graph") == "eager":
         if _step_path is None:
             _step_path = "eager"
             print("[temporal] decode step path: eager")
