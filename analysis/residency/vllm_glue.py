@@ -191,7 +191,11 @@ def install():
     # signature (sigmoid scoring + grouped topk).
     import torch
     from vllm.model_executor.models import lfm2_moe as mlf
-    orig_fm = mlf.FusedMoE
+    # vLLM renamed the factory FusedMoE -> FusedMoEFactory (0.27.x). Same signature,
+    # same call site inside Lfm2MoeSparseMoeBlock, so bind whichever name this version
+    # exposes -- the wrap must land on the name lfm2_moe itself calls.
+    _fm_name = "FusedMoE" if hasattr(mlf, "FusedMoE") else "FusedMoEFactory"
+    orig_fm = getattr(mlf, _fm_name)
 
     def fm_wrap(*a, **kw):
         if kw.get("scoring_func") == "sigmoid" and kw.get("use_grouped_topk"):
@@ -214,7 +218,7 @@ def install():
                       topk_group=None, custom_routing_function=route)
         return orig_fm(*a, **kw)
 
-    mlf.FusedMoE = fm_wrap
+    setattr(mlf, _fm_name, fm_wrap)
 
     # gpt-oss: external router logits, softmax over the selection (renormalize=True)
     # -> -inf masking before the fused kernel is exact, same as the audited HF MXFP4
