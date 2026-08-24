@@ -133,8 +133,11 @@ def _score(A, merged, arm, R, secs):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dump", required=True,
-                    help="dump stem under genbench_samples, e.g. "
-                         "gemma4_think_on_R8_humaneval_gemma_fixed")
+                    help="dump stem(s) under genbench_samples, comma-separated to run "
+                         "several cells through ONE engine boot (loading a 49GB model "
+                         "takes ~9 min, several times the generation it serves here). "
+                         "Per-cell --arm/--old-cap are parsed from the stems unless "
+                         "given explicitly.")
     ap.add_argument("--path", required=True, help="model directory")
     ap.add_argument("--new-cap", type=int, required=True)
     ap.add_argument("--old-cap", type=int, default=None,
@@ -171,7 +174,19 @@ def main():
 
     import genprotocol
     genprotocol.check_dump_dir()
-    src = os.path.join(SAMP, A.dump + ".json")
+    vllm_glue.install()
+    from vllm import LLM
+    _llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
+               max_model_len=A.max_model_len or (A.new_cap + 2048),
+               enable_prefix_caching=False)
+    _tk = _llm.get_tokenizer()
+    _rebuilt = _rebuild_prompts(A, _tk) if A.rebuild_prompt else None
+    for _d in A.dump.split(","):
+        _one(A, _d.strip(), _llm, _tk, _rebuilt)
+
+
+def _one(A, dump, llm, tk, rebuilt):
+    src = os.path.join(SAMP, dump + ".json")
     blob = json.load(open(src))
     items = blob["items"]
     old_cap = A.old_cap or max(i["gen_toks"] for i in items)
@@ -188,7 +203,7 @@ def main():
     done = [i for i in items if i["gen_toks"] < old_cap - 8]
     add = A.new_cap - old_cap
     assert add > 0, f"--new-cap {A.new_cap} must exceed the dump's cap {old_cap}"
-    print(f"[resume] {A.dump}: {len(items)} items, {len(done)} finished (reused "
+    print(f"[resume] {dump}: {len(items)} items, {len(done)} finished (reused "
           f"as-is), {len(trunc)} truncated -> continuing each by up to {add} tokens",
           flush=True)
     print(f"[resume] tokens to decode: {len(trunc) * add} "
@@ -197,26 +212,21 @@ def main():
         print("[resume] nothing truncated; nothing to do")
         return
 
-    arm = A.arm
+    # with several dumps in one boot the arm MUST come from each stem; a global
+    # --arm would silently label every cell with the first one's arm
+    arm = A.arm if "," not in A.dump else None
     if arm is None:
-        for part in A.dump.split("_"):
+        for part in dump.split("_"):
             if part == "free" or (part.startswith("R") and part[1:].isdigit()):
                 arm = part
     assert arm, "could not parse arm from --dump; pass --arm"
     R = None if arm == "free" else int(arm.lstrip("R"))
 
-    vllm_glue.install()
-    from vllm import LLM, SamplingParams
+    from vllm import SamplingParams
     from vllm.inputs import TokensPrompt
-    mml = A.max_model_len or (A.new_cap + 2048)
-    llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
-              max_model_len=mml, enable_prefix_caching=False)
 
     # Build the resume prompts: original prompt + everything generated so far. The
     # boundary tells the walker which part stays free.
-    tk = llm.get_tokenizer()
-    rebuilt = _rebuild_prompts(A, tk) if A.rebuild_prompt else None
-
     prompts, meta, src_count = [], [], {"engine_ids": 0, "retokenized": 0}
     DEC["resume_map"].clear()
     DEC["enforce_from"].clear()
@@ -274,7 +284,7 @@ def main():
     merged.sort(key=lambda x: order.get(x["doc"], 1 << 30))
     # task name = the dump stem after "<record>_<arm>_", so the merged dump lands
     # under the same task the original cell used
-    task = A.dump.split(f"_{arm}_", 1)[1] if f"_{arm}_" in A.dump else "resumed"
+    task = dump.split(f"_{arm}_", 1)[1] if f"_{arm}_" in dump else "resumed"
     genprotocol.write_dump(A.record_as, arm, task, merged, len(items))
     if A.score:
         _score(A, merged, arm, R, secs)
