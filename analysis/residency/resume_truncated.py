@@ -58,6 +58,8 @@ def _rebuild_prompts(A, tk):
     instr = ("Complete the following Python function. Provide the complete function "
              "in a single ```python code block.\n\n")
     ck = {} if A.think == "default" else {"enable_thinking": A.think == "on"}
+    if A.reasoning_effort:          # gpt-oss: effort is part of the prompt
+        ck["reasoning_effort"] = A.reasoning_effort
     out = {}
     for p in probs:
         text = tk.apply_chat_template(
@@ -65,8 +67,67 @@ def _rebuild_prompts(A, tk):
             tokenize=False, add_generation_prompt=True, **ck)
         out[p["task_id"]] = tk(text, add_special_tokens=False).input_ids
     print(f"[resume] rebuilt {len(out)} prompts via the chat template "
-          f"(think={A.think})", flush=True)
+          f"(think={A.think}, effort={A.reasoning_effort})", flush=True)
     return out
+
+
+def _score(A, merged, arm, R, secs):
+    """Score the merged dump with the originating harness's extractor, so a resumed
+    cell is directly comparable to the cell it extends."""
+    import csv
+    import json as _j
+    import re
+    import subprocess
+    from datasets import load_dataset
+    probs = {p["task_id"]: p for p in load_dataset("openai/openai_humaneval",
+                                                   split="test")}
+    FENCE = re.compile(r"```(?:python)?\n(.*?)```", re.S)
+    CHANNEL = re.compile(r"<\|channel>.*?(?:<channel\|>|\Z)", re.S)
+
+    def extract(raw, unfinished):
+        if unfinished:
+            return ""                     # still unfinished at the NEW cap
+        if A.score == "humaneval_gemma":
+            t = CHANNEL.sub("", raw)
+            b = FENCE.findall(t)
+            return b[-1] if b else t
+        if A.score == "humaneval_gptoss":
+            MK = "<|channel|>final<|message|>"
+            t = raw.rsplit(MK, 1)[1] if MK in raw else ("" if "<|channel|>" in raw else raw)
+        else:
+            t = raw.split("</think>", 1)[1] if "</think>" in raw else raw
+        return (FENCE.findall(t) or [t])[-1]
+
+    mk = {"humaneval_gemma": "<channel|>"}.get(A.score, "</think>")
+    if A.score == "humaneval_gptoss":
+        mk = "<|channel|>final<|message|>"
+    preds, tests = [], []
+    unfin = []
+    for it in merged:
+        u = it["gen_toks"] >= A.new_cap - 8 and mk not in it["raw"]
+        unfin.append(u)
+        preds.append([extract(it["raw"], u)])
+        p = probs[it["doc"]]
+        tests.append(p["test"] + f"\ncheck({p['entry_point']})")
+    _j.dump({"preds": preds, "tests": tests}, open("/tmp/heg_preds.json", "w"))
+    out = subprocess.run(["/workspace/venv_fla/bin/python",
+                          os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "heg_scorer.py")], capture_output=True, text=True)
+    line = [l for l in out.stdout.splitlines() if l.startswith("PASS1")]
+    assert line, f"scorer failed: {out.stderr[-400:]}"
+    p1 = float(line[0].split()[1])
+    il = [l for l in out.stdout.splitlines() if l.startswith("ITEMS")]
+    bits = il[0].split()[1] if il else ""
+    for i, it in enumerate(merged):
+        it["pass"] = (bits[i] == "1") if i < len(bits) else None
+        it["unfinished"] = unfin[i]
+    print(f"[resume] {A.record_as} {arm} pass@1 = {p1:.4f} "
+          f"({len(merged)} items, {sum(unfin)} still unfinished)", flush=True)
+    with open(os.path.join(ABLATIONS, A.csv_name), "a", newline="") as fh:
+        csv.writer(fh).writerow(
+            [A.record_as, 128, 8, arm, R or "", A.score.replace("humaneval_gemma",
+             "humaneval_gemma_fixed"), "pass@1,channel-aware", f"{p1:.6f}",
+             "full", A.new_cap, f"{secs:.0f}"])
 
 
 def main():
@@ -76,6 +137,11 @@ def main():
                          "gemma4_think_on_R8_humaneval_gemma_fixed")
     ap.add_argument("--path", required=True, help="model directory")
     ap.add_argument("--new-cap", type=int, required=True)
+    ap.add_argument("--old-cap", type=int, default=None,
+                    help="the budget the dump was generated at. MUST be given when "
+                         "the cell may not have truncated: inferring it from "
+                         "max(gen_toks) would label the single longest (naturally "
+                         "finished) generation as truncated and 'resume' past its EOS")
     ap.add_argument("--record-as", required=True, help="stem for the merged dump")
     ap.add_argument("--arm", default=None, help="free or R<n>; default: parsed from --dump")
     ap.add_argument("--gpu-mem", type=float, default=0.90)
@@ -89,6 +155,15 @@ def main():
                     help="reconstruct prompt_ids for dumps that predate prompt-id "
                          "capture. The prompt IS exactly recoverable: it is the "
                          "dataset item through the model's chat template")
+    ap.add_argument("--reasoning-effort", default=None,
+                    choices=("low", "medium", "high"),
+                    help="gpt-oss effort used by the ORIGINAL run; part of the "
+                         "prompt, so it must match or the rebuilt prefix is wrong")
+    ap.add_argument("--score", default=None,
+                    choices=("humaneval_gemma", "humaneval_gptoss", "humaneval_think"),
+                    help="score the merged dump with that harness's extractor and "
+                         "append a CSV row (default: dump only)")
+    ap.add_argument("--csv-name", default="screening_genbench.csv")
     ap.add_argument("--think", choices=("on", "off", "default"), default="default",
                     help="template thinking flag used by the ORIGINAL run "
                          "(must match, or the rebuilt prompt is the wrong prefix)")
@@ -99,7 +174,7 @@ def main():
     src = os.path.join(SAMP, A.dump + ".json")
     blob = json.load(open(src))
     items = blob["items"]
-    old_cap = max(i["gen_toks"] for i in items)
+    old_cap = A.old_cap or max(i["gen_toks"] for i in items)
 
     missing = [i for i in items if not i.get("gen_ids")]
     if missing and not A.allow_retokenized_prefix:
@@ -201,6 +276,8 @@ def main():
     # under the same task the original cell used
     task = A.dump.split(f"_{arm}_", 1)[1] if f"_{arm}_" in A.dump else "resumed"
     genprotocol.write_dump(A.record_as, arm, task, merged, len(items))
+    if A.score:
+        _score(A, merged, arm, R, secs)
     print(f"[resume] prefixes: {src_count['engine_ids']} exact (engine ids), "
           f"{src_count['retokenized']} best-effort (re-tokenized text)", flush=True)
     print(f"[resume] continued {len(trunc)} items in {secs:.0f}s; "
