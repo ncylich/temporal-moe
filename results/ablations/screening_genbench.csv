@@ -681,3 +681,7 @@ abdecode_basecheck,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.160
 abdecode_basecheck,64,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.490000,100,2048,71
 qwen35_instruct_gm92,256,8,R8,8,humaneval_think,"pass@1,channel-aware",0.890244,full,4096,971
 qwen35_instruct_gm92,256,8,R32,32,humaneval_think,"pass@1,channel-aware",0.951220,full,4096,915
+qwen35_instruct_cap8k,256,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.938596,4,8192,1399
+qwen35_instruct_cap8k,256,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.916667,4,8192,1399
+qwen35_instruct_cap8k,256,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.916667,4,8192,4242
+qwen35_instruct_cap8k,256,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.872807,4,8192,4242

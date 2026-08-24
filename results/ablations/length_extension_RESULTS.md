@@ -93,6 +93,32 @@ cap-hit items:
   change are not the cells with the largest cap component — Qwen thinking-on
   HumanEval is +360 total against +94 cap, while LFM is +250 against +138.
 
+## Measured at a fair budget: two thirds of qwen's MMLU damage was the budget
+
+The cell above was re-measured at 8192, double its original budget, both arms,
+everything else unchanged (single run per arm):
+
+| qwen think-on MMLU | 4096 | 8192 |
+|---|---|---|
+| free | 0.8816 | **0.9386** |
+| R = 8 | 0.8158 | **0.9167** |
+| **damage (R8 − free)** | **−6.6 pts** | **−2.2 pts** |
+| generations still at the cap | 63 free / 78 R8 | 2 free / 9 R8 |
+| mean tokens | 2530 / 2614 | 2894 / 3363 |
+
+- **Most of the measured damage was truncation, not residency.** At 4096, 27% of
+  free-arm and 34% of constrained-arm generations were cut off mid-thought and
+  scored as wrong. Give the model room to finish and the gap between the arms
+  falls from 6.6 points to 2.2.
+- **The −2.2 that remains is real** — and so is the mechanism behind the rest: the
+  constrained arm still runs longer (3363 against 2894 mean tokens) and still hits
+  the wall more often (9 against 2). Residency does push generations toward the
+  budget. It just was not worth 6.6 points of accuracy; the budget was.
+- This is the honest version of the §1 estimate in `TRUNCATION_RERUN_PLAN.md`,
+  which put the shift at +7.4 points by *excluding* truncated items (landing at
+  +0.8). Measuring at a budget the model can finish in lands at −2.2 instead of
+  dropping the inconvenient items.
+
 ## Per-surface detail worth naming
 
 - **Qwen thinking-on MMLU saturates its budget**: 63 of 228 free-arm items and 78
