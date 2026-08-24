@@ -43,6 +43,54 @@ an afternoon and a week.
 
 ---
 
+# Part 0 — Every re-run the paper wants, in priority order
+
+Added 2026-08-24. This part exists because the recovery work and the paper's remaining
+measurements got tangled together, and most of the paper's are **not** gated on recovery.
+Group A needs nothing that the pod deletion took. Do it first, and do it independently.
+Full statements of each item live in `paper/TODO.md`; this is the index and the ordering.
+
+## Group A — paper-critical, needs only base weights
+
+Nothing here touches a lost adapter, trajectory or prompt pool. All of it can run on a fresh
+pod the day it boots.
+
+| # | run | why it matters | cost |
+|---|---|---|---|
+| A1 | **Qwen3.5-35B, free routing, IFEval, at 16384** | The one arm the truncation sweep missed. Its two constrained arms were rerun and are clean, but with no matched free arm the whole cell falls back to 8192, where the free arm is 8.0% truncated. This is the single number holding Qwen3.5's thinking-on mean at -7.0, so it decides whether "free-form thinking amplifies the constraint" survives for that model. | 1 cell |
+| A2 | **WritingBench at 8192 for gpt-oss-120b, gpt-oss-20b, LFM** | Never swept for truncation. At its 4096 budget those three sit at 30-36%, 20-25% and 21-27% on both arms, and Section 6 leans on WritingBench for "prose is the robust surface". The paired delta may survive since both arms truncate alike, but it is untested. | 3 models, 1 surface |
+| A3 | **A trained temporally-coherent router, serving measurement** | Every phone number prescribes turnover as a stand-in. LEDGER S3-9 calls this "the required next step, not more systems work". The longest-standing open item in the paper. | new training |
+| A4 | **gemma4 thinking-on IFEval and MMLU at double budget** | The last two cells above the 2% cap-hit bar (6.5% and 6.1%), left by judgment rather than evidence. Low value alone; worth folding in only if the machine is already up for A1. | 3 arms x 2 tasks |
+| A5 | **Mohsen's Intel iGPU numbers** | Third device class. Not blocking. | external |
+
+**A1 is the highest-value single cell in the whole list.** It is one rerun, it needs no
+adapter, and it settles a claim the paper currently has to hedge.
+
+## Group B — paper-critical, gated on Part 1
+
+These need an adapter, so they sit behind the rebuild chain below.
+
+| # | run | why it matters | gated on |
+|---|---|---|---|
+| B1 | **Adapted gemma4 at 8192 on HumanEval** | Section 7 compares released against adapted at the 1,536-token budget the adaptation runs share, because the adapted model was never run higher, while Section 6 reports the same released cell at 8192. A clause in Section 7 names the budget for now; this retires it. The base side already exists as `gemma4_instruct_cap8k`. | §1.3 |
+| B2 | **Qwen3.5 thinking-on adaptation, then its length grid** | Section 7's length result rests on gemma4 alone. Qwen3.5's adapted checkpoints were only ever evaluated thinking-off, where neither routing regime lengthens and the comparison is empty. | §1.1, §1.2, §1.4 |
+
+## Group C — durability, do while the above runs
+
+| # | change | why |
+|---|---|---|
+| C1 | **Make the dump schema self-describing.** Write `total_toks`, `think_toks`, `answer_toks` as three explicit fields. | Inferring which convention a dump uses produced four separate wrong results on 2026-08-24 (`results/ablations/INSTRUCT_RESULTS.md` §5). Fold into the next regeneration rather than running a pass for it. |
+| C2 | **Mirror every adapter and trajectory to Hugging Face as it is written**, and add it to `results/MANIFEST.csv`. | The standing rule from Part 2. It is what would have made this whole plan unnecessary. |
+
+## What is explicitly NOT being re-run
+
+- **GSM8K and IFEval regeneration.** Their cells predate the unfinished-thinking scoring fix,
+  but the measured blast radius is 0.73% of GSM8K items and 1.88% of IFEval items, both under
+  the binomial standard errors already reported. Re-parsing is impossible (no raw text saved)
+  and not worth doing. Recorded so it is not re-litigated.
+
+---
+
 # Part 1 — What we need to recover
 
 The four items form one dependency chain. Each is the input to the next, so they must be done
@@ -353,6 +401,10 @@ Both are recorded in `gemma_adapt_RESULTS.md` §Open and are currently impossibl
 
 # Part 2 — Execution order
 
+0. **Run Part 0 Group A first, in parallel with everything else.** None of it is gated on
+   recovery, A1 is a single cell, and it settles a claim the paper currently hedges. Booking a
+   machine for the rebuild is also the moment to run A1, A2 and A4, which share the same base
+   weights.
 1. **Check the network volume.** If `/workspace/olmoe-adapt/data` survived, stop; nothing below
    is needed.
 2. **§1.1 rebuild the d7 pool, commit it and a builder.** CPU. Do this before booking a machine.
@@ -363,6 +415,8 @@ Both are recorded in `gemma_adapt_RESULTS.md` §Open and are currently impossibl
 5. **§1.4 qwen d12r2** → train → merge via `qwen_ce_patch.py` → **push adapter to HF** →
    re-measure.
 6. **§1.5** decide and apply the Section 8 disposition.
+7. **Part 0 Group B**, which is unblocked once §1.3 and §1.4 land: B1 needs only gemma, B2
+   needs qwen and a thinking-on evaluation pass.
 
 **Standing rule from here on.** Mirror every adapter and trajectory file to Hugging Face the
 moment it is written, and add it to `results/MANIFEST.csv` so `scripts/artifacts.py` can fetch
