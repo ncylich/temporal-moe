@@ -675,6 +675,16 @@ def main():
             m = model.merge_and_unload() if hasattr(model, "merge_and_unload") else model
             m.save_pretrained(A.merge_out, safe_serialization=True)
             tok.save_pretrained(A.merge_out)
+            # save_pretrained does not carry processor_config.json (gemma4's
+            # multimodal processor class needs it even for text-only serving;
+            # vLLM fails at engine boot without it) -- copy it from the source
+            # checkpoint if present, so the merged dir is directly vLLM-servable
+            import shutil
+            src_proc = os.path.join(A.model, "processor_config.json")
+            if os.path.exists(src_proc):
+                shutil.copy(src_proc, A.merge_out)
+                print(f"[gce] copied processor_config.json -> {A.merge_out}",
+                      flush=True)
             print(f"[gce] merged model -> {A.merge_out}", flush=True)
             return
         ev = torch.load("/workspace/instruct-traj/gemma4_instruct.pt",
