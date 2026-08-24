@@ -20,6 +20,7 @@ Also emits the three-way rescore per cell:
 Writes results/ablations/truncation_decomp.csv (per cell) and prints the pooled
 table. Re-analysis of committed dumps only; no GPU, no regeneration.
 """
+import argparse
 import csv
 import glob
 import json
@@ -60,7 +61,23 @@ def load(rec, arm, task):
     return {i["doc"]: i for i in items}
 
 
-def cells():
+def is_adapted(rec):
+    """True for CE-adapted checkpoints (train_gemma_ce.py / train_qwen_ce.py output).
+
+    This decomposition is a statement about BASE-model residency damage: how a
+    released model's generations fail when the serving constraint is imposed on it.
+    An adapted model has been trained against that constraint, so its blown-up
+    generations are a different population and pooling them changes the headline.
+    They arrived silently because cells() globs the dump directory and the adapted
+    regeneration (gemma4_ce_d12_freshregen, qwen35_ce_d12r2_freshregen) landed in it
+    afterwards -- 8 cells, moving group C from 3.3x/1.6x (commit 82355ff) to
+    3.2x/1.8x. Excluded by default, selectable with --include-adapted, and either
+    way the count is stated rather than left to the glob.
+    """
+    return "_ce_" in rec
+
+
+def cells(include_adapted=False):
     """(surface, record, arm, task) for every constrained cell with a free partner."""
     out = []
     for p in sorted(glob.glob(f"{SAMP}/*.json")):
@@ -73,19 +90,21 @@ def cells():
                 continue
             stem = b[: -len("_" + task)]
             m = re.match(r"(.+)_(R\d+)$", stem)
-            if m:
+            if m and (include_adapted or not is_adapted(m.group(1))):
                 out.append((surf, m.group(1), m.group(2), task))
     return out
 
 
-def decompose():
+def decompose(include_adapted=False):
     """(pooled groups, per-cell rows). Groups are {surface: {group: [n, n_wrong]}}
     pooled over every constrained cell. Split out of main so a figure producer can
-    read exactly the numbers this file prints, with no chance of the two drifting."""
+    read exactly the numbers this file prints, with no chance of the two drifting.
+
+    include_adapted mixes CE-adapted cells into the base-model pool; see is_adapted."""
     groups = {s: {g: [0, 0] for g in "ABCD"} | {"N": [0, 0]}
               for s in ("HumanEval", "MMLU")}          # [n, n_wrong]
     rows = []
-    for surf, rec, arm, task in cells():
+    for surf, rec, arm, task in cells(include_adapted):
         fr, cn = load(rec, "free", task), load(rec, arm, task)
         if not fr or not cn:
             continue
@@ -128,14 +147,25 @@ def decompose():
 
 
 def main():
-    groups, rows = decompose()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--include-adapted", action="store_true",
+                    help="also pool CE-adapted cells (see is_adapted). Off by default: "
+                         "this decomposition is about base-model residency damage")
+    A = ap.parse_args()
+    groups, rows = decompose(A.include_adapted)
+    skipped = len(cells(True)) - len(cells(A.include_adapted))
+    print(f"[decomp] {len(cells(A.include_adapted))} constrained cells in scope; "
+          f"{skipped} CE-adapted cells excluded"
+          + (" (--include-adapted to pool them)" if skipped else ""))
     out = os.path.join(ABLATIONS, "truncation_decomp.csv")
     with open(out, "w", newline="") as fh:
         fh.write('"# Truncation decomposition per constrained cell (TRUNCATION_RERUN_PLAN '
                  'section 1). acc_reported = scored as-is; acc_honest = generations that '
                  'hit the cap with thinking still open count as unanswered; acc_finished '
                  '= over the n_finished that emitted something. n_unfinished is group A. '
-                 'Re-analysis of committed dumps; no regeneration. Producer: '
+                 'Re-analysis of committed dumps; no regeneration. Base-model cells '
+                 'only unless --include-adapted: CE-adapted checkpoints are a different '
+                 'population (see is_adapted). Producer: '
                  'analysis/residency/truncation_decomp.py"\n')
         w = csv.writer(fh)
         w.writerow(["surface", "record", "arm", "n", "n_unfinished", "acc_reported",

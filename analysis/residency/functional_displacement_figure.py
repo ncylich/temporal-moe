@@ -9,6 +9,7 @@ tight arm (R=k) minus own free arm, points, thinking off/low
 thinking-on value is used and flagged). Reads functional_displacement.csv and
 router_wasserstein.csv."""
 import csv
+import os
 import sys
 from collections import defaultdict
 
@@ -16,7 +17,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-ABL = "/workspace/temporal-moe/results/ablations"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from paths import ABLATIONS as ABL                                   # noqa: E402
 
 STYLE = {  # model key -> (label, color)
     "gpt-oss-120b": ("gpt-oss-120b (R4 = 3.1%)", "#1e618d"),
