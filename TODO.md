@@ -273,3 +273,104 @@ comparable.
 - Task #73 (gpt-oss sampling recipe question) is resolved in substance (see
   §1.4 above) but still shows as pending in the task tracker — bookkeeping
   only, no action needed on the actual result.
+
+---
+
+## 6. Overnight orchestration (2026-08-24, appended — does not modify sections 1-5)
+
+Launched an unattended overnight chain per Noah's instruction: hourly cron
+heartbeat (independent of the Monitor/bash-chain mechanism), persistent Monitor
+on stage transitions, commit-and-push after each phase.
+
+**Phase 1 — closed the last truncation gap, SUCCEEDED.** `gpt-oss-20b-high`
+(free/R4) was still 6.1%/6.7% truncated at the 8192 cap. Resumed (not
+re-run) from the existing 8192 prefixes to 16384; all 21 continued items used
+**exact engine token IDs**, confirming the ID-persistence fix carries through a
+second-order resume correctly. Truncation now 3.0-3.7%. Committed `7abb259`.
+
+**Phase 2 — adapted-model regeneration (gemma4_ce_d12, qwen35_ce_d12r2).**
+Both are LoRA/expert-LoRA adapters that needed merging onto their base models;
+no merged checkpoint survived anywhere on disk (checked three ways per Noah's
+prompt to look at command history — adapters exist, merges don't).
+
+- **gemma4_ce_d12: SUCCEEDED, committed `d0f67aa`.** Two real merge bugs found
+  and fixed at the source in `train_gemma_ce.py` (not worked around):
+  1. `--expert-lora-r` was omitted, so unsloth built attention-only LoRA
+     modules while the checkpoint actually carries grouped-mm expert-LoRA
+     tensors (`elora_gu_A/B`, `elora_dp_A/B`). Confirmed the correct rank (16)
+     by reading it directly from the checkpoint's own stored metadata rather
+     than guessing.
+  2. The merge's `save_pretrained` does not carry gemma4's multimodal
+     `processor_config.json`, which vLLM needs even for text-only serving —
+     this exact bug was already in memory from an earlier program and simply
+     wasn't applied here. Fixed with a copy step after `save_pretrained`.
+  A near-miss: the orchestration script's own cleanup (`rm -rf`) would have
+  deleted the successfully-merged checkpoint seconds after the *second* bug
+  surfaced, forcing a full re-merge for nothing. Caught it by checking
+  `/dev/shm` state immediately after the failure notification and killing the
+  exact PIDs (not a `-f` pattern) before the cleanup line executed.
+  12 dumps, 12/12 with raw text, full CSV coverage (GSM8K/IFEval/HumanEval/
+  MMLU-dual × free/R8/R16).
+
+- **qwen35_ce_d12r2: BLOCKED on a real architectural gap, not a quick fix.**
+  The `--expert-lora-r 8` fix (confirmed from checkpoint metadata, same
+  pattern as gemma) resolved the merge itself cleanly. But the checkpoint that
+  results is **unservable by vLLM as of this vLLM version**, and it is not a
+  config or CLI-flag problem:
+  - Qwen3.5-35B is multimodal (ships `preprocessor_config.json` +
+    `video_preprocessor_config.json`, different names than gemma4's file —
+    broadened the processor-copy fix to cover all three filenames per family,
+    committed `1da222c`, checked proactively before it could fail a second
+    time under a different name).
+  - The CE-adaptation training pipeline (`--no-unsloth`/HF+peft path) only
+    ever loads the **text-only submodule** of the multimodal checkpoint, so
+    `merge_and_unload()` + `save_pretrained()` produces a checkpoint whose
+    safetensors files genuinely never contained any `visual.*` vision-tower
+    tensors — they were never in memory to save. Its self-produced
+    `config.json` correctly reflects this (`model_type: qwen3_5_moe_text`,
+    `architectures: [Qwen3_5MoeForCausalLM]`).
+  - Tested **both** the checkpoint's own self-consistent config and a
+    "corrected" config copied from the full multimodal base, with a fresh
+    remerge in between so each was a clean test, not a guess stacked on a
+    guess. **Both fail**, with different errors:
+    - Self-produced (text-only) config: `TypeError: Invalid type of
+      HuggingFace config. Expected type: Qwen3_5MoeConfig, but found type:
+      Qwen3_5MoeTextConfig` — this vLLM version's Qwen3.5-MoE loading path
+      unconditionally calls `get_hf_config(Qwen3_5MoeConfig)` regardless of
+      which model class def gets dispatched to, so a text-only config is
+      rejected outright.
+    - Base's full multimodal config forced onto the merged tensors:
+      `ValueError: Following weights were not initialized from checkpoint:
+      {113 × visual.blocks.N.norm*, visual.patch_embed.*, visual.merger.*,
+      visual.pos_embed.*}` — config now correctly matches a class that
+      requires vision-tower weights, but those tensors were never produced by
+      training in the first place.
+  - **Root cause, plainly:** the merge writes only what the trainer's live
+    Python object holds in memory (a text-only submodule), and there is no
+    text-only serving path in the installed vLLM version for this model
+    family. A `save_pretrained`-style merge cannot fix this.
+  - **The correct fix** (not attempted tonight — real engineering, not a
+    config tweak): a **patch-onto-a-full-base-copy merge**, the same pattern
+    this codebase already uses successfully in
+    `analysis/residency/qwen_half_split_patch.py` for the half-grain program —
+    copy the complete base checkpoint (vision tower included, untouched by
+    this training recipe) and patch in only the delta-changed text-side
+    tensors from the adapter, rather than doing a raw `save_pretrained` from a
+    partial in-memory model. This is a real script to write, not a flag.
+  - Nothing was lost: the adapter (`qwen_ce_d12r2_adapter.pt`) and base weights
+    are both safely persisted; the broken 65GB `/dev/shm` output was deleted
+    (freed back to 0 used) since it is cheaply reproducible from the adapter
+    once the patch-based merge exists. No GPU time was spent past the two
+    quick diagnostic probes (1-item each) that established this diagnosis.
+
+**Phase 3 (truncation check on the adapted regen):** only gemma's cells exist
+to check (qwen never produced valid dumps). None of gemma's 12 cells hit 5%
+truncation at the caps used (2048 GSM8K/IFEval, 4096 MMLU, 1536 HumanEval) —
+no resume needed there.
+
+**What's next for qwen adaptation, if picked up later:** write the
+patch-onto-base-copy merge script (adapt `qwen_half_split_patch.py`'s pattern
+rather than starting from scratch), verify it produces a checkpoint whose
+`model.safetensors.index.json` key set is a strict superset of the base's
+(vision tower present, text-side tensors patched), then rerun Phase 2/3 for
+qwen35_ce_d12r2 only — gemma does not need to be touched again.
