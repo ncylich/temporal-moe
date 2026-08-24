@@ -491,7 +491,17 @@ Truncation falls to 1.0% (free) / 0.5% (R4). Old `gptoss_20b_high` row kept
 untouched in `instruct_genbench_vllm.csv` for reference; new row is
 `gptoss_20b_high_cap16k`. Committed `85ad812`.
 
-After #79, no cell in the grid remains at ≥5% truncation without either a
+After #79, swept once more and found the exact same class of gap on the
+**base** (non-adapted) qwen35_instruct model: IFEval R8 (10.0%) and R32
+(8.5%) truncated at 8192, same pre-Task-0 dump format with no raw text or
+token IDs. **Task #80**: reran both at 16384 with `--presence-penalty 1.5`
+preserved (the qwen3.5-thinking model-card fallback the script's own help
+text documents — found in tonight's earlier invocations of this exact cell
+and necessary for protocol fidelity). Truncation falls to 2.0% (R8) / 1.0%
+(R32). Old rows kept for reference; new rows are `qwen35_instruct_cap16k`.
+Committed `332d2d3`.
+
+After #80, no cell in the grid remains at ≥5% truncation without either a
 resolution already on record (qwen think-on MMLU's fair-budget
 re-measurement, gemma think-on HumanEval's documented blow-up analysis in
 `length_extension_RESULTS.md`) or a genuinely closed gap. This is the actual
