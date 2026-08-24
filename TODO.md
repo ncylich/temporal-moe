@@ -426,3 +426,47 @@ regression suite (`test_decode_accel.py`, `test_walker_slots.py`,
 TEMPORAL_WALKER×TEMPORAL_DECODE combos, `temporal/tests/test_resume_residency.py`)
 re-run clean after the flip. Committed `3bb4a85` (code + the qwen/gpt-oss/OLMoE
 validation dumps and CSV rows above as evidence). Task #72 done.
+
+**Task #78 — qwen35_ce_d12r2, the patch-onto-base-copy merge that was flagged
+above as "not attempted tonight." SUCCEEDED.** New script:
+`analysis/residency/qwen_ce_patch.py`. Same shape as
+`qwen_half_split_patch.py`: reads the full multimodal base checkpoint
+shard-by-shard (never loads a model into memory), adds the adapter's
+expert-LoRA deltas onto `mlp.experts.{gate_up,down}_proj` for the text-side
+layers, replaces a handful of full-precision tensors the adapter also carries
+(per-layer norms), and copies every other tensor — the entire vision tower
+included — through byte-for-byte unchanged. Because the vision tower is never
+absent from memory in the first place (unlike `train_gemma_ce.py --merge-out`,
+which only ever holds the text-only submodule), the resulting checkpoint's own
+config is the untouched multimodal one and satisfies this vLLM version's
+Qwen3.5-MoE loader without any config surgery.
+
+One real bug caught before it reached vLLM: the first full run finished all 14
+shards and then failed its own closing assertion (`adapter not fully
+consumed`) — 80 of the adapter's 371 tensors were unused. Root cause: the
+adapter carries attention `q/k/v/o_proj` LoRA (r=32, `lora_alpha=64` → scale
+2.0, PEFT's standard `B @ A` layout) on every 4th transformer layer
+(3, 7, 11, ..., 39), and the script's key-naming check during development had
+only sampled `sorted(T)[:15]`/`[-15:]`, which alphabetically lands on layers
+0–9's expert-LoRA and norm keys and never surfaces layer 10+'s attention keys.
+The assertion did its job — this was caught immediately after the write, not
+discovered later against a bad checkpoint. Fixed two ways: (1) added the
+missing `q/k/v/o_proj` LoRA branch to `qwen_ce_patch.py` itself, so future runs
+of this script don't hit it; (2) rather than repeat the full 72GB, 14-shard
+copy, wrote a one-off script that located the exact 2 shards
+(`00013`, `00014` of 14) holding those 10 layers' attention weights via the
+index's `weight_map`, and patched only those in place. Re-verified afterward
+that all 371 adapter tensors are accounted for across the two passes (160
+expert-LoRA + 80 attention-LoRA + 131 replaced-verbatim = 371).
+
+Regenerated end-to-end with dumps at the same recipe as gemma4_ce_d12
+(GSM8K=200/IFEval=200/HumanEval=full/MMLU-dual, free/R8/R16, `--gpu-mem 0.94`).
+12/12 dumps, all item counts verified (200 GSM8K, 200 IFEval, 164 HumanEval,
+228 MMLU per arm — GSM8K's dump has 400 raw entries because lm_eval scores it
+under two filters, strict-match and flexible-extract, both logged per item;
+the CSV's own `sample_len` column correctly reports 200). No cell hit the 5%
+truncation threshold — no resume needed. Committed `d6d8559`. The freed
+`/dev/shm` checkpoint (67GB) was deleted after commit, same convention as
+gemma4_ce_d12; reproducible from `qwen_ce_d12r2_adapter.pt` + the fixed script
+in well under an hour if needed again. Task #78 done — this was the last
+open item from tonight's queue.
