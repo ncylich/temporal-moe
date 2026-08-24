@@ -468,5 +468,31 @@ the CSV's own `sample_len` column correctly reports 200). No cell hit the 5%
 truncation threshold — no resume needed. Committed `d6d8559`. The freed
 `/dev/shm` checkpoint (67GB) was deleted after commit, same convention as
 gemma4_ce_d12; reproducible from `qwen_ce_d12r2_adapter.pt` + the fixed script
-in well under an hour if needed again. Task #78 done — this was the last
-open item from tonight's queue.
+in well under an hour if needed again. Task #78 done.
+
+**Task #79 (found after #78, not on the original list) — gptoss_20b_high
+IFEval was still 17-19% truncated and had never been touched.** With every
+queued task closed, swept the whole grid for any cell still ≥5% truncated
+that hadn't been addressed (the same check used all night: fraction of items
+within 8 tokens of the cell's own max). Found `gptoss_20b_high` free/R4
+IFEval sitting at 17.0%/19.0% at the original 8192-token cap — Phase 1's
+"closed the last truncation gap" claim earlier in this section was accurate
+for this model's **HumanEval** cells only; IFEval was a separate, still-open
+gap under the same model tag. Its dump predates the Task 0 dumps-default-on
+fix (no `raw` text, no `gen_ids`/`prompt_ids` — just `doc_id`/`gen_toks`/
+scores), so `resume_truncated.py` has nothing to continue from: there is no
+saved prefix, retokenizable or otherwise. This is exactly the case Noah's
+overnight directive named explicitly ("if we didn't properly save the raw
+outputs for these runs, it's okay to rerun some of them end-to-end"). Reran
+both arms at 16384 (double, matching Phase 1's precedent for this same
+model) via `instruct_genbench_vllm.py`, which now writes full dumps by
+default, so this run is resumable in the future if it ever needs to be.
+Truncation falls to 1.0% (free) / 0.5% (R4). Old `gptoss_20b_high` row kept
+untouched in `instruct_genbench_vllm.csv` for reference; new row is
+`gptoss_20b_high_cap16k`. Committed `85ad812`.
+
+After #79, no cell in the grid remains at ≥5% truncation without either a
+resolution already on record (qwen think-on MMLU's fair-budget
+re-measurement, gemma think-on HumanEval's documented blow-up analysis in
+`length_extension_RESULTS.md`) or a genuinely closed gap. This is the actual
+last open item from tonight's queue.
