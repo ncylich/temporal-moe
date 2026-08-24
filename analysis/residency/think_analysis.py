@@ -43,6 +43,24 @@ PAIRS = {
     "OLMoE-1B-7B": {"modes": {"off": "olmoe_instruct"},      # no thinking mode
                     "default": "off", "arms": ["R8"]},
 }
+# fair-budget (8192-cap) resumed cells from the truncation-fix sweep (TODO.md).
+# NOT merged into PAIRS: only used when --out targets a non-default file, so the
+# default think_ablation_summary.csv output is byte-for-byte unchanged.
+PAIRS_CAP8K = {
+    "gemma4-26B-IT": {"modes": {"off_8k": "gemma4_instruct_cap8k",
+                                "on_8k": "gemma4_think_on_cap8k"},
+                      "default": "off_8k", "arms": ["R8", "R16"]},
+    "Qwen3.5-35B": {"modes": {"on_8k": "qwen35_instruct_cap8k"},
+                    "default": "on_8k", "arms": ["R8", "R32"]},
+    "gpt-oss-20b": {"modes": {"medium_8k": "gptoss_20b_cap8k",
+                              "high_8k": "gptoss_20b_high_cap8k"},
+                    "default": "medium_8k", "arms": ["R4"]},
+    "gpt-oss-120b": {"modes": {"medium_8k": "gptoss_120b_cap8k",
+                               "high_8k": "gptoss_120b_high_cap8k"},
+                     "default": "medium_8k", "arms": ["R4", "R16"]},
+    "LFM2.5-A1B": {"modes": {"on_8k": "lfm25_instruct_cap8k"},
+                   "default": "on_8k", "arms": ["R4"]},
+}
 # per-record task->metric candidates, first pair where BOTH arms have a row wins.
 # MMLU: relaxed extraction (extractor v2, mmlu_gptoss.py) is the reported metric
 # wherever the relaxed harness has run (gemma_adapt_RESULTS.md convention: strict
@@ -75,6 +93,22 @@ def load_cells():
     cells = {}                                    # (record, arm, task, metric) -> value
     for r in csv.reader(open(f"{ABLATIONS}/instruct_genbench_vllm.csv")):
         if len(r) > 7 and not r[0].startswith(("#", "smoke", "model")):
+            try:
+                cells[(r[0], r[3], r[5], r[6])] = float(r[7])
+            except ValueError:
+                pass
+    return cells
+
+
+def load_cap8k_cells():
+    """Fair-budget (8192-cap) rows from screening_genbench.csv, record suffix
+    _cap8k only -- screening rows are NOT protocol-comparable in general, but
+    the _cap8k ones are a deliberate exception: same protocol, doubled budget,
+    written for exactly this comparison (TODO.md)."""
+    cells = {}
+    for r in csv.reader(open(f"{ABLATIONS}/screening_genbench.csv")):
+        if len(r) > 7 and not r[0].startswith(("#", "smoke", "model")) \
+                and r[0].endswith("_cap8k"):
             try:
                 cells[(r[0], r[3], r[5], r[6])] = float(r[7])
             except ValueError:
@@ -119,19 +153,44 @@ def load_lengths(record, arm, task):
 
 
 def main():
+    out_name = "think_ablation_summary.csv"
+    for a in sys.argv[1:]:
+        if a.startswith("--out="):
+            out_name = a.split("=", 1)[1]
     cells = load_cells()
-    sm = open(os.path.join(ABLATIONS, "think_ablation_summary.csv"), "w", newline="")
+    pairs = {m: dict(cfg) for m, cfg in PAIRS.items()}   # shallow copy, never mutate PAIRS
+    if out_name != "think_ablation_summary.csv":
+        cells = {**cells, **load_cap8k_cells()}
+        for m, cap_cfg in PAIRS_CAP8K.items():
+            pairs[m]["modes"] = {**pairs[m]["modes"], **cap_cfg["modes"]}
+    sm = open(os.path.join(ABLATIONS, out_name), "w", newline="")
     w = csv.writer(sm)
     sm.write('"# Thinking ablation summary: damage (constrained-free; damage_se = '
              'UNPAIRED binomial SE of the difference, n per task) and lengths per '
              'model/mode/arm/task. Producer: analysis/residency/think_analysis.py"\n')
+    if out_name != "think_ablation_summary.csv":
+        sm.write('"# LOWER CONFIDENCE than think_ablation_summary.csv (which this file '
+                 'does NOT overwrite, by request). Regenerated 2026-08-24 by an agent '
+                 'session that was not the original process/model that produced the '
+                 'committed think_ablation_summary.csv, using the SAME unmodified '
+                 'aggregation logic (task_map/PAIRS/candidate-task selection below) but '
+                 'over a data mix that session did not independently author end to end: '
+                 'the original grid rows, plus this session\\\'s Task-3 regeneration, plus '
+                 'the fair-budget (8192-cap) resumed cells from the truncation-fix sweep '
+                 '(see TODO.md). The new _cap8k rows specifically are single-run, use a '
+                 'resume+retokenize+rescore pipeline that had one bug already found and '
+                 'fixed mid-sweep (stale per-item pass -- see TODO.md section 1.8), and '
+                 'have not had an independent review pass beyond the checks in TODO.md '
+                 'section 4. Treat rows sourced from _cap8k records as provisional; cross-'
+                 'check against genbench_samples/*_cap8k_*.json and screening_genbench.csv '
+                 'before citing."\n')
     w.writerow(["model", "mode", "arm", "task", "free", "constrained", "damage",
                 "damage_se",
                 "gen_free", "gen_con", "think_free", "think_con"])
 
     print("=== 1. damage x thinking mode (points, constrained - free) ===")
     dam = {}
-    for model, cfg in PAIRS.items():
+    for model, cfg in pairs.items():
         for mode, rec in cfg["modes"].items():
             tm = task_map(rec)
             for tname, cands in tm.items():
@@ -165,12 +224,12 @@ def main():
     sm.close()
 
     # figure 1: damage by mode
-    models = [m for m in PAIRS if any(k[0] == m for k in dam)]
+    models = [m for m in pairs if any(k[0] == m for k in dam)]
     if models:
         fig, axes = plt.subplots(1, len(models), figsize=(4 * len(models), 4.4),
                                  squeeze=False)
         for ax, model in zip(axes[0], models):
-            cfg = PAIRS[model]
+            cfg = pairs[model]
             modes = [md for md in cfg["modes"] if any(
                 k[:2] == (model, md) for k in dam)]
             tnames = sorted({k[3] for k in dam if k[0] == model})
@@ -189,7 +248,7 @@ def main():
             ax.set_xticks(range(len(tnames)))
             ax.set_xticklabels(tnames, rotation=30, fontsize=8)
             ax.axhline(0, color="black", lw=0.8)
-            ax.set_title(f"{model} (R={PAIRS[model]['arms'][0].lstrip('R')})",
+            ax.set_title(f"{model} (R={pairs[model]['arms'][0].lstrip('R')})",
                          fontsize=9)
             ax.legend(fontsize=7)
             ax.grid(alpha=0.25, axis="y")
@@ -197,13 +256,15 @@ def main():
         fig.suptitle("Damage with and without thinking (constrained − free, "
                      "same items and protocol per mode)", fontsize=10)
         fig.tight_layout()
-        fig.savefig(f"{FIG}/think_damage.png", dpi=150)
-        print(f"wrote {FIG}/think_damage.png")
+        fig_suffix = "" if out_name == "think_ablation_summary.csv" else "_" + out_name.rsplit(".", 1)[0]
+        fig1_path = f"{FIG}/think_damage{fig_suffix}.png"
+        fig.savefig(fig1_path, dpi=150)
+        print(f"wrote {fig1_path}")
 
     # figure 2 + table: think-length shift free -> constrained
     print("=== 2. think length: free vs constrained (mean tokens) ===")
     pts = []
-    for model, cfg in PAIRS.items():
+    for model, cfg in pairs.items():
         for mode, rec in cfg["modes"].items():
             tm = task_map(rec)
             for tname, cands in tm.items():
@@ -266,7 +327,8 @@ def main():
         ax.legend(handles=handles, fontsize=9 if PAPER else 8, loc="upper left")
         ax.grid(alpha=0.25, which="both")
         fig.tight_layout()
-        out = f"{FIG}/think_length_shift{'_nocaption' if PAPER else ''}.png"
+        fig_suffix = "" if out_name == "think_ablation_summary.csv" else "_" + out_name.rsplit(".", 1)[0]
+        out = f"{FIG}/think_length_shift{fig_suffix}{'_nocaption' if PAPER else ''}.png"
         fig.savefig(out, dpi=170)
         print(f"wrote {out}")
 
