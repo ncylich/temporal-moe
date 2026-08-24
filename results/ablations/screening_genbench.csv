@@ -701,3 +701,9 @@ lfm25_instruct_cap8k,128,8,R4,4,humaneval_think,"pass@1,channel-aware",0.676829,
 lfm25_instruct_cap8k,128,8,free,,humaneval_think,"pass@1,channel-aware",0.829268,full,8192,78
 qwen35_instruct_cap8k,128,8,R8,8,humaneval_think,"pass@1,channel-aware",0.890244,full,8192,448
 qwen35_instruct_cap8k,128,8,R32,32,humaneval_think,"pass@1,channel-aware",0.951220,full,8192,563
+gptoss_120b_high_cap8k,128,8,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.963415,full,8192,598
+gptoss_120b_high_cap8k,128,8,free,,humaneval_gptoss,"pass@1,channel-aware",0.969512,full,8192,184
+gptoss_120b_high_cap8k,128,8,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.963415,full,8192,459
+gptoss_120b_cap8k,128,8,R16,16,humaneval_gptoss,"pass@1,channel-aware",0.957317,full,8192,152
+gptoss_120b_cap8k,128,8,R4,4,humaneval_gptoss,"pass@1,channel-aware",0.975610,full,8192,203
+gptoss_120b_cap8k,128,8,free,,humaneval_gptoss,"pass@1,channel-aware",0.945122,full,8192,63

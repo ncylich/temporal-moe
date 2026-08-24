@@ -73,10 +73,14 @@ def _rebuild_prompts(A, tk):
     return out
 
 
-def _score(A, merged, arm, R, secs):
-    """Score the merged dump with the originating harness's extractor, so a resumed
-    cell is directly comparable to the cell it extends."""
-    import csv
+def score_items(items, score_kind, new_cap):
+    """Score items in place with the originating harness's extractor and return
+    pass@1. Sets per-item `pass` and `unfinished`.
+
+    MUST run before the dump is written: for a while it ran after, so every
+    resumed dump carried the STALE pass value inherited from its truncated
+    original while the CSV row carried the correct one -- silently wrong per-item
+    data feeding every flip/wrongness analysis."""
     import json as _j
     import re
     import subprocess
@@ -89,24 +93,24 @@ def _score(A, merged, arm, R, secs):
     def extract(raw, unfinished):
         if unfinished:
             return ""                     # still unfinished at the NEW cap
-        if A.score == "humaneval_gemma":
+        if score_kind == "humaneval_gemma":
             t = CHANNEL.sub("", raw)
             b = FENCE.findall(t)
             return b[-1] if b else t
-        if A.score == "humaneval_gptoss":
+        if score_kind == "humaneval_gptoss":
             MK = "<|channel|>final<|message|>"
             t = raw.rsplit(MK, 1)[1] if MK in raw else ("" if "<|channel|>" in raw else raw)
         else:
             t = raw.split("</think>", 1)[1] if "</think>" in raw else raw
         return (FENCE.findall(t) or [t])[-1]
 
-    mk = {"humaneval_gemma": "<channel|>"}.get(A.score, "</think>")
-    if A.score == "humaneval_gptoss":
+    mk = {"humaneval_gemma": "<channel|>"}.get(score_kind, "</think>")
+    if score_kind == "humaneval_gptoss":
         mk = "<|channel|>final<|message|>"
     preds, tests = [], []
     unfin = []
-    for it in merged:
-        u = it["gen_toks"] >= A.new_cap - 8 and mk not in it["raw"]
+    for it in items:
+        u = it["gen_toks"] >= new_cap - 8 and mk not in it["raw"]
         unfin.append(u)
         preds.append([extract(it["raw"], u)])
         p = probs[it["doc"]]
@@ -120,16 +124,10 @@ def _score(A, merged, arm, R, secs):
     p1 = float(line[0].split()[1])
     il = [l for l in out.stdout.splitlines() if l.startswith("ITEMS")]
     bits = il[0].split()[1] if il else ""
-    for i, it in enumerate(merged):
+    for i, it in enumerate(items):
         it["pass"] = (bits[i] == "1") if i < len(bits) else None
         it["unfinished"] = unfin[i]
-    print(f"[resume] {A.record_as} {arm} pass@1 = {p1:.4f} "
-          f"({len(merged)} items, {sum(unfin)} still unfinished)", flush=True)
-    with open(os.path.join(ABLATIONS, A.csv_name), "a", newline="") as fh:
-        csv.writer(fh).writerow(
-            [A.record_as, 128, 8, arm, R or "", A.score.replace("humaneval_gemma",
-             "humaneval_gemma_fixed"), "pass@1,channel-aware", f"{p1:.6f}",
-             "full", A.new_cap, f"{secs:.0f}"])
+    return p1, sum(unfin)
 
 
 def main():
@@ -317,10 +315,20 @@ def _one(A, dump, llm, tk, rebuilt):
     # task name = the dump stem after "<record>_<arm>_", so the merged dump lands
     # under the same task the original cell used
     task = dump.split(f"_{arm}_", 1)[1] if f"_{arm}_" in dump else "resumed"
+    if A.score:                     # score BEFORE writing: the dump must carry the
+        import csv                  # re-scored per-item pass, not the stale one
+        p1, n_unf = score_items(merged, A.score, A.new_cap)
+        print(f"[resume] {A.record_as} {arm} pass@1 = {p1:.4f} "
+              f"({len(merged)} items, {n_unf} still unfinished)", flush=True)
+        if not A.dry_run:
+            with open(os.path.join(ABLATIONS, A.csv_name), "a", newline="") as fh:
+                csv.writer(fh).writerow(
+                    [A.record_as, 128, 8, arm, R or "",
+                     A.score.replace("humaneval_gemma", "humaneval_gemma_fixed"),
+                     "pass@1,channel-aware", f"{p1:.6f}", "full", A.new_cap,
+                     f"{secs:.0f}"])
     genprotocol.write_dump(A.record_as + ("_dryrun" if A.dry_run else ""),
                            arm, task, merged, len(items))
-    if A.score:
-        _score(A, merged, arm, R, secs)
     print(f"[resume] prefixes: {src_count['engine_ids']} exact (engine ids), "
           f"{src_count['retokenized']} best-effort (re-tokenized text)", flush=True)
     print(f"[resume] continued {len(trunc)} items in {secs:.0f}s; "
