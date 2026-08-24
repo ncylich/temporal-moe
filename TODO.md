@@ -399,3 +399,30 @@ rerunning (no real generation time was wasted, the failure was at engine boot).
 
 Two architectures now confirmed clean. A third (gpt-oss, the MXFP4-quantized
 family) is queued next before deciding whether to flip either default.
+
+**Third architecture (gpt-oss-20b, MXFP4) — also bit-exact, and the decision:**
+Same protocol, R4 GSM8K=100, think off:
+
+| arm | wall time | exact_match (flexible) | text vs baseline |
+|---|---|---|---|
+| baseline (dict walker + eager step) | 98s | 0.8800 | — |
+| **fast (slots walker + graph step)** | **82s** | **0.8800** | **100/100 bit-identical** |
+| baseline again (run-to-run floor) | 104s | 0.8800 | 100/100 bit-identical |
+
+Three architecturally distinct models (OLMoE 64e/16L, qwen3.5-35B 256e/40L,
+gpt-oss-20b MXFP4-quantized) all bit-exact, all a real wall-clock win
+(-13% to -18%, gpt-oss ≈ -16-21% depending on which baseline run is the
+comparator). No case found where the fast path diverges even by one token.
+
+**Decision: flipped the project-wide defaults.** `TEMPORAL_DECODE` now
+defaults to `graph` (was `eager`) and `TEMPORAL_WALKER` now defaults to
+`slots` (was `dict`), in `temporal/temporal_router.py` and
+`analysis/residency/vllm_residency.py` respectively. `TEMPORAL_DECODE=eager`
+/ `TEMPORAL_WALKER=dict` still work as explicit opt-outs — every grid row
+produced before 2026-08-24 was generated on that eager/dict path, so use the
+env vars if a future comparison needs the old path specifically. Full
+regression suite (`test_decode_accel.py`, `test_walker_slots.py`,
+`test_decode_state.py`, `test_vllm_walker.py` under all 4
+TEMPORAL_WALKER×TEMPORAL_DECODE combos, `temporal/tests/test_resume_residency.py`)
+re-run clean after the flip. Committed `3bb4a85` (code + the qwen/gpt-oss/OLMoE
+validation dumps and CSV rows above as evidence). Task #72 done.
