@@ -163,10 +163,10 @@ curve_panel(axes[0][0], P16, "$10^{16}$ FLOPs · 16k vocab", ticks=TICKS["1e16"]
 curve_panel(axes[0][1], P17, "$10^{17}$ FLOPs · 16k vocab", ticks=TICKS["1e17"], xlabel=False, ylabel=False)
 curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"])
 bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab", ylabel=False)
-fig.legend([Line2D([0], [0], color=c, lw=2.4) for _, c, _ in STYLE], LEG,
-           ncol=5, loc="upper center", fontsize=8.5, frameon=False,
-           bbox_to_anchor=(0.5, 1.005), columnspacing=1.4, handlelength=1.6)
-fig.tight_layout(rect=[0, 0, 1, 0.94])
+fig.legend([Line2D([0], [0], color=c, lw=2.6) for _, c, _ in STYLE], LEG,
+           ncol=5, loc="upper center", fontsize=10.5, frameon=False,
+           bbox_to_anchor=(0.5, 1.008), columnspacing=1.5, handlelength=1.7)
+fig.tight_layout(rect=[0, 0, 1, 0.925])
 fig.subplots_adjust(wspace=0.16, hspace=0.42)
 out = f"{OUTD}/isoflop_panels_2x2_nocaption.png"
 fig.savefig(out, dpi=200); print("wrote", out); plt.close(fig)
