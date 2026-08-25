@@ -237,9 +237,47 @@ def oasst2(scan_cap):
             yield "oasst2", r["message_id"], t
 
 
+def selfgen_lane(path, lane, screen, fits, cap):
+    """Rows from a self-generated lane file, screened and length-gated like any other.
+
+    These lanes exist because the first rebuild sourced math and code from real corpora and
+    both regressed -- GSM8K -5.5 against a published +0.0 on gemma and -10.0 against -3.5 on
+    qwen, gemma HumanEval -4.9 against -1.2 -- while the two lanes that were already
+    real-corpus in the original (chat -> IFEval, general -> MMLU) reproduced or beat
+    published. The original generated its own math and code; this restores that.
+    """
+    import json as _json
+    out, seen = [], set()
+    for line in open(path):
+        r = _json.loads(line)
+        t = " ".join((r.get("text") or "").split())
+        if not t or t.lower() in seen:
+            continue
+        if grams(t) & screen or not fits(t):
+            continue
+        seen.add(t.lower())
+        src = r.get("source", "selfgen")
+        out.append({"lane": lane, "source": src, "source_id": f"{src}:{r['idx']}",
+                    "text": t, "is_code": lane == "domain8k"})
+        if len(out) >= cap:
+            break
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="/workspace/olmoe-adapt/data")
+    ap.add_argument("--selfgen-math", default=None,
+                    help="jsonl replacing mathlane_v2 wholesale. NOTE: do NOT feed this "
+                         "model-authored word problems shaped like the target benchmark. "
+                         "An earlier attempt templated grade-school arithmetic prompts "
+                         "BECAUSE GSM8K was the failing cell; that passes the 8-gram screen "
+                         "while overfitting to the evaluation by construction, which is the "
+                         "same defect as the Orca-Math lane the lineage rule exists to "
+                         "forbid. Use real, non-benchmark math questions.")
+    ap.add_argument("--selfgen-code", default=None,
+                    help="jsonl of model-authored coding tasks; replaces the real-corpus "
+                         "code sub-quota inside domain8k")
     ap.add_argument("--scan-cap", type=int, default=1_000_000,
                     help="max rows to stream per streaming source")
     ap.add_argument("--max-prompt-tok", type=int, default=1024,
@@ -315,6 +353,15 @@ def main():
         if lane == "domain":
             return len(kept["domain8k"]) < LANES["domain8k"] - CODE_ROWS
         return len(kept[lane]) < LANES[lane]
+
+    # --- self-generated lanes first: they REPLACE their real-corpus counterparts -----
+    if A.selfgen_math:
+        kept["mathlane_v2"] = selfgen_lane(A.selfgen_math, "mathlane_v2", screen, fits,
+                                           LANES["mathlane_v2"])
+        print(f"[d7] selfgen math lane: {len(kept['mathlane_v2'])} rows", flush=True)
+    if A.selfgen_code:
+        code_kept.extend(selfgen_lane(A.selfgen_code, "domain8k", screen, fits, CODE_ROWS))
+        print(f"[d7] selfgen code lane: {len(code_kept)} rows", flush=True)
 
     # --- lanes 1-3, from the chat corpora, in a fixed source order -------------------
     for src, sid, text in wildchat(A.scan_cap):

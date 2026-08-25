@@ -322,3 +322,55 @@ def coherence_bce_loss(logits, resident_mask):
     Returns a scalar (mean BCE over all experts).
     """
     return F.binary_cross_entropy_with_logits(logits, resident_mask.to(logits.dtype).detach())
+
+def cosmoes_block_loss(logits: torch.Tensor, block: int) -> torch.Tensor:
+    """CoSMoEs block-selection penalty (Huber et al., arXiv:2503.00245), reimplemented.
+
+    BASELINE_METHODS_COMPARISON.md baseline #1. Appendix E currently argues against CoSMoEs
+    by quoting their reported table rather than running their method, which that document
+    calls the most attackable move in the paper. This makes it runnable on our own isoFLOP
+    sweep, so the comparison is a measurement instead of a citation.
+
+    The method: cut the sequence into fixed-length blocks and penalise how many DISTINCT
+    experts get used inside a block. Nothing is forbidden -- switching is merely made
+    expensive -- so the model learns to stay with a smaller set within each block. Their own
+    paper reports the trade directly: fewer expert changes, and a measurable quality drop.
+
+    Implementation. "Number of distinct experts in a block" is a counting statistic and not
+    differentiable, so use the used-at-least-once surrogate: treating each token's routing
+    probability as an independent chance of touching expert e, the chance the block touches
+    it at all is 1 - prod_t (1 - p_te), and summing that over experts gives a smooth
+    estimate of the distinct-expert count.
+
+    The obvious cheaper surrogate, max_t p_te, was tried first and rejected: it only tracks
+    distinctness when routing is PEAKED. Under flat routing every expert's max is 1/E, so
+    the sum is identically 1 no matter how many experts the block really touches -- the
+    penalty goes silent in exactly the regime it is meant to punish. The product form gives
+    ~3.3 on that case against a true expectation of E(1-(1-1/E)^block) = 3.3, and still
+    gives ~1 for a block that uses one expert and ~block for one that rotates every token.
+    Computed in log space, since the product underflows for long blocks.
+
+    Contrast with bursty_window_loss, its nearest sibling here: that penalises the ENTROPY
+    of a window's mean demand, which concentrates demand while leaving the support free to
+    rotate; this penalises the SUPPORT SIZE itself. The distinction is the point of the
+    comparison -- CoSMoEs shrinks how many experts a block touches without ever bounding
+    the resident set, so it still has to provision memory for the experts it might miss,
+    which is why it cannot serve at R = k by construction and we can.
+
+    Args:
+        logits: [seq, batch, num_experts] raw router logits, seq-first as Megatron routes.
+        block: block length in tokens. Tail tokens beyond the last full block are dropped,
+            matching bursty_window_loss's convention.
+    Returns:
+        Scalar, mean over blocks and batch of the soft distinct-expert count. Differentiable.
+    """
+    S, B, E = logits.shape
+    n = S // block
+    if n == 0:
+        return logits.sum() * 0.0                       # no full block: inert, keeps graph
+    p = F.softmax(logits[: n * block].float(), dim=-1)  # [n*block, B, E]
+    p = p.view(n, block, B, E)
+    # 1 - prod_t (1 - p), in log space: prod = exp(sum log1p(-p))
+    log_unused = torch.log1p(-p.clamp(max=1 - 1e-6)).sum(dim=1)   # [n, B, E]
+    soft_used = -torch.expm1(log_unused)                          # 1 - exp(log_unused)
+    return soft_used.sum(dim=-1).mean()                 # soft |distinct experts| per block
