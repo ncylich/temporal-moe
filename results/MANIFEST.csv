@@ -1,4 +1,6 @@
 local_path,hf_repo,hf_path,bytes,sha256,run_name,cited
+/workspace/instruct-traj/gemma4_d7.pt,ncylich/temporal-moe-extras,adaptation/instruct-traj/gemma4_d7.pt,36317381,610e52fc2cc54fdc3eb0bd69b5be12f767fd4d06046b860e89c5ba5e18a3f380,,
+/workspace/instruct-traj/qwen35_d7.pt,ncylich/temporal-moe-extras,adaptation/instruct-traj/qwen35_d7.pt,50848965,5bacdcd059d19ea1bc7954ab2ff75e414e19a48f07f1cfc8dff946975d6763bc,,
 /workspace/olmoe-adapt/data/d7_prompts.jsonl,ncylich/temporal-moe-extras,adaptation/data/d7_prompts.jsonl,7053261,e6e334de9b40bf9ea786a537db76d2e20ac5ae087e067d70e899c43f911ce06d,,
 /workspace/olmoe-adapt/data/d7_prompts.meta.json,ncylich/temporal-moe-extras,adaptation/data/d7_prompts.meta.json,1353,dfbac8621ece576e81e3f3aa499bd0335a0797271e06cdd87342a75306a7d7f3,,
 _hf_upload_stage/README_corpus.md,ncylich/temporal-moe-corpus,README.md,6378,27497936b5fcfbc3680ea7288128dcfafc82129b7587128c0d22547901658888,,

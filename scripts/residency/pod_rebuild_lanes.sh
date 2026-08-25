@@ -100,8 +100,58 @@ a4)
 # one piece the 0.27.1 port touched, and a silent no-op there produced arm-identical
 # generations once before. See RERUN_ORCHESTRATION.md.
 a2)
-  echo "A2 is not wired up yet -- stage the WritingBench harness and gate LFM first." >&2
-  exit 2
+  export CUDA_VISIBLE_DEVICES=3
+  WB=/workspace/writingbench
+  WBSRC=$ROOT/analysis/writingbench
+  cd $WB
+  # Three disjoint 50-query subsets (A=0-49, B=50-99, C=100-149), matching the M3
+  # matrix protocol the existing 4096 cells were measured under, so the 8192 cells are
+  # comparable to them cell-for-cell and carry the same across-subset SD.
+  off_for () { case "$1" in "_sB") echo 50;; "_sC") echo 100;; *) echo 0;; esac; }
+  gen () {  # path record arm suffix extra...
+    local path=$1 rec=$2 arm=$3 suf=$4; shift 4
+    local out=responses/${rec}_${arm}${suf}.jsonl
+    [ -s "$out" ] && { echo "skip $out"; return; }
+    echo "### A2: gen $rec $arm ${suf:-_sA} $(date -u +%H:%M)"
+    $PY $WBSRC/wb_generate.py --model-path $path --record $rec --arm $arm \
+        --suffix "$suf" --offset $(off_for "$suf") --n 50 \
+        --max-new 8192 --gpu-mem 0.95 "$@" > $LOG/a2_${rec}_${arm}${suf}.log 2>&1
+    grep -q DONE $LOG/a2_${rec}_${arm}${suf}.log
+  }
+  # Engagement check: a constrained arm that reproduces the free arm verbatim means the
+  # residency patch did not engage. This is not paranoia -- vllm_glue's LFM factory wrap
+  # silently no-opped once before and produced exactly this signature.
+  engage () {
+    /workspace/venv_fla/bin/python - "$1" "$2" "$3" <<'PYEOF'
+import json, sys
+rec, arm, suf = sys.argv[1], sys.argv[2], sys.argv[3]
+def load(p): return {json.loads(l)["index"]: json.loads(l)["response"] for l in open(p)}
+f = load(f"responses/{rec}_free{suf}.jsonl"); r = load(f"responses/{rec}_{arm}{suf}.jsonl")
+same = sum(f[i] == r[i] for i in f)
+print(f"[engage] {rec} {arm}{suf}: {same}/{len(f)} identical")
+assert same < len(f) // 2, f"ENGAGEMENT FAIL {rec} {arm}{suf}"
+PYEOF
+  }
+  block () {  # path record arms...
+    local path=$1 rec=$2; shift 2
+    for suf in "" "_sB" "_sC"; do
+      gen $path $rec free "$suf" "${EXTRA[@]}"
+      for arm in "$@"; do
+        gen $path $rec $arm "$suf" "${EXTRA[@]}"
+        engage $rec $arm "$suf"
+      done
+    done
+  }
+  EXTRA=(--think default)
+  block /dev/shm/gpt-oss-120b oss120_cap8k R4 R16
+  block /dev/shm/gpt-oss-20b  oss20_cap8k  R4
+  EXTRA=(--think off)
+  block /dev/shm/lfm25-8b-a1b lfm25_cap8k  R4
+  echo "### A2: scoring with the critic $(date -u +%H:%M)"
+  $PY $WBSRC/wb_score.py --responses responses/*_cap8k_*.jsonl \
+      > $LOG/a2_score.log 2>&1
+  grep "wb-score" $LOG/a2_score.log | tail -20
+  echo "### A2 DONE $(date -u +%H:%M)"
   ;;
 
 *)
