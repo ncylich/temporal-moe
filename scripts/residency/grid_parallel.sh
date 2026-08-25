@@ -1,6 +1,11 @@
 #!/bin/bash
 # Run one model's 12-cell grid as parallel per-TASK jobs, one GPU each.
 #
+# NOTE: this covers GSM8K, IFEval and MMLU only. The full surface is FIVE benchmarks --
+# HumanEval needs its own channel-aware producer (humaneval_gemma.py / humaneval_think.py)
+# and WritingBench needs wb_arm.sh with the local critic. Run those alongside, or an arm
+# ends up reported on 3 of 5 cells.
+#
 # Safe because the batch-fair protocol constrains ARMS, not tasks: every arm of a cell must
 # share one engine boot, which each job here preserves by running free,R8,R16 together.
 # Tasks were only ever sequential because the driver loops over them in one process.
