@@ -14,7 +14,7 @@ into memory at all -- it only ever holds one shard's tensors, patched or
 copied verbatim -- so the vision tower survives because it was never dropped
 in the first place.
 
-Env: ADAPTER_PATH, DST_PATH. SRC is the qwen35 instruct base on /workspace."""
+Env: ADAPTER_PATH, DST_PATH, optional SRC_PATH (qwen35 instruct base)."""
 import json
 import os
 import shutil
@@ -22,7 +22,9 @@ import shutil
 import torch
 from safetensors.torch import safe_open, save_file
 
-SRC = "/workspace/instruct-models/qwen35-35b-a3b-instruct"
+# SRC_PATH override: the base checkpoint is staged wherever the pod put it, and on the
+# rebuilt pod that is /dev/shm rather than /workspace/instruct-models. Default unchanged.
+SRC = os.environ.get("SRC_PATH", "/workspace/instruct-models/qwen35-35b-a3b-instruct")
 DST = os.environ["DST_PATH"]
 os.makedirs(DST, exist_ok=True)
 

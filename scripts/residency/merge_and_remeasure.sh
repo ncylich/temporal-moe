@@ -1,0 +1,82 @@
+#!/bin/bash
+# RECOVER_DATA_PLAN section 1.5 -- merge each retrained adapter and regenerate its grid.
+#
+#     merge_and_remeasure.sh gemma    # GPU 1
+#     merge_and_remeasure.sh qwen     # GPU 2
+#
+# TWO producers per model, which is why every record in this program has a _dual sibling:
+#   instruct_genbench_vllm.py  -> GSM8K 200, IFEval 200, HumanEval full, under <record>
+#   mmlu_gptoss.py             -> MMLU, under <record>_dual
+# MMLU must come from mmlu_gptoss.py. It is NOT an lm_eval task: the reported metric is
+# acc,relaxed-extract, which only that producer emits, while instruct_genbench_vllm.py's
+# mmlu_flan_cot_fewshot records the STRICT filter alone. Wiring the strict number in as if
+# it were the reported one is exactly the metric-provenance bug that hit the Group A gemma
+# MMLU re-run (strict said damage widened -9.2 to -12.3; relaxed says it shrank -4.4 to
+# -1.3) and, separately, OLMoE's headline mean (-14.8 vs -11.8). Check the producer, not
+# just the CSV.
+set -euo pipefail
+
+ROOT=/workspace/temporal-moe
+export TMOE_ROOT=$ROOT
+export PATH=/workspace/venv_vllm312/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
+export HF_TOKEN=$(cat /root/.cache/huggingface/token)
+export HF_HUB_DISABLE_XET=1 HF_ALLOW_CODE_EVAL=1
+export VLLM_ENABLE_V1_MULTIPROCESSING=0
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+cd $ROOT
+
+VPY=/workspace/venv_vllm312/bin/python      # serving stack
+TPY=/workspace/venv_fla/bin/python          # training stack (merge)
+G=analysis/residency/instruct_genbench_vllm.py
+M=analysis/residency/mmlu_gptoss.py
+DATA=/workspace/olmoe-adapt/data
+LOG=${LOG_DIR:-/workspace/rerun-logs}
+mkdir -p $LOG
+
+case "${1:?usage: merge_and_remeasure.sh gemma|qwen}" in
+  gemma)
+    DEV=1; BASE=/dev/shm/gemma4-26b-it; MERGED=/dev/shm/gemma4-rebuild-merged
+    ADAPTER=$DATA/gemma_ce_rebuild_adapter.pt; REC=gemma4_ce_rebuild
+    MODEL_KEY=gemma4_instruct; ARMS=free,R8,R16; RANK=32 ;;
+  qwen)
+    DEV=2; BASE=/dev/shm/qwen35-35b-a3b; MERGED=/dev/shm/qwen35-rebuild-merged
+    ADAPTER=$DATA/qwen_ce_rebuild_adapter.pt; REC=qwen35_ce_rebuild
+    MODEL_KEY=qwen35_instruct; ARMS=free,R8,R16; RANK=16 ;;
+  *) echo "unknown: $1" >&2; exit 2 ;;
+esac
+export CUDA_VISIBLE_DEVICES=$DEV
+[ -s "$ADAPTER" ] || { echo "adapter missing: $ADAPTER" >&2; exit 2; }
+
+if [ ! -d "$MERGED" ]; then
+  echo "### $1 MERGE $(date -u +%H:%M)"
+  if [ "$1" = "qwen" ]; then
+    # NEVER --merge-out for qwen. The CE trainer only ever holds the text-only submodule,
+    # so save_pretrained writes a checkpoint that never contained visual.* and this vLLM
+    # has no working text-only serving path for the family (TODO section 6 / task #78).
+    # qwen_ce_patch streams the full multimodal base shard-by-shard and patches only the
+    # text side, so the vision tower survives by never being dropped.
+    ADAPTER_PATH=$ADAPTER DST_PATH=$MERGED SRC_PATH=$BASE \
+      $TPY analysis/residency/qwen_ce_patch.py 2>&1 | tee $LOG/merge_${1}.log
+  else
+    # --expert-lora-r MUST be passed at merge time or unsloth builds attention-only LoRA
+    # modules and silently misses elora_gu_A/B and elora_dp_A/B (commit ae505b7).
+    $TPY analysis/residency/train_gemma_ce.py --model $BASE --family gemma4 \
+        --expert-lora-r $RANK --out $ADAPTER --merge-out $MERGED \
+        2>&1 | tee $LOG/merge_${1}.log
+    # vLLM's engine boot fails on gemma4's multimodal processor class without this
+    # (commit d0f67aa); save_pretrained does not carry it across.
+    cp $BASE/processor_config.json $MERGED/ 2>/dev/null || true
+  fi
+fi
+echo "### $1 MERGE DONE $(date -u +%H:%M)"
+
+echo "### $1 REMEASURE gsm8k/ifeval/humaneval $(date -u +%H:%M)"
+$VPY -u $G --model $MODEL_KEY --path $MERGED --arms $ARMS --record-as $REC \
+    --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval=0" \
+    --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94 \
+    2>&1 | tee $LOG/remeasure_${1}_gen.log
+echo "### $1 REMEASURE MMLU (relaxed, the reported metric) $(date -u +%H:%M)"
+$VPY -u $M --model $MODEL_KEY --path $MERGED --arms $ARMS --record-as ${REC}_dual \
+    --gpu-mem 0.94 2>&1 | tee $LOG/remeasure_${1}_mmlu.log
+echo "### $1 ALL DONE $(date -u +%H:%M)"
