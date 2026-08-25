@@ -40,16 +40,27 @@ mkdir -p $OUT $LOG
 
 [ -s "$POOL" ] || { echo "pool missing: $POOL" >&2; exit 2; }
 
-case "${1:?usage: regen_trajectories.sh gemma|qwen}" in
-  gemma) DEV=1; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7;  EXTRA=() ;;
-  qwen)  DEV=2; MODEL=/dev/shm/qwen35-35b-a3b; TAG=qwen35_d7;  EXTRA=(--max-seqs 128) ;;
+# think-on lanes are the B2 prerequisite (RECOVER_DATA_PLAN Part 0 group B): Section 7's
+# length result rests on gemma alone because qwen's adapted checkpoints were only ever
+# evaluated think-off, where neither routing regime lengthens and the comparison is empty.
+# They need a bigger envelope than think-off -- gemma_adapt_RESULTS records 35.7% of
+# think-on responses exceeding 3072 with a median think response of 2346 -- which the
+# 8192 cap already covers. GPU is overridable; this box is shared.
+case "${1:?usage: regen_trajectories.sh gemma|qwen|qwen-think|gemma-think}" in
+  gemma) DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7;  EXTRA=() ;;
+  qwen)  DEV=${GPU:-2}; MODEL=/dev/shm/qwen35-35b-a3b; TAG=qwen35_d7;  EXTRA=(--max-seqs 128) ;;
+  qwen-think)  DEV=${GPU:-1}; MODEL=/dev/shm/qwen35-35b-a3b; TAG=qwen35_d7think
+               EXTRA=(--max-seqs 128 --think on) ;;
+  gemma-think) DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7think
+               EXTRA=(--think on) ;;
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac
 
 export CUDA_VISIBLE_DEVICES=$DEV
 echo "### traj $TAG on GPU $DEV, cap $MAXNEW $(date -u +%H:%M)"
+case "$1" in *-think) THINK=() ;; *) THINK=(--think off) ;; esac
 $PY -u $GEN --model $MODEL --tag $TAG --prompts $POOL \
-    --think off --max-new $MAXNEW --max-prompt-tok $PROMPT_TOK \
+    "${THINK[@]}" --max-new $MAXNEW --max-prompt-tok $PROMPT_TOK \
     --gpu-mem 0.94 --out $OUT "${EXTRA[@]}" 2>&1 | tee $LOG/traj_${TAG}.log
 echo "### traj $TAG DONE $(date -u +%H:%M)"
 

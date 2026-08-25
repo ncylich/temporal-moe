@@ -34,15 +34,18 @@ DATA=/workspace/olmoe-adapt/data
 LOG=${LOG_DIR:-/workspace/rerun-logs}
 mkdir -p $LOG
 
+# GPU overridable, same as the other lanes: this box is shared AND our own lanes move
+# around. A merge launched without honouring GPU= landed on top of the think-on trajectory
+# job and OOM'd against its 136 GiB.
 case "${1:?usage: merge_and_remeasure.sh gemma|qwen}" in
   gemma)
-    DEV=1; BASE=/dev/shm/gemma4-26b-it; MERGED=/dev/shm/gemma4-rebuild-merged
+    DEV=${GPU:-1}; BASE=/dev/shm/gemma4-26b-it; MERGED=/dev/shm/gemma4-rebuild-merged
     ADAPTER=$DATA/gemma_ce_rebuild_adapter.pt; REC=gemma4_ce_rebuild
-    MODEL_KEY=gemma4_instruct; ARMS=free,R8,R16; RANK=32 ;;
+    MODEL_KEY=gemma4_instruct; ARMS=free,R8,R16; RANK=32; TRAJ=gemma4_d7_seq4096 ;;
   qwen)
-    DEV=2; BASE=/dev/shm/qwen35-35b-a3b; MERGED=/dev/shm/qwen35-rebuild-merged
+    DEV=${GPU:-2}; BASE=/dev/shm/qwen35-35b-a3b; MERGED=/dev/shm/qwen35-rebuild-merged
     ADAPTER=$DATA/qwen_ce_rebuild_adapter.pt; REC=qwen35_ce_rebuild
-    MODEL_KEY=qwen35_instruct; ARMS=free,R8,R16; RANK=16 ;;
+    MODEL_KEY=qwen35_instruct; ARMS=free,R8,R16; RANK=16; TRAJ=qwen35_d7_seq4096 ;;
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac
 export CUDA_VISIBLE_DEVICES=$DEV
@@ -61,7 +64,19 @@ if [ ! -d "$MERGED" ]; then
   else
     # --expert-lora-r MUST be passed at merge time or unsloth builds attention-only LoRA
     # modules and silently misses elora_gu_A/B and elora_dp_A/B (commit ae505b7).
-    $TPY analysis/residency/train_gemma_ce.py --model $BASE --family gemma4 \
+    # --traj is required even for a merge: train_gemma_ce.py loads the trajectory file
+    # unconditionally at startup, before it reaches the merge branch, so omitting it falls
+    # back to the gemma4_train5k default and dies with FileNotFoundError. The published
+    # wb_matrix3.sh merge omitted it and only worked because that file existed on that pod.
+    # --no-unsloth at MERGE time too, matching how the adapter was TRAINED. peft on the
+    # HF stack targets gemma4's wrapped projections as q_proj.linear (transformers 5.x
+    # wraps them in Gemma4ClippableLinear), so the checkpoint's attention-LoRA keys are
+    # named for that module path. Loading under unsloth builds a differently-named module
+    # tree, and --merge-out has no every-tensor-consumed assertion the way qwen_ce_patch.py
+    # does -- a mismatch would drop the attention LoRA silently and yield a checkpoint that
+    # looks fine and is wrong. Stacks must match across train and merge.
+    $TPY analysis/residency/train_gemma_ce.py --model $BASE --family gemma4 --no-unsloth \
+        --traj $TRAJ --max-seq 4096 \
         --expert-lora-r $RANK --out $ADAPTER --merge-out $MERGED \
         2>&1 | tee $LOG/merge_${1}.log
     # vLLM's engine boot fails on gemma4's multimodal processor class without this

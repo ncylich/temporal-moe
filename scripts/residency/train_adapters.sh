@@ -56,13 +56,16 @@ DATA=/workspace/olmoe-adapt/data
 LOG=${LOG_DIR:-/workspace/rerun-logs}
 mkdir -p $DATA $LOG
 
+# GPU is overridable: this box is SHARED. A third-party job (run_acts.py) claimed GPU 0
+# and GPU 1 mid-run on 2026-08-25 and OOM'd gemma inside loss.backward() by taking 61 GiB
+# out from under it. Pin a lane to a device that is actually free rather than assuming.
 case "${1:?usage: train_adapters.sh gemma|qwen}" in
   gemma)
-    DEV=1; MODEL=/dev/shm/gemma4-26b-it; TRAJ=gemma4_d7_seq4096
+    DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it; TRAJ=gemma4_d7_seq4096
     FAM=(--family gemma4 --no-unsloth); RANK=32; KLW=0.05; MB=16; OPT=(--opt adamw)
     OUT=$DATA/gemma_ce_rebuild_adapter.pt ;;
   qwen)
-    DEV=2; MODEL=/dev/shm/qwen35-35b-a3b; TRAJ=qwen35_d7_seq4096
+    DEV=${GPU:-2}; MODEL=/dev/shm/qwen35-35b-a3b; TRAJ=qwen35_d7_seq4096
     FAM=(--family qwen35 --no-unsloth); RANK=16; KLW=0.1; MB=16; OPT=(--opt adamw)
     OUT=$DATA/qwen_ce_rebuild_adapter.pt ;;
   *) echo "unknown: $1" >&2; exit 2 ;;

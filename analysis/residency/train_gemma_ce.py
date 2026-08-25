@@ -229,22 +229,26 @@ def main():
         # <1GB headroom (mha_graph.execute failure at 81.1/81.6GB); flash/
         # mem-efficient SDPA backends are leaner
         torch.backends.cuda.enable_cudnn_sdp(False)
-        # transformers 5.x wraps gemma4's attention projections in
-        # Gemma4ClippableLinear, a plain Module holding the real nn.Linear at .linear
-        # rather than subclassing it, and peft attaches only to nn.Linear -- so naming
-        # q_proj here hits the wrapper and dies with "Target module
-        # Gemma4ClippableLinear(...) is not supported". Address the inner Linear when
-        # the wrapper is present. Same weights either way: LoRA sits on the projection
-        # and the wrapper's clipping still applies on top, as it does for the base path.
-        _proj = ["q_proj", "k_proj", "v_proj", "o_proj"]
-        _wrapped = any(type(m).__name__ == "Gemma4ClippableLinear"
-                       for m in model.modules())
-        if _wrapped:
-            _proj = [f"{n}.linear" for n in _proj]
-            print(f"[gce] gemma4 clippable-linear wrapper detected; "
-                  f"LoRA targets {_proj}", flush=True)
+        # Target the LANGUAGE model's attention projections by regex, and never the
+        # vision tower. gemma4 wraps ONLY the vision tower's projections in
+        # Gemma4ClippableLinear (vision hidden 1152); the language model's q/k/v/o are
+        # plain nn.Linear. A bare ["q_proj", ...] therefore hits the wrapper and raises,
+        # while retargeting to "q_proj.linear" silently does the opposite: it matches the
+        # vision tower ONLY, so a text-only run puts LoRA where no gradient ever flows and
+        # every lora_B stays at its zero init. That is invisible -- training completes,
+        # the adapter has 108 attention tensors, and all of them are exactly zero, so the
+        # merged model carries expert-LoRA and no attention LoRA at all. Anchor on
+        # language_model instead, and assert the attachment rather than trusting it.
+        _tm = r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj)$"
         model = get_peft_model(model, LoraConfig(
-            r=32, lora_alpha=64, lora_dropout=0.0, target_modules=_proj))
+            r=32, lora_alpha=64, lora_dropout=0.0, target_modules=_tm))
+        _lm_lora = [n for n, q in model.named_parameters()
+                    if q.requires_grad and "lora_" in n and "language_model" in n]
+        assert _lm_lora, ("attention LoRA attached to NO language_model module -- "
+                          f"target_modules={_tm!r} matched nothing trainable")
+        assert not any("vision_tower" in n for n in _lm_lora), \
+            "attention LoRA leaked onto the vision tower"
+        print(f"[gce] attention LoRA on {len(_lm_lora)} language_model tensors", flush=True)
 
     if A.family == "qwen35":
         GL.patch_qwen35()
