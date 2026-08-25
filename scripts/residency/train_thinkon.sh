@@ -33,7 +33,7 @@ case "${1:?usage: train_thinkon.sh gemma|qwen}" in
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac
 KL=/workspace/instruct-traj/${TRAJ}_klref.pt
-export CUDA_VISIBLE_DEVICES=${GPU:-0}
+export CUDA_VISIBLE_DEVICES=${GPU:-1}
 COMMON=(--model $MODEL --traj $TRAJ --max-seq 8192 --expert-lora-r $RANK --out $OUT
         "${FAM[@]}" --opt adamw --micro-batch ${MB:-4})
 

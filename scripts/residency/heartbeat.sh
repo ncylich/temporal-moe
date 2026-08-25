@@ -1,56 +1,39 @@
 #!/bin/bash
-# One status block for the overnight run. Deliberately dumb: no functions inside command
-# substitution, no pipes that can SIGPIPE, every lookup guarded. An inline version of this
-# died with exit 144 and no error text, which is exactly the failure mode heartbeats are
-# supposed to CATCH rather than exhibit.
+# One status block. Deliberately dumb: no functions inside command substitution, no pipes
+# that can SIGPIPE, every lookup guarded -- an inline version died with exit 144 and no
+# error text, which is the failure heartbeats exist to CATCH rather than exhibit.
 #
-# Process-independent by design: it reports every lane whether or not anything is running,
-# so a dead job reads as DOWN instead of as silence.
+# Lanes are DERIVED from what is actually on the GPUs, not a hardcoded list. The previous
+# version listed lanes fixed at arm time, so hours later it reported finished jobs as DOWN
+# and said nothing about the four running ones.
 L=/workspace/rerun-logs
-PS=$(ps -eo cmd 2>/dev/null)
-
-status_of () {          # $1 = process pattern, $2 = logfile
-  local st="DOWN" stage step
-  case "$PS" in *"$1"*) st="up" ;; esac
-  if [ -f "$2" ]; then
-    stage=$(grep -E "^### |^\[chain\] |^### PIPE " "$2" 2>/dev/null | tail -1)
-    stage=${stage#\#\#\# }
-    stage=${stage#\[chain\] }
-    step=$(grep -oE "step [0-9]+ seen [0-9.]+M loss [0-9.]+" "$2" 2>/dev/null | tail -1)
-  fi
-  [ -n "$stage" ] || stage="no marker yet"
-  [ -z "$step" ] || stage="$stage | $step"
-  echo "$st|$stage"
-}
-
 echo "HEARTBEAT $(date -u '+%H:%M UTC')"
-echo "CORE GOAL: adapters FULLY fixed, trained, merged, re-measured, with GOOD results --"
-echo "  not merely 'ran'. Verify every merge with verify_merge.py (diff merged vs base):"
-echo "  a LoRA silently attached to the wrong module tree already produced one"
-echo "  'successful' merge that carried no attention LoRA at all."
-for entry in \
-  "gemma-train:train_adapters.sh gemma:$L/adapt_gemma.out" \
-  "qwen-train:train_adapters.sh qwen:$L/adapt_qwen.out" \
-  "gemma-merge:merge_and_remeasure.sh gemma:$L/chain_gemma-merge.out" \
-  "qwen-merge:night_chain.sh qwen-merge:$L/chain_qwen-merge.out" \
-  "qwen-think:regen_trajectories.sh qwen-think:$L/traj_qwen_think.out" \
-  "gemma-think:regen_trajectories.sh gemma-think:$L/traj_gemma_think.out" \
-  "selfgen-pipe:selfgen_pipeline.sh:$L/selfgen_pipeline.out"
-do
-  lbl=${entry%%:*}; rest=${entry#*:}; pat=${rest%%:*}; log=${rest#*:}
-  res=$(status_of "$pat" "$log")
-  printf '  [%-11s|%-4s] %s\n' "$lbl" "${res%%|*}" "${res#*|}"
+echo "CORE GOAL: adapters FULLY fixed, trained, merged, re-measured, with GOOD results."
+echo "  Verify every merge with verify_merge.py. Evaluate the FULL surface: GSM8K, IFEval,"
+echo "  MMLU (grid_parallel) + HumanEval (channel-aware producer) + WritingBench (wb_arm)."
+echo "  A parallel grid alone is 3 of 5 cells."
+echo "LIVE GPU WORK:"
+for g in 0 1 2 3; do
+  mem=$(nvidia-smi -i $g --query-gpu=memory.used --format=csv,noheader 2>/dev/null)
+  ut=$(nvidia-smi -i $g --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null)
+  pid=$(nvidia-smi -i $g --query-compute-apps=pid --format=csv,noheader 2>/dev/null | head -1)
+  if [ -n "$pid" ]; then
+    cmd=$(ps -o cmd= -p "$pid" 2>/dev/null | sed 's|.*/python[0-9.]* *-u* *||' | cut -c1-58)
+  else
+    cmd="IDLE -- give it work"
+  fi
+  printf "  GPU %s %-11s %-6s %s\n" "$g" "$mem" "$ut" "$cmd"
 done
-echo "GPU:"
-nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader 2>/dev/null | sed 's/^/  /'
-echo "BACKGROUND QUEUE (fire when a GPU frees):"
-echo "  * unsloth non-determinism: diagnose + fix. Both adapters run --no-unsloth, giving"
-echo "    up its fused expert path, because unsloth gemma4 drifts up to 10.75 max|dlogit|"
-echo "    across identical forwards (HF is bit-exact). Hypothesis: non-deterministic"
-echo "    reduction in the MoE combine (atomics). diagnose_unsloth_nondet.py is queued and"
-echo "    auto-fires on the first idle GPU; results -> rerun-logs/unsloth_diag.log"
-echo "  * measure the throughput price of --no-unsloth (timed --smoke, both stacks)"
-echo "NEXT AFTER ADAPTERS: (1) OLMoE item  (2) BASELINE_METHODS_COMPARISON.md -- read,"
-echo "  execute, run it. No published competitor (skliar/cosmoe/promoe/pregated/"
-echo "  oracle-moe/eliseev/blockffn) is implemented anywhere yet. Update the doc as fit."
-echo "NOTE: GPU 0 usable from 08:30 UTC (01:30 PDT)."
+echo "RECENT COMPLETIONS (last 6):"
+grep -hoE "### .*(ALL DONE|TRAIN DONE|PARALLEL DONE|COMPLETE) [0-9:]+" $L/*.out $L/*.log 2>/dev/null \
+  | tail -6 | sed 's/^/  /'
+echo "STORAGE (caps: RAM 200GB, local 1TB, network 1TB):"
+printf "  RAM %s  local %s  network-ours %s\n" \
+  "$(du -sh /dev/shm 2>/dev/null | cut -f1)" \
+  "$(du -sh /root/models 2>/dev/null | cut -f1)" \
+  "$(du -s /workspace/instruct-traj /workspace/olmoe-adapt /workspace/merged-ckpts 2>/dev/null | awk '{s+=$1} END{printf "%.0fG", s/1048576}')"
+echo "BACKGROUND QUEUE:"
+echo "  * unsloth: ROOT-CAUSED (deterministic algorithms -> bit-exact). Still to do:"
+echo "    measure the throughput price of --no-unsloth, then decide whether to switch back."
+echo "  * backfill WritingBench for arm A (the control everything is measured against)."
+echo "  * BASELINE_METHODS_COMPARISON.md -- no published competitor implemented yet."

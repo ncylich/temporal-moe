@@ -24,7 +24,11 @@ export CUDA_VISIBLE_DEVICES=${GPU:-3}
 cd $WB
 off_for () { case "$1" in "_sB") echo 50;; "_sC") echo 100;; *) echo 0;; esac; }
 gen () {  # arm suffix
-  local arm=$1 suf=$2 out=responses/${REC}_${arm}${suf}.jsonl
+  # separate statements on purpose: bash expands ALL arguments to `local` before it
+  # performs any assignment, so `local a=$1 b=${a}` leaves ${a} unbound under set -u
+  local arm=$1
+  local suf=$2
+  local out=responses/${REC}_${arm}${suf}.jsonl
   [ -s "$out" ] && { echo "skip $out"; return; }
   echo "### wb $REC $arm ${suf:-_sA} $(date -u +%H:%M)"
   $PY $ROOT/analysis/writingbench/wb_generate.py --model-path $MPATH --record $REC \

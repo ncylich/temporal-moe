@@ -14,6 +14,10 @@ while true; do
   for f in /workspace/rerun-logs/*.out /workspace/rerun-logs/*.log; do
     [ -f "$f" ] || continue
     base=$(basename "$f")
+    # heartbeat.log QUOTES recent completion markers in its own body, so reading it here
+    # creates a feedback loop that re-reports finished jobs forever. Skip any log that is
+    # itself a digest of other logs.
+    case "$base" in heartbeat.log|backup_merged.log|unsloth_diag.log) continue ;; esac
     grep -hoE "$PAT" "$f" 2>/dev/null | tail -3 | while read -r m; do
       key="$base :: $m"
       grep -qxF "$key" "$STATE" 2>/dev/null && continue
