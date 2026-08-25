@@ -188,6 +188,18 @@ def main():
     print(f"[gce] {len(rows)} trajectories", flush=True)
 
     import granularity_ladder as GL
+
+    # Select a non-cuDNN SDPA backend BEFORE either stack loads. This call already
+    # existed in the HF+peft branch below, for a memory reason; it is hoisted here
+    # because the unsloth branch needs it too and never had it. On a mismatched cuDNN
+    # (this pod: CUDNN_STATUS_SUBLIBRARY_VERSION_MISMATCH out of
+    # scaled_dot_product_attention) the cuDNN fused-attention backend fails outright and
+    # takes gemma's unsloth path down before the smoke can run. "cuDNN SDP off" is
+    # already a documented accommodation of the published qwen recipe, so this is the
+    # known-good configuration rather than a new one. Numerics-neutral: flash and
+    # mem-efficient SDPA compute the same attention.
+    torch.backends.cuda.enable_cudnn_sdp(False)
+
     use_unsloth = not A.no_unsloth
     try:
         if A.no_unsloth:
