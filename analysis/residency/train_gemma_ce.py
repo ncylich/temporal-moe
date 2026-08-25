@@ -229,9 +229,22 @@ def main():
         # <1GB headroom (mha_graph.execute failure at 81.1/81.6GB); flash/
         # mem-efficient SDPA backends are leaner
         torch.backends.cuda.enable_cudnn_sdp(False)
+        # transformers 5.x wraps gemma4's attention projections in
+        # Gemma4ClippableLinear, a plain Module holding the real nn.Linear at .linear
+        # rather than subclassing it, and peft attaches only to nn.Linear -- so naming
+        # q_proj here hits the wrapper and dies with "Target module
+        # Gemma4ClippableLinear(...) is not supported". Address the inner Linear when
+        # the wrapper is present. Same weights either way: LoRA sits on the projection
+        # and the wrapper's clipping still applies on top, as it does for the base path.
+        _proj = ["q_proj", "k_proj", "v_proj", "o_proj"]
+        _wrapped = any(type(m).__name__ == "Gemma4ClippableLinear"
+                       for m in model.modules())
+        if _wrapped:
+            _proj = [f"{n}.linear" for n in _proj]
+            print(f"[gce] gemma4 clippable-linear wrapper detected; "
+                  f"LoRA targets {_proj}", flush=True)
         model = get_peft_model(model, LoraConfig(
-            r=32, lora_alpha=64, lora_dropout=0.0,
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj"]))
+            r=32, lora_alpha=64, lora_dropout=0.0, target_modules=_proj))
 
     if A.family == "qwen35":
         GL.patch_qwen35()
