@@ -86,6 +86,14 @@ if [ ! -d "$MERGED" ]; then
 fi
 echo "### $1 MERGE DONE $(date -u +%H:%M)"
 
+# Never trust a merge that "succeeded". On 2026-08-25 a merge reported success while
+# carrying expert-LoRA and NO attention LoRA, because peft had attached the attention
+# adapter to gemma4's vision tower. Diff every trained surface against base before any
+# grid is generated from it -- a wrong grid is far more expensive than a failed merge.
+$TPY analysis/residency/verify_merge.py --base $BASE --merged $MERGED \
+    2>&1 | tee $LOG/verify_${1}.log
+echo "### $1 VERIFY DONE $(date -u +%H:%M)"
+
 echo "### $1 REMEASURE gsm8k/ifeval/humaneval $(date -u +%H:%M)"
 $VPY -u $G --model $MODEL_KEY --path $MERGED --arms $ARMS --record-as $REC \
     --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval=0" \
