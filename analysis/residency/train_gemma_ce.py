@@ -239,16 +239,28 @@ def main():
         # the adapter has 108 attention tensors, and all of them are exactly zero, so the
         # merged model carries expert-LoRA and no attention LoRA at all. Anchor on
         # language_model instead, and assert the attachment rather than trusting it.
-        _tm = r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj)$"
+        # Enumerate the ACTUAL text-side attention projections rather than assuming a
+        # naming convention. Two architectures, two shapes: gemma4 nests its text stack
+        # under language_model AND wraps only the VISION tower's projections in
+        # Gemma4ClippableLinear, while qwen3.5 has no language_model prefix at all -- a
+        # regex tuned for one raises "target modules not found" on the other. Selecting
+        # concrete nn.Linear module names that are not under a vision tower works for both
+        # and cannot silently land on modules a text-only forward never reaches, which is
+        # exactly how the attention LoRA once trained to all-zero on the vision tower.
+        import torch.nn as _nn
+        _names = [n for n, m in model.named_modules()
+                  if isinstance(m, _nn.Linear)
+                  and n.rsplit(".", 1)[-1] in ("q_proj", "k_proj", "v_proj", "o_proj")
+                  and "vision_tower" not in n and "visual" not in n]
+        assert _names, "found no text-side attention projections to attach LoRA to"
         model = get_peft_model(model, LoraConfig(
-            r=32, lora_alpha=64, lora_dropout=0.0, target_modules=_tm))
-        _lm_lora = [n for n, q in model.named_parameters()
-                    if q.requires_grad and "lora_" in n and "language_model" in n]
-        assert _lm_lora, ("attention LoRA attached to NO language_model module -- "
-                          f"target_modules={_tm!r} matched nothing trainable")
-        assert not any("vision_tower" in n for n in _lm_lora), \
+            r=32, lora_alpha=64, lora_dropout=0.0, target_modules=_names))
+        _lora = [n for n, q in model.named_parameters() if q.requires_grad and "lora_" in n]
+        assert _lora, "attention LoRA attached to nothing trainable"
+        assert not any("vision_tower" in n or "visual" in n for n in _lora), \
             "attention LoRA leaked onto the vision tower"
-        print(f"[gce] attention LoRA on {len(_lm_lora)} language_model tensors", flush=True)
+        print(f"[gce] attention LoRA on {len(_names)} text-side projections "
+              f"({len(_lora)} trainable tensors)", flush=True)
 
     if A.family == "qwen35":
         GL.patch_qwen35()
