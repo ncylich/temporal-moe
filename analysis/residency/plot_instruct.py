@@ -90,7 +90,11 @@ def load_damage():
     # genbench values (OLMoE, the one model outside the thinking summary)
     METRIC = {"gsm8k_cot_zeroshot": ("exact_match,flexible-extract",),
               "ifeval": ("prompt_level_strict_acc,none",),
-              "mmlu_flan_cot_fewshot": ("exact_match,get-answer",)}
+              "mmlu_flan_cot_fewshot": ("exact_match,get-answer",),
+              # relaxed extraction is the reported MMLU metric everywhere else and
+              # in Appendix D; OLMoE was the one model still read off the strict
+              # flan filter, which cost it 11.9 points of MMLU damage on its own
+              "mmlu_gptoss_relaxed": ("acc,relaxed-extract",)}
     vals = {}
     for r in csv.reader(open(f"{ABLATIONS}/instruct_genbench_vllm.csv")):
         if len(r) < 10 or r[0].startswith("#") or r[0] == "model":
@@ -114,7 +118,7 @@ def load_damage():
     #         ("vals", record, humaneval task, mmlu task) uses genbench accuracies.
     SPEC = [
         ("OLMoE-Instruct 7B", [("none", "off",
-          ("vals", "olmoe_instruct", "humaneval_instruct", "mmlu_flan_cot_fewshot"))],
+          ("vals", "olmoe_instruct", "humaneval_instruct", "mmlu_gptoss_relaxed"))],
          ("R8", "R8"), None, None),
         ("LFM2.5-8B-A1B", [("on", "on", ("think", "LFM2.5-A1B"))],
          ("R4", "R4"), ("lfm25_free", "lfm25_R4", "lfm25_R4"), "on"),

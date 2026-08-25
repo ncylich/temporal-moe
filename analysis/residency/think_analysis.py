@@ -50,8 +50,12 @@ PAIRS = {
 # across arms; where that fails the chain falls back to the parent record.
 FAIR = {
     "gemma4_instruct":  ["gemma4_instruct_cap8k"],
-    "gemma4_think_on":  ["gemma4_think_on_cap8k"],
-    "qwen35_instruct":  ["qwen35_instruct_cap16k", "qwen35_instruct_cap8k"],
+    "gemma4_think_on":  ["gemma4_think_on_cap16k", "gemma4_think_on_cap8k"],
+    # cap16k_b ran free/R8/R32 in ONE boot; cap16k ran only the constrained arms in
+    # a different boot, and its R8 reads 0.800 against the matched 0.765 on identical
+    # settings. Prefer the matched record and never pair across the two.
+    "qwen35_instruct":  ["qwen35_instruct_cap16k_b", "qwen35_instruct_cap16k",
+                         "qwen35_instruct_cap8k"],
     "lfm25_instruct":   ["lfm25_instruct_cap8k"],
     "gptoss_20b":       ["gptoss_20b_cap8k"],
     "gptoss_20b_high":  ["gptoss_20b_high_cap16k", "gptoss_20b_high_cap8k"],
