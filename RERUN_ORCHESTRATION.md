@@ -166,3 +166,58 @@ is the standing rule from Part 2 anyway, and the omission that caused all of thi
 **Nothing is mirrored yet.** Rule C2 — every adapter and trajectory to Hugging Face the
 moment it is written, plus a row in `results/MANIFEST.csv` — has no enforcement. It is the
 one change that would have made the recovery plan unnecessary.
+
+---
+
+# 6. Adaptation stage — five findings that cost time
+
+Added 2026-08-25, while retraining the two CE adapters. Each of these presented as a
+different problem than it was.
+
+**This box is SHARED, and a neighbour can OOM a multi-hour run.** A third-party process
+(`run_acts.py alpaca instructed_pairs roleplaying`, parented to docker-init, not ours)
+claimed GPU 0 and GPU 1 mid-run and took 61 GiB out from under gemma's training inside
+`loss.backward()`. The lane scripts now take a `GPU=` override instead of assuming a fixed
+device; check `nvidia-smi --query-compute-apps` before placing a lane, and remember that
+`--resume`/`--resume-step` with `--save-every 400` is the only thing standing between a
+neighbour's allocation and a lost GPU-day.
+
+**unsloth's gemma4 patches are non-deterministic here.** Six identical forwards of one
+probe -- no residency patch, no expert-LoRA, constraint off -- differ pairwise by 5.75 to
+10.75 max|dlogit|, and post-warmup #1 vs #5 is 9.00, so it is not compile or autotune.
+Divergence starts at the first transformer block (layer 0 identical, layer 1 = 0.25) and
+compounds to 31.6 by layer 30. Plain HF on the same weights and machine is bit-exact
+(0.000000). gemma therefore trains with `--no-unsloth`.
+
+**That noise masqueraded as a grouped-GEMM defect.** The smoke failed as "grouped-path
+parity FAIL (max logit diff 10-12)" against a 2.0 bound, which reads like `torch._grouped_mm`
+being wrong. It is not: the same failure reproduces at r16, the PUBLISHED rank, and
+response-token CE over 6,536 real tokens is identical between the eager loop and the
+grouped path to six decimals (0.258747 both). On the fixed stack the gate reads 0.000.
+The parity bound was never too tight -- it was correctly detecting a real problem and
+naming the wrong culprit. `check_grouped_mm.py` exists because this exact confusion
+happened before; its "eager vs eager" harness check is the first thing to run.
+
+**The real blocker was peft, silently.** transformers 5.x wraps gemma4's attention
+projections in `Gemma4ClippableLinear`, a plain Module holding the real `nn.Linear` at
+`.linear` rather than subclassing it, and peft attaches only to `nn.Linear`. Targeting
+`q_proj` therefore raised, gemma fell through to unsloth, and the unsloth noise floor
+produced the parity failure above. Target the inner `.linear` when the wrapper is present.
+
+**Neither staged checkpoint has a vision tower.** gemma4-26b-it is 1,013 tensors, all
+under `model.`; qwen35-35b-a3b is 1,811 under `lm_head`/`model`/`mtp`. Zero `visual.*` in
+either. So the architectural gap that blocked the August qwen merge -- `save_pretrained()`
+writing a checkpoint that never contained `visual.*` -- does NOT apply to these weights;
+that base was a multimodal composite and this snapshot is text-only. Do not re-derive the
+multimodal fear from `TODO.md` section 6 and conclude the merge is blocked. `qwen_ce_patch.py`
+is still the path used, because it carries the assertion that every adapter tensor was
+consumed (the check that caught 80 unused tensors in task #78), not because a tower needs
+saving.
+
+**MMLU: check the producer, not the CSV.** `mmlu_gptoss_relaxed` is not an lm_eval task.
+The reported metric, `acc,relaxed-extract`, is emitted only by `analysis/residency/mmlu_gptoss.py`;
+`instruct_genbench_vllm.py`'s `mmlu_flan_cot_fewshot` records the STRICT filter alone. This
+is why every record in the program has a `_dual` sibling. Reading the strict number as the
+reported one produced two separate wrong results in one day -- the Group A gemma MMLU
+re-run (strict: damage widens -9.2 to -12.3; relaxed: it shrinks -4.4 to -1.3) and OLMoE's
+headline mean (-14.8 against -11.8).
