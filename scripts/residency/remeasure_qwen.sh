@@ -24,18 +24,18 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 cd $ROOT
 PY=/workspace/venv_vllm312/bin/python
 LOG=${LOG_DIR:-/workspace/rerun-logs}
-M=/dev/shm/qwen35-rebuild-merged
+M=/root/models/qwen35-selfgen-merged
 export CUDA_VISIBLE_DEVICES=${GPU:-2}
 
 echo "### qwen REMEASURE think-off gsm8k/ifeval/humaneval $(date -u +%H:%M)"
 $PY -u analysis/residency/instruct_genbench_vllm.py --model qwen35_instruct --path $M \
-    --arms free,R8,R16 --record-as qwen35_ce_rebuild \
+    --arms free,R8,R16 --record-as qwen35_ce_selfgen \
     --think off --temperature 0.7 --top-p 0.8 \
     --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval_instruct=0" \
     --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94 2>&1 | tee $LOG/remeasure_qwen_gen.log
 
 echo "### qwen REMEASURE MMLU (relaxed, the reported metric) $(date -u +%H:%M)"
 $PY -u analysis/residency/mmlu_gptoss.py --model qwen35_instruct --path $M \
-    --arms free,R8,R16 --record-as qwen35_ce_rebuild_dual --think off \
+    --arms free,R8,R16 --record-as qwen35_ce_selfgen_dual --think off \
     --gpu-mem 0.94 2>&1 | tee $LOG/remeasure_qwen_mmlu.log
 echo "### qwen REMEASURE DONE $(date -u +%H:%M)"

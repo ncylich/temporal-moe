@@ -63,11 +63,11 @@ case "${1:?usage: train_adapters.sh gemma|qwen}" in
   gemma)
     DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it; TRAJ=gemma4_d7_seq4096
     FAM=(--family gemma4 --no-unsloth); RANK=32; KLW=0.05; MB=16; OPT=(--opt adamw)
-    OUT=$DATA/gemma_ce_rebuild_adapter.pt ;;
+    OUT=$DATA/gemma_ce_realmath_adapter.pt ;;
   qwen)
     DEV=${GPU:-2}; MODEL=/dev/shm/qwen35-35b-a3b; TRAJ=qwen35_d7_seq4096
     FAM=(--family qwen35 --no-unsloth); RANK=16; KLW=0.1; MB=16; OPT=(--opt adamw)
-    OUT=$DATA/qwen_ce_rebuild_adapter.pt ;;
+    OUT=$DATA/qwen_ce_realmath_adapter.pt ;;
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac
 KL=/workspace/instruct-traj/${TRAJ}_klref.pt

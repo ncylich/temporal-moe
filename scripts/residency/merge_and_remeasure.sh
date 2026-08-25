@@ -26,6 +26,16 @@ export VLLM_ENABLE_V1_MULTIPROCESSING=0
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 cd $ROOT
 
+$ROOT/scripts/residency/disk_budget.sh || exit 3
+# SPACE CHECK: a merge writes a full model copy (49-67GB). /dev/shm filling mid-write kills
+# the merge with a bare "No space left on device" from safetensors, after minutes of work.
+free_kb=$(df -k /root/models | tail -1 | awk '{print $4}')
+if [ "$free_kb" -lt 75000000 ]; then
+  echo "### ABORT: /root/models has only $((free_kb/1024/1024))GB free; a merge needs ~70GB." >&2
+  echo "### Delete finished merged checkpoints (they are reproducible from adapter+base)." >&2
+  exit 3
+fi
+
 VPY=/workspace/venv_vllm312/bin/python      # serving stack
 TPY=/workspace/venv_fla/bin/python          # training stack (merge)
 G=analysis/residency/instruct_genbench_vllm.py
@@ -39,12 +49,12 @@ mkdir -p $LOG
 # job and OOM'd against its 136 GiB.
 case "${1:?usage: merge_and_remeasure.sh gemma|qwen}" in
   gemma)
-    DEV=${GPU:-1}; BASE=/dev/shm/gemma4-26b-it; MERGED=/dev/shm/gemma4-rebuild-merged
-    ADAPTER=$DATA/gemma_ce_rebuild_adapter.pt; REC=gemma4_ce_rebuild
+    DEV=${GPU:-1}; BASE=/dev/shm/gemma4-26b-it; MERGED=/root/models/gemma4-realmath-merged
+    ADAPTER=$DATA/gemma_ce_realmath_adapter.pt; REC=gemma4_ce_realmath
     MODEL_KEY=gemma4_instruct; ARMS=free,R8,R16; RANK=32; TRAJ=gemma4_d7_seq4096 ;;
   qwen)
-    DEV=${GPU:-2}; BASE=/dev/shm/qwen35-35b-a3b; MERGED=/dev/shm/qwen35-rebuild-merged
-    ADAPTER=$DATA/qwen_ce_rebuild_adapter.pt; REC=qwen35_ce_rebuild
+    DEV=${GPU:-2}; BASE=/dev/shm/qwen35-35b-a3b; MERGED=/root/models/qwen35-realmath-merged
+    ADAPTER=$DATA/qwen_ce_realmath_adapter.pt; REC=qwen35_ce_realmath
     MODEL_KEY=qwen35_instruct; ARMS=free,R8,R16; RANK=16; TRAJ=qwen35_d7_seq4096 ;;
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac

@@ -30,15 +30,15 @@ case "${1:?usage: remeasure_humaneval.sh gemma|qwen}" in
     export CUDA_VISIBLE_DEVICES=${GPU:-3}
     echo "### gemma HUMANEVAL (channel-aware) $(date -u +%H:%M)"
     $PY -u analysis/residency/humaneval_gemma.py \
-        --path /dev/shm/gemma4-rebuild-merged --arms free,R8,R16 \
-        --tag gemma4_ce_rebuild --think off 2>&1 | tee $LOG/he_gemma.log ;;
+        --path /root/models/gemma4-realmath-merged --arms free,R8,R16 \
+        --tag gemma4_ce_realmath --think off 2>&1 | tee $LOG/he_gemma.log ;;
   qwen)
     export CUDA_VISIBLE_DEVICES=${GPU:-2}
     for arm in free R8 R16; do
       echo "### qwen HUMANEVAL $arm (channel-aware) $(date -u +%H:%M)"
       $PY -u analysis/residency/humaneval_think.py --model qwen35_instruct \
-          --path /dev/shm/qwen35-rebuild-merged --arm $arm \
-          --tag qwen35_ce_rebuild --think off 2>&1 | tee -a $LOG/he_qwen.log
+          --path /root/models/qwen35-realmath-merged --arm $arm \
+          --tag qwen35_ce_realmath --think off 2>&1 | tee -a $LOG/he_qwen.log
     done ;;
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac

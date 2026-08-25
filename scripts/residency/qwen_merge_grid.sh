@@ -16,7 +16,7 @@ cd $ROOT
 TPY=/workspace/venv_fla/bin/python
 LOG=${LOG_DIR:-/workspace/rerun-logs}
 BASE=/dev/shm/qwen35-35b-a3b
-MERGED=/dev/shm/qwen35-selfgen-merged
+MERGED=/root/models/qwen35-selfgen-merged
 ADAPTER=/workspace/olmoe-adapt/data/qwen_ce_selfgen_adapter.pt
 export CUDA_VISIBLE_DEVICES=${GPU:-3}
 
