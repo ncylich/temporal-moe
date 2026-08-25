@@ -52,19 +52,41 @@ Full statements of each item live in `paper/TODO.md`; this is the index and the 
 
 ## Group A — paper-critical, needs only base weights
 
+**A1, A2 and A4 are DONE (2026-08-25).** Run on the rebuilt pod, wired into the reported
+grid, and written into the paper. Results and caveats below; the full statements are in
+`paper/TODO.md`. A3 and A5 remain open.
+
 Nothing here touches a lost adapter, trajectory or prompt pool. All of it can run on a fresh
 pod the day it boots.
 
-| # | run | why it matters | cost |
-|---|---|---|---|
-| A1 | **Qwen3.5-35B, free routing, IFEval, at 16384** | The one arm the truncation sweep missed. Its two constrained arms were rerun and are clean, but with no matched free arm the whole cell falls back to 8192, where the free arm is 8.0% truncated. This is the single number holding Qwen3.5's thinking-on mean at -7.0, so it decides whether "free-form thinking amplifies the constraint" survives for that model. | 1 cell |
-| A2 | **WritingBench at 8192 for gpt-oss-120b, gpt-oss-20b, LFM** | Never swept for truncation. At its 4096 budget those three sit at 30-36%, 20-25% and 21-27% on both arms, and Section 6 leans on WritingBench for "prose is the robust surface". The paired delta may survive since both arms truncate alike, but it is untested. | 3 models, 1 surface |
-| A3 | **A trained temporally-coherent router, serving measurement** | Every phone number prescribes turnover as a stand-in. LEDGER S3-9 calls this "the required next step, not more systems work". The longest-standing open item in the paper. | new training |
-| A4 | **gemma4 thinking-on IFEval and MMLU at double budget** | The last two cells above the 2% cap-hit bar (6.5% and 6.1%), left by judgment rather than evidence. Low value alone; worth folding in only if the machine is already up for A1. | 3 arms x 2 tasks |
-| A5 | **Mohsen's Intel iGPU numbers** | Third device class. Not blocking. | external |
+| # | run | status | why it matters | cost |
+|---|---|---|---|---|
+| A1 | **Qwen3.5-35B, free routing, IFEval, at 16384** | **DONE** | The one arm the truncation sweep missed. Its two constrained arms were rerun and are clean, but with no matched free arm the whole cell falls back to 8192, where the free arm is 8.0% truncated. This is the single number holding Qwen3.5's thinking-on mean at -7.0, so it decides whether "free-form thinking amplifies the constraint" survives for that model. | 1 cell |
+| A2 | **WritingBench at 8192 for gpt-oss-120b, gpt-oss-20b, LFM** | **DONE** | Never swept for truncation. At its 4096 budget those three sit at 30-36%, 20-25% and 21-27% on both arms, and Section 6 leans on WritingBench for "prose is the robust surface". The paired delta may survive since both arms truncate alike, but it is untested. | 3 models, 1 surface |
+| A3 | **A trained temporally-coherent router, serving measurement** | open | Every phone number prescribes turnover as a stand-in. LEDGER S3-9 calls this "the required next step, not more systems work". The longest-standing open item in the paper. | new training |
+| A4 | **gemma4 thinking-on IFEval and MMLU at double budget** | **DONE** | The last two cells above the 2% cap-hit bar (6.5% and 6.1%), left by judgment rather than evidence. Low value alone; worth folding in only if the machine is already up for A1. | 3 arms x 2 tasks |
+| A5 | **Mohsen's Intel iGPU numbers** | open | Third device class. Not blocking. | external |
 
-**A1 is the highest-value single cell in the whole list.** It is one rerun, it needs no
-adapter, and it settles a claim the paper currently has to hedge.
+**What Group A actually returned.** A1 ran all three arms in one boot rather than the single
+free cell this plan costed, because pairing a fresh free arm against Task #80's
+separately-booted constrained arms is the stitching the batch-fair protocol exists to
+prevent. That caution earned its keep: the matched R8 reads 0.765 against the separately
+booted 0.800 on identical settings, a **3.5-point batch effect**. Qwen3.5's IFEval penalty
+lands at -12.5, down from -16.5 but real.
+
+A4 removed gemma4's think-on IFEval penalty entirely (-5.0 to +0.5) and its MMLU penalty
+nearly so (-4.4 to -1.3), the second only after recovering the reported relaxed metric
+offline, since the re-run recorded the strict filter under which that cell appears to get
+WORSE rather than better.
+
+Between them the two retire the paper's thinking-amplification claim rather than sharpening
+it. Mode means are now gemma4 -2.0 off against -2.2 on, Qwen3.5 -7.2 off against -6.0 on.
+Every reported cell now sits under 5 percent cap-hit on both arms, with no exceptions.
+
+A2 confirmed Section 6's prose claim survives its untested budget, range -0.02 to -0.30.
+
+**A3 is now the highest-value item left in Group A**, and unlike the rest it needs training
+rather than a boot.
 
 ## Group B — paper-critical, gated on Part 1
 
@@ -80,6 +102,7 @@ These need an adapter, so they sit behind the rebuild chain below.
 | # | change | why |
 |---|---|---|
 | C1 | **Make the dump schema self-describing.** Write `total_toks`, `think_toks`, `answer_toks` as three explicit fields. | Inferring which convention a dump uses produced four separate wrong results on 2026-08-24 (`results/ablations/INSTRUCT_RESULTS.md` §5). Fold into the next regeneration rather than running a pass for it. |
+| C3 | **Record the scoring metric in the row, and check the FIGURE producer reads it.** | Two metric-provenance bugs surfaced on 2026-08-25. The Group A MMLU re-run recorded the strict filter while the paper reports relaxed, opposite directions. Separately OLMoE had been read off the strict filter for months because `plot_instruct.py` hardcoded it, while the relaxed rows sat unused in the CSV and `think_analysis.py` correctly preferred them. A metric existing in the CSV is not the same as the paper reading it. |
 | C2 | **Mirror every adapter and trajectory to Hugging Face as it is written**, and add it to `results/MANIFEST.csv`. | The standing rule from Part 2. It is what would have made this whole plan unnecessary. |
 
 ## What is explicitly NOT being re-run
