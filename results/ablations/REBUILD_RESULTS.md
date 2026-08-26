@@ -417,3 +417,34 @@ and killed by the next one.
 Architectural floor: gemma4 cannot be served below R8 because R >= top-k = 8, so its minimum
 resident fraction is 6.25% against qwen's 3.1%. Expert count sets how aggressive residency
 can be, which the memory-quality frontier does not currently express.
+
+## The code conclusion was a generation-budget artifact (2026-08-26)
+
+Every code cell in this document above was produced at the 1536-token default. Re-running
+HumanEval at 8192 (paper/TODO.md line 189, which asked for this for an unrelated
+bookkeeping reason) reverses the conclusion:
+
+| budget | model | free | R8 | R8-free | adapted vs base |
+|---|---|---|---|---|---|
+| 1536 | base | 98.2 | 92.7 | -5.5 | -- |
+| 1536 | adapted | 97.6 | 92.1 | -5.5 | +0.0 +/- 2.9 (z=0.00) |
+| 8192 | base | 99.4 | 94.5 | -4.9 | -- |
+| 8192 | adapted | 97.0 | 97.0 | **+0.0** | **+4.9 +/- 2.4 (z=2.00) REAL** |
+
+At 8192 the adapted model's constrained arm exactly equals its own free arm: residency
+damage on HumanEval is gone. **The adapter repairs code damage; it needs generation budget
+to show it.** This is consistent with the documented gemma failure mode -- non-convergent
+deliberation, constrained generations ruminating until truncated -- and with
+halfgrain_RESULTS.md already recording gemma code as budget-saturating
+(0.524@1536 / 0.634@3k / 0.628@6k). That was in the repo and was not connected to the cap
+in use here.
+
+Consequences, stated plainly:
+- "The adapter recovers math and leaves code untouched" was wrong, and was repeated several
+  times before the budget was varied.
+- Every MBPP cell here used 1536, including all three d7code arms, so
+  "code damage is structural, not a data-mix problem" is unsupported until MBPP is re-run
+  at 8192. That re-run is in flight.
+- A benchmark's generation cap is part of its measurement, not an implementation detail. The
+  n=200-vs-n=1319 lesson has a twin: sample size AND budget both have to be right before a
+  null means anything.
