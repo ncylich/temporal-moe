@@ -451,6 +451,22 @@ _step_path = None
 # concept; the two paths never run in one process.
 _RHO = float(os.environ.get("TEMPORAL_RHO", "0"))
 
+# Opt-in swap accounting. The RHO sweep's x-axis was a SIMULATED swap rate (a synthetic
+# correlated routing signal), while its y-axis was measured on real generations -- an
+# estimate divided into a measurement. With this on, the serving path counts the swaps it
+# actually performs, so the bandwidth claim rests on the same workload as the quality
+# claim. Off by default: this adds a device-to-host sync per step and would slow every
+# other run. Read with swap_stats().
+_COUNT = os.environ.get("TEMPORAL_COUNT_SWAPS", "") == "1"
+_SWAPS = [0, 0]          # [swaps performed, token-rows stepped]
+
+
+def swap_stats():
+    """(swaps, token_rows, swaps_per_token) since import; zeros unless
+    TEMPORAL_COUNT_SWAPS=1."""
+    sw, tk = _SWAPS
+    return sw, tk, (sw / tk if tk else 0.0)
+
 
 def _minlogit_step(lt, resident):
     """`_step` specialized to min_logit eviction (use_lru=False), refresh dropped.
@@ -468,6 +484,9 @@ def _minlogit_step(lt, resident):
     evict_i = lt.masked_fill(~resident, POS).argmin(dim=-1)
     evicted = F.one_hot(evict_i, E).bool() & do_swap
     nominee = F.one_hot(nom_i, E).bool() & do_swap
+    if _COUNT:
+        _SWAPS[0] += int(do_swap.sum())
+        _SWAPS[1] += do_swap.shape[0]
     return (resident & ~evicted) | nominee
 
 
@@ -538,7 +557,7 @@ def step_accel_mask(lt, resident):
     slotted serving walker. Same env switch and same one-time hard equality gate
     as `step_accel`; returns a fresh tensor (safe to index_copy_ into a bank)."""
     global _step_path
-    if not lt.is_cuda or os.environ.get("TEMPORAL_DECODE", "graph") == "eager":
+    if not lt.is_cuda or os.environ.get("TEMPORAL_DECODE", "graph") == "eager" or _COUNT:
         if _step_path is None:
             _step_path = "eager"
             print("[temporal] decode step path: eager")
