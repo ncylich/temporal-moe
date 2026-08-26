@@ -179,7 +179,7 @@ def _step(lt, resident, refresh, tval, use_lru):
     NEG, POS = float("-inf"), float("inf")
     nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
     worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
-    do_swap = (nom_val > worst_val).unsqueeze(-1)
+    do_swap = (nom_val > worst_val + _RHO).unsqueeze(-1)   # _RHO=0 -> published rule
     evict_key = refresh if use_lru else lt
     evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)
     evicted = F.one_hot(evict_i, E).bool() & do_swap
@@ -440,6 +440,18 @@ _step_graph_cache = {}
 _step_path = None
 
 
+# Cache-conditional experts (Skliar et al., arXiv:2412.00099), serving side.
+# Their method adds a fixed bonus to experts already in memory so close calls break
+# toward what is already loaded. In this scoring rule that is exactly a swap deadband:
+# evict only when the best non-resident logit beats the worst resident one by more than
+# RHO. 0.0 is our published min_logit rule, bit-identical -- the comparison is unchanged
+# when the bonus is zero, so every prior row stands. Read once at import so the captured
+# CUDA graph and the eager reference always agree (the bit-exactness gate in step_accel
+# checks this). The same env name is used by the training-side router for the same
+# concept; the two paths never run in one process.
+_RHO = float(os.environ.get("TEMPORAL_RHO", "0"))
+
+
 def _minlogit_step(lt, resident):
     """`_step` specialized to min_logit eviction (use_lru=False), refresh dropped.
 
@@ -452,7 +464,7 @@ def _minlogit_step(lt, resident):
     NEG, POS = float("-inf"), float("inf")
     nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
     worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
-    do_swap = (nom_val > worst_val).unsqueeze(-1)
+    do_swap = (nom_val > worst_val + _RHO).unsqueeze(-1)   # _RHO=0 -> published rule
     evict_i = lt.masked_fill(~resident, POS).argmin(dim=-1)
     evicted = F.one_hot(evict_i, E).bool() & do_swap
     nominee = F.one_hot(nom_i, E).bool() & do_swap
