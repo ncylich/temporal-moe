@@ -107,6 +107,11 @@ def main():
     ap.add_argument("--traj", default="gemma4_train5k")
     ap.add_argument("--tokens", type=int, default=3_400_000, help="response-token budget")
     ap.add_argument("--lr", type=float, default=3e-5)
+    ap.add_argument("--data-seed", type=int, default=0,
+                    help="permutation seed for batch order. Default 0 reproduces every "
+                         "run made before 2026-08-26. Vary it to get a training-variance "
+                         "replicate: the paired McNemar error bar on a benchmark covers "
+                         "question sampling only and says nothing about run-to-run spread.")
     ap.add_argument("--extra-lr-div", type=float, default=5.0,
                     help="router/norm full-weight lr = lr / this")
     ap.add_argument("--accum", type=int, default=16)
@@ -770,7 +775,9 @@ def main():
     accum_batches = max(1, A.accum // mb)      # 16 rows per optimizer step
     lidx = sorted(range(len(rows)), key=lambda i: rows[i]["ids"].shape[0])
     chunks = [lidx[i:i + mb] for i in range(0, len(lidx), mb)]
-    order = torch.randperm(len(chunks), generator=torch.Generator().manual_seed(0)).tolist()
+    order = torch.randperm(
+        len(chunks),
+        generator=torch.Generator().manual_seed(A.data_seed)).tolist()
     oi = 0
     if A.resume:
         ck = torch.load(A.out, map_location="cpu", weights_only=False)
