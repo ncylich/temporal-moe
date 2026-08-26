@@ -9,6 +9,8 @@ local_path,hf_repo,hf_path,bytes,sha256,run_name,cited
 /workspace/olmoe-adapt/data/gemma_ce_realmath_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_realmath_adapter.pt,2017942038,4fbc7483d61d90d85c74c93d3fa49d55a75e718f47fee93bdbf55501f3c8692f,,
 /workspace/olmoe-adapt/data/gemma_ce_rebuild_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_rebuild_adapter.pt,2017942038,d4b1d40e2b8a21b919cdfa307ca87dfdff7ee2711834e3e6584f3932f199427d,,
 /workspace/olmoe-adapt/data/gemma_ce_selfgen_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_selfgen_adapter.pt,2017942038,b802270b55e57f4c841d31930db09da7d7081c69014ec9547e01a86e3323c7df,,
+/workspace/olmoe-adapt/data/gemma_ce_short1pass_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_short1pass_adapter.pt,2017942038,533d00e9c537994e298eabb9f213dffb1655d19149ac9ab4e77e63baca043be4,,
+/workspace/olmoe-adapt/data/gemma_ce_short3p4m_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_short3p4m_adapter.pt,2017942038,b852cb16fddf5d996a9bdcd89f1ddb21211d0654b8730736369abd8915ed186d,,
 /workspace/olmoe-adapt/data/gemma_ce_thinkon_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_thinkon_adapter.pt,2017942038,b1725d391de9ff591015664c55032d91e08b9f0ce97bca7e6029d49def0772e7,,
 /workspace/olmoe-adapt/data/qwen_ce_rebuild_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/qwen_ce_rebuild_adapter.pt,1915453614,aba1899ff7f9535b8931b58b906784d18fbe7fc6238539c0326f594a0edc17a2,,
 /workspace/olmoe-adapt/data/qwen_ce_thinkon_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/qwen_ce_thinkon_adapter.pt,1915453614,f80aecd2d7a64ae06cb41a084e7c7b430cc7a92ec0e2b25514af693e56c93cad,,

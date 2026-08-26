@@ -12,6 +12,10 @@ echo "CORE GOAL: adapters FULLY fixed, trained, merged, re-measured, with GOOD r
 echo "  Verify every merge with verify_merge.py. Evaluate the FULL surface: GSM8K, IFEval,"
 echo "  MMLU (grid_parallel) + HumanEval (channel-aware producer) + WritingBench (wb_arm)."
 echo "  A parallel grid alone is 3 of 5 cells."
+echo "STATS GATE (2026-08-26): n=200 GSM8K has cross-arm SE ~3.0pt. NO D7 arm has beaten"
+echo "  the unadapted base. Run analysis/residency/arm_power.py and require |z|>1.96"
+echo "  before calling any arm an improvement. Full split = --tasks gsm8k_cot_zeroshot=0"
+echo "  (n=1319, SE ~1.2). gemma4 = flexible-extract only; strict-match is always 0.000."
 echo "LIVE GPU WORK (GPUs 0 and 1 are reserved for other users):"
 for g in 0 1 2 3; do
   mem=$(nvidia-smi -i $g --query-gpu=memory.used --format=csv,noheader 2>/dev/null)
