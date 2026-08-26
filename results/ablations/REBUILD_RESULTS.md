@@ -448,3 +448,20 @@ Consequences, stated plainly:
 - A benchmark's generation cap is part of its measurement, not an implementation detail. The
   n=200-vs-n=1319 lesson has a twin: sample size AND budget both have to be right before a
   null means anything.
+
+### Frontier operating points, paired at n=1319 (supersedes the screening table)
+
+The critical-rate table above uses a 10-POINT drop as its threshold. That is adequate for
+locating a cliff and far too permissive for a deployment claim. Paired against the same arm
+at RHO=0, both cells at n=1319:
+
+| arm | resident | reduced rate | saving | accuracy | vs full rate |
+|---|---|---|---|---|---|
+| R16 | 12.5% | 0.574 | 1.7x | 87.6 | **+1.1 +/- 0.6 (free)** |
+| R32 | 25% | 0.194 | 5.2x | 84.8 | -2.9 +/- 0.7 (z=-4.30) |
+| R64 | 50% | 0.084 | 11.9x | 83.2 | -4.1 +/- 0.8 (z=-5.40) |
+
+**Only ~1.7x is free.** Larger savings buy bandwidth with accuracy along a smooth curve;
+they are not a free lunch. The earlier framing of R64 as a "12x saving" quoted the -4.0 cost
+from screening and still presented the point as attractive -- the number was right and the
+framing oversold it. Quote the pair, not the bandwidth factor alone.
