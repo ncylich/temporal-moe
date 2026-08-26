@@ -182,3 +182,27 @@ Consequences:
 Fix in flight: rescore on the FULL GSM8K test split (1,319 problems, `--tasks
 "gsm8k_cot_zeroshot=0"`), which takes the within-record SE to ~0.9 and the cross-record
 SE to ~1.2. Same benchmark, same data, scored completely instead of sampled at 200.
+
+## Full-split GSM8K settles it: the adapter works (2026-08-26)
+
+Scored on all 1,319 GSM8K test problems (`--tasks "gsm8k_cot_zeroshot=0"`), flexible-extract.
+
+| record | free | R8 | R16 | R8-free | R16-free |
+|---|---|---|---|---|---|
+| gemma4_instruct (no adapter) | 87.8 | 78.8 | 86.6 | -9.0 (z=-9.26) | -1.2 (z=-2.26) |
+| gemma4_ce_rebuild (D7 published recipe) | 86.8 | 81.9 | 87.5 | -4.9 (z=-5.81) | +0.7 (z=+1.24) |
+| improvement vs base | | | | **+4.1 +/- 1.3, z=+3.17** | **+1.9 +/- 0.8, z=+2.46** |
+
+The D7 reconstruction closes 45% of the R8 residency gap and eliminates the R16 gap
+entirely (its R16 arm scores above its own free arm). Both clear |z| > 1.96.
+
+The n=200 sample was not merely noisy, it was unrepresentative: it put the base R8 gap at
+-6.0 where the full split puts it at -9.0. **Every conclusion drawn from the n=200 sweep is
+void in both directions** -- the arms recorded above as "not resolved" were being compared
+against a base estimate that was off by 3 points, so none of them is actually falsified
+except the length family, whose internal comparisons (363 vs 650 tokens, 0.6M vs 3.4M
+budget, all exactly -6.0 on identical questions) were self-consistent. Those arms need
+re-measurement at n=1319 before any of them is ranked.
+
+Practical rule going forward: residency-gap claims are made at n=1319, never at n=200.
+A full-split 3-arm gemma cell costs ~25 min on one H200.
