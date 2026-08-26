@@ -465,3 +465,31 @@ at RHO=0, both cells at n=1319:
 they are not a free lunch. The earlier framing of R64 as a "12x saving" quoted the -4.0 cost
 from screening and still presented the point as attractive -- the number was right and the
 framing oversold it. Quote the pair, not the bandwidth factor alone.
+
+### CORRECTION to the budget-artifact section above (2026-08-26, same day)
+
+The section above concluded from ONE run (rebuild) that raising the cap to 8192 lets the
+adapter fully repair HumanEval. A second D7 run at the same budget contradicts it:
+
+| benchmark @8192 | base gap | rebuild | seed3 | D7 mean |
+|---|---|---|---|---|
+| HumanEval n=164 | -4.9 | +0.0 (recovery +4.9) | -7.3 (recovery -2.4) | +1.2 |
+| MBPP n=500 | -14.0 | -11.4 (+2.6) | -12.4 (+1.6) | +2.1 |
+
+The two HumanEval runs sit ~3 sigma apart. At n=164 that surface cannot support a
+single-run claim in either direction -- which was already established earlier in this same
+document and was ignored when the 8192 number looked decisive.
+
+What survives, across both budgets and all runs:
+- **MBPP damage is real, large and largely unrepaired**: -14.6 at 1536, -14.0 at 8192, with
+  a consistent but small D7 recovery of ~+2 that never approaches significance against a
+  14-point gap. Budget does NOT explain MBPP.
+- HumanEval is too small (n=164, SE 1.7 per gap, ~2.4 cross-run) to settle anything; its
+  runs scatter from -7.3 to +0.0.
+- The code-mix arm (d7code, 26.7% code) is within run scatter of the D7 arms on both
+  surfaces at 8192, as it was at 1536. The hypothesis remains unsupported.
+
+Sequence of claims made about code tonight, all from under-measurement:
+"no movement" (unmeasurable at n=164) -> "a real null" (one MBPP run, sd 3.5) ->
+"a budget artifact, adapter repairs code" (one HumanEval run at 8192) -> the above.
+Each correction came from adding a replicate, never from new reasoning.
