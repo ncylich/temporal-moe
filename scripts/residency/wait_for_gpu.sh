@@ -14,7 +14,7 @@ WANT=${1:-}
 deadline=$(( $(date +%s) + ${TIMEOUT:-3600} ))
 declare -A ok
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  for g in ${WANT:-1 2 3}; do
+  for g in ${WANT:-2 3}; do
     used=$(nvidia-smi -i "$g" --query-gpu=memory.used --format=csv,noheader 2>/dev/null | tr -dc 0-9)
     tot=$(nvidia-smi -i "$g" --query-gpu=memory.total --format=csv,noheader 2>/dev/null | tr -dc 0-9)
     free_gb=$(( (${tot:-0} - ${used:-0}) / 1024 ))

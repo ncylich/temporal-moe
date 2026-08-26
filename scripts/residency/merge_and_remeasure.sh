@@ -49,7 +49,7 @@ mkdir -p $LOG
 # job and OOM'd against its 136 GiB.
 case "${1:?usage: merge_and_remeasure.sh gemma|qwen}" in
   gemma)
-    DEV=${GPU:-1}; BASE=/dev/shm/gemma4-26b-it; MERGED=/root/models/gemma4-realmath-merged
+    DEV=${GPU:-2}; BASE=/dev/shm/gemma4-26b-it; MERGED=/root/models/gemma4-realmath-merged
     ADAPTER=$DATA/gemma_ce_realmath_adapter.pt; REC=gemma4_ce_realmath
     MODEL_KEY=gemma4_instruct; ARMS=free,R8,R16; RANK=32; TRAJ=gemma4_d7_seq4096 ;;
   qwen)

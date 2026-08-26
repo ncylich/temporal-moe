@@ -5,6 +5,7 @@ local_path,hf_repo,hf_path,bytes,sha256,run_name,cited
 /workspace/instruct-traj/qwen35_d7think.pt,ncylich/temporal-moe-extras,adaptation/instruct-traj/qwen35_d7think.pt,139497997,d283cab8abe59a9fbfcf6c54796d08767c6f2e62e2e76d6ed86d33377ca8ad11,,
 /workspace/olmoe-adapt/data/d7_prompts.jsonl,ncylich/temporal-moe-extras,adaptation/data/d7_prompts.jsonl,7053261,e6e334de9b40bf9ea786a537db76d2e20ac5ae087e067d70e899c43f911ce06d,,
 /workspace/olmoe-adapt/data/d7_prompts.meta.json,ncylich/temporal-moe-extras,adaptation/data/d7_prompts.meta.json,1353,dfbac8621ece576e81e3f3aa499bd0335a0797271e06cdd87342a75306a7d7f3,,
+/workspace/olmoe-adapt/data/gemma_ce_kl003_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_kl003_adapter.pt,2017942038,d9d3d463f03defc0e6ba9f1c8013acfed331c3c701f497c5ad361ad1f2644c8e,,
 /workspace/olmoe-adapt/data/gemma_ce_realmath_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_realmath_adapter.pt,2017942038,4fbc7483d61d90d85c74c93d3fa49d55a75e718f47fee93bdbf55501f3c8692f,,
 /workspace/olmoe-adapt/data/gemma_ce_rebuild_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_rebuild_adapter.pt,2017942038,d4b1d40e2b8a21b919cdfa307ca87dfdff7ee2711834e3e6584f3932f199427d,,
 /workspace/olmoe-adapt/data/gemma_ce_selfgen_adapter.pt,ncylich/temporal-moe-extras,adaptation/adapters/gemma_ce_selfgen_adapter.pt,2017942038,b802270b55e57f4c841d31930db09da7d7081c69014ec9547e01a86e3323c7df,,

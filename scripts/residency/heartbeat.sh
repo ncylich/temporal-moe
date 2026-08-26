@@ -12,13 +12,15 @@ echo "CORE GOAL: adapters FULLY fixed, trained, merged, re-measured, with GOOD r
 echo "  Verify every merge with verify_merge.py. Evaluate the FULL surface: GSM8K, IFEval,"
 echo "  MMLU (grid_parallel) + HumanEval (channel-aware producer) + WritingBench (wb_arm)."
 echo "  A parallel grid alone is 3 of 5 cells."
-echo "LIVE GPU WORK:"
+echo "LIVE GPU WORK (GPUs 0 and 1 are reserved for other users):"
 for g in 0 1 2 3; do
   mem=$(nvidia-smi -i $g --query-gpu=memory.used --format=csv,noheader 2>/dev/null)
   ut=$(nvidia-smi -i $g --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null)
   pid=$(nvidia-smi -i $g --query-compute-apps=pid --format=csv,noheader 2>/dev/null | head -1)
   if [ -n "$pid" ]; then
     cmd=$(ps -o cmd= -p "$pid" 2>/dev/null | sed 's|.*/python[0-9.]* *-u* *||' | cut -c1-58)
+  elif [ "$g" = "0" ]; then
+    cmd="idle -- RESERVED for other users, do not claim"
   else
     cmd="IDLE -- give it work"
   fi
@@ -35,5 +37,6 @@ printf "  RAM %s  local %s  network-ours %s\n" \
 echo "BACKGROUND QUEUE:"
 echo "  * unsloth: ROOT-CAUSED (deterministic algorithms -> bit-exact). Still to do:"
 echo "    measure the throughput price of --no-unsloth, then decide whether to switch back."
-echo "  * backfill WritingBench for arm A (the control everything is measured against)."
+echo "  * gemma think-on GSM8K has NO base arm at 16384 -- its +0.0/+3.5 are absolute"
+echo "    numbers, not effects. Run the baseline before quoting them."
 echo "  * BASELINE_METHODS_COMPARISON.md -- no published competitor implemented yet."

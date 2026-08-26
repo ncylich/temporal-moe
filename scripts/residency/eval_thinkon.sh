@@ -39,7 +39,7 @@ case "${1:?usage: eval_thinkon.sh gemma|qwen}" in
          A=/workspace/olmoe-adapt/data/qwen_ce_thinkon_adapter.pt
          KEY=qwen35_instruct; REC=qwen35_ce_thinkon; ARMS=free,R8,R32; RANK=16 ;;
 esac
-export CUDA_VISIBLE_DEVICES=${GPU:-1}
+export CUDA_VISIBLE_DEVICES=${GPU:-2}
 [ -s "$A" ] || { echo "### $1-thinkon ABORT: adapter missing"; exit 2; }
 
 if [ ! -d "$M" ]; then

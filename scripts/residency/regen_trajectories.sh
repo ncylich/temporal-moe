@@ -47,11 +47,11 @@ mkdir -p $OUT $LOG
 # think-on responses exceeding 3072 with a median think response of 2346 -- which the
 # 8192 cap already covers. GPU is overridable; this box is shared.
 case "${1:?usage: regen_trajectories.sh gemma|qwen|qwen-think|gemma-think}" in
-  gemma) DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7;  EXTRA=() ;;
+  gemma) DEV=${GPU:-2}; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7;  EXTRA=() ;;
   qwen)  DEV=${GPU:-2}; MODEL=/dev/shm/qwen35-35b-a3b; TAG=qwen35_d7;  EXTRA=(--max-seqs 128) ;;
-  qwen-think)  DEV=${GPU:-1}; MODEL=/dev/shm/qwen35-35b-a3b; TAG=qwen35_d7think
+  qwen-think)  DEV=${GPU:-2}; MODEL=/dev/shm/qwen35-35b-a3b; TAG=qwen35_d7think
                EXTRA=(--max-seqs 128 --think on) ;;
-  gemma-think) DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7think
+  gemma-think) DEV=${GPU:-2}; MODEL=/dev/shm/gemma4-26b-it;  TAG=gemma4_d7think
                EXTRA=(--think on) ;;
   *) echo "unknown: $1" >&2; exit 2 ;;
 esac

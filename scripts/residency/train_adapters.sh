@@ -61,7 +61,7 @@ mkdir -p $DATA $LOG
 # out from under it. Pin a lane to a device that is actually free rather than assuming.
 case "${1:?usage: train_adapters.sh gemma|qwen}" in
   gemma)
-    DEV=${GPU:-1}; MODEL=/dev/shm/gemma4-26b-it; TRAJ=gemma4_d7_seq4096
+    DEV=${GPU:-2}; MODEL=/dev/shm/gemma4-26b-it; TRAJ=gemma4_d7_seq4096
     FAM=(--family gemma4 --no-unsloth); RANK=32; KLW=0.05; MB=16; OPT=(--opt adamw)
     OUT=$DATA/gemma_ce_realmath_adapter.pt ;;
   qwen)

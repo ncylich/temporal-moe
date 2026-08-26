@@ -33,7 +33,7 @@ WritingBench sits within the across-subset SD of D12 and above base on all three
 `01-findings`' claim that *"adaptation pays no fluency tax"* reproduces. HumanEval recovers
 substantially from the base's −6.1 but not to the published −1.2.
 
-## Four data hypotheses, all eliminated
+## Five hypotheses, all eliminated
 
 | # | hypothesis | test | result |
 |---|---|---|---|
@@ -41,6 +41,8 @@ substantially from the base's −6.1 but not to the published −1.2.
 | 2 | the math lane needs *better real* math | whole lane swapped to math.stackexchange (StackMathQA), lineage-clean | −5.5 → **−6.0**. No effect |
 | 3 | the code lane | held identical across arms | control: −4.9 / −4.3 / −4.3, ≈0.6pt arm-to-arm variance |
 | 4 | token-budget coverage | the original's 3.4M was one COMPLETE pass (371 tok/row × 9,173); ours covers 46–60%. Ran a full pass at 7,356,394 tokens | −5.5 → **−7.5**, i.e. worse — independently reproducing the ladder's "more tokens hurt" (D10 collapsed constrained GSM8K +4 → −10 at 10M) on a new pool at KL 0.05 |
+
+| 5 | the KL anchor is over-anchoring the constrained arm | KL 0.03, the lower end of the bracket `gemma_adapt_RESULTS` §Open names as untested. Strict single variable: identical pool, trajectories, budget, rank, batch | **no change** — R8 stays −5.5. The free arm rose to 0.880, the highest of any arm, which is the OPPOSITE of the ladder's prediction that less anchoring weakens the free arm and strengthens the constrained one. The dial that governs the free/constrained tradeoff on MMLU has no purchase on GSM8K at R8 |
 
 Only hypothesis 1 moved GSM8K, and it moved it for the wrong reason. That is itself a
 useful demonstration: benchmark-shaped training data produces exactly the signature the
@@ -65,8 +67,24 @@ For gemma4, R16 is 12.5% resident and R8 is 6.25%. The adapters recover the cons
 different data recipes or a doubled token budget. `gemma_adapt_RESULTS` already warns that
 cross-model claims should quote matched *fractions* rather than matched R, because
 "R8-of-256 (3.1%) is structurally harder than anything gemma faced"; the same logic applies
-within a model. The remaining levers are training-side, not data-side — the KL bracket
-0.03/0.07 that §Open names as untested is the first of them.
+within a model. The first training-side lever, the KL bracket at 0.03, has now been tried and does not
+move it either.
+
+Full four-arm picture at R8:
+
+| benchmark | pub D12 | base | armA | armC | full-pass | KL 0.03 |
+|---|---|---|---|---|---|---|
+| GSM8K | +0.0 | −6.0 | −5.5 | −6.0 | −7.5 | −5.5 |
+| IFEval | −1.0 | +0.0 | −1.0 | −2.5 | +0.5 | −3.0 |
+| MMLU | −1.8 | −0.2 | +0.0 | +0.0 | +1.3 | −0.4 |
+
+**Conclusion.** This is not a pool-reconstruction failure. Four data recipes, a doubled
+token budget and a KL change all leave the same shape: R8 at −5.5 to −7.5, R16 at −0.5 to
+−1.0. Something specific to gemma4 at 6.25% residency on math resists adaptation, and the
+published D12's +0.0 on that cell depends on something the recipe as written down does not
+capture. That belongs in the paper as a reproducibility caveat on one cell, not as a silent
+gap — and §1.5's second disposition follows: keep the published numbers, release these
+adapters as labelled replications with this table beside them.
 
 ## B2: think-on adaptation (RECOVER_DATA_PLAN Part 0 group B)
 

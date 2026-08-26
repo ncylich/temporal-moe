@@ -29,7 +29,7 @@ cd $ROOT
 PY=/workspace/venv_vllm312/bin/python
 LOG=${LOG_DIR:-/workspace/rerun-logs}
 MODEL=${1:?gemma|qwen}; MERGED=${2:?merged dir}; REC=${3:?record}
-IFS=',' read -ra G <<< "${GPUS:-1,2,3}"
+IFS=',' read -ra G <<< "${GPUS:-2,3}"
 
 case "$MODEL" in
   gemma) KEY=gemma4_instruct; ARMS=free,R8,R16; THINK=(); HE=(analysis/residency/humaneval_gemma.py) ;;
@@ -50,7 +50,7 @@ CUDA_VISIBLE_DEVICES=${G[1]} $PY -u analysis/residency/instruct_genbench_vllm.py
   --tasks "ifeval=200" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94 \
   > $LOG/grid_${MODEL}_ifeval.log 2>&1 &
 pids+=($!)
-CUDA_VISIBLE_DEVICES=${G[2]} $PY -u analysis/residency/mmlu_gptoss.py \
+CUDA_VISIBLE_DEVICES=${G[2]:-${G[1]}} $PY -u analysis/residency/mmlu_gptoss.py \
   --model $KEY --path $MERGED --arms $ARMS --record-as ${REC}_dual "${THINK[@]}" \
   --gpu-mem 0.94 > $LOG/grid_${MODEL}_mmlu.log 2>&1 &
 pids+=($!)
