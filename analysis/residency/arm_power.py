@@ -34,7 +34,11 @@ def load(rec, arm, task):
         return None
     out = {}
     for i in json.load(open(p))["items"]:
-        out[i["doc_id"]] = max(out.get(i["doc_id"], 0.0), i["exact_match"])
+        # gsm8k/mmlu dumps key on doc_id and carry exact_match once per metric;
+        # the HumanEval producer keys on doc and carries a boolean pass instead.
+        k = i["doc_id"] if "doc_id" in i else i["doc"]
+        v = float(i["exact_match"]) if "exact_match" in i else float(bool(i["pass"]))
+        out[k] = max(out.get(k, 0.0), v)
     return {k: bool(v) for k, v in out.items()}
 
 
