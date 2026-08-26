@@ -14,11 +14,14 @@ echo "  MMLU (grid_parallel) + HumanEval (channel-aware producer) + WritingBench
 echo "  A parallel grid alone is 3 of 5 cells."
 echo "STATS GATE (2026-08-26): claims are made at n=1319, NEVER at n=200 -- the 200-sample"
 echo "  is biased, not just noisy (base R8 gap reads -6.0 there, -9.0 on the full split)."
-echo "  RESULT: gemma4_ce_rebuild heals R8 +4.1+/-1.3 (z=3.17) and R16 +1.9+/-0.8 (z=2.46)."
+echo "  RESULT (4 runs, same recipe): GSM8K R8 recovery mean +3.1, run sd 1.1 -- the"
+echo "  +4.1 from the rebuild run alone was the best of four. Quote the MEAN, not a run."
+echo "  CODE: HumanEval +2.2 (3/3 runs positive), MBPP -0.7 (scattered). They disagree;"
+echo "  code recovery is 0..+2 at most, well under math. d7code arm tests the mix fix."
 echo "  Run analysis/residency/arm_power.py and require |z|>1.96"
 echo "  before calling any arm an improvement. Full split = --tasks gsm8k_cot_zeroshot=0"
 echo "  (n=1319, SE ~1.2). gemma4 = flexible-extract only; strict-match is always 0.000."
-echo "LIVE GPU WORK (GPUs 0 and 1 are reserved for other users):"
+echo "LIVE GPU WORK (all four GPUs available as of 2026-08-26):"
 for g in 0 1 2 3; do
   mem=$(nvidia-smi -i $g --query-gpu=memory.used --format=csv,noheader 2>/dev/null)
   ut=$(nvidia-smi -i $g --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null)
@@ -26,7 +29,7 @@ for g in 0 1 2 3; do
   if [ -n "$pid" ]; then
     cmd=$(ps -o cmd= -p "$pid" 2>/dev/null | sed 's|.*/python[0-9.]* *-u* *||' | cut -c1-58)
   elif [ "$g" = "0" ]; then
-    cmd="idle -- RESERVED for other users, do not claim"
+    cmd="idle -- give it work"
   else
     cmd="IDLE -- give it work"
   fi
