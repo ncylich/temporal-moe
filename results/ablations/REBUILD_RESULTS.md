@@ -269,3 +269,44 @@ Correction recorded: the arm labelled `realmath` was NOT trained on StackMathQA.
 adapter metadata reads traj=gemma4_d7_seq4096 and its chain log builds only the standard
 D7 trajectory -- build_realmath_lane.py never ran. It is a second run of the D7 recipe, so
 it is a run-to-run replicate (+3.3 vs rebuild's +4.1), not independent-data evidence.
+
+## Swap rate: quality is flat over a 14x bandwidth reduction, then falls off a cliff (2026-08-26)
+
+BASELINE_METHODS_COMPARISON.md #3 (cache-conditional experts, Skliar et al.,
+arXiv:2412.00099), implemented on the serving path as a swap deadband: evict only when the
+best non-resident logit beats the worst resident one by more than RHO. RHO=0 is the
+published min_logit rule, verified bit-identical, so no existing row moves. Producer:
+`TEMPORAL_RHO` in `temporal/temporal_router.py` (applied in both `_step` and
+`_minlogit_step` so the CUDA-graph path and its eager reference stay equal).
+
+gemma4, R8 (6.25% resident), full GSM8K test split, free arm 87.8:
+
+| RHO | swaps/token | GSM8K R8 | paired vs RHO=0 |
+|---|---|---|---|
+| 0.00 | 0.99 | 78.8 | reference (published rule) |
+| 0.25 | 0.79 | 79.4 | +0.6 +/- 1.1 |
+| 0.50 | 0.42 | 80.0 | +1.2 +/- 1.0 |
+| 1.00 | 0.07 | 78.3 | -0.5 +/- 1.1 |
+| 2.00 | 0.00 | **71.7** | **-7.1 +/- 1.3 (z=-5.59)** |
+
+**Quality is unchanged across a 14x reduction in swap traffic** (0.99 -> 0.07 swaps per
+token; every point within +/-1.1 of the published rule), and then collapses by 7.1 points
+when swaps reach exactly zero. So the swaps matter, but only a handful of them do: roughly
+one swap per fourteen tokens preserves full quality, and none at all is catastrophic.
+
+Consequences:
+
+- The bandwidth cost of rolling residency as currently served is ~14x higher than the
+  quality needs. This is a free serving win, available with no training and no memory cost,
+  since R stays pinned at 8 throughout.
+- Skliar's method is **complementary, not competitive**. It buys bandwidth, which is what
+  their paper claims; it does not bound the resident set, which is the memory claim. Appendix
+  E can now make that argument from a measurement on our own system rather than from their
+  reported table.
+- The zero-swap point is the honest control for "does the rolling constraint do any work at
+  all". It does: freezing the resident set at whatever prefill left costs 7.1 points.
+
+Two predictions of mine were wrong here and are recorded because the sequence matters:
+quality would FALL as RHO rose (it did not, until the cliff), and the 0.25/0.50 rise was a
+trend worth reporting (RHO=1.0 flattened it; it was noise). The curve only became
+interpretable at five points.
