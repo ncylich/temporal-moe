@@ -206,3 +206,33 @@ re-measurement at n=1319 before any of them is ranked.
 
 Practical rule going forward: residency-gap claims are made at n=1319, never at n=200.
 A full-split 3-arm gemma cell costs ~25 min on one H200.
+
+## The rebuild arm on all five benchmarks (2026-08-26)
+
+`gemma4_ce_rebuild` = the faithful D7 published-recipe reconstruction, expert-LoRA r32 on
+the 3D expert tensors + attention LoRA r32 + router/RMSNorm, 3.4M response tokens.
+All cells are base-vs-adapted at MATCHED settings, paired by question, R8 = 6.25% resident.
+
+| benchmark | n | base R8-free | rebuild R8-free | rebuild vs base | verdict |
+|---|---|---|---|---|---|
+| GSM8K | 1319 | -9.0 | -4.9 | +4.1 +/- 1.3 (z=3.17) | **REAL** |
+| HumanEval | 164 | -5.5 | -5.5 | +0.0 +/- 2.9 | unresolvable at n=164 |
+| IFEval | 541 | -1.8 | -2.6 | -0.7 +/- 1.6 | no change |
+| MMLU | 228 | -0.4 | +1.8 | +2.2 +/- 1.8 | not resolved |
+| WritingBench | 150 | -0.073 | -0.080 | -0.007 +/- 0.143 | no change |
+
+Reading: **residency damage is concentrated on GSM8K** (-9.0) and HumanEval (-5.5). MMLU
+(-0.4) and WritingBench (-0.073) are barely touched by the constraint, so there is almost
+nothing there for adaptation to recover, and IFEval loses under 2 points. The adapter
+closes 45% of the GSM8K gap and eliminates the R16 gap entirely (-1.2 -> +0.7, z=2.46),
+while costing nothing on any other surface -- the "adaptation pays no fluency tax" claim
+reproduces (WritingBench unchanged within +/-0.14).
+
+Two cells cannot be strengthened by more data: HumanEval has only 164 problems total
+(SE 2.9, so it resolves nothing below ~5.7 points) and WritingBench's 150 queries are
+critic-scored. Report them as unresolved rather than as nulls.
+
+Matched-settings notes, each of which had to be fixed before the comparison was valid:
+- base IFEval had only ever run at n=200 while the adapted arm ran the full 541;
+- base MMLU had only `mmlu_flan_cot_fewshot` while the adapted arm used the dual producer;
+- gemma4 strict-match is identically 0.000 (channel markers) -- flexible-extract only.
