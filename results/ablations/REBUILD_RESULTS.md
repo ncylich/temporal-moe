@@ -493,3 +493,29 @@ Sequence of claims made about code tonight, all from under-measurement:
 "no movement" (unmeasurable at n=164) -> "a real null" (one MBPP run, sd 3.5) ->
 "a budget artifact, adapter repairs code" (one HumanEval run at 8192) -> the above.
 Each correction came from adding a replicate, never from new reasoning.
+
+## The recipe sits at a sharp optimum: four knobs, four failures (2026-08-26)
+
+`gemma_adapt_RESULTS.md` asserts "all settings load-bearing" without showing the ablation.
+This is that ablation, on the rebuilt pool. GSM8K n=1319, absolute accuracy; the adapter's
+job is to raise the R8 arm above the unadapted base's 78.8.
+
+| arm | free | R8 | vs base R8 |
+|---|---|---|---|
+| base (no adapter) | 87.8 | 78.8 | -- |
+| **rebuild (published settings)** | 86.8 | **81.9** | **+3.1** |
+| d7code_s2 (published settings + code lane) | 87.7 | 81.1 | +2.4 |
+| A2: KL weight 0.05 -> 0.02 | 87.6 | 79.2 | +0.5 |
+| A1: lr 3e-5 -> 5e-5 | 87.0 | 78.1 | -0.7 |
+| A3: expert-LoRA r32 -> r64 | 87.6 | 77.3 | -1.5 |
+
+Every lever that lets the model adapt HARDER makes it worse: more capacity, bigger steps,
+weaker anchoring. With the earlier budget result (3.4M beats both 0.6M and 7.36M) that is
+four independent knobs all showing the published settings at a local optimum, and the
+KL anchor at 0.05 doing real work rather than acting as a safety margin.
+
+Consequence for the D12 gap: the rebuild reaches +3.1 where D12 reported +6.0, and none of
+these knobs closes it -- they all point the wrong way. The remaining difference is most
+likely the PROMPT POOL, which is a reconstruction from a prose spec because the original
+was lost with the pod. That is the honest disposition: the recipe is reproducible, the
+data is not.
