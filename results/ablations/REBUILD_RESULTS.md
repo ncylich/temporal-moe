@@ -236,3 +236,36 @@ Matched-settings notes, each of which had to be fixed before the comparison was 
 - base IFEval had only ever run at n=200 while the adapted arm ran the full 541;
 - base MMLU had only `mmlu_flan_cot_fewshot` while the adapted arm used the dual producer;
 - gemma4 strict-match is identically 0.000 (channel markers) -- flexible-extract only.
+
+## Code: MBPP shows the damage HumanEval was too small and too ceilinged to see (2026-08-26)
+
+HumanEval put base R8 code damage at -5.5 with a detection floor of +/-5.7 -- unable to
+resolve its own effect. Its free arm also sits at 98.2, near ceiling, which compresses how
+much damage is even expressible. MBPP (500 problems, free arm 86.8) has room to move.
+
+| surface | n | base R8-free | rebuild R8-free | rebuild vs base |
+|---|---|---|---|---|
+| HumanEval | 164 | -5.5 | -4.3 | +1.2 +/- 2.7 (z=0.45) |
+| MBPP | 500 | **-14.6** | -13.4 | +1.2 +/- 2.6 (z=0.46) |
+| pooled code | 664 | **-12.3** | -11.1 | +1.2 +/- 2.1 (z=0.58) |
+
+Two findings, both important:
+
+1. **Code is the most residency-damaged surface, not math.** Pooled code loses 12.3 points
+   at R8 against GSM8K's 9.0. HumanEval understated it by ~7 points because its free arm is
+   at ceiling. Any claim about where rolling residency hurts that rests on HumanEval alone
+   is understating the code cost.
+
+2. **The adapter does not fix code.** +1.2 +/- 2.1 pooled, z=0.58. This is now a real null,
+   not an absence of measurement: at n=664 the surface resolves +/-4.1, so a math-sized
+   recovery (+3.1) would have been near-detectable and the point estimate is well below it.
+   Against the same adapter's +3.1 +/- 1.0 on GSM8K, the honest statement is that the
+   recipe recovers math and leaves the worst-damaged surface essentially untouched.
+
+D7 carries 431 code rows out of 8,482 (5.1%). Whether code damage is fixable by a
+code-weighted mix is untested and is the obvious next experiment.
+
+Correction recorded: the arm labelled `realmath` was NOT trained on StackMathQA. Its
+adapter metadata reads traj=gemma4_d7_seq4096 and its chain log builds only the standard
+D7 trajectory -- build_realmath_lane.py never ran. It is a second run of the D7 recipe, so
+it is a run-to-run replicate (+3.3 vs rebuild's +4.1), not independent-data evidence.
