@@ -28,6 +28,11 @@ IFS=':' read -ra SRCS <<< "${BACKUP_SRCS:-/root/.claude:$REPO_ROOT}"
 
 mkdir -p "$DST"
 
+# Liveness is checked via this pidfile, never with `pgrep -f`: that pattern matches the
+# shell running it, so a check false-positives and a kill takes out the caller.
+PIDFILE="${BACKUP_PIDFILE:-/workspace/tmoe_queue/pids/backup.pid}"
+mkdir -p "$(dirname "$PIDFILE")"
+
 # ionice idle class + nice 19: yields to the experiments, never competes for I/O.
 # No --delete: this is a backup, not a mirror. Removing a file from the container
 # disk must never remove it from the durable copy.
@@ -47,7 +52,8 @@ if [[ "${1:-loop}" == "once" ]]; then
   exit 0
 fi
 
-echo "[$(date -u +%FT%TZ)] backup daemon started -> $DST every ${INTERVAL}s"
+echo $$ > "$PIDFILE"; trap 'rm -f "$PIDFILE"' EXIT
+echo "[$(date -u +%FT%TZ)] backup daemon started (pid $$) -> $DST every ${INTERVAL}s"
 while true; do
   backup_once
   echo "[$(date -u +%FT%TZ)] synced ($(du -sh "$DST" 2>/dev/null | cut -f1))"

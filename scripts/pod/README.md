@@ -1,4 +1,23 @@
-# Pod backup
+# Pod backup and restore
+
+## After a pod restart, run one command
+
+```
+/workspace/temporal-moe/scripts/pod/restore-all.sh
+```
+
+No flags, no environment variables. It restores `/root` from the snapshot, re-stages both
+base models, checks that everything on `/workspace` survived, and starts the backup daemon
+and the four GPU queue runners. Safe to re-run: every step is skipped if already satisfied.
+
+Add `--check` to see what it would do without changing anything.
+
+## Before stopping the pod
+
+```
+/workspace/temporal-moe/scripts/pod/snapshot.sh save
+```
+
 
 The container disk (`/`) is wiped when the pod stops. `/workspace` is a network volume and
 survives. These two scripts keep everything irreplaceable on the durable side.
