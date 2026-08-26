@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Direct HumanEval scorer: exec each prediction+test in a fresh subprocess with a
 timeout (the sandboxing code_eval performs, without its fork-under-filelock issue).
-Reads /tmp/heg_preds.json {preds: [[code]], tests: [test]}, prints 'PASS1 <frac>'."""
+Reads the preds file named by argv[1] (default /tmp/heg_preds.json)
+{preds: [[code]], tests: [test]}, prints 'PASS1 <frac>'. The path is an argument so two
+producers can score concurrently without clobbering each other's file."""
 import json
+import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-d = json.load(open("/tmp/heg_preds.json"))
+d = json.load(open(sys.argv[1] if len(sys.argv) > 1 else "/tmp/heg_preds.json"))
 def run_one(args):
     pred, test = args
     try:
