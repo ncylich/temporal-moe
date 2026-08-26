@@ -39,6 +39,13 @@ def main():
                     help="load --out adapter, save merged model to this dir, exit")
     A = ap.parse_args()
 
+    # Same accommodation the gemma trainer makes: on this pod the cuDNN fused-attention
+    # backend raises CUDNN_STATUS_SUBLIBRARY_VERSION_MISMATCH out of
+    # scaled_dot_product_attention and takes the unsloth path down before any work runs.
+    # Numerics-neutral -- flash and mem-efficient SDPA compute the same attention -- and
+    # "cuDNN SDP off" is already documented as part of the published qwen recipe.
+    torch.backends.cuda.enable_cudnn_sdp(False)
+
     rows = torch.load(f"/workspace/instruct-traj/{A.traj}.pt", weights_only=False)["rows"]
     rows = [r for r in rows if len(r["ids"]) <= A.max_seq]
     print(f"[qce] {len(rows)} trajectories (<= {A.max_seq} tokens)", flush=True)
