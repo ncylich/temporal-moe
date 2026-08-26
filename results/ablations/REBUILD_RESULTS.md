@@ -371,3 +371,49 @@ So there are three separable levers, where the paper currently plots one:
 
 Deployment consequence: RHO is NOT portable. At RHO=1.0 gemma runs 0.8985 swaps/token and
 qwen 0.9468 because their router logit scales differ. Tune to a target swap RATE per model.
+
+Note on the frontier's low-fraction end: gemma4 cannot be run below R8. Its top-k is 8, so
+the resident set must hold at least the experts a token routes to (`instruct_genbench_vllm.py`
+asserts R >= k). gemma's minimum resident fraction is therefore 6.25% and qwen's is 3.1%,
+and the 3.1% cell cannot be reproduced on gemma. The fraction-vs-model confound is instead
+tested at E/R=8, where gemma R16 (12.5% of 128) and qwen R32 (12.5% of 256) coincide.
+
+## Memory-for-bandwidth substitution is model-specific, not a design rule (2026-08-26)
+
+Critical swap rate = the measured swaps/token at which GSM8K falls 10 points below the
+same arm at RHO=0. Rates measured with `TEMPORAL_COUNT_SWAPS=1` on the same generations as
+the accuracy. Screening cells are n=200 (+/-3-4 points), adequate for locating a cliff.
+
+| E/R | resident | gemma4 (E=128) | qwen3.5 (E=256) |
+|---|---|---|---|
+| 32 | 3.1% | unreachable (R >= k = 8) | 0.82 |
+| 16 | 6.25% | 0.53 | 0.86 |
+| 8 | 12.5% | 0.25 | 0.79 |
+| 4 | 25% | 0.16 | 0.81 |
+| 2 | 50% | 0.07 | 0.30 |
+
+**gemma substitutes memory for bandwidth smoothly**: 0.53 -> 0.07 as resident memory goes
+6.25% -> 50%, well fit by rate ~ 0.042*(E/R)^0.85 (five points, 16x range, +/-15%, and the
+E/R=2 point was predicted before it was run). At 50% resident it needs 0.084 swaps/token --
+a 12x bandwidth saving.
+
+**qwen does not.** Its requirement is FLAT at ~0.8 swaps/token from E/R=32 down to E/R=4 --
+eight-fold more resident memory buys nothing -- and drops only at 50% resident. It is a step,
+not a curve.
+
+So there is no transferable law. At matched E/R=8 gemma needs 0.25 and qwen 0.79, 3x apart;
+at E/R=2, 0.07 vs 0.30. Any deployment must measure its own model's curve. That negative is
+the durable result here, and it is worth more than the law would have been, because it tells
+a practitioner to measure rather than to apply a constant.
+
+**Three false starts, recorded because the sequence is the lesson.** (1) "Quality falls as
+RHO rises" -- it does not, until the cliff. (2) "fraction x critical rate is conserved
+(~0.03)" -- the product drifts 0.026-0.040 and the true exponent is ~0.85, not 1. (3) "E/R
+sets the cliff" -- fit five gemma points across a 16x range within 15% and correctly
+predicted an extrapolated point, then missed qwen R32 by 3x. A within-model fit, however
+good, is not evidence of a mechanism. Every one of these was called from two or three points
+and killed by the next one.
+
+Architectural floor: gemma4 cannot be served below R8 because R >= top-k = 8, so its minimum
+resident fraction is 6.25% against qwen's 3.1%. Expert count sets how aggressive residency
+can be, which the memory-quality frontier does not currently express.
