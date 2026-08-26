@@ -142,3 +142,43 @@ family: *the instrument the harness offers is not the one the paper reports.*
 
 A parallel grid alone is **three of five** cells. HumanEval needs its architecture's
 producer and WritingBench needs the local critic.
+
+## Statistical power: why the D7 arm sweep was inconclusive (2026-08-26)
+
+Every arm number here is a difference of differences: (R8 - free) for an adapted
+checkpoint, against (R8 - free) for the unadapted base. Both levels are paired on the
+same questions, so the error bar is McNemar's, driven by the count of questions where
+the two arms disagree -- typically 13-27 of 200.
+
+At the sampled n=200 that puts the SE on a single record's residency gap at ~2.2 points
+and on a cross-record comparison at ~3.0 points. Producer:
+`analysis/residency/arm_power.py`.
+
+| record | R8 - free | z (within) | vs base | verdict |
+|---|---|---|---|---|
+| gemma4_instruct (no adapter) | -6.0 | -2.68 | reference | gap is real |
+| gemma4_ce_d12 | -0.5 | -0.28 | +5.5 +/- 2.9 | z=1.91, not resolved |
+| gemma4_ce_domain / think3k | -2.5 | -1.1 / -1.2 | +3.5 +/- 3.1 | not resolved |
+| gemma4_ce_selfgen | -3.0 | -1.60 | +3.0 +/- 2.9 | not resolved |
+| gemma4_ce_short1pass (mean 363 tok) | -6.0 | -2.83 | +0.0 +/- 3.1 | not resolved |
+| gemma4_ce_dose1024 (mean 650 tok) | -6.0 | -3.00 | +0.0 +/- 3.0 | not resolved |
+| gemma4_ce_fullpass | -9.5 | -3.66 | -3.5 +/- 3.4 | not resolved |
+
+Consequences:
+
+- **The residency gap itself is real** (base -6.0, z=-2.68) and reproduces across every
+  record. The open question is only whether any adaptation closes it.
+- **No D7-derived arm has been shown to beat doing nothing.** Six successive hypotheses
+  (self-generated math, StackMathQA, code-lane control, full-pass budget, KL weight,
+  response length) each moved 1-3 points and none cleared its own error bar. That
+  pattern is what an underpowered comparison looks like, not six failed mechanisms.
+- **The response-length hypothesis is falsified on its own terms**, independent of
+  power: cutting mean response length from 668 to 363 tokens and to 650 tokens produced
+  the SAME -6.0, so there is no dose-response along the axis the hypothesis predicted.
+- Only flexible-extract is meaningful for gemma4 here. strict-match reads 0.000 on every
+  gemma cell because the model emits `<channel|>` before the answer; an earlier -4.5
+  reported for short1pass came from misreading a strict row and is superseded by -6.0.
+
+Fix in flight: rescore on the FULL GSM8K test split (1,319 problems, `--tasks
+"gsm8k_cot_zeroshot=0"`), which takes the within-record SE to ~0.9 and the cross-record
+SE to ~1.2. Same benchmark, same data, scored completely instead of sampled at 200.
