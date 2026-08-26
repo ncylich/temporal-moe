@@ -196,6 +196,16 @@ def main():
                                   **({"samples": {task: sub[task]}} if use_sub
                                      else {}))
             secs = time.time() - t0
+            # Measured swap traffic for this cell (TEMPORAL_COUNT_SWAPS=1 only). The RHO
+            # sweep's bandwidth axis was simulated on a synthetic routing signal; this
+            # reports what the serving path actually did on THIS workload, so the
+            # bandwidth number and the quality number come from the same run.
+            if os.environ.get("TEMPORAL_COUNT_SWAPS") == "1":
+                from temporal.temporal_router import swap_stats
+                _sw, _rows, _rate = swap_stats()
+                print(f"  [swaps] {A.record_as or A.model} {arm_name} {task}: "
+                      f"{_sw} swaps over {_rows} stepped rows = {_rate:.4f}/token "
+                      f"(cumulative since process start)", flush=True)
             metrics = (res.get("groups") or res["results"]).get(task) or res["results"][task]
             for mk, mv in metrics.items():
                 if isinstance(mv, (int, float)) and "_stderr" not in mk:
