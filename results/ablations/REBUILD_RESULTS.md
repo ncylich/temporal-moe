@@ -329,3 +329,45 @@ practice. The tell was visible before the measurement -- RHO=1.75 and RHO=2.0 bo
 0.000 simulated swaps while differing by 5.3 quality points, which is impossible. Never
 divide a measured numerator by a simulated denominator: run with TEMPORAL_COUNT_SWAPS=1 so
 both axes come from the same generations.
+
+## The R x swap-rate frontier: memory and bandwidth substitute (2026-08-26)
+
+Falls out of the RHO sweep once swap rates are measured rather than simulated. All cells
+gemma4/qwen3.5 GSM8K, swap rate from `TEMPORAL_COUNT_SWAPS=1` on the same generations.
+
+**Resident fraction sets where the cliff is.** At comparable swap rates the tighter arm is
+destroyed while the looser one is untouched:
+
+| arm | resident fraction | swaps/token | GSM8K | vs its own RHO=0 |
+|---|---|---|---|---|
+| gemma R16 | 12.5% | 0.575 | 86.0 | -0.6 |
+| gemma R8 | 6.25% | 0.528 | 68.5 | -10.3 |
+| qwen R8 | 3.1% | 0.673 | 48.5 | -28.1 |
+
+Approximate rate at which quality breaks: 12.5% -> ~0.28/token, 6.25% -> ~0.53,
+3.1% -> ~0.75. The ordering is by resident FRACTION, not model identity. The product
+(fraction x critical rate) is ~0.035 / 0.033 / 0.023 -- suggestive of a conserved expert
+throughput, but these are three points interpolated off a coarse RHO grid at n=200 and the
+qwen point is the least constrained. Knee sweeps at finer resolution are the test; do not
+state the invariant until they land.
+
+**Adaptation does not move the cliff.** Base vs adapted at R8, same swap rates:
+
+| RHO | swaps/token | base | adapted | delta |
+|---|---|---|---|---|
+| 0 | 0.999 | 78.8 | 81.9 | +3.1 |
+| 2.0 | ~0.525 | 68.5 | 71.5 | +3.0 |
+| 2.5 | ~0.295 | 51.5 | 51.0 | -0.5 |
+| 3.0 | ~0.086 | 12.5 | 16.5 | +4.0 |
+
+A flat vertical offset of roughly +3 at every swap rate, with the collapse in the same
+place. The adapter learns to be more accurate under the constraint, not to need fewer swaps.
+
+So there are three separable levers, where the paper currently plots one:
+- resident fraction R/E: moves the cliff horizontally (memory buys bandwidth tolerance)
+- adaptation: moves quality vertically (~+3, cliff unchanged)
+- swap rate: the axis previously held fixed at ~1/token as if it were a property of the
+  method rather than a tunable
+
+Deployment consequence: RHO is NOT portable. At RHO=1.0 gemma runs 0.8985 swaps/token and
+qwen 0.9468 because their router logit scales differ. Tune to a target swap RATE per model.
