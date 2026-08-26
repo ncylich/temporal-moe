@@ -270,43 +270,62 @@ adapter metadata reads traj=gemma4_d7_seq4096 and its chain log builds only the 
 D7 trajectory -- build_realmath_lane.py never ran. It is a second run of the D7 recipe, so
 it is a run-to-run replicate (+3.3 vs rebuild's +4.1), not independent-data evidence.
 
-## Swap rate: quality is flat over a 14x bandwidth reduction, then falls off a cliff (2026-08-26)
+## Swap rate: the swaps are necessary. min_logit sits near the efficient frontier (2026-08-26)
 
 BASELINE_METHODS_COMPARISON.md #3 (cache-conditional experts, Skliar et al.,
 arXiv:2412.00099), implemented on the serving path as a swap deadband: evict only when the
 best non-resident logit beats the worst resident one by more than RHO. RHO=0 is the
 published min_logit rule, verified bit-identical, so no existing row moves. Producer:
-`TEMPORAL_RHO` in `temporal/temporal_router.py` (applied in both `_step` and
-`_minlogit_step` so the CUDA-graph path and its eager reference stay equal).
+`TEMPORAL_RHO` in `temporal/temporal_router.py`; swap rates measured with
+`TEMPORAL_COUNT_SWAPS=1` (`swap_stats()`), reported per cell by the eval driver.
 
-gemma4, R8 (6.25% resident), full GSM8K test split, free arm 87.8:
+gemma4, R8 (6.25% resident), full GSM8K test split, free arm 87.8. Swap rate is MEASURED on
+the same generations as the accuracy, not simulated:
 
-| RHO | swaps/token | GSM8K R8 | paired vs RHO=0 |
-|---|---|---|---|
-| 0.00 | 0.99 | 78.8 | reference (published rule) |
-| 0.25 | 0.79 | 79.4 | +0.6 +/- 1.1 |
-| 0.50 | 0.42 | 80.0 | +1.2 +/- 1.0 |
-| 1.00 | 0.07 | 78.3 | -0.5 +/- 1.1 |
-| 2.00 | 0.00 | **71.7** | **-7.1 +/- 1.3 (z=-5.59)** |
+| RHO | swaps/token | reduction | GSM8K R8 | paired vs RHO=0 |
+|---|---|---|---|---|
+| 0.00 | 0.9987 | 1.00x | 78.8 | reference (published rule) |
+| 0.25 | -- | -- | 79.4 | +0.6 +/- 1.1 |
+| 0.50 | 0.9806 | 1.02x | 80.0 | +1.2 +/- 1.0 |
+| 1.00 | 0.8985 | 1.11x | 78.3 | -0.5 +/- 1.1 |
+| 1.25 | 0.8270 | 1.21x | 79.7 | +0.9 +/- 1.1 |
+| 1.50 | 0.7405 | 1.35x | 77.9 | -0.8 +/- 1.1 |
+| 1.75 | 0.6390 | 1.56x | 77.0 | -1.7 +/- 1.1 |
+| 2.00 | 0.5281 | **1.89x** | **71.7** | **-7.1 +/- 1.3 (z=-5.59)** |
 
-**Quality is unchanged across a 14x reduction in swap traffic** (0.99 -> 0.07 swaps per
-token; every point within +/-1.1 of the published rule), and then collapses by 7.1 points
-when swaps reach exactly zero. So the swaps matter, but only a handful of them do: roughly
-one swap per fourteen tokens preserves full quality, and none at all is catastrophic.
+**About 36% of swap traffic is removable for free; removing 47% costs 7.1 points.** There is
+no order-of-magnitude headroom -- there is barely a factor of two. Nearly every swap
+min_logit performs is doing work, so the eviction rule operates close to the efficient
+frontier and the mechanism cannot be cheapened much without breaking.
 
-Consequences:
+Quality is flat over RHO 0-1.75 on FIVE benchmarks and two models, base and adapted, so the
+free region is general even though it is narrow:
 
-- The bandwidth cost of rolling residency as currently served is ~14x higher than the
-  quality needs. This is a free serving win, available with no training and no memory cost,
-  since R stays pinned at 8 throughout.
-- Skliar's method is **complementary, not competitive**. It buys bandwidth, which is what
-  their paper claims; it does not bound the resident set, which is the memory claim. Appendix
-  E can now make that argument from a measurement on our own system rather than from their
-  reported table.
-- The zero-swap point is the honest control for "does the rolling constraint do any work at
-  all". It does: freezing the resident set at whatever prefill left costs 7.1 points.
+| surface | n | RHO=0 | RHO=1.0 | paired |
+|---|---|---|---|---|
+| GSM8K | 1319 | 78.8 | 78.3 | -0.5 +/- 1.1 |
+| MBPP | 500 | 72.2 | 72.2 | +0.0 +/- 2.3 |
+| HumanEval | 164 | 92.7 | 93.3 | +0.6 +/- 2.2 |
+| IFEval | 541 | 86.9 | 87.6 | +0.7 +/- 1.1 |
+| MMLU | 228 | 92.5 | 94.3 | +1.8 +/- 1.4 |
 
-Two predictions of mine were wrong here and are recorded because the sequence matters:
-quality would FALL as RHO rose (it did not, until the cliff), and the 0.25/0.50 rise was a
-trend worth reporting (RHO=1.0 flattened it; it was noise). The curve only became
-interpretable at five points.
+Also: gemma R16 +0.0 +/- 0.5, qwen R8 (3.1% resident) -0.2 +/- 1.1, adapted gemma R8
+-0.9 +/- 1.1 -- the deadband composes with the adapter at no cost.
+
+**RHO does not transfer across models.** At RHO=1.0 gemma runs 0.8985 swaps/token and qwen
+0.9468, because their router logit scales differ. Any deployment setting must be expressed
+as a target swap rate and tuned per model, never as a shared RHO.
+
+Consequence for Appendix E: Skliar's method is not refuted, it is simply operating where
+there is little to win. Under a hard R=k bound the swaps are load-bearing, and their bonus
+can buy ~36% before quality breaks. That is now a measurement on our own system across five
+benchmarks rather than an argument from their reported table.
+
+**Correction, recorded because the error was mine and it was large.** This section first
+claimed a 14x (then 65x) free bandwidth reduction. That came from a SIMULATED swap rate
+computed on a synthetic correlated routing signal whose logit gaps are far tighter than the
+real router's, so a deadband that suppressed 93% of swaps in simulation suppresses 10% in
+practice. The tell was visible before the measurement -- RHO=1.75 and RHO=2.0 both showed
+0.000 simulated swaps while differing by 5.3 quality points, which is impossible. Never
+divide a measured numerator by a simulated denominator: run with TEMPORAL_COUNT_SWAPS=1 so
+both axes come from the same generations.
