@@ -508,8 +508,10 @@ job is to raise the R8 arm above the unadapted base's 78.8.
 | A2: KL weight 0.05 -> 0.02 | 87.6 | 79.2 | +0.5 |
 | A1: lr 3e-5 -> 5e-5 | 87.0 | 78.1 | -0.7 |
 | A3: expert-LoRA r32 -> r64 | 87.6 | 77.3 | -1.5 |
+| A4: 3.4M -> 5M tokens | -- | 80.1 | +1.4 |
 
-Every lever that lets the model adapt HARDER makes it worse: more capacity, bigger steps,
+All four variants lose to the published settings, and they degrade in order of distance
+from them. Every lever that lets the model adapt HARDER makes it worse: more capacity, bigger steps,
 weaker anchoring. With the earlier budget result (3.4M beats both 0.6M and 7.36M) that is
 four independent knobs all showing the published settings at a local optimum, and the
 KL anchor at 0.05 doing real work rather than acting as a safety margin.
@@ -519,3 +521,7 @@ these knobs closes it -- they all point the wrong way. The remaining difference 
 likely the PROMPT POOL, which is a reconstruction from a prose spec because the original
 was lost with the pod. That is the honest disposition: the recipe is reproducible, the
 data is not.
+
+Caveat: each variant is ONE training run against a run-to-run sd of 0.9, so no single
+comparison here is airtight (A4 vs rebuild is ~1.9 sigma). The conclusion rests on the
+monotone ordering across four independent knobs, not on any one cell.
