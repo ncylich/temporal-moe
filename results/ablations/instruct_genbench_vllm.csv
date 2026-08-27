@@ -1902,3 +1902,8 @@ gemma4_ce_selfgen_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extr
 gemma4_ce_selfgen_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,549
 gemma4_ce_selfgen_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,549
 gemma4_ce_selfgen_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.866566,full,2048,549
+gemma4_ce_selfgen_full,128,8,free,,ifeval,sample_len,541.000000,full,2048,213
+gemma4_ce_selfgen_full,128,8,free,,ifeval,"prompt_level_strict_acc,none",0.900185,full,2048,213
+gemma4_ce_selfgen_full,128,8,free,,ifeval,"inst_level_strict_acc,none",0.930456,full,2048,213
+gemma4_ce_selfgen_full,128,8,free,,ifeval,"prompt_level_loose_acc,none",0.918669,full,2048,213
+gemma4_ce_selfgen_full,128,8,free,,ifeval,"inst_level_loose_acc,none",0.943645,full,2048,213

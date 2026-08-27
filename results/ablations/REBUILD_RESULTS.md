@@ -750,3 +750,20 @@ regenerating: `selfgen_math_2341.jsonl` holds the stage-A INSTRUCTIONS (120 dist
 templates, repeated), not the problems -- a pool spliced from it collapses to ~120 math
 rows under dedup. The authored problems are `selfgen_math_prompts.jsonl` (2,671 distinct).
 The qwen cross-model test uses those authored problems with qwen's own solutions.
+
+### Style, not contamination (2026-08-27)
+
+Two measurements separate the claims. 8-gram overlap with GSM8K test: selfgen 63 of 2,671
+authored problems hit, StackMathQA 0, WildChat 0 -- but every one of the 17 distinct hit
+grams is question-stem boilerplate ("how many hours will it take them to complete", "how much
+money will she have left over after"), max 2 per row, no numbers or names. The gemma selfgen
+pool was built through build_d7_prompts.py and so was screened; those rows never trained.
+Style: selfgen prompts share a median 4.5% of their 4-grams with GSM8K test (p90 12.2%),
+StackMathQA 0% (p90 3.4%). The lane reproduces GSM8K's phrasing and structure without
+reproducing any item.
+
+So the published +6.0 is not leaked test data. It is an adapter trained on problems in the
+benchmark's exact format, which an n-gram screen cannot catch because the text is novel.
+This is why the lineage rule bans synthetic derivatives by PROVENANCE rather than by
+post-hoc filtering -- and why a self-generation pipeline that produces benchmark-format
+items is a derivative even with a clean screen.
