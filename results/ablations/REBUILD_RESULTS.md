@@ -525,3 +525,45 @@ data is not.
 Caveat: each variant is ONE training run against a run-to-run sd of 0.9, so no single
 comparison here is airtight (A4 vs rebuild is ~1.9 sigma). The conclusion rests on the
 monotone ordering across four independent knobs, not on any one cell.
+
+## The rebuild on qwen3.5: it does not transfer at 3.1% resident (2026-08-27)
+
+Same recipe, same pool, qwen's own trajectories (`qwen35_d7_seq4096`), adapter
+`qwen_ce_rebuild_adapter.pt`. Same-arm delta = adapted arm minus base arm at the SAME
+constraint, so a moving baseline cannot flatter it. Published d12r figures are the
+same-arm gains stated in gemma_adapt_RESULTS.md.
+
+**R8 = 8/256 = 3.1% resident** (twice as tight as gemma's R8):
+
+| benchmark | base | d12r published | rebuild |
+|---|---|---|---|
+| GSM8K (n=1319) | 76.6 | +6.5 | +2.1 |
+| IFEval (n=541) | 82.6 | +3.5 | +0.2 |
+| HumanEval (n=164) | 90.9 | +3.0 | -1.8 |
+| MMLU (n=228) | 92.1 | -2.2 | -2.2 |
+| MBPP (n=500) | 75.2 | n/a | +1.6 |
+| **MEAN (4 published cells)** | | **+2.7** | **-0.4** |
+
+**R32 = 12.5% resident** (the fraction matching gemma's R8):
+
+| benchmark | base | rebuild |
+|---|---|---|
+| GSM8K | 79.8 | +3.2 |
+| HumanEval | 89.0 | +0.6 |
+| MMLU | 93.4 | -1.8 |
+| MBPP | 76.4 | +2.6 |
+| **MEAN (3 published cells)** | | **+0.7** |
+
+Read against gemma's +1.6 mean, the recipe **transfers poorly**: net-negative at 3.1%
+resident and only mildly positive at 12.5%. MMLU was the cell most likely to rescue the
+mean, since it is where the published arm LOST -- it came in at exactly -2.2, matching
+published, so it pulls our mean down rather than up.
+
+The one signal consistent across both models and both bounds is MATH: gemma +3.1,
+qwen +2.1 (R8) / +3.2 (R32). Everything else is within noise or negative. The defensible
+claim from this rebuild is a gemma math-recovery result with a partial qwen replication at
+matched residency fraction -- not a general adaptation method.
+
+Instrument note: HumanEval is n=164 with 10-17 arm disagreements, so neither the gemma
++2.4 nor the qwen -1.8 is individually resolvable; their difference is ~1.4 sigma. Do not
+read a model contrast into that cell.
