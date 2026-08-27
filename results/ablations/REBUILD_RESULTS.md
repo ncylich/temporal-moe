@@ -840,3 +840,23 @@ is an arithmetic slip appearing or disappearing. The adapter RESHUFFLES which pr
 the slip. It does not lower the slip rate, because nothing in a full-trajectory CE loss
 rewards the correct digit specifically. This is the quantity --digit-weight is meant to
 change; the test is whether the "broke" column shrinks without the "fixed" column shrinking.
+
+### Dose-response and the selfgen connection
+
+Arithmetic-slip share of real constrained failures vs residency fraction (LaTeX-aware parse,
+noise floor 10-17%):
+
+| model | 3.1% | 6.25% | 12.5% |
+|---|---|---|---|
+| qwen base | 71% (107/150) | -- | 60% (64/107) |
+| gemma base | -- | 63% (89/142) | **27% (9/33)** |
+
+Monotone on both models; at 12.5% resident gemma's arithmetic slips nearly reach the noise
+floor and there are only 33 failures left. Arithmetic breakage is the specific signature of
+tight residency.
+
+And it explains the selfgen lane's gain. Slips among gemma R8 failures: base 89, rebuild 57,
+**selfgen 33**. Model-authored word problems are arithmetic-dense, so digit tokens were a
+larger share of that lane's loss -- it upweighted arithmetic by accident, with
+benchmark-format data as the vehicle. `--digit-weight` is the same lever applied on
+purpose, on real prompts.
