@@ -174,6 +174,12 @@ def main():
                          "response-token CE under free and R8 routing; saves "
                          "{row_index: (ce_free fp16, ce_r8 fp16)} to PATH, then "
                          "exits. Feeds --tok-weights")
+    ap.add_argument("--digit-weight", type=float, default=1.0,
+                    help="multiply the CE loss on DIGIT tokens by this factor. Failure "
+                         "analysis (REBUILD_RESULTS.md, 2026-08-27): residency breaks the "
+                         "arithmetic primitive (5+4+2=8) while digit tokens are 6.3% of the "
+                         "response and digits after '=' 0.66%, so plain CE spends >99% of its "
+                         "gradient on tokens that do not fail. 1.0 = off (bit-identical).")
     ap.add_argument("--tok-weights", default=None,
                     help="path from --precompute-tokw: weight response-token CE by "
                          "w = 1 + 2*clip(ce_R8 - ce_free, 0, 3) (constraint-"
@@ -316,6 +322,17 @@ def main():
         print(f"[gce] disagreement weights loaded for {len(TOKW)} rows "
               f"(w = 1 + 2*clip(ce_R8 - ce_free, 0, 3))", flush=True)
 
+    DIGW = None
+    if A.digit_weight != 1.0:
+        import re as _re
+        _V = len(tok)
+        DIGW = torch.ones(_V, device="cuda")
+        _n = 0
+        for _i in range(_V):
+            if _re.fullmatch(r"\s?\d+", tok.decode([_i])):
+                DIGW[_i] = A.digit_weight; _n += 1
+        print(f"[gce] digit-weight {A.digit_weight} on {_n} digit token ids", flush=True)
+
     DEC = HEAD = None
     if A.no_unsloth:
         # chunked-head path: never materialise [B,S,V] logits (2.5GB bf16 at
@@ -332,12 +349,21 @@ def main():
             if not bool(m_.any()):
                 continue
             hb, tb = hid[b][m_], targets[b][m_]
-            for j in range(0, tb.shape[0], 512):
-                num = num + torch.utils.checkpoint.checkpoint(
-                    lambda h_, t_: torch.nn.functional.cross_entropy(
-                        HEAD(h_).float(), t_, reduction="sum"),
-                    hb[j:j + 512], tb[j:j + 512], use_reentrant=False)
-            den += int(m_.sum())
+            if DIGW is None:
+                for j in range(0, tb.shape[0], 512):
+                    num = num + torch.utils.checkpoint.checkpoint(
+                        lambda h_, t_: torch.nn.functional.cross_entropy(
+                            HEAD(h_).float(), t_, reduction="sum"),
+                        hb[j:j + 512], tb[j:j + 512], use_reentrant=False)
+                den += int(m_.sum())
+            else:
+                # weighted mean: digit tokens carry --digit-weight, everything else 1
+                for j in range(0, tb.shape[0], 512):
+                    num = num + torch.utils.checkpoint.checkpoint(
+                        lambda h_, t_: (torch.nn.functional.cross_entropy(
+                            HEAD(h_).float(), t_, reduction="none") * DIGW[t_]).sum(),
+                        hb[j:j + 512], tb[j:j + 512], use_reentrant=False)
+                den += float(DIGW[tb].sum())
         return num / den / scale
 
     def batch_ce(logits, tgt, scale, ridx=None):
@@ -355,11 +381,17 @@ def main():
                 # 248k vocab) is recomputed per 512-token slice in backward
                 lgb_, tg_ = logits[b][m_], targets[b][m_]
                 for j in range(0, tg_.shape[0], 512):
-                    num = num + torch.utils.checkpoint.checkpoint(
-                        lambda lg_, t_: torch.nn.functional.cross_entropy(
-                            lg_.float(), t_, reduction="sum"),
-                        lgb_[j:j + 512], tg_[j:j + 512], use_reentrant=False)
-                den += int(m_.sum())
+                    if DIGW is None:
+                        num = num + torch.utils.checkpoint.checkpoint(
+                            lambda lg_, t_: torch.nn.functional.cross_entropy(
+                                lg_.float(), t_, reduction="sum"),
+                            lgb_[j:j + 512], tg_[j:j + 512], use_reentrant=False)
+                    else:
+                        num = num + torch.utils.checkpoint.checkpoint(
+                            lambda lg_, t_: (torch.nn.functional.cross_entropy(
+                                lg_.float(), t_, reduction="none") * DIGW[t_]).sum(),
+                            lgb_[j:j + 512], tg_[j:j + 512], use_reentrant=False)
+                den += int(m_.sum()) if DIGW is None else float(DIGW[tg_].sum())
                 continue
             ce = torch.nn.functional.cross_entropy(
                 logits[b][m_].float(), targets[b][m_], reduction="none")
