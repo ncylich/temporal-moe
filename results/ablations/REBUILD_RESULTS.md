@@ -824,3 +824,19 @@ base R8, 89/106 adapted R8) and **66% on gemma** (87/131, 57/92), against noise 
 13-17%. Examples the plain regex missed: `5000 + 2*5000` written as `\$5,000 + \$10,000 =
 \$16,000`; `300+200+500` in prose as "$800". Arithmetic slips are two-thirds to five-sixths
 of the damage. The rest is scorer artifacts plus a small residue of wrong plans.
+
+### The mechanism is systematic across five independent gemma runs
+
+| run | broke | of which NEW slip | fixed | of which slip gone |
+|---|---|---|---|---|
+| rebuild | 75 | 37 (49%) | 116 | 59 (51%) |
+| seed1 | 100 | 45 (45%) | 112 | 59 (53%) |
+| seed2 | 85 | 37 (44%) | 126 | 61 (48%) |
+| seed3 | 97 | 42 (43%) | 123 | 68 (55%) |
+| realmath | 81 | 31 (38%) | 114 | 55 (48%) |
+
+Every run repairs ~120 problems and breaks ~90; in both directions about half the movement
+is an arithmetic slip appearing or disappearing. The adapter RESHUFFLES which problems get
+the slip. It does not lower the slip rate, because nothing in a full-trajectory CE loss
+rewards the correct digit specifically. This is the quantity --digit-weight is meant to
+change; the test is whether the "broke" column shrinks without the "fixed" column shrinking.
