@@ -42,8 +42,9 @@ echo "  quote a simulated rate: use TEMPORAL_COUNT_SWAPS=1 and swap_stats()."
 echo "  Run analysis/residency/arm_power.py and require |z|>1.96"
 echo "  before calling any arm an improvement. Full split = --tasks gsm8k_cot_zeroshot=0"
 echo "  (n=1319, SE ~1.2). gemma4 = flexible-extract only; strict-match is always 0.000."
-echo "LIVE GPU WORK (all four GPUs available as of 2026-08-26):"
-for g in 0 1 2 3; do
+echo "LIVE GPU WORK ($(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l) GPU(s) on this machine):"
+NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l)
+for g in $(seq 0 $((NGPU-1))); do
   mem=$(nvidia-smi -i $g --query-gpu=memory.used --format=csv,noheader 2>/dev/null)
   ut=$(nvidia-smi -i $g --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null)
   pid=$(nvidia-smi -i $g --query-compute-apps=pid --format=csv,noheader 2>/dev/null | head -1)
@@ -82,7 +83,7 @@ echo "    Third scaling law tonight to die on a second model. Always test cross-
 echo "  Run analysis/residency/arm_power.py and require |z|>1.96"
 echo "  before calling any arm an improvement. Full split = --tasks gsm8k_cot_zeroshot=0"
 echo "  (n=1319, SE ~1.2). gemma4 = flexible-extract only; strict-match is always 0.000."
-echo "LIVE GPU WORK (all four GPUs available as of 2026-08-26):"
+echo "LIVE GPU WORK ($(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l) GPU(s) on this machine):"
 for g in 0 1 2 3; do
   mem=$(nvidia-smi -i $g --query-gpu=memory.used --format=csv,noheader 2>/dev/null)
   ut=$(nvidia-smi -i $g --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null)

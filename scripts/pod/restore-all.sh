@@ -66,7 +66,11 @@ else
   if [ -f "$BP" ] && kill -0 "$(cat $BP)" 2>/dev/null; then ok "backup daemon already running"
   else nohup "$REPO/scripts/pod/backup.sh" > /root/backup.log 2>&1 &
        sleep 1; ok "backup daemon started (log: /root/backup.log)"; fi
-  for g in 0 1 2 3; do
+  # one runner per PHYSICAL gpu -- this used to hardcode 0..3 and would spawn four
+  # runners fighting over a single device on a smaller machine (2026-08-26).
+  NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l)
+  echo "  detected $NGPU GPU(s)"
+  for g in $(seq 0 $((NGPU-1))); do
     f=/workspace/tmoe_queue/pids/runner$g.pid
     if [ -f "$f" ] && kill -0 "$(cat $f)" 2>/dev/null; then ok "queue runner $g already up"
     else nohup "$REPO/scripts/residency/orchestration/tmoe_runner.sh" $g >/dev/null 2>&1 &
