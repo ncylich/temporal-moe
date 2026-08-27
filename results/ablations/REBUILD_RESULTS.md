@@ -882,3 +882,36 @@ And it explains the selfgen lane's gain. Slips among gemma R8 failures: base 89,
 larger share of that lane's loss -- it upweighted arithmetic by accident, with
 benchmark-format data as the vehicle. `--digit-weight` is the same lever applied on
 purpose, on real prompts.
+
+## THE FIX AT THE SOURCE WORKS ON QWEN: digit-weight 10 (2026-08-27)
+
+Producer: `tmoe_qwen_digit.sh 10` (the rebuild recipe unchanged plus `--digit-weight 10`),
+scored by `failure_filter.py --adapted qwen35_ce_digit10_n1319` and `slip_position.py`.
+The weighting costs nothing at training time (440 tok/s against 433) and the weighted loss
+at step 50 is lower, not higher (0.40 against 0.62): under teacher forcing the digit after
+an `=` is easy, which is why the unweighted loss never saw the failure.
+
+GSM8K, n=1319, flexible-extract, same arms for every row:
+
+| arm | base | rebuild | digit10 | digit10 vs base | digit10 vs rebuild (paired McNemar) |
+|---|---|---|---|---|---|
+| free | 85.9 | 86.7 | 87.1 | +1.2 (z=2.0) | +0.5, discordant 31/25, z=0.8 |
+| R8 (3.1%) | 76.6 | 78.8 | 82.0 | +5.4 (z=5.1) | +3.3, discordant 109/66, z=3.3 |
+| R32 (12.5%) | 79.8 | 83.0 | 85.1 | +5.3 (z=5.8) | +2.1, discordant 75/47, z=2.5 |
+
+The criterion set before the run was that the "adapter broke" column should shrink without
+the "damage fixed" column shrinking. Against the rebuild: broke 92 to 61, fixed 103 to 115,
+unfixed 47 to 35. The false-equation rate at R8 falls from 3.77% to 2.29%, so the adapter now
+removes 63% of the constraint's arithmetic excess where the rebuild removed 29% (gemma's
+rebuild: 52%). At R32 the rate is 1.19% against a base of 3.35%.
+
+Why this and not the seven levers before it: every earlier knob changed how hard the adapter
+trained on the same signal; this one changed which tokens carry the signal, to the class the
+failure analysis had singled out. The self-generated D12 lane had done the same thing by
+accident (arithmetic-dense text upweights digits), which is how the published qwen number
+was reached without anyone knowing why.
+
+Open at the time of writing: gemma at W=10 (running), the qwen surface beyond GSM8K
+(IFEval, MMLU, HumanEval, MBPP; queued, records `qwen35_ce_digit10_{full,n_dual,code}`),
+and W=3 for dose-response. The GSM8K gain is not a result until the rest of the surface
+shows it was not bought elsewhere.
