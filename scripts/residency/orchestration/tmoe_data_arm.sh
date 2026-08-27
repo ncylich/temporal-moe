@@ -16,31 +16,26 @@ B=/dev/shm/gemma4-26b-it; TAG=gemma4_$NAME
 A=/workspace/olmoe-adapt/data/gemma_ce_${NAME}_adapter.pt
 M=/root/models/gemma4-${NAME}-merged
 KL=/workspace/instruct-traj/${TAG}_seq4096_klref.pt
-G=scripts/residency/wait_gpu_free.sh
+L=scripts/residency/gpu_lease.sh
 scripts/residency/disk_budget.sh || exit 3
 echo "### $NAME trajectories $(date -u +%H:%M)"
-[ -s /workspace/instruct-traj/${TAG}.pt ] || { $G 120 7200
-  /workspace/venv_vllm312/bin/python -u analysis/residency/gen_traj_vllm.py \
+[ -s /workspace/instruct-traj/${TAG}.pt ] || { $L /workspace/venv_vllm312/bin/python -u analysis/residency/gen_traj_vllm.py \
     --model $B --tag $TAG --prompts "$PROMPTS" --max-new 3072 --max-prompt-tok 1024 --gpu-mem 0.90; }
 [ -s /workspace/instruct-traj/${TAG}_seq4096.pt ] || \
   /workspace/venv_fla/bin/python analysis/residency/cut_trajectories.py --tag $TAG --max-seq 4096
 COMMON="--model $B --family gemma4 --no-unsloth --traj ${TAG}_seq4096 --max-seq 4096
         --expert-lora-r 32 --opt adamw --micro-batch 16 --out $A"
 echo "### $NAME KL precompute $(date -u +%H:%M)"
-[ -s "$KL" ] || { $G 120 3600
-  /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON --precompute-kl $KL; }
+[ -s "$KL" ] || { $L /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON --precompute-kl $KL; }
 echo "### $NAME train $(date -u +%H:%M)"
-[ -s "$A" ] || { $G 120 3600
-  /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON \
+[ -s "$A" ] || { $L /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON \
     --accum 16 --lr 3e-5 --tokens 3400000 --kl-anchor $KL --kl-weight 0.05 "$@"; }
 echo "### $NAME merge $(date -u +%H:%M)"
-[ -d $M ] || { $G 120 3600
-  /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py $COMMON --merge-out $M
+[ -d $M ] || { $L /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py $COMMON --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true; }
 /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### $NAME eval $(date -u +%H:%M)"
-$G 120 3600
-/workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
+$L /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
   --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${NAME}_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
 echo "### $NAME ALL DONE $(date -u +%H:%M)"
