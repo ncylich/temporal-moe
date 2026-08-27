@@ -17,7 +17,7 @@ echo "  was made on math + 2 code cells before IFEval and HumanEval@8192 landed.
 echo "  FULL surface the code lane is net-negative: rebuild mean +1.6 vs d7code -0.2"
 echo "  (4 published cells). The code lane buys MBPP (+3.6, best of any arm) and pays"
 echo "  it back on IFEval (-3.0) and HumanEval (-1.8). Canonical: gemma_ce_rebuild."
-echo "QWEN TRANSFER IS POOR (2026-08-27): mean -0.4 at R8 (3.1% resident), +0.7 at R32"
+echo "QWEN TRANSFER IS POOR (2026-08-27): mean -0.4 at R8 (3.1% resident), +0.2 at R32"
 echo "  (12.5%), vs gemma +1.6. MMLU landed at exactly the published -2.2, so it did"
 echo "  NOT rescue the mean. Only MATH is consistent across both models and bounds."
 echo "RECIPE IS AT A SHARP OPTIMUM (5 knobs at n=1319, base R8 78.8; KL-arm added 08-27):"
