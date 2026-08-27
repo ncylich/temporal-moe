@@ -107,6 +107,17 @@ def main():
     ap.add_argument("--traj", default="gemma4_train5k")
     ap.add_argument("--tokens", type=int, default=3_400_000, help="response-token budget")
     ap.add_argument("--lr", type=float, default=3e-5)
+    ap.add_argument("--router-only", action="store_true",
+                    help="BASELINE #2 (ReMoE): train ONLY the router projections, freezing "
+                         "attention LoRA, expert LoRA and norms. Their method is a post-hoc "
+                         "router finetune, so giving it our full adaptation surface would "
+                         "compare capacity rather than objective.")
+    ap.add_argument("--remoe-lambda", type=float, default=0.0,
+                    help="weight on the ReMoE recency-reuse objective (0 = off). Their "
+                         "recipe trains with the residency constraint OFF, so pair this "
+                         "with --no-constraint for the faithful remake.")
+    ap.add_argument("--remoe-gamma", type=float, default=0.9,
+                    help="recency decay for the reuse objective; 0.9 ~ a 10-token window")
     ap.add_argument("--data-seed", type=int, default=0,
                     help="permutation seed for batch order. Default 0 reproduces every "
                          "run made before 2026-08-26. Vary it to get a training-variance "
@@ -456,6 +467,19 @@ def main():
                 or n.endswith(".mlp.gate.weight"):  # qwen35 router (not shared_expert_gate)
             p.requires_grad_(True)
             extra.append(p)
+    if A.router_only:
+        # ReMoE is a router-only method; freeze every other trainable surface so the
+        # comparison is objective-vs-objective, not capacity-vs-capacity.
+        keep = {id(p) for p in extra}
+        n_off = 0
+        for n, p in model.named_parameters():
+            if p.requires_grad and id(p) not in keep:
+                p.requires_grad_(False); n_off += 1
+        # norms are not the router either -- drop them too
+        for n, p in model.named_parameters():
+            if p.requires_grad and n.endswith("norm.weight"):
+                p.requires_grad_(False); n_off += 1
+        print(f"[gce] --router-only: froze {n_off} non-router tensors", flush=True)
     train_params = [p for p in model.parameters() if p.requires_grad]
     print(f"[gce] stack={'unsloth' if use_unsloth else 'hf+peft'} trainable="
           f"{sum(p.numel() for p in train_params)/1e6:.1f}M (extra router/norm "
@@ -823,10 +847,23 @@ def main():
                 loss.backward()      # free the constrained graph BEFORE the KL
                 del hid
             else:
+                # ReMoE (baseline #2): its objective is defined over ROUTER logits, so the
+                # router forward stashes them for the duration of this step only.
+                if A.remoe_lambda > 0:
+                    GL.CFG["collect"] = []
                 logits = model(ids, attention_mask=am).logits[:, :-1]
                 loss = batch_ce(logits, tgt, accum_batches, ridx=ridx)
+                if A.remoe_lambda > 0:
+                    from temporal.ablation_mechanisms import remoe_reuse_loss
+                    col = GL.CFG.pop("collect", []) or []
+                    if col:
+                        k_ = int(getattr(model.config, "num_experts_per_tok", 8) or 8)
+                        reuse = sum(remoe_reuse_loss(c, k_, A.remoe_gamma)
+                                    for c in col) / len(col)
+                        loss = loss + (A.remoe_lambda * reuse / accum_batches)
                 loss.backward()
                 del logits
+                GL.CFG.pop("collect", None)
             if KLREF is not None:    # forward: two live graphs OOM'd at mb2/4096
                 if A.kl_arm == "free":
                     GL.CFG.update(on=False, enforce_from=0, batch=1)

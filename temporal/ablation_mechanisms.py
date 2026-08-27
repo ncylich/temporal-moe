@@ -374,3 +374,52 @@ def cosmoes_block_loss(logits: torch.Tensor, block: int) -> torch.Tensor:
     log_unused = torch.log1p(-p.clamp(max=1 - 1e-6)).sum(dim=1)   # [n, B, E]
     soft_used = -torch.expm1(log_unused)                          # 1 - exp(log_unused)
     return soft_used.sum(dim=-1).mean()                 # soft |distinct experts| per block
+
+
+def remoe_reuse_loss(logits: torch.Tensor, k: int, gamma: float = 0.9) -> torch.Tensor:
+    """ReMoE recency-bias reuse objective (Zhu et al., arXiv:2605.27081), reimplemented.
+
+    BASELINE_METHODS_COMPARISON.md baseline #2. Their method gives the router a bonus for
+    experts it picked on recent tokens, so it tends to pick them again, then finetunes ONLY
+    the router to lean into that bonus. Nothing is forbidden and the router may still choose
+    any expert, so the resident set is never bounded -- which is exactly why it cannot serve
+    at R = k by construction and we can. Their reported result is ~26% better expert reuse.
+
+    The objective here: maintain a recency-decayed record of which experts recent tokens
+    actually selected, then reward the router for placing probability mass on them.
+
+        u_t = gamma * u_{t-1} + onehot(top-k at t-1)        (detached: it is a TARGET)
+        loss = -mean_t < softmax(logits_t), u_t / sum(u_t) >
+
+    Minimising this makes consecutive tokens reuse experts, lengthening the stretches an
+    expert stays in use so a cache misses less often. The history is detached because it is
+    the bonus the router is being trained toward, not a quantity to differentiate through --
+    differentiating through it would let the model trivially shrink the loss by collapsing
+    its own history rather than by learning reuse.
+
+    Contrast with `cosmoes_block_loss`, the other reimplemented competitor: CoSMoEs penalises
+    how many DISTINCT experts a fixed block touches (support size, trained from scratch);
+    this rewards temporal CONTINUITY between adjacent tokens (a post-hoc router finetune).
+    Neither bounds the resident set.
+
+    Args:
+        logits: [S, B, E] router logits, sequence-first.
+        k: experts selected per token (top-k), matching the model's router.
+        gamma: recency decay. 0.9 gives a ~10-token effective window.
+    Returns:
+        scalar loss; lower means more reuse. Differentiable through `logits` only.
+    """
+    S, B, E = logits.shape
+    if S < 2:
+        return logits.sum() * 0.0
+    p = torch.softmax(logits.float(), dim=-1)
+    with torch.no_grad():
+        sel = torch.zeros_like(p)
+        sel.scatter_(-1, logits.float().topk(k, dim=-1).indices, 1.0)
+    u = torch.zeros_like(p[0])
+    total = 0.0
+    for t in range(1, S):
+        u = gamma * u + sel[t - 1]                       # history through t-1, detached
+        w = u / u.sum(dim=-1, keepdim=True).clamp_min(1e-9)
+        total = total + (p[t] * w).sum(dim=-1).mean()
+    return -(total / (S - 1))

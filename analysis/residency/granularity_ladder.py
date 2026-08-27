@@ -99,6 +99,15 @@ def patch_gemma4():
         hidden_states = self.norm(hidden_states)
         hidden_states = hidden_states * self.scale * self.scalar_root_size
         expert_scores = self.proj(hidden_states)                     # [B*S, E]
+        # ReMoE (baseline #2) needs the router logits its objective is defined over.
+        # Opt-in: CFG["collect"] is a list only while that loss is being computed, so the
+        # normal training and serving paths allocate nothing and keep no references.
+        _col = CFG.get("collect")
+        if _col is not None:
+            _Bn = CFG.get("batch", 1)
+            _T, _E = expert_scores.shape
+            _col.append(expert_scores.view(_Bn, _T // _Bn, _E).transpose(0, 1)
+                        if _Bn > 1 else expert_scores.unsqueeze(1))
         router_probabilities = nn.functional.softmax(expert_scores, dim=-1)
         li = getattr(self, "_layer_idx", None)
         fs = CFG.get("free_set")
