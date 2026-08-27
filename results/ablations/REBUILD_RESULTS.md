@@ -626,3 +626,34 @@ size held at 8482; other lanes shrank proportionally. Same recipe, same budget.
 No gain on R8, a loss on R16. The recovery is not data-hungry along the math axis; the
 published lane proportion is at least as good as doubling it. Sixth lever confirmed at the
 published setting (lr, KL weight, rank, budget, KL arm, math share).
+
+## EXP C: 3x unique prompts -- worse (2026-08-27). The overnight sweep is closed.
+
+The pool went 8,482 -> 25,446 prompts (published lane ratios, realmath lane scaled and
+spliced correctly), yielding 22.1M response tokens. At the same 3.4M budget the run sees
+~15% of the pool (vs ~46% for the rebuild), so this isolates diversity from repetition.
+
+| model | free | R8 | R16 | R8 vs base | R16 vs base |
+|---|---|---|---|---|---|
+| base | 87.8 | 78.8 | 86.6 | -- | -- |
+| rebuild (8.5k prompts) | 86.8 | 81.9 | 87.5 | +3.1 +/- 1.0 | +0.9 +/- 0.6 |
+| B: constrained-arm KL | 86.7 | 81.0 | 86.5 | +2.2 +/- 1.1 | -0.1 +/- 0.6 |
+| A: math lane x2 | 87.4 | 81.4 | 86.3 | +2.7 +/- 1.1 | -0.3 +/- 0.7 |
+| **C: 3x unique prompts** | 87.6 | 79.8 | 86.3 | **+1.0 +/- 1.1** | -0.3 +/- 0.6 |
+
+C is the worst arm of the night. More unique prompts at fixed budget means LESS repetition
+per prompt, and that costs recovery: the adapter appears to need several passes over a
+prompt to learn its constrained trajectory, and 3x diversity starves it of them. Taken with
+fullpass (7.36M tokens over the same 8.5k prompts, also worse), the budget-to-pool ratio
+of the published recipe (~half a pass) is itself a tuned quantity.
+
+**Seven levers, seven failures**, all landing at or below the published settings:
+lr, KL weight, expert-LoRA rank, token budget, KL anchor arm, math share, pool size.
+Every direction is downhill. The +3.1 vs +6.0 gap to D12 is not in any hyperparameter or
+in any data-composition or data-scale knob available to us. It is in D12's SPECIFIC
+prompts, which were lost with the pod and have no committed builder.
+
+Disposition: the recipe reproduces; the data does not. The paper should report +3.1 (five
+runs, z=7.5) as the reproducible result and state that the published +6.0 rests on an
+unrecoverable pool. This is the second of the two dispositions RECOVER_DATA_PLAN.md
+section 1.5 anticipated, and it is now established by exhaustion rather than assumed.
