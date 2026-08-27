@@ -810,3 +810,17 @@ resident experts enough to introduce new slips.
 
 **Proposed fix, at the source:** reweight the CE loss on digit tokens (`--digit-weight`),
 so the gradient concentrates on the failing token class. Same data, same budget, one flag.
+
+### Refined (same day): scorer artifacts are uniform; arithmetic is 84% of real qwen failures
+
+Three extractors (as scored / last-number / bold-answer) give qwen R8 gaps of -9.2 / -8.8 /
+-9.5 -- the extractor moves every arm together and leaves the gap alone. 18% of individual
+constrained failures are scorer artifacts (`$21.00`, or "**$132** after 12 hours" where the
+last-number rule takes 12), but the free arm has the same rate. Closed: the damage is real.
+
+With LaTeX-aware equation parsing (`\$`, `\times`, `\text{}`, thousands commas), the share
+of REAL constrained failures containing a false equation rises to **84% on qwen** (103/123
+base R8, 89/106 adapted R8) and **66% on gemma** (87/131, 57/92), against noise floors of
+13-17%. Examples the plain regex missed: `5000 + 2*5000` written as `\$5,000 + \$10,000 =
+\$16,000`; `300+200+500` in prose as "$800". Arithmetic slips are two-thirds to five-sixths
+of the damage. The rest is scorer artifacts plus a small residue of wrong plans.
