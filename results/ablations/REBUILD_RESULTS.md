@@ -741,3 +741,12 @@ number is reproducible but should not be reported as constraint robustness.
 
 Next: selfgen's full surface (IFEval, MMLU, HumanEval, MBPP, WritingBench). If those are
 flat while GSM8K is +5.3, the case is closed.
+
+Mechanism, confirmed from `selfgen_math_raw.pt` (2,700 rows): stage A gave gemma seed
+instructions ("Write a multi-step word problem needing at least three arithmetic operations
+... Output ONLY the problem statement") and it authored the problems; stage B had it solve
+its own problems, and the adapter trained on those solutions. Data-file trap for anyone
+regenerating: `selfgen_math_2341.jsonl` holds the stage-A INSTRUCTIONS (120 distinct
+templates, repeated), not the problems -- a pool spliced from it collapses to ~120 math
+rows under dedup. The authored problems are `selfgen_math_prompts.jsonl` (2,671 distinct).
+The qwen cross-model test uses those authored problems with qwen's own solutions.
