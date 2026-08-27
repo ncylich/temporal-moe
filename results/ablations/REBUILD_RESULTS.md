@@ -593,3 +593,20 @@ bandwidth; neither buys memory; our constraint-aware CE recovers +3.1 where they
 nothing. Appendix E can now make that argument from two measurements on our own ladder.
 
 Prediction registered before the run: "little or no constrained-quality gain". Held.
+
+## EXP B: KL anchor on the constrained arm -- worse (2026-08-27)
+
+Hypothesis: the rebuild anchors KL to the base's FREE-routing logprobs, pulling the adapter
+toward behaviour it cannot exhibit under R=8; anchoring to the base's own constrained
+behaviour should free it to move. Same pool, same trajectories, same budget, `--kl-arm
+constrained` for both the reference precompute and training.
+
+| model | free | R8 | R16 | R8 vs base | R16 vs base |
+|---|---|---|---|---|---|
+| base | 87.8 | 78.8 | 86.6 | -- | -- |
+| rebuild (free-arm KL) | 86.8 | 81.9 | 87.5 | +3.1 +/- 1.0 | +0.9 +/- 0.6 |
+| **EXP B (constrained KL)** | 86.7 | 81.0 | 86.5 | +2.2 +/- 1.1 | -0.1 +/- 0.6 |
+
+Falsified. The free-arm reference is the TARGET the adapter recovers toward, not a
+distraction from it; anchoring to constrained behaviour anchors to the damage. Fifth recipe
+knob (after lr, KL weight, rank, budget) confirmed at its published setting.
