@@ -1907,3 +1907,13 @@ gemma4_ce_selfgen_full,128,8,free,,ifeval,"prompt_level_strict_acc,none",0.90018
 gemma4_ce_selfgen_full,128,8,free,,ifeval,"inst_level_strict_acc,none",0.930456,full,2048,213
 gemma4_ce_selfgen_full,128,8,free,,ifeval,"prompt_level_loose_acc,none",0.918669,full,2048,213
 gemma4_ce_selfgen_full,128,8,free,,ifeval,"inst_level_loose_acc,none",0.943645,full,2048,213
+gemma4_ce_selfgen_full,128,8,R8,8,ifeval,sample_len,541.000000,full,2048,353
+gemma4_ce_selfgen_full,128,8,R8,8,ifeval,"prompt_level_strict_acc,none",0.861368,full,2048,353
+gemma4_ce_selfgen_full,128,8,R8,8,ifeval,"inst_level_strict_acc,none",0.904077,full,2048,353
+gemma4_ce_selfgen_full,128,8,R8,8,ifeval,"prompt_level_loose_acc,none",0.879852,full,2048,353
+gemma4_ce_selfgen_full,128,8,R8,8,ifeval,"inst_level_loose_acc,none",0.920863,full,2048,353
+gemma4_ce_selfgen_full,128,8,R16,16,ifeval,sample_len,541.000000,full,2048,291
+gemma4_ce_selfgen_full,128,8,R16,16,ifeval,"prompt_level_strict_acc,none",0.870610,full,2048,291
+gemma4_ce_selfgen_full,128,8,R16,16,ifeval,"inst_level_strict_acc,none",0.911271,full,2048,291
+gemma4_ce_selfgen_full,128,8,R16,16,ifeval,"prompt_level_loose_acc,none",0.894640,full,2048,291
+gemma4_ce_selfgen_full,128,8,R16,16,ifeval,"inst_level_loose_acc,none",0.930456,full,2048,291

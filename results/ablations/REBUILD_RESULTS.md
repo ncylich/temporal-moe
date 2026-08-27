@@ -767,3 +767,46 @@ benchmark's exact format, which an n-gram screen cannot catch because the text i
 This is why the lineage rule bans synthetic derivatives by PROVENANCE rather than by
 post-hoc filtering -- and why a self-generation pipeline that produces benchmark-format
 items is a derivative even with a clean screen.
+
+## Why the adapter fails on qwen: residency breaks ARITHMETIC, and the loss cannot see it (2026-08-27)
+
+Producer: `analysis/residency/failure_filter.py` plus the equation checks in this section.
+All from the committed n=1319 dumps (which carry full generated text), no GPU.
+
+**The adapter repairs most damage on BOTH models; the difference is what it breaks.**
+
+| | damage_fixed | adapter_broke | net |
+|---|---|---|---|
+| qwen | 103 | 92 | +11 (+0.8%) |
+| gemma | 107 | 75 | +32 (+2.4%) |
+
+Repair rate is ~70% of residency-damaged problems on each. On adapter_broke, the adapted
+FREE arm is still right on 78/92 (qwen) and 63/75 (gemma): a reshuffle of which problems
+survive the constraint, not a capability loss.
+
+**Not truncation, loops, or extraction.** Cap-hit 0-9%, 8-gram repetition ~0, lengths normal.
+A normalised extractor (strip $ , .00) adds ~+5 to EVERY arm uniformly and leaves the gap
+untouched -- a scorer offset, not a residency effect.
+
+**It is arithmetic.** Among wrong constrained generations (base-free-right subset), the
+fraction containing a demonstrably false `a op b = c` equation:
+
+| | base R8 | adapted R8 | noise on correct gens |
+|---|---|---|---|
+| qwen | 49% (73/150) | 41% (53/128) | 2-4% |
+| gemma | 32% (46/142) | 28% (27/98) | 2-3% |
+
+The slips are trivial: `5+4+2=8`, `7+8=30`, `30-27=7`, `160+330=794`, `6*20=60`. Mostly
+two-term, mid-response (median position 0.55-0.67), qwen's on smaller operands (median 35
+vs gemma's 80) -- 3.1% residency breaks easier arithmetic than 6.25% does. The plan and
+setup are intact; the primitive fails. 37% (qwen) / 24% (gemma) of adapter_broke problems
+are broken by a NEW false equation the base R8 did not make.
+
+**Why CE cannot fix it.** In the qwen D7 trajectories, digit tokens are 6.3% of response
+tokens and digits following '=' are 0.66%. The loss is >99% about tokens that do not fail.
+The adapter therefore learns format and phrasing (which is why the free arm moves, and why
+the selfgen lane 'works') and leaves the arithmetic primitive alone, while perturbing the
+resident experts enough to introduce new slips.
+
+**Proposed fix, at the source:** reweight the CE loss on digit tokens (`--digit-weight`),
+so the gradient concentrates on the failing token class. Same data, same budget, one flag.
