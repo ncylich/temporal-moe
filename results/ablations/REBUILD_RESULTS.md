@@ -673,3 +673,32 @@ IFEval at R32 is -1.3, so the fraction-matched mean falls from the +0.7 quoted o
 cells to +0.2 on four. gemma at the same 12.5% fraction is +1.6. Final qwen position: the
 rebuild's math recovery transfers (+3.2 GSM8K, +2.6 MBPP); nothing else does, and IFEval
 and MMLU go slightly negative. Net ~0 at both residency fractions tested.
+
+## Two full runs of the published recipe on the five-benchmark surface (2026-08-27)
+
+seed3 (the median D7 seed) now has every cell. Same-arm R8 delta vs matched base.
+**This table uses same-arm framing throughout** (adapted R8 minus base R8). The earlier
+five-run GSM8K mean of +3.1 used gap-closure framing (R8-free vs base's R8-free), which
+credits the adapter for its own free-arm sag; same-arm is the honest number and is used
+from here on. In same-arm framing the five GSM8K runs are +3.1/+2.5/+0.9/+3.1/+2.0,
+**mean +2.3, sd 0.9, z=5.6**.
+
+| benchmark | D12 published | rebuild | seed3 | two-run mean |
+|---|---|---|---|---|
+| GSM8K (n=1319) | +6.0 | +3.1 | +2.0 | +2.5 |
+| IFEval (n=541) | -1.0 | -0.7 | +0.0 | -0.4 |
+| HumanEval (n=164, @8192) | +4.9 | +2.4 | -3.0 | -0.3 |
+| MMLU (n=228) | -1.1 | +1.8 | +0.9 | +1.3 |
+| MBPP (n=500, @8192) | n/a | +1.6 | -0.4 | +0.6 |
+| WritingBench (n=150) | n/a | +0.020 | +0.008 | +0.014 |
+| **MEAN (4 published cells)** | **+2.2** | **+1.6** | **-0.1** | **+0.8** |
+
+The second run halves the headline. seed3 is a worse run than rebuild on every cell but
+IFEval, and its HumanEval is -3.0 (150/164 vs base 155/164, zero unfinished -- real, not
+an artifact). HumanEval's two runs differ by 5.4 points on 164 problems; that cell cannot
+carry a claim in either direction and should be reported as unresolved.
+
+Honest position for the paper: the published recipe recovers GSM8K under residency
+(+2.3 same-arm, five runs, z=5.6) and is neutral-to-slightly-positive elsewhere, with a
+four-cell mean of roughly +0.8 across two full runs against the published +2.2. The
+published number rests on an unrecoverable pool; ours reproduces.
