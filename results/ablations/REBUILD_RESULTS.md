@@ -567,3 +567,29 @@ matched residency fraction -- not a general adaptation method.
 Instrument note: HumanEval is n=164 with 10-17 arm disagreements, so neither the gemma
 +2.4 nor the qwen -1.8 is individually resolvable; their difference is ~1.4 sigma. Do not
 read a model contrast into that cell.
+
+## Baseline #2 (ReMoE) measured: router-only reuse buys nothing under a hard R (2026-08-27)
+
+BASELINE_METHODS_COMPARISON.md #2, faithful remake: router projections ONLY trainable
+(attention LoRA, expert LoRA and norms frozen), recency-reuse objective at lambda 1.0 /
+gamma 0.9, residency constraint OFF during training, same 3.4M-token budget and pool as
+every other arm. Producer: `--router-only --no-constraint --remoe-lambda` in
+train_gemma_ce.py; objective in temporal/ablation_mechanisms.py::remoe_reuse_loss.
+
+| model | free | R8 | R8-free | R8 vs base R8 |
+|---|---|---|---|---|
+| base (no adapter) | 87.8 | 78.8 | -9.0 | -- |
+| ours (rebuild) | 86.8 | 81.9 | -4.9 | +3.1 +/- 1.0 |
+| **ReMoE** | 87.6 | 78.7 | -8.9 | **-0.1 +/- 1.1** |
+
+The router genuinely trained (all 30 router projections moved by ~3.8e-4, loss 0.345 ->
+0.225), so this is a null from the method and not from a no-op. verify_merge reports the
+expert and attention surfaces as unchanged, which is CORRECT for a router-only arm.
+
+Reading: ReMoE improves expert reuse without ever bounding the resident set, so at a fixed
+R=8 it recovers none of the residency damage. This is the same conclusion baseline #3
+(Skliar, serving-side deadband) reached from the other direction. Both competitors buy
+bandwidth; neither buys memory; our constraint-aware CE recovers +3.1 where they recover
+nothing. Appendix E can now make that argument from two measurements on our own ladder.
+
+Prediction registered before the run: "little or no constrained-quality gain". Held.
