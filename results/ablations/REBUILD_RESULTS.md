@@ -610,3 +610,19 @@ constrained` for both the reference precompute and training.
 Falsified. The free-arm reference is the TARGET the adapter recovers toward, not a
 distraction from it; anchoring to constrained behaviour anchors to the damage. Fifth recipe
 knob (after lr, KL weight, rank, budget) confirmed at its published setting.
+
+## EXP A: StackMathQA lane doubled -- no gain (2026-08-27)
+
+Math is the only signal consistent across both models, so the obvious data lever is more
+of it. The realmath lane went 2306 -> 4700 rows (27% -> 55% of the pool) with total pool
+size held at 8482; other lanes shrank proportionally. Same recipe, same budget.
+
+| model | free | R8 | R16 | R8 vs base | R16 vs base |
+|---|---|---|---|---|---|
+| base | 87.8 | 78.8 | 86.6 | -- | -- |
+| rebuild (math 27%) | 86.8 | 81.9 | 87.5 | +3.1 +/- 1.0 | +0.9 +/- 0.6 |
+| **EXP A (math 55%)** | 87.4 | 81.4 | 86.3 | +2.7 +/- 1.1 | -0.3 +/- 0.7 |
+
+No gain on R8, a loss on R16. The recovery is not data-hungry along the math axis; the
+published lane proportion is at least as good as doubling it. Sixth lever confirmed at the
+published setting (lr, KL weight, rank, budget, KL arm, math share).

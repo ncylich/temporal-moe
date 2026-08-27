@@ -1831,3 +1831,12 @@ gemma4_ce_klcons_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extra
 gemma4_ce_klcons_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,574
 gemma4_ce_klcons_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,574
 gemma4_ce_klcons_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.865049,full,2048,574
+gemma4_ce_mathx2_n1319,128,8,free,,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,204
+gemma4_ce_mathx2_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,204
+gemma4_ce_mathx2_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.874147,full,2048,204
+gemma4_ce_mathx2_n1319,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,575
+gemma4_ce_mathx2_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000758,full,2048,575
+gemma4_ce_mathx2_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.814253,full,2048,575
+gemma4_ce_mathx2_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,544
+gemma4_ce_mathx2_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,544
+gemma4_ce_mathx2_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.862775,full,2048,544
