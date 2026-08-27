@@ -657,3 +657,19 @@ Disposition: the recipe reproduces; the data does not. The paper should report +
 runs, z=7.5) as the reproducible result and state that the published +6.0 rests on an
 unrecoverable pool. This is the second of the two dispositions RECOVER_DATA_PLAN.md
 section 1.5 anticipated, and it is now established by exhaustion rather than assumed.
+
+### qwen R32 completed with IFEval (2026-08-27) -- the fraction-matched table at 4 of 4
+
+| benchmark | base R32 | rebuild |
+|---|---|---|
+| GSM8K | 79.8 | +3.2 |
+| IFEval | 85.2 | -1.3 |
+| HumanEval | 89.0 | +0.6 |
+| MMLU | 93.4 | -1.8 |
+| MBPP | 76.4 | +2.6 |
+| **MEAN (4 published cells)** | | **+0.2** |
+
+IFEval at R32 is -1.3, so the fraction-matched mean falls from the +0.7 quoted on three
+cells to +0.2 on four. gemma at the same 12.5% fraction is +1.6. Final qwen position: the
+rebuild's math recovery transfers (+3.2 GSM8K, +2.6 MBPP); nothing else does, and IFEval
+and MMLU go slightly negative. Net ~0 at both residency fractions tested.
