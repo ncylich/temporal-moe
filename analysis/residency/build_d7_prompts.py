@@ -46,6 +46,24 @@ filter are kept, so a regeneration is byte-identical and checkable against the s
 the meta json -- the discipline build_wildchat_prompts.py already uses.
 
     build_d7_prompts.py [--out DIR] [--scan-cap N]
+
+PROVENANCE DEFECT FOUND 2026-08-27, READ BEFORE REGENERATING
+------------------------------------------------------------
+This builder does NOT reproduce the pool that trained the committed adapters. The
+committed d7_prompts.jsonl has 2,306 rows in mathlane_v2 sourced from StackMathQA
+(math.stackexchange), spliced in from realmath_2341.jsonl -- produced by
+build_realmath_lane.py, which is a SEPARATE script. Nothing here loads StackMathQA, so a
+fresh run fills that lane from WildChat/oasst2 by keyword classification instead, and you
+get a pool with the same row counts, the same lane names, and different math data.
+
+The meta json compounds it: its "sources" field lists only WildChat and oasst2, and its
+"builder" field names this file alone. 27% of the pool is undeclared.
+
+To regenerate the pool as trained:
+  1. build_realmath_lane.py --n 2341        -> realmath_2341.jsonl
+  2. this script                            -> the other lanes
+  3. splice: mathlane_v2 takes realmath rows first, WildChat/oasst2 only to top up
+Verify with the sha256 in the meta before trusting a regenerated pool.
 """
 import argparse
 import hashlib
@@ -293,10 +311,22 @@ def main():
                     default=["/dev/shm/gemma4-26b-it", "/dev/shm/qwen35-35b-a3b"],
                     help="both consumers' tokenizers: a row is kept only if it fits for "
                          "EVERY model that will generate trajectories from this pool")
+    ap.add_argument("--scale", type=float, default=1.0,
+                    help="multiply every lane quota, keeping the published RATIOS fixed. "
+                         "1.0 reproduces the 8,482-row pool exactly. Pool SIZE is the one "
+                         "data lever never tested: --tokens tested more EPOCHS over the "
+                         "same prompts (fullpass, 7.36M) and lost, which says nothing "
+                         "about more UNIQUE prompts. Needs a larger --scan-cap to fill.")
     ap.add_argument("--cache", default="/workspace/d7_screen_cache.txt",
                     help="8-gram screen cache; the four test sets are fixed, so building "
                          "735k grams on every run is pure waste")
     A = ap.parse_args()
+
+    if A.scale != 1.0:
+        global LANES, CODE_ROWS
+        LANES = {k: int(round(v * A.scale)) for k, v in LANES.items()}
+        CODE_ROWS = int(round(CODE_ROWS * A.scale))
+        print(f"[d7] lane quotas scaled x{A.scale}: {LANES} (code {CODE_ROWS})", flush=True)
     os.makedirs(A.out, exist_ok=True)
 
     screen = cached_screen(A.cache)
