@@ -915,3 +915,22 @@ Open at the time of writing: gemma at W=10 (running), the qwen surface beyond GS
 (IFEval, MMLU, HumanEval, MBPP; queued, records `qwen35_ce_digit10_{full,n_dual,code}`),
 and W=3 for dose-response. The GSM8K gain is not a result until the rest of the surface
 shows it was not bought elsewhere.
+
+### Gemma at W=10: no gain (2026-08-27)
+
+Same flag on the gemma rebuild recipe, GSM8K n=1319, arms free/R8/R16:
+
+| arm | base | rebuild | digit10 | digit10 vs base | digit10 vs rebuild (paired) |
+|---|---|---|---|---|---|
+| free | 87.8 | 86.8 | 87.4 | -0.4 (z=-0.7) | +0.6, discordant 33/25, z=1.1 |
+| R8 (6.25%) | 78.8 | 81.9 | 80.2 | +1.4 (z=1.3) | -1.7, discordant 92/114, z=-1.5 |
+| R16 (12.5%) | 86.6 | 87.5 | 87.0 | +0.4 (z=0.5) | -0.5, discordant 33/40, z=-0.8 |
+
+Against the rebuild the broke column grows (75 to 101) and fixed holds (107 to 102). The
+same lever that moved qwen by +3.3 over its rebuild leaves gemma inside the noise of its
+five rebuild runs (+1.6 to +3.1) and on the low side of it. Two differences are candidates:
+the gemma rebuild already removed 52% of the arithmetic excess (qwen's removed 29%), so
+there was less left to take; and gemma's tokenizer has 403 digit-token ids (multi-digit
+numbers are single tokens) against qwen's 22, so a weight of 10 lands on a different and
+larger set. W=3 on gemma is the next cell; the qwen surface beyond GSM8K is the gate on
+calling the qwen result real.
