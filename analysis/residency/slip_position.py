@@ -58,14 +58,15 @@ def equations(raw):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True, choices=("qwen35", "gemma4"))
+    ap.add_argument("--dir", default=f"{ABLATIONS}/failure_analysis", help="failure_filter.py --out")
     A = ap.parse_args()
-    D = json.load(open(f"{ABLATIONS}/failure_analysis/{A.model}_categories.json"))
+    D = json.load(open(f"{A.dir}/{A.model}_categories.json"))
     T = D["tight"]
     print(f"{A.model} tight={T}. Position = fraction of words before the equation (0=start, 1=end).\n")
     hdr = f"{'category / arm':<30}{'gens':>5}{'w/false':>8}{'eqs':>6}{'false':>6}{'medpos all':>11}{'medpos 1stF':>12}{'F late>0.5%':>12}{'all late%':>10}{'triv(<=20)%':>12}{'triv all%':>10}"
     print(hdr)
     for cat in ("damage_unfixed", "adapter_broke", "damage_fixed", "always_right"):
-        rows = [json.loads(l) for l in open(f"{ABLATIONS}/failure_analysis/{A.model}_{cat}.jsonl")]
+        rows = [json.loads(l) for l in open(f"{A.dir}/{A.model}_{cat}.jsonl")]
         for arm in ("base_free", f"base_{T}", f"adapted_{T}"):
             allpos, fpos, ftriv, atriv, nfalse, neq, wfalse = [], [], [], [], 0, 0, 0
             for r in rows:
