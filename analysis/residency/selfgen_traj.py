@@ -32,6 +32,9 @@ def main():
     ap.add_argument("--n", type=int, default=4500)
     ap.add_argument("--max-new", type=int, default=1024)
     ap.add_argument("--gpu-mem", type=float, default=0.85)
+    ap.add_argument("--max-model-len", type=int, default=2048)
+    ap.add_argument("--presence-penalty", type=float, default=0.0,
+                    help="match the eval's card recipe (qwen think-off: 1.5)")
     ap.add_argument("--think", choices=("on", "off"), default=None,
                     help="pass enable_thinking to the chat template (qwen); omit "
                          "for templates without the kwarg (gemma default = low)")
@@ -43,14 +46,15 @@ def main():
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(A.path)
     llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
-              max_model_len=2048, enable_prefix_caching=False)
+              max_model_len=A.max_model_len, enable_prefix_caching=False)
     DEC.update(on=True, R=A.R, swaps=1)
     DEC["state"].clear()
 
     prompts = [json.loads(l) for l in open(A.prompts)][: A.n]
     texts = [p.get("prompt") or p.get("text") for p in prompts]
     msgs = [[{"role": "user", "content": t}] for t in texts]
-    sp = SamplingParams(temperature=0.7, top_p=0.8, seed=1234, max_tokens=A.max_new)
+    sp = SamplingParams(temperature=0.7, top_p=0.8, seed=1234, max_tokens=A.max_new,
+                        presence_penalty=A.presence_penalty)
     ctk = ({} if A.think is None
            else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}})
     outs = llm.chat(msgs, sp, use_tqdm=True, **ctk)
