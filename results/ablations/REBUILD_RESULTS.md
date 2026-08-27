@@ -934,3 +934,16 @@ there was less left to take; and gemma's tokenizer has 403 digit-token ids (mult
 numbers are single tokens) against qwen's 22, so a weight of 10 lands on a different and
 larger set. W=3 on gemma is the next cell; the qwen surface beyond GSM8K is the gate on
 calling the qwen result real.
+
+The mechanism on gemma is now visible (`slip_position.py --dir failure_analysis_digit10`).
+The W=10 adapter repairs less arithmetic than the rebuild, not the same amount: R8
+false-equation rate 3.69% against the rebuild's 2.75% (base 4.82%), so it removes 28% of the
+excess where the rebuild removed 52%. And 17 R8 generations (1.3%) collapse into a digit
+stream (`3151088888…`, `1010…`), 0 for the base and 0 for the rebuild at any arm, 0 for qwen
+at any weight. Those 17 are all wrong under W=10 and 16 of them are right under the rebuild,
+which is most of the -1.7. The stream starts mid-sentence rather than after an `=`, so it is
+a mode collapse onto gemma's 403 numeric token ids at 10x weight, not a slip. The weight that
+is right for a tokenizer with 22 digit ids is too strong for one with 403; W=3 on gemma is
+the queued test. The scorer-FN offsets quoted above were recomputed with a bounded bold-span
+pattern (the unbounded one was cubic on those digit streams): qwen 4.2-5.0 points, gemma
+1.3-1.8, still uniform across arms.

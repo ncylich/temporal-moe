@@ -16,7 +16,7 @@ import argparse, json, os, re, statistics, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS                                          # noqa: E402
 
-NUM = r"-?\d[\d,]*(?:\.\d+)?"
+NUM = r"-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"   # real thousands grouping only: "1, 2, 3, ..." lists must not chain
 OP = r"\s*(?:[-+*/x×÷]|\\times|\\cdot)\s*"
 EQ = re.compile(rf"({NUM}(?:{OP}{NUM})+)\s*=\s*({NUM})")
 TOKS = re.compile(rf"{NUM}|[-+*/x×÷]|\\times|\\cdot")
@@ -88,7 +88,8 @@ def main():
     rates(D)
 
 
-BOLD = re.compile(r"\*\*[^*]*?(-?\d[\d,]*\.?\d*)[^*]*?\*\*")
+BOLD = re.compile(r"\*\*([^*]{1,300})\*\*")          # bounded: unclosed ** before a 2k-char digit run was cubic
+_BNUM = re.compile(r"-?\d[\d,]*\.?\d*")
 LMEVAL = re.compile(r"(-?[$0-9.,]{2,})|(-?[0-9]+)")   # gsm8k_cot_zeroshot flexible-extract, group_select -1
 
 
@@ -109,7 +110,7 @@ def rates(D):
             a = r["arms"][arm]; eqs = equations(a["raw"]); f = sum(e[1] for e in eqs)
             ne += len(eqs); nf += f; wf += f > 0
             if a["correct"]: continue
-            wrong += 1; bolds = [_norm(x) for x in BOLD.findall(a["raw"])]
+            wrong += 1; bolds = [_norm(m.group(0)) for span in BOLD.findall(a["raw"]) for m in [_BNUM.search(span)] if m]
             m = LMEVAL.findall(a["raw"]); last = _norm(m[-1][0] or m[-1][1]) if m else None
             fn += bool(bolds) and bolds[-1] == r["gold"] and last != r["gold"]
         print(f"{arm:<14}{ne:>7}{nf:>7}{100*nf/ne:>7.2f}{100*wf/n:>15.1f}   {wrong:>6}{fn:>10}{100*fn/n:>6.1f}")

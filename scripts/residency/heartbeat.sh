@@ -54,6 +54,8 @@ echo "  qwen35_ce_digit10_{full,n_dual,code}), W=3 dose. Not a result until the 
 echo "  GEMMA W=10 (21:06): NO GAIN. R8 80.2 (+1.4 vs base, -1.7 vs rebuild z=-1.5), broke 75->101."
 echo "  Lever is qwen-specific so far (gemma rebuild already removes 52% of excess; 403 digit ids"
 echo "  vs qwen 22). Next cells: qwen surface (running), gemma W=3, qwen W=3, distill from digit10."
+echo "  GEMMA W=10 MECHANISM: 17 R8 gens (1.3%) collapse into digit streams (0 on base/rebuild/qwen);"
+echo "  false-eq rate 3.69% vs rebuild 2.75%. W=10 overshoots on 403 numeric ids. W=3 is the test."
 echo "FALLBACK #2 QUEUED (tmoe_qwen_distill.sh): one round of semi-on-policy self-distillation:"
 echo "  sample the constrained student (R8, eval recipe) on the D7 pool, label with the free"
 echo "  base's top-50 logprobs, continue the rebuild adapter on KL-only (--kl-arm constrained)."
