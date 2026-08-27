@@ -702,3 +702,42 @@ Honest position for the paper: the published recipe recovers GSM8K under residen
 (+2.3 same-arm, five runs, z=5.6) and is neutral-to-slightly-positive elsewhere, with a
 four-cell mean of roughly +0.8 across two full runs against the published +2.2. The
 published number rests on an unrecoverable pool; ours reproduces.
+
+## THE GAP TO D12 IS THE SELF-GENERATED MATH LANE (2026-08-27)
+
+D12's pool used a `math_selfgen` lane: the model writing its own multi-step arithmetic word
+problems ("Maya went to the grocery store... purchased 12..."). The rebuild replaced it with
+StackMathQA (real math.stackexchange questions) after the lane was flagged as overfitting
+to GSM8K. An adapter trained on the self-generated lane (`gemma_ce_selfgen`, trained 08-25
+before the trajectory file was rewritten -- provenance from timestamps and from its 312-step
+count vs the rebuild's 258 at equal tokens) was re-scored at n=1319:
+
+| adapter | math lane | free | R8 | R8 same-arm | R16 same-arm |
+|---|---|---|---|---|---|
+| base | -- | 87.8 | 78.8 | -- | -- |
+| rebuild | StackMathQA (real) | 86.8 | 81.9 | +3.1 +/- 1.0 | +0.9 +/- 0.6 |
+| **selfgen** | model-written, GSM8K-shaped | 88.2 | 84.1 | **+5.3 +/- 1.0** | +0.1 +/- 0.6 |
+
+Head-to-head on the same 1319 questions: selfgen beats rebuild by +2.2 +/- 0.9 (z=2.39).
++5.3 is within noise of D12's published +6.0 (n=200). **The entire gap is the lane.**
+
+Two signatures mark this as style-matching rather than residency robustness:
+1. selfgen's FREE arm is 88.2, above base's 87.8. It improved the unconstrained model on
+   GSM8K -- it taught the task. The rebuild's free arm sagged (86.8), which is what an
+   adapter that only learns the constraint looks like.
+2. selfgen's R16 delta is +0.1 vs the rebuild's +0.9. Genuine constraint robustness should
+   help at every bound; a GSM8K-specialised adapter has nothing extra to give at R16.
+
+This is the Orca-Math failure mode arriving by a different door. The lineage rule bans
+"benchmark-family data in any form (test/train splits, synthetic derivatives)"; a model
+generating GSM8K-format problems is a synthetic derivative in everything but provenance.
+The 8-gram screen cannot catch it because the problems are novel text in the benchmark's
+shape. The published +6.0 (gemma) and +6.5 (qwen, same pool) both rest on it.
+
+**Supersedes the "prompt pool is lost" disposition.** The pool is not lost; its math lane
+was regenerable all along (build_selfgen_lanes.py, selfgen_math_raw.pt). It was rejected
+on principle, correctly. The reproducible honest number is the rebuild's; the published
+number is reproducible but should not be reported as constraint robustness.
+
+Next: selfgen's full surface (IFEval, MMLU, HumanEval, MBPP, WritingBench). If those are
+flat while GSM8K is +5.3, the case is closed.

@@ -1890,3 +1890,15 @@ gemma4_ce_seed3_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0
 gemma4_ce_seed3_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.355263,4,2048,1005
 gemma4_ce_seed3_full_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.947368,4,2048,956
 gemma4_ce_seed3_full_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.385965,4,2048,956
+gemma4_ce_seed2_he8192,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,8192,115
+gemma4_ce_seed2_he8192,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.957317,full,8192,219
+gemma4_ce_seed2_he8192,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,8192,196
+gemma4_ce_selfgen_n1319,128,8,free,,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,179
+gemma4_ce_selfgen_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,179
+gemma4_ce_selfgen_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.881729,full,2048,179
+gemma4_ce_selfgen_n1319,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,583
+gemma4_ce_selfgen_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000758,full,2048,583
+gemma4_ce_selfgen_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.840788,full,2048,583
+gemma4_ce_selfgen_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,549
+gemma4_ce_selfgen_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,549
+gemma4_ce_selfgen_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.866566,full,2048,549
