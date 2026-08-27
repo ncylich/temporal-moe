@@ -92,8 +92,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", choices=sorted(SPEC), required=True)
     ap.add_argument("--out", default=os.path.join(ABLATIONS, "failure_analysis"))
+    ap.add_argument("--adapted", default=None, help="override the adapted record, e.g. qwen35_ce_digit10_n1319")
     A = ap.parse_args()
-    S = SPEC[A.model]
+    S = dict(SPEC[A.model])
+    if A.adapted: S["adapted"] = A.adapted
     os.makedirs(A.out, exist_ok=True)
 
     from datasets import load_dataset

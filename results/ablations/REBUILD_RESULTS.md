@@ -811,19 +811,41 @@ resident experts enough to introduce new slips.
 **Proposed fix, at the source:** reweight the CE loss on digit tokens (`--digit-weight`),
 so the gradient concentrates on the failing token class. Same data, same budget, one flag.
 
-### Refined (same day): scorer artifacts are uniform; arithmetic is 84% of real qwen failures
+### Refined (same day): scorer artifacts are uniform; arithmetic is about half of real failures
 
 Three extractors (as scored / last-number / bold-answer) give qwen R8 gaps of -9.2 / -8.8 /
 -9.5 -- the extractor moves every arm together and leaves the gap alone. 18% of individual
 constrained failures are scorer artifacts (`$21.00`, or "**$132** after 12 hours" where the
 last-number rule takes 12), but the free arm has the same rate. Closed: the damage is real.
 
-With LaTeX-aware equation parsing (`\$`, `\times`, `\text{}`, thousands commas), the share
-of REAL constrained failures containing a false equation rises to **84% on qwen** (103/123
-base R8, 89/106 adapted R8) and **66% on gemma** (87/131, 57/92), against noise floors of
-13-17%. Examples the plain regex missed: `5000 + 2*5000` written as `\$5,000 + \$10,000 =
-\$16,000`; `300+200+500` in prose as "$800". Arithmetic slips are two-thirds to five-sixths
-of the damage. The rest is scorer artifacts plus a small residue of wrong plans.
+The first pass at this claimed 84% of real qwen failures (66% gemma) contained a false
+equation. That number came from equation checks that were never committed and it does not
+reproduce. The committed parser (`analysis/residency/slip_position.py`, LaTeX-aware: `\$`,
+`\times`, `\text{}`, thousands commas) finds a false equation in about half of the
+real-damage generations on both models: qwen 68/150 (25/47 unfixed, 43/103 fixed), gemma
+63/142 (16/35, 47/107), or roughly 55% once the 18% scorer artifacts leave the denominator.
+The parser is a lower bound (prose-form sums such as "300 + 200 + 500" written as "$800" are
+not caught), so arithmetic is the largest failure class either way, but "84%" overstated it.
+
+The cleaner statement is a rate rather than a share. Across all 1319 generations per arm,
+the fraction of parsed equations that are false:
+
+| | free | tight | adapted tight | adapted free |
+|---|---|---|---|---|
+| qwen (R8) | 0.68% | 5.03% | 3.77% | 0.53% |
+| gemma (R8) | 0.81% | 4.82% | 2.75% | 0.75% |
+
+The constraint multiplies the error rate by six or seven on both models. The qwen adapter
+removes 29% of that excess; the gemma adapter removes 52%. That single number is the
+qwen gap, and it does not depend on the scorer. It is the primary readout for the
+digit-weight runs (standard error about 0.5 points at 2000-3500 equations per arm).
+
+Where the slips land: the first false equation sits at median position 0.40-0.62 of the
+generation and falls in the second half 29-61% of the time, against 55-64% for equations
+in general. There is no late clustering on either model, so the slips are not accumulated
+residency-state drift, and nothing here says prefix-independent CE cannot reach them. On
+qwen the slips skew toward trivial operands (both sides at most 20: 39-64% of slips vs
+27-43% of all equations); on gemma the reverse, on small counts.
 
 ### The mechanism is systematic across five independent gemma runs
 
