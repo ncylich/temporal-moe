@@ -1196,3 +1196,23 @@ worst max|diff| 0 (EXACT), applied in 8.4 s including the 2 GB torch.load. The m
 `--adapter` on instruct_genbench_vllm / mmlu_gptoss / humaneval_gemma / mbpp_gemma;
 `tmoe_deadband_surface.sh` takes `adapter:<file>`. WritingBench's generator still needs the
 flag. Qwen keeps merging until apply_adapter learns its checkpoint names.
+
+## On-policy reverse-KL, round 1 from W=3: R16 +1.7 over W=3, R8 unchanged (2026-08-28 22:19)
+
+`tmoe_gemma_online.sh digit3 850000 16 256`: +0.85M tokens on the W=3 adapter, reverse-KL
+sampled-token objective on trajectories the CURRENT adapter generated under R8 (256 rows
+every 16 steps, 58-60 s per refresh, three refreshes), plus the free-arm anchor, no CE.
+Training 21 min including engine boot. GSM8K n=1319:
+
+| arm | base | W=3 | online r1 | r1 vs W=3 (paired) |
+|---|---|---|---|---|
+| free | 87.8 | -1.1 | -0.8 | +0.3, 26/22, z=0.6 |
+| R8 (6.25%) | 78.8 | +3.6 | +3.3 | -0.3, 79/83, z=-0.3 |
+| R16 (12.5%) | 86.6 | -0.4 | +1.3 | +1.7, 47/25, z=2.6 |
+
+False-equation rate: R8 2.23% (W=3 2.49%), R16 0.84% (W=3 1.28%). The reverse-KL
+estimate on the student's own tokens sat around 0.34 nats/token. R16 is the first cell any
+lever has moved significantly upward on gemma; R8 did not move. Consistent with a
+mode-seeking objective matching the teacher where the bound leaves room. Next: the
+from-scratch run (distillation only, 3.4M tokens), then the deadband surfaces; a second
+round from this adapter is the candidate after those.
