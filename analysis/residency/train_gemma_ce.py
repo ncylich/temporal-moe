@@ -950,6 +950,41 @@ def main():
             ref = _json.load(open(A.online_smoke)); n_ = len(ref["gens"]["free"])
             qs = [r["question"] for r in _ld("openai/gsm8k", "main", split="test")][:n_]
             SAMPLER.sync()
+            # tensor-level check of the sync against the merged checkpoint on disk (generation-free)
+            import glob as _glob
+            from safetensors import safe_open as _so
+            mdir = ref.get("merged_dir") or "/root/models/gemma4-digit3-merged"
+            ck = {}
+            for f in _glob.glob(f"{mdir}/*.safetensors"):
+                with _so(f, "pt", device="cpu") as fh:
+                    for k in fh.keys():
+                        if "layers.0." in k or "layers.29." in k or k.endswith("language_model.norm.weight"):
+                            ck[k] = fh.get_tensor(k)
+            vp = dict(SAMPLER.vmodel.named_parameters())
+            for L_ in ("0", "29"):
+                pre = f"model.language_model.layers.{L_}."; hits = 0
+                for n_, t_ in vp.items():
+                    if f"layers.{L_}." not in n_:
+                        continue
+                    tail = n_.split(f"layers.{L_}.", 1)[1]
+                    want = None
+                    if tail.endswith("qkv_proj.weight"):
+                        want = torch.cat([ck[pre + f"self_attn.{x}_proj.weight"] for x in "qkv"], 0)
+                    elif tail.endswith("o_proj.weight"):
+                        want = ck.get(pre + "self_attn.o_proj.weight")
+                    elif tail.endswith("router.proj.weight"):
+                        want = ck.get(pre + "router.proj.weight")
+                    elif "w13" in tail and tail.endswith("weight") or tail.endswith("gate_up_proj"):
+                        want = ck.get(pre + "experts.gate_up_proj")
+                    elif ("w2" in tail and tail.endswith("weight")) or tail.endswith("down_proj") and "experts" in tail:
+                        want = ck.get(pre + "experts.down_proj")
+                    if want is None or want.shape != t_.shape:
+                        continue
+                    d_ = (t_.detach().float().cpu() - want.float()).abs().max().item(); hits += 1
+                    print(f"[online-smoke] tensor {n_}: max|engine - checkpoint| = {d_:.3e}", flush=True)
+                if hits == 0:
+                    print(f"[online-smoke] layer {L_}: no comparable tensors matched; engine names: "
+                          f"{[n for n in vp if f'layers.{L_}.' in n][:12]}", flush=True)
             for arm in ref["gens"]:
                 rows_ = SAMPLER.sample(n_, greedy=True, prompts=qs, constrained=arm != "free", max_tokens=256)
                 gens = [r["ids"][r["prompt_len"]:].tolist() for r in rows_]
