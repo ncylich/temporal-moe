@@ -1076,3 +1076,44 @@ cell and delivers the qwen gain (four-cell +1.7 against the rebuild's -0.4). Tha
 standing recipe. What it does not do is close the paper: gemma +1.6 against +2.2 (HumanEval
 +2.4 against +4.9 and GSM8K +3.6 against +6.0), qwen +1.7 against +2.7 (IFEval and GSM8K).
 Self-distillation round 2 is the open lever.
+
+## Serving-side residency rewritten: constrained decode at free-arm speed (2026-08-28)
+
+Every eval and every sample under the constraint went through `vllm_residency.py`, which
+ran 2.6-3.2x slower than the free arm (gemma GSM8K 229 s free vs 599 s R8; qwen 318 vs
+1013) and ~330 tok/s while sampling 4524 prompts for self-distillation (3h+, killed).
+Three launch-overhead causes: prefill observation stepped the state one token at a time
+in python; the decode hot path was ~8 launches per layer per step; the engine ran
+enforce_eager because the hook branched in python. Fix (`residency_kernels.py`, fast
+walker in `vllm_residency.py`, `vllm_glue.llm_kwargs()`): one fused Triton launch per
+layer per step over persistent state banks and device-resident index buffers, one launch
+per prefill/replay chunk, and vLLM full CUDA graphs on decode-only steps with no
+torch.compile.
+
+Verification: 324 kernel cases against the torch reference (E, dtype, rho, swaps, seeded);
+the continuous-batching walker test; a 300-request randomised schedule with chunked prefill,
+joins, finishes, slot reuse and preemption replay, three seeds, fast == old walker == GPU
+reference on every decode position; and end to end on gemma (64 GSM8K prompts, greedy) the
+fast walker in eager mode reproduces the old walker 64/64 free and 63/64 R8, where the old
+walker reproduces ITSELF 63/64 (its lazily captured per-shape graphs are not run-to-run
+deterministic). Measured on that run:
+
+| arm | old (eager, python walker) | new (CUDA graphs, fused walker) | |
+|---|---|---|---|
+| free | 1350 tok/s | 3908 tok/s | 2.9x |
+| R8 | 432 tok/s | 4094 tok/s | 9.5x |
+
+Sampling for distillation: ~330 -> ~4800 output tok/s (3h -> 11 min). Swaps per decode
+token are counted on the device (0.9988 on this run; the old counter, which needed a
+sync per layer, read 0.9987), and prefill observation is no longer counted as a swap.
+
+Two things to carry. (1) CUDA-graph decode is numerically different from eager: under
+greedy the free arm reproduces eager 55/64 and R8 32/64 (residency amplifies a token
+divergence once it starts). Same-arm comparisons within a run are unaffected; a paired
+comparison against a row produced on the eager path carries that drift. The sampled evals
+(temperature 0.7) already sit above it. (2) The schedule test found a pre-existing corner
+in every walker: a request preempted at step s and replayed at s+1 was never pruned, so
+its re-prefill was scanned from stale decode state. Fixed by cold-filling any prefill span
+that starts at token 0. No committed row is known to have hit it (preemption needs KV
+pressure the evals did not have), but the rows before this date were produced without the
+fix.
