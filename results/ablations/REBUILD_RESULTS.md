@@ -1011,3 +1011,24 @@ came from the same accident (arithmetic-dense self-generated data); the fix on p
 model-specific because the failure's visibility to the loss is.
 
 Standing settings: gemma rebuild as is (W=1); qwen rebuild with --digit-weight 10.
+
+## Self-distillation, round 1: KL-only continuation from digit10 gives nothing (2026-08-28)
+
+Producer `tmoe_qwen_distill.sh digit10`: 4500 R8 samples from the merged digit10 student on the
+D7 pool (eval recipe; 45% hit the 1024-token cap, mean 741 tokens), free-base top-50 logprobs
+as teacher, then the digit10 adapter continued for 1.4M tokens on
+KL(student constrained || teacher free) alone (`--kl-only --kl-arm constrained`, weight 1.0,
+lr 3e-5). KL fell from 0.187 to 0.178 nats per token.
+
+| arm | base | digit10 | distill | distill vs digit10 (paired) |
+|---|---|---|---|---|
+| free | 85.9 | +1.2 | +0.1 | -1.1, 18/33, z=-2.1 |
+| R8 | 76.6 | +5.4 | +4.8 | -0.6, 56/64, z=-0.7 |
+| R32 | 79.8 | +5.3 | +4.2 | -1.1, 44/59, z=-1.5 |
+
+R8 false-equation rate 2.43% against digit10's 2.29%. Two things went wrong. The KL-only
+phase has no free-arm anchor, so the free arm drifts (the one significant change). And the
+constrained arms do not move, so the on-policy signal on these samples was too weak to
+matter in 1.4M tokens; the KL barely fell. Round 2 has to keep the CE and the free-arm anchor
+and add the on-policy term rather than replace them, and the sample set needs looking at
+before it is reused.
