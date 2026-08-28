@@ -77,6 +77,8 @@ echo "  mix (CE W=3 + anchor + fwd-KL on W=3-student samples, from scratch) fini
 echo "  off-policy data point. pure/cont CANCELLED. RUNNING: tmoe_gemma_onpolicy_loop.sh digit3 3 850000:"
 echo "  each round samples from the CURRENT adapter, reverse-KL + anchor, merge, GSM8K n=1319; records"
 echo "  gemma4_ce_onp_r{1,2,3}_n1319, ~45 min/round. Then the gemma deadband surfaces."
+echo "EVAL WITHOUT MERGES (22:08): apply_adapter.py applies an adapter to the live engine, EXACT on 325"
+echo "  tensors, 8.4 s; gemma chains use --adapter / adapter:<file>. Merged dirs only for qwen + WritingBench."
 echo "ONLINE ON-POLICY VALIDATED (21:40): sync bit-exact, refresh 24s/64 rows, 2.9k tok/s, e2e PASS. RUNNING:"
 echo "  tmoe_gemma_online.sh digit3 850000 16 256 (reverse-KL + anchor, from W=3), result ~22:25 UTC,"
 echo "  record gemma4_ce_online_digit3_e16_n1319. Compare vs base R8 78.8 / W=3 +3.6. If it moves R8:"
