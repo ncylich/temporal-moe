@@ -272,8 +272,9 @@ it is a run-to-run replicate (+3.3 vs rebuild's +4.1), not independent-data evid
 
 ## Swap rate: the swaps are necessary. min_logit sits near the efficient frontier (2026-08-26)
 
+Relabelled 2026-08-28: this is a hysteresis ablation of OUR eviction rule at R=8, inspired by
 BASELINE_METHODS_COMPARISON.md #3 (cache-conditional experts, Skliar et al.,
-arXiv:2412.00099), implemented on the serving path as a swap deadband: evict only when the
+arXiv:2412.00099); it is not their method or their setting. Implemented on the serving path as a swap deadband: evict only when the
 best non-resident logit beats the worst resident one by more than RHO. RHO=0 is the
 published min_logit rule, verified bit-identical, so no existing row moves. Producer:
 `TEMPORAL_RHO` in `temporal/temporal_router.py`; swap rates measured with
