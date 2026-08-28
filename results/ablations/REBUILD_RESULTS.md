@@ -1138,3 +1138,21 @@ plus the free-arm anchor and no CE, for 0.85M tokens, then merges and runs GSM8K
 next round samples from the adapter just trained. About 45 minutes per round on the fast
 serving path. Records `gemma4_ce_onp_r{1,2,3}_n1319`, compared same-arm against the base
 (R8 78.8) and the W=3 start point (+3.6).
+
+## "mix": off-policy forward KL added to the W=3 recipe -- no gain at the bound (2026-08-28)
+
+Producer `tmoe_gemma_onpol.sh digit3 mix`: from scratch, 3.4M tokens, CE (W=3) + free-arm
+anchor + a forward-KL term (teacher-weighted, top-50) on 4524 math-weighted samples written
+by the W=3 student under R8. Off-policy for the adapter being trained (a different adapter
+wrote the samples). GSM8K n=1319:
+
+| arm | base | W=3 | mix | mix vs W=3 (paired) |
+|---|---|---|---|---|
+| free | 87.8 | -1.1 | +0.2 | +1.3, 29/12, z=2.7 |
+| R8 | 78.8 | +3.6 | +2.2 | -1.4, 69/87, z=-1.4 |
+| R16 | 86.6 | -0.4 | +0.7 | +1.1, 45/31, z=1.6 |
+
+The term does what forward KL does: it pulls the student toward the free model's whole
+distribution, which helps the arms that are already near it (free, R16) and costs the one
+that is not (R8). Not the lever. Superseded by the on-policy reverse-KL work (in-process
+sampler, below).
