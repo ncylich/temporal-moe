@@ -192,12 +192,15 @@ def main():
     ap.add_argument("--online-smoke", default=None,
                     help="path of a parity_vllm.py dump made from the MERGED checkpoint of the adapter this "
                          "run resumes from: sync once, generate the same prompts greedily, compare tokens, exit")
-    ap.add_argument("--aux-loss", choices=("fwdkl", "revkl"), default="fwdkl",
+    ap.add_argument("--aux-loss", choices=("fwdkl", "revkl", "revkl_full"), default="fwdkl",
                     help="fwdkl: teacher-weighted KL over the teacher top-50 at the student's states. "
                          "revkl: reverse KL, sampled-token estimator: loss = -sum_t A_t log p_s(y_t), "
                          "A_t = log p_teacher(y_t) - log p_student(y_t) held fixed (the on-policy "
                          "distillation objective; needs a --precompute-kl file that stores the "
-                         "teacher log-prob at the sampled token)")
+                         "teacher log-prob at the sampled token). revkl_full: ANALYTIC reverse KL at "
+                         "the student's states over the teacher's top-50 support plus a tail term: "
+                         "sum_{y in top50} p_s(y)(log p_s(y) - log p_t(y)) + m_s (log m_s - log m_t), "
+                         "m = mass outside the top-50; exact given the stored teacher, low variance")
     ap.add_argument("--precompute-tokw", default=None,
                     help="forward-only pass over all trajectories computing per-"
                          "response-token CE under free and R8 routing; saves "
@@ -1107,6 +1110,15 @@ def main():
                         s_at = lgb.gather(1, tid_) - torch.logsumexp(lgb, -1, keepdim=True)
                         p = tlp_.exp(); p = p / p.sum(1, keepdim=True)
                         return (p * (tlp_ - s_at)).sum()
+                    def _aux_rev_full(x_, tid_, tlp_):
+                        lgb = (HEAD(x_) if DEC is not None else x_).float()
+                        ls = lgb - torch.logsumexp(lgb, -1, keepdim=True)            # student log-probs [n,V]
+                        s_in = ls.gather(1, tid_)                                      # on the teacher top-50
+                        p_in = s_in.exp()
+                        m_s = (1.0 - p_in.sum(1)).clamp_min(1e-6)                      # student mass outside
+                        m_t = (1.0 - tlp_.exp().sum(1)).clamp_min(1e-6)                # teacher mass outside
+                        kl = (p_in * (s_in - tlp_)).sum(1) + m_s * (m_s.log() - m_t.log())
+                        return kl.sum(), kl.detach().sum()
                     def _aux_rev(x_, tok_, tat_):
                         lgb = (HEAD(x_) if DEC is not None else x_).float()
                         lps = lgb.gather(1, tok_[:, None]).squeeze(1) - torch.logsumexp(lgb, -1)
@@ -1121,6 +1133,11 @@ def main():
                         for j in range(0, row_x.shape[0], 512):
                             l_, e_ = torch.utils.checkpoint.checkpoint(
                                 _aux_rev, row_x[j:j + 512], tok[j:j + 512], tat[j:j + 512], use_reentrant=False)
+                            kl_sum = kl_sum + l_; aux_est += float(e_) / kl_den_a / accum_batches
+                    elif A.aux_loss == "revkl_full":
+                        for j in range(0, row_x.shape[0], 512):
+                            l_, e_ = torch.utils.checkpoint.checkpoint(
+                                _aux_rev_full, row_x[j:j + 512], tid[j:j + 512], tlp[j:j + 512], use_reentrant=False)
                             kl_sum = kl_sum + l_; aux_est += float(e_) / kl_den_a / accum_batches
                     else:
                         for j in range(0, row_x.shape[0], 512):
@@ -1140,8 +1157,8 @@ def main():
             print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*accum_batches:.4f} "
                   f"({seen/(time.time()-t0):.0f} tok/s)", flush=True)
             if AUX is not None:
-                if A.aux_loss == "revkl":
-                    print(f"[gce] aux-revkl loss {aux_tot/max(1,aux_steps):.4f}; reverse-KL estimate {aux_est/max(1,aux_steps):.4f} nats/tok "
+                if A.aux_loss in ("revkl", "revkl_full"):
+                    print(f"[gce] aux-{A.aux_loss} loss {aux_tot/max(1,aux_steps):.4f}; reverse-KL estimate {aux_est/max(1,aux_steps):.4f} nats/tok "
                           f"(student constrained || teacher free, student-sampled tokens)", flush=True)
                 else:
                     print(f"[gce] aux-kl {aux_tot/max(1,aux_steps):.4f} nats/tok (constrained arm, own prefixes)", flush=True)

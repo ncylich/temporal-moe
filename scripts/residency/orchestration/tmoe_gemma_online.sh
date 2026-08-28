@@ -12,7 +12,7 @@ export TMOE_ROOT=/workspace/temporal-moe PATH=/workspace/venv_vllm312/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=${HF_TOKEN:-$(cat /root/.cache/huggingface/token 2>/dev/null)} HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
-START=${1:-digit3}; T=${2:-850000}; EVERY=${3:-16}; N=${4:-256}; NAME=online_${START}_e${EVERY}
+START=${1:-digit3}; T=${2:-850000}; EVERY=${3:-16}; N=${4:-256}; NAME=online_${START}_e${EVERY}${TMOE_NAME_SUFFIX:-}
 # START=scratch: no adapter, the base under R8 is the initial student; distillation-only from the ground up
 B=/dev/shm/gemma4-26b-it; L=scripts/residency/gpu_lease.sh; D=/workspace/olmoe-adapt/data; PY=/workspace/venv_vllm312/bin/python
 KL=/workspace/instruct-traj/gemma4_d7_seq4096_klref.pt
@@ -24,7 +24,7 @@ scripts/residency/disk_budget.sh || exit 3
 echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), refresh every $EVERY steps x $N rows $(date -u +%H:%M)"
 [ -f $A.done ] || { [ -n "$INIT" ] && cp $D/gemma_ce_${START}_adapter.pt $A; rm -f $A.tmp
   $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
-    --kl-only --kl-anchor $KL --kl-weight 0.05 --aux-loss revkl --aux-kl-weight 1.0 \
+    --kl-only --kl-anchor $KL --kl-weight 0.05 --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
     --online-every $EVERY --online-n $N
   touch $A.done; }
 if [ "${TMOE_MERGE:-0}" = 1 ]; then
