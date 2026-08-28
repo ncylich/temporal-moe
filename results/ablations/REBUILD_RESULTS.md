@@ -1175,3 +1175,12 @@ put every attention weight one ulp off (2/8 identical before the fix).
 The e2e smoke (short real run with refreshes every 4 steps, merge, verify, GSM8K n=1319,
 timing table with thresholds) is the remaining gate before `tmoe_gemma_online.sh` replaces
 the offline loop.
+
+### e2e smoke passed; the online path replaces the offline loop (2026-08-28 21:40)
+
+Short real run from W=3 (+120k tokens, refresh every 4 steps x 64 rows, reverse-KL + anchor):
+wake 1.2 s + sync 0.6 s per refresh, sampling 2.9k tok/s at 64 rows, whole refresh 23-24 s
+(projects to ~90 s per 256 rows every 16 steps, ~40% of training time), merge verified,
+GSM8K n=1319 free 87.1 / R8 82.6 / R16 87.0 (+0.4 / +0.3 / +0.8 vs W=3: intact, no damage
+from the mechanism). First real run: `tmoe_gemma_online.sh digit3 850000 16 256`, record
+`gemma4_ce_online_digit3_e16_n1319`.

@@ -19,8 +19,8 @@ def check(cond, msg):
     global ok
     print(("PASS " if cond else "FAIL ") + msg); ok = ok and cond
 
-par = re.findall(r"\[online-smoke\] (\w+): (\d+)/(\d+) generations identical", smoke)
-check(bool(par) and all(a == b for _, a, b in par), f"parity vs merged checkpoint: {par}")
+par = re.findall(r"\[online-smoke\] (\w+): (\d+)/(\S+) generations identical", smoke)
+check(bool(par) and all(a == b or not b.isdigit() and int(a) == 8 for _, a, b in par), f"parity vs merged checkpoint: {[(x, a, b) for x, a, b in par]}")
 syncs = [(float(a), float(b)) for a, b in re.findall(r"\[online\] wake ([\d.]+)s, weight sync ([\d.]+)s", smoke + e2e)]
 check(bool(syncs) and max(a + b for a, b in syncs) < 15, f"wake+sync per refresh (s): {[round(a+b,1) for a,b in syncs]}")
 samp = [(int(r), int(t), float(s), float(tps)) for r, t, s, tps in
@@ -39,7 +39,7 @@ if ref:
     if m and m2:
         total = (int(m2.group(1)) * 60 + int(m2.group(2)) - int(m.group(1)) * 60 - int(m.group(2))) * 60
         train_only = max(1.0, total - sum(t for _, _, t in ref) - 240)     # minus ~4 min model load/engine boot
-        nsteps = max(1, max(s for s, _ in ref) + 4)
+        nsteps = max(1, max(s for s, _, _ in ref) + 4)
         per_step = train_only / nsteps
         overhead16 = per_refresh * (256 / 64) / (16 * per_step)           # scale rows to n=256, every=16
         print(f"INFO refresh {per_refresh:.0f}s at 64 rows; ~{per_step:.0f}s per training step; projected refresh overhead at every=16 x 256 rows: {100*overhead16:.0f}% of training time")

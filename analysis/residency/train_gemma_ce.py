@@ -929,7 +929,7 @@ def main():
         shutil.move("/tmp/gce_ckpt_tmp.pt", A.out)
 
     AUXS = {"chunks": None, "order": None, "i": 0}
-    aux_tot = 0.0; aux_est = 0.0
+    aux_tot = 0.0; aux_est = 0.0; aux_steps = 0
 
     def _rebuild_aux(rows_, seed_):
         alidx = sorted(range(len(rows_)), key=lambda i: rows_[i]["ids"].shape[0])
@@ -1134,17 +1134,17 @@ def main():
         GL.CFG.update(batch=1)
         torch.nn.utils.clip_grad_norm_(train_params, 1.0)
         opt.step()
-        step += 1
+        step += 1; aux_steps += 1
         if step % 50 == 0:
             print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*accum_batches:.4f} "
                   f"({seen/(time.time()-t0):.0f} tok/s)", flush=True)
             if AUX is not None:
                 if A.aux_loss == "revkl":
-                    print(f"[gce] aux-revkl loss {aux_tot/50:.4f}; reverse-KL estimate {aux_est/50:.4f} nats/tok "
+                    print(f"[gce] aux-revkl loss {aux_tot/max(1,aux_steps):.4f}; reverse-KL estimate {aux_est/max(1,aux_steps):.4f} nats/tok "
                           f"(student constrained || teacher free, student-sampled tokens)", flush=True)
                 else:
-                    print(f"[gce] aux-kl {aux_tot/50:.4f} nats/tok (constrained arm, own prefixes)", flush=True)
-                aux_tot = 0.0; aux_est = 0.0
+                    print(f"[gce] aux-kl {aux_tot/max(1,aux_steps):.4f} nats/tok (constrained arm, own prefixes)", flush=True)
+                aux_tot = 0.0; aux_est = 0.0; aux_steps = 0
         if step % A.save_every == 0:
             save()
     save()
