@@ -26,6 +26,13 @@ while :; do
 done
 for i in $(seq 1 90); do
   [ "${TMOE_LEASE_NOMEM:-}" = 1 ] && { free=999999; break; }     # tests: skip the memory wait
+  # host RAM guard: the container limit is ~251 GB and /dev/shm counts; a model load or a
+  # sleeping vLLM engine needs ~60-110 GB, so require 140 GB of headroom before starting
+  lim=$(cat /sys/fs/cgroup/memory.max 2>/dev/null); cur=$(cat /sys/fs/cgroup/memory.current 2>/dev/null)
+  if [ -n "$lim" ] && [ "$lim" != max ] && [ -n "$cur" ] && [ $(( (lim - cur) / 1073741824 )) -lt 140 ]; then
+    [ $((i % 6)) -eq 1 ] && echo "[lease] waiting for host RAM: $(( (lim - cur) / 1073741824 )) GB free of $((lim / 1073741824))"
+    sleep 20; continue
+  fi
   free=$(env -u CUDA_VISIBLE_DEVICES nvidia-smi -i "$G" --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null)
   [ "${free:-0}" -ge 122880 ] && break
   sleep 20
