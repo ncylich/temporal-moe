@@ -989,3 +989,25 @@ while W=10's is 2.29%. So at R8 the accuracy moves before the measured arithmeti
 is a lower bound on slips, so this may be a measurement gap rather than a different
 mechanism, but it should be said: W=3 recovers the accuracy without a visible drop in false
 equations, and only W=10 shows both.
+
+### Gemma at W=3: the collapse goes away and the result is the rebuild (2026-08-28)
+
+| arm | base | rebuild | W=3 | W=10 | W=3 vs rebuild |
+|---|---|---|---|---|---|
+| free | 87.8 | -1.0 | -1.1 | -0.4 | 23/24, z=-0.1 |
+| R8 (6.25%) | 78.8 | +3.1 | +3.6 (124/77, z=3.3) | +1.4 | 92/86, z=+0.4 |
+| R16 (12.5%) | 86.6 | +0.9 | -0.4 | +0.4 | 25/42, z=-2.1 |
+
+Zero digit-stream generations at W=3 (17 at W=10). R8 false-equation rate 2.49%, the lowest
+of any gemma adapter (rebuild 2.75%, W=10 3.69%), with broke 77 and fixed 107 against the
+rebuild's 75 and 107. R16 gives back 1.3 against the rebuild, on 67 discordant pairs.
+
+So the digit lever does nothing for gemma at any dose: W=10 collapses, W=3 reproduces the
+rebuild. That is the expected outcome under the tokenizer explanation. Gemma's numeric
+tokens already carry their loss (multi-digit numbers are single tokens, 403 ids), so plain
+CE saw the arithmetic and the rebuild removed half the excess on its own; qwen's per-digit
+tokens (22 ids) hid it, and W=10 is what exposed it. The published gemma and qwen numbers
+came from the same accident (arithmetic-dense self-generated data); the fix on purpose is
+model-specific because the failure's visibility to the loss is.
+
+Standing settings: gemma rebuild as is (W=1); qwen rebuild with --digit-weight 10.

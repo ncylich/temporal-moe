@@ -1977,3 +1977,12 @@ qwen35_ce_digit3_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extra
 qwen35_ce_digit3_n1319,256,8,R32,32,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,987
 qwen35_ce_digit3_n1319,256,8,R32,32,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,987
 qwen35_ce_digit3_n1319,256,8,R32,32,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.831691,full,2048,987
+gemma4_ce_digit3_n1319,128,8,free,,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,229
+gemma4_ce_digit3_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,229
+gemma4_ce_digit3_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.867324,full,2048,229
+gemma4_ce_digit3_n1319,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,599
+gemma4_ce_digit3_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,599
+gemma4_ce_digit3_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.823351,full,2048,599
+gemma4_ce_digit3_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,553
+gemma4_ce_digit3_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,553
+gemma4_ce_digit3_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.862017,full,2048,553
