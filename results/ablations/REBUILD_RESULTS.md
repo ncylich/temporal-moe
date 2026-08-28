@@ -1156,3 +1156,22 @@ The term does what forward KL does: it pulls the student toward the free model's
 distribution, which helps the arms that are already near it (free, R16) and costs the one
 that is not (R8). Not the lever. Superseded by the on-policy reverse-KL work (in-process
 sampler, below).
+
+## In-process on-policy sampler: sync verified bit-exact (2026-08-28 21:19)
+
+`online_sampler.py` + `train_gemma_ce.py --online-every N`: a vLLM engine lives inside the
+trainer process, asleep during training (weights in pinned host RAM, KV freed), and every N
+steps wakes, receives the current adapter merged on the GPU, samples under R8, sleeps.
+
+Measured on gemma: engine boot 139-210 s once; wake 1.2-2.5 s; full weight sync 0.6 s
+(11,941 engine params, ~45 GB); sleep 1.3 s after the first; steady-state generation at the
+standalone engine's rate. Exactness (eager mode, deterministic): every compared engine
+tensor equals the merged-on-disk W=3 checkpoint to the bit (layers 0 and 29: qkv, o_proj,
+router, both fused expert tensors), and greedy generations on 8 GSM8K prompts are 8/8
+identical on the free arm and 8/8 on R8. One rounding bug was found and fixed on the way:
+the LoRA delta is fp32 and peft adds it with a single rounding; casting it to bf16 first
+put every attention weight one ulp off (2/8 identical before the fix).
+
+The e2e smoke (short real run with refreshes every 4 steps, merge, verify, GSM8K n=1319,
+timing table with thresholds) is the remaining gate before `tmoe_gemma_online.sh` replaces
+the offline loop.
