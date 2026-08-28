@@ -2037,3 +2037,15 @@ qwen35_ce_distill_digit10_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexi
 qwen35_ce_distill_digit10_n1319,256,8,R32,32,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,941
 qwen35_ce_distill_digit10_n1319,256,8,R32,32,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000758,full,2048,941
 qwen35_ce_distill_digit10_n1319,256,8,R32,32,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.840030,full,2048,941
+qwen35_ce_digit3_code,256,8,free,,mbpp_instruct,sample_len,500.000000,full,1536,383
+qwen35_ce_digit3_code,256,8,free,,mbpp_instruct,"pass_at_1,extract_code",0.772000,full,1536,383
+qwen35_ce_digit3_code,256,8,free,,humaneval_instruct,sample_len,164.000000,full,1536,198
+qwen35_ce_digit3_code,256,8,free,,humaneval_instruct,"pass@1,create_test",0.932927,full,1536,198
+qwen35_ce_digit3_code,256,8,R8,8,mbpp_instruct,sample_len,500.000000,full,1536,2441
+qwen35_ce_digit3_code,256,8,R8,8,mbpp_instruct,"pass_at_1,extract_code",0.758000,full,1536,2441
+qwen35_ce_digit3_code,256,8,R8,8,humaneval_instruct,sample_len,164.000000,full,1536,496
+qwen35_ce_digit3_code,256,8,R8,8,humaneval_instruct,"pass@1,create_test",0.908537,full,1536,496
+qwen35_ce_digit3_code,256,8,R32,32,mbpp_instruct,sample_len,500.000000,full,1536,2364
+qwen35_ce_digit3_code,256,8,R32,32,mbpp_instruct,"pass_at_1,extract_code",0.782000,full,1536,2364
+qwen35_ce_digit3_code,256,8,R32,32,humaneval_instruct,sample_len,164.000000,full,1536,500
+qwen35_ce_digit3_code,256,8,R32,32,humaneval_instruct,"pass@1,create_test",0.908537,full,1536,500

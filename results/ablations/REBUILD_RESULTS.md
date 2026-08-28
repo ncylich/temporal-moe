@@ -1032,3 +1032,23 @@ constrained arms do not move, so the on-policy signal on these samples was too w
 matter in 1.4M tokens; the KL barely fell. Round 2 has to keep the CE and the free-arm anchor
 and add the on-policy term rather than replace them, and the sample set needs looking at
 before it is reused.
+
+### Qwen W=3 on the full surface: the general setting matches W=10 at R8 (2026-08-28)
+
+Same bases as the W=10 table. Records `qwen35_ce_digit3_{full,n_dual,code}`.
+
+| benchmark | base R8 | published | rebuild | W=3 | W=10 | | base R32 | rebuild | W=3 | W=10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| GSM8K (n=1319) | 76.6 | +6.5 | +2.1 | +5.1 | +5.4 | | 79.8 | +3.2 | +3.3 | +5.3 |
+| IFEval (n=541) | 82.6 | +3.5 | +0.2 | +1.3 | +0.2 | | 85.2 | -1.3 | -0.9 | -1.5 |
+| HumanEval (n=164) | 90.9 | +3.0 | -1.8 | 0.0 | +3.0 | | 89.0 | +0.6 | +1.8 | +0.6 |
+| MMLU (n=228) | 92.1 | -2.2 | -2.2 | +0.4 | -1.3 | | 93.4 | -1.8 | -2.2 | -0.4 |
+| MBPP (n=500) | 75.2 | n/a | +1.6 | +0.6 | +1.4 | | 76.4 | +2.6 | +1.8 | +0.8 |
+| **mean, 4 published cells** | | **+2.7** | **-0.4** | **+1.7** | **+1.8** | | | +0.2 | +0.5 | +1.0 |
+
+At R8 the two weights are the same adapter for practical purposes (four-cell +1.7 against
++1.8; every difference is inside its cell's noise). W=10 keeps an edge at R32 (+1.0 against
++0.5, mostly GSM8K +5.3 against +3.3) and on the free arm. One weight for both models is
+therefore W=3: it is the rebuild on gemma and the full gain on qwen at the published bound.
+The gap to the paper on qwen is unchanged: IFEval (+1.3 against +3.5) and GSM8K (+5.1
+against +6.5).
