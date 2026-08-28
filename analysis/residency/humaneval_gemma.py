@@ -75,8 +75,8 @@ def main():
     from vllm import LLM, SamplingParams
     arms = A.arms.split(",") if A.arms else [A.arm]
     assert all(a == "free" or re.fullmatch(r"R\d+", a) for a in arms) and arms, "bad --arm(s)"
-    llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=0.85,
-              max_model_len=A.max_model_len, enable_prefix_caching=False)
+    llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=0.85,
+              max_model_len=A.max_model_len)
     msgs = [[{"role": "user", "content":
               "Complete the following Python function. Provide the complete function "
               "in a single ```python code block.\n\n" + p["prompt"]}] for p in probs]

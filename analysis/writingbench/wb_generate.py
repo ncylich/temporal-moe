@@ -53,9 +53,8 @@ def main():
     from decode_state import DEC
     from vllm import LLM, SamplingParams
 
-    llm = LLM(model=A.model_path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
-              max_model_len=A.max_new + 2048, max_num_seqs=A.max_seqs,
-              enable_prefix_caching=False)
+    llm = LLM(model=A.model_path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
+              max_model_len=A.max_new + 2048, max_num_seqs=A.max_seqs)
     R = None if A.arm == "free" else int(A.arm.lstrip("R"))
     DEC.update(on=R is not None, R=R or 0, swaps=1)
     DEC["state"].clear()

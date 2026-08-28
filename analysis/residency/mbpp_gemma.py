@@ -80,8 +80,8 @@ def main():
     from vllm import LLM, SamplingParams
     arms = A.arms.split(",")
     assert all(a == "free" or re.fullmatch(r"R\d+", a) for a in arms) and arms, "bad --arms"
-    llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
-              max_model_len=A.max_model_len, enable_prefix_caching=False)
+    llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
+              max_model_len=A.max_model_len)
     # MBPP's convention: the asserts are shown so the model knows the required signature.
     msgs = [[{"role": "user", "content":
               "You are an expert Python programmer. Write a Python function for this "

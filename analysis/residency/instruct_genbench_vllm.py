@@ -91,7 +91,7 @@ def main():
         THINK_MARK = None            # instruct mode: no think segment to strip
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.gen_cap,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
-              enforce_eager=True, enable_prefix_caching=False,
+              **vllm_glue.llm_kwargs(),
               **({"dtype": "bfloat16"} | kw))
 
     # Thinking-mode control: inject template kwargs at the tokenizer level (unknown

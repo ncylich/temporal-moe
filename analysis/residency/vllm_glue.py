@@ -28,7 +28,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vllm_residency as VR                                           # noqa: E402
 
 
+def llm_kwargs():
+    """Engine kwargs for the residency stack. Fast walker (default): full CUDA graphs on
+    decode-only steps, no torch.compile (CompilationMode.NONE), so the fused kernel is
+    captured and replayed and prefill/mixed steps stay eager where the python part of the
+    walker runs. TEMPORAL_EAGER=1 or a non-fast TEMPORAL_WALKER keeps the old
+    enforce_eager=True behaviour. Prefix caching stays off in every mode (see module doc)."""
+    if os.environ.get("TEMPORAL_EAGER") == "1" or VR._WALKER != "fast":
+        return {"enforce_eager": True, "enable_prefix_caching": False}
+    from vllm.config import CompilationConfig, CompilationMode, CUDAGraphMode
+    return {"enforce_eager": False, "enable_prefix_caching": False,
+            "compilation_config": CompilationConfig(mode=CompilationMode.NONE,
+                                                    cudagraph_mode=CUDAGraphMode.FULL_DECODE_ONLY)}
+
+
 def install():
+    if VR._WALKER == "fast":          # the evals read swap traffic from the router module
+        from temporal import temporal_router as TR
+        TR.swap_stats = VR.swap_stats
     # transformers 5.15 heterogeneity guard: gemma4 marks head_dim per-layer and vLLM
     # reads it globally; hf_overrides does not reach every config object vLLM constructs,
     # so permit global access at the mixin class level. gemma4-26B is homogeneous in

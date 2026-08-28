@@ -51,14 +51,21 @@ for _ in range(mx):
     if step:
         SCHEDULE.append(step)
 
+# the fast walker is GPU-only (Triton); its buffers live on the current CUDA device
+import os
+DEV = "cuda" if os.environ.get("TEMPORAL_WALKER", "fast") == "fast" and torch.cuda.is_available() else "cpu"
+if DEV == "cpu":
+    os.environ["TEMPORAL_WALKER"] = os.environ.get("TEMPORAL_WALKER", "slots")
+    if VR._WALKER == "fast":
+        VR._WALKER = "slots"
 DEC.update(on=True, R=R, swaps=1)
 DEC["state"].clear()
 got = {r: {} for r in REQS}                     # req -> {position: mask row}
 for step in SCHEDULE:
     spans = [(r, e - s, pf) for r, s, e, pf in step]
     VR.set_step(spans)
-    flat = torch.cat([STREAM[r][s:e, 0] for r, s, e, _ in step])
-    out = VR.apply(0, flat.clone())
+    flat = torch.cat([STREAM[r][s:e, 0] for r, s, e, _ in step]).to(DEV)
+    out = VR.apply(0, flat.clone()).cpu()
     o = 0
     for r, s, e, pf in step:
         if not pf:
@@ -72,5 +79,5 @@ for r, (p, t) in REQS.items():
         want = ref[pos_i - p, 0]
         assert torch.equal(m, want), f"req {r} pos {pos_i} mask mismatch"
 n = sum(len(v) for v in got.values())
-print(f"CONTINUOUS-BATCHING WALKER PARITY PASS ({n} decode positions, "
+print(f"CONTINUOUS-BATCHING WALKER PARITY PASS [{VR._WALKER} walker on {DEV}] ({n} decode positions, "
       f"chunked/join/finish/preempt-replay all exercised)")

@@ -48,8 +48,8 @@ def main():
     from vllm import LLM, SamplingParams
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(A.path)
-    llm = LLM(model=A.path, enforce_eager=True, gpu_memory_utilization=A.gpu_mem,
-              max_model_len=A.max_model_len, enable_prefix_caching=False)
+    llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
+              max_model_len=A.max_model_len)
     DEC.update(on=True, R=A.R, swaps=1)
     DEC["state"].clear()
 

@@ -91,7 +91,7 @@ def main():
         kw["hf_overrides"] = {"allow_global_per_layer_attribute_access": True}
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.gen_cap,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
-              enforce_eager=True, enable_prefix_caching=False, dtype="auto", **kw)
+              **vllm_glue.llm_kwargs(), dtype="auto", **kw)
 
     if A.reasoning_effort or A.think != "default":
         _tk = lm.tokenizer

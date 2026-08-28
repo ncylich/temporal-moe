@@ -26,6 +26,12 @@ from decode_state import DEC                                         # noqa: E40
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
 from temporal import temporal_router as TR                           # noqa: E402
+import residency_kernels as RK                                       # noqa: E402
+
+# Walker selection. "fast" (default as of 2026-08-28): fused Triton kernels over
+# persistent device buffers, CUDA-graph safe (see residency_kernels.py). "slots"
+# and "dict" are the earlier python walkers, kept for comparison.
+_WALKER = os.environ.get("TEMPORAL_WALKER", "fast")
 
 STEP = {"spans": None}     # [(req_id, n_tokens, is_prefill)] for the current model step
 
@@ -45,6 +51,12 @@ def set_step(spans):
             for req in [r for r in SL["rows"] if r not in live]:
                 SL["free"].append(SL["rows"].pop(req))
                 SL["seeded"].discard(req)
+        if FAST["reqrow"]:
+            for req in [r for r in FAST["reqrow"] if r not in live]:
+                FAST["free"].append(FAST["reqrow"].pop(req))
+                FAST["seeded"].discard(req)
+    if _WALKER == "fast":
+        _fast_set_step(spans)
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +225,191 @@ def _observe_into(bank, row, lg, seeded):
     bank[row: row + 1].copy_(res)
 
 
+# ---------------------------------------------------------------------------
+# Fast walker (TEMPORAL_WALKER=fast, default).
+#
+# State: one persistent [cap,E] int8 bank per layer; request -> slot map kept on the
+# host. Per STEP (in set_step, outside any CUDA graph): classify spans once, assign
+# slots, and copy three small index buffers to the device (rows of the flattened
+# token stream that are decode tokens, their slots, and the count). Per LAYER: one
+# clone of the router logits and ONE fused kernel launch that steps every decode row
+# and writes the masked logits. Prefill / preemption-replay / cold-fill chunks are
+# walked by one kernel launch each, in the python part that only runs on eager steps.
+#
+# CUDA-graph safety: the decode launch depends on no host state (fixed grid = cap,
+# live rows gated by the device scalar ndec), so vLLM can capture it into its
+# decode-only graphs and replay it while set_step keeps the buffers current. The
+# python part is skipped while a stream is capturing; a capture that finds no
+# buffers raises rather than allocating from the graph pool. Free arms run the same
+# launch with ndec = 0 (exact no-op on the logits).
+# ---------------------------------------------------------------------------
+FAST = {"cap": int(os.environ.get("TEMPORAL_MAX_SEQS", "1024")),
+        "rho": float(os.environ.get("TEMPORAL_RHO", "0")),
+        "banks": {}, "rows": None, "slots": None, "ndec": None, "count": None,
+        "scratch": None, "stage": None, "dev_stage": None, "epoch": None,
+        "reqrow": {}, "free": [], "next": 0, "seeded": set(), "plan": None,
+        "swaps_c": None, "verified": {"step": False, "scan": False}}
+
+
+def _fast_alloc(device):
+    if FAST["rows"] is not None:
+        return
+    if torch.cuda.is_current_stream_capturing():
+        raise RuntimeError("[residency] fast-walker buffers must be allocated before "
+                           "CUDA-graph capture (no eager step ran first)")
+    cap = FAST["cap"]
+    FAST["dev_stage"] = torch.zeros(2 * cap + 1, dtype=torch.int32, device=device)
+    FAST["rows"] = FAST["dev_stage"][:cap]
+    FAST["slots"] = FAST["dev_stage"][cap:2 * cap]
+    FAST["ndec"] = FAST["dev_stage"][2 * cap:]
+    FAST["stage"] = [torch.zeros(2 * cap + 1, dtype=torch.int32).pin_memory()
+                     for _ in range(2)]
+    FAST["count"] = torch.zeros(2, dtype=torch.int64, device=device)
+    FAST["scratch"] = torch.zeros(2, dtype=torch.int64, device=device)
+
+
+def _fast_bank(layer, E, device):
+    t = FAST["banks"].get(layer)
+    if t is None:
+        if torch.cuda.is_current_stream_capturing():
+            raise RuntimeError("[residency] state bank for a new layer requested during "
+                               "CUDA-graph capture")
+        t = torch.zeros(FAST["cap"], E, dtype=torch.int8, device=device)
+        FAST["banks"][layer] = t
+    return t
+
+
+def _fast_epoch():
+    """The harnesses clear DEC["state"] between arms; zero the persistent state with it."""
+    if DEC["state"].get("__fast_epoch__") != FAST["epoch"] or FAST["epoch"] is None:
+        FAST.update(reqrow={}, free=[], next=0, seeded=set(), epoch=object(), plan=None)
+        DEC["state"]["__fast_epoch__"] = FAST["epoch"]
+        for t in FAST["banks"].values():
+            t.zero_()
+        if FAST["count"] is not None:
+            FAST["count"].zero_()
+
+
+def _fast_row(req):
+    r = FAST["reqrow"].get(req)
+    if r is None:
+        r = FAST["free"].pop() if FAST["free"] else FAST["next"]
+        if r == FAST["next"]:
+            FAST["next"] += 1
+        if r >= FAST["cap"]:
+            raise RuntimeError(f"[residency] more live requests than TEMPORAL_MAX_SEQS={FAST['cap']}")
+        FAST["reqrow"][req] = r
+    return r
+
+
+def _fast_set_step(spans):
+    _fast_epoch()
+    if FAST["rows"] is None:
+        _fast_alloc(torch.device("cuda", torch.cuda.current_device()))
+    cap = FAST["cap"]
+    st = FAST["stage"][0]; FAST["stage"].reverse()          # alternate host buffers
+    if spans is None or not DEC["on"]:
+        FAST["plan"] = None
+        st[2 * cap] = 0
+        FAST["dev_stage"][2 * cap:].copy_(st[2 * cap:], non_blocking=True)
+        return
+    if FAST["swaps_c"] is not None and DEC["swaps"] != FAST["swaps_c"]:
+        raise RuntimeError("[residency] DEC['swaps'] changed after the decode kernel was "
+                           "captured; restart the process for a different swap budget")
+    pre, replay, cold, dec_rows, dec_slots = [], [], [], [], []
+    o = 0
+    for sp in spans:
+        req, n, is_prefill = sp[0], sp[1], sp[2]
+        seeded = req in FAST["seeded"]
+        row = _fast_row(req)
+        if is_prefill:
+            pre.append((row, o, n, seeded))
+        elif n > 1:
+            replay.append((row, o, n, seeded))
+        elif not seeded:
+            cold.append((row, o))
+        else:
+            dec_rows.append(o); dec_slots.append(row)
+        FAST["seeded"].add(req)
+        o += n
+    D = len(dec_rows)
+    if D > cap:
+        raise RuntimeError(f"[residency] {D} decode rows > TEMPORAL_MAX_SEQS={cap}")
+    if D:
+        st[:D] = torch.tensor(dec_rows, dtype=torch.int32)
+        st[cap:cap + D] = torch.tensor(dec_slots, dtype=torch.int32)
+    st[2 * cap] = D
+    FAST["dev_stage"].copy_(st, non_blocking=True)
+    FAST["plan"] = {"pre": pre, "replay": replay, "cold": cold, "D": D}
+
+
+def _apply_fast(layer, router_logits):
+    logits = router_logits.contiguous()
+    N, E = logits.shape
+    if FAST["rows"] is None:                    # profile / warm-up forward before any step
+        _fast_alloc(logits.device)
+    bank = _fast_bank(layer, E, logits.device)
+    out = logits.clone()
+    capturing = torch.cuda.is_current_stream_capturing()
+    if FAST["swaps_c"] is None:
+        FAST["swaps_c"] = int(DEC["swaps"])
+    pl = FAST["plan"]
+    if not capturing and pl is not None and DEC["on"]:
+        NEG = float("-inf")
+        with torch.no_grad():
+            for row, o, n, seeded in pl["pre"]:        # observed free; only the state moves
+                res0 = bank[row] if seeded else None
+                m = RK.chunk_scan(logits[o:o + n], res0, DEC["R"], FAST["rho"],
+                                  FAST["swaps_c"], FAST["scratch"])
+                if not FAST["verified"]["scan"]:
+                    ref, _ = RK.reference_scan(logits[o:o + n], res0, DEC["R"], FAST["rho"],
+                                               FAST["swaps_c"])
+                    if not torch.equal(m.bool(), ref):
+                        raise RuntimeError("[residency] chunk_scan DISAGREES WITH REFERENCE -- aborting")
+                    FAST["verified"]["scan"] = True
+                    print("[residency] chunk_scan verified == reference", flush=True)
+                bank[row].copy_(m[-1])
+            for row, o, n, seeded in pl["replay"]:     # generated tokens recomputed as a chunk
+                res0 = bank[row] if seeded else None
+                m = RK.chunk_scan(logits[o:o + n], res0, DEC["R"], FAST["rho"],
+                                  FAST["swaps_c"], FAST["count"])
+                bank[row].copy_(m[-1])
+                out[o:o + n].masked_fill_(m == 0, NEG)
+            for row, o in pl["cold"]:                  # no prefill seen: top-R cold fill
+                m = RK.chunk_scan(logits[o:o + 1], None, DEC["R"], FAST["rho"],
+                                  FAST["swaps_c"], FAST["scratch"])
+                bank[row].copy_(m[0])
+                out[o].masked_fill_(m[0] == 0, NEG)
+    if not capturing and pl is not None and DEC["on"] and pl["D"] and not FAST["verified"]["step"]:
+        # one-time bit-exactness gate on the fused decode step (hard, house rule)
+        with torch.no_grad():
+            D = pl["D"]
+            rows = FAST["rows"][:D].long(); slots = FAST["slots"][:D].long()
+            ref, _ = RK.reference_step(logits.index_select(0, rows), bank.index_select(0, slots).bool(),
+                                       FAST["rho"], FAST["swaps_c"])
+            probe_bank = bank.clone(); probe_out = out.clone()
+            RK.decode_step(probe_out, logits, probe_bank, FAST["rows"], FAST["slots"], FAST["ndec"],
+                           FAST["scratch"], FAST["rho"], FAST["swaps_c"], FAST["cap"])
+            got = probe_bank.index_select(0, slots).bool()
+            want_out = logits.index_select(0, rows).masked_fill(~ref, float("-inf"))
+            if not torch.equal(got, ref) or not torch.equal(probe_out.index_select(0, rows), want_out):
+                raise RuntimeError("[residency] decode_step DISAGREES WITH REFERENCE -- aborting")
+            FAST["verified"]["step"] = True
+            print("[residency] decode_step verified == reference", flush=True)
+    RK.decode_step(out, logits, bank, FAST["rows"], FAST["slots"], FAST["ndec"], FAST["count"],
+                   FAST["rho"], FAST["swaps_c"], FAST["cap"])
+    return out
+
+
+def swap_stats():
+    """(swaps performed, decode rows stepped, swaps per decode token) since the last
+    arm reset; on-device counters, one sync here. Prefill observation is not counted."""
+    if FAST["count"] is None:
+        return 0, 0, 0.0
+    sw, tk = (int(x) for x in FAST["count"].tolist())
+    return sw, tk, (sw / tk if tk else 0.0)
+
+
 def apply(layer, router_logits):
     """router_logits [N,E] flattened across spans -> same tensor with non-resident
     experts masked to -inf on DECODE rows only. Prefill rows pass through free.
@@ -220,13 +417,15 @@ def apply(layer, router_logits):
     All decode rows advance in ONE batched reference _step (the scan's step is batched
     over B); with hundreds of concurrent requests a per-request loop would be
     kernel-launch-bound -- the exact pathology this stack exists to escape."""
+    if _WALKER == "fast" and router_logits.is_cuda:
+        return _apply_fast(layer, router_logits)
     if not DEC["on"] or STEP["spans"] is None:
         return router_logits
     # DEFAULT SLOTS as of 2026-08-24: validated bit-exact + real wall-clock win
     # on three architecturally distinct models (see temporal_router.step_accel
     # and TODO.md section 6). TEMPORAL_WALKER=dict opts back into the path
     # every pre-2026-08-24 grid row was produced on, if a comparison needs it.
-    if os.environ.get("TEMPORAL_WALKER", "slots") != "dict":
+    if _WALKER != "dict":
         return _apply_slots(layer, router_logits)
     N = router_logits.shape[0]
     total = sum(sp[1] for sp in STEP["spans"])
