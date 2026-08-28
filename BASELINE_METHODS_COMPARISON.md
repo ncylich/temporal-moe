@@ -227,3 +227,11 @@ Every cell is therefore a triple, and the paper's comparison is a plot on these 
 What this means for the existing rows: keep the R=8 ReMoE and deadband numbers as an
 ablation of "what does bounding do to a bandwidth method" if at all, and build the real
 table from runs at each method's own configuration. Not yet run.
+
+**Skliar against the fair baseline.** The deadband is training-free, so its baseline is the
+untrained base at the same R, and on that comparison it is not a null: +1.2 +/- 1.0 at rho
+0.5 (positive at rho 0.25, 0.5 and 1.25, each inside noise on its own) and up to ~36% fewer
+swaps at flat quality on all five benchmarks. Ours is +3.1 for 3.4M training tokens with
+swaps unchanged at 1.0 per layer per token. The two stack (ours + rho 0.5: +3.5). The paper
+should present them as complementary at equal memory: theirs moves the speed axis, ours the
+quality axis, and the combination is the best cell measured.
