@@ -195,3 +195,35 @@ Disambiguate in the bibliography or a reviewer will assume the wrong paper was c
   venue, since putting one in the wrong regime is the error this document is meant to prevent.
 - The OLMoE 70.7% recovery figure that circulated earlier is void. Those artifacts are
   archived under `results/archive/olmoe_wrong_renorm/`.
+
+## Protocol correction (2026-08-28): compare each method at ITS OWN setting, on three axes
+
+The measured comparisons above (ReMoE and the Skliar deadband, both at our R=8 on GSM8K)
+are not a fair comparison and should not be presented as one. Two problems, both raised by
+Noah on 2026-08-28:
+
+1. Forcing a competitor into our R=8 bound tests it where it was never designed to operate.
+   Each method must be run at the configuration its paper used (ReMoE and CoSMoEs with no
+   resident bound; Skliar at their cache sizes, typically half the experts resident, which
+   is about 4x our RAM at R=8 on gemma). They may well win on quality there; the point is to
+   show what that quality costs in memory and in speed, not to show them losing on our turf.
+2. GSM8K alone is not a surface. Every method gets the same five benchmarks we report for
+   ourselves (GSM8K, IFEval, HumanEval, MMLU, MBPP; WritingBench where the producer exists).
+
+Every cell is therefore a triple, and the paper's comparison is a plot on these axes:
+
+- **resident memory**: fraction of expert weights resident (ours 6.25% gemma / 3.1% qwen at
+  R8; Skliar ~50%; ReMoE and CoSMoEs 100% unless paired with a cache);
+- **expert swaps per layer per token**, MEASURED on the eval generations
+  (`TEMPORAL_COUNT_SWAPS=1`, `swap_stats()`), not simulated. Above 1 swap per layer per
+  token the system becomes very slow, so this is the speed axis. The floor of the memory
+  axis is the streaming-only MoE (nothing resident, every selected expert loaded on demand):
+  same or better memory than ours and no quality drop, at k swaps per layer per token
+  (8 on both models), which is why it is not a usable system. Ours runs at about 1.0 at R8
+  (0.9987 measured on gemma GSM8K), i.e. at that threshold by construction of the
+  one-swap-per-token rule;
+- **quality** on the full surface, same-arm against the unadapted base at the same setting.
+
+What this means for the existing rows: keep the R=8 ReMoE and deadband numbers as an
+ablation of "what does bounding do to a bandwidth method" if at all, and build the real
+table from runs at each method's own configuration. Not yet run.
