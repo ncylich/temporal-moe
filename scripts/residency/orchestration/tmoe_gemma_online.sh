@@ -27,10 +27,16 @@ echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), r
     --kl-only --kl-anchor $KL --kl-weight 0.05 --aux-loss revkl --aux-kl-weight 1.0 \
     --online-every $EVERY --online-n $N
   touch $A.done; }
-echo "### $NAME 2/3 merge + verify $(date -u +%H:%M)"
-[ -d $M ] || { $L $PY analysis/residency/train_gemma_ce.py $COMMON --out $A --merge-out $M; cp $B/processor_config.json $M/ 2>/dev/null || true; }
-$L $PY analysis/residency/verify_merge.py --base $B --merged $M
+if [ "${TMOE_MERGE:-0}" = 1 ]; then
+  echo "### $NAME 2/3 merge + verify $(date -u +%H:%M)"
+  [ -d $M ] || { $L $PY analysis/residency/train_gemma_ce.py $COMMON --out $A --merge-out $M; cp $B/processor_config.json $M/ 2>/dev/null || true; }
+  $L $PY analysis/residency/verify_merge.py --base $B --merged $M
+  EVAL_MODEL="--path $M"
+else
+  echo "### $NAME 2/3 no merge: the eval engine applies the adapter directly (apply_adapter.py, bit-exact, ~8 s) $(date -u +%H:%M)"
+  EVAL_MODEL="--path $B --adapter $A"
+fi
 echo "### $NAME 3/3 GSM8K n=1319 $(date -u +%H:%M)"
-$L $PY -u analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${NAME}_n1319 \
+$L $PY -u analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct $EVAL_MODEL --arms free,R8,R16 --record-as gemma4_ce_${NAME}_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
 echo "### $NAME ALL DONE $(date -u +%H:%M)"
