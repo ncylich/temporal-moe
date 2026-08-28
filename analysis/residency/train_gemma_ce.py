@@ -993,8 +993,9 @@ def main():
                 print(f"[online-smoke] {arm}: {same}/{n_ref} generations identical to the merged checkpoint", flush=True)
             SAMPLER.sleep()
             return
+    step0 = step
     while seen < A.tokens:
-        if SAMPLER is not None and step % A.online_every == 0:
+        if SAMPLER is not None and (step - step0) % A.online_every == 0:   # first step always refreshes
             t_on = time.time()
             AUX = SAMPLER.refresh(A.online_n)
             AUXREF = teacher_ref(AUX, adapted=True)
