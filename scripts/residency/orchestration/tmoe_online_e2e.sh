@@ -11,8 +11,8 @@ export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=$(cat /root/.cache/huggingface/token) HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
 L=scripts/residency/gpu_lease.sh; PY=/workspace/venv_vllm312/bin/python; D=/workspace/olmoe-adapt/data; B=/dev/shm/gemma4-26b-it
-until grep -q "### smoke DONE rc=0" /workspace/rerun-logs/online_smoke.out 2>/dev/null; do sleep 30; done
-grep -q "identical to the merged checkpoint" /workspace/rerun-logs/online_smoke.out || { echo "### e2e ABORT: parity smoke did not report"; exit 2; }
+until grep -q "### smoke DONE rc=0" /workspace/rerun-logs/online_smoke_eager.out 2>/dev/null; do sleep 30; done
+grep -q "identical to the merged checkpoint" /workspace/rerun-logs/online_smoke_eager.out || { echo "### e2e ABORT: parity smoke did not report"; exit 2; }
 KL=/workspace/instruct-traj/gemma4_d7_seq4096_klref.pt
 COMMON="--model $B --family gemma4 --no-unsloth --traj gemma4_d7_seq4096 --max-seq 4096 --expert-lora-r 32 --opt adamw --micro-batch 16"
 A=$D/gemma_ce_onlinesmoke_adapter.pt; M=/root/models/gemma4-onlinesmoke-merged
@@ -27,5 +27,5 @@ $L $PY analysis/residency/verify_merge.py --base $B --merged $M
 $L $PY -u analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_onlinesmoke_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
 echo "### e2e 3/3 checks $(date -u +%H:%M)"
-$PY analysis/residency/online_e2e_check.py /workspace/rerun-logs/online_smoke.out /workspace/rerun-logs/online_e2e.out
+$PY analysis/residency/online_e2e_check.py /workspace/rerun-logs/online_smoke_eager.out /workspace/rerun-logs/online_e2e.out
 echo "### e2e DONE rc=$? $(date -u +%H:%M)"

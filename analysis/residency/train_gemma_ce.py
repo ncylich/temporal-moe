@@ -947,8 +947,8 @@ def main():
         if A.online_smoke:
             import json as _json
             from datasets import load_dataset as _ld
-            ref = _json.load(open(A.online_smoke)); n_ = len(ref["gens"]["free"])
-            qs = [r["question"] for r in _ld("openai/gsm8k", "main", split="test")][:n_]
+            ref = _json.load(open(A.online_smoke)); n_ref = len(ref["gens"]["free"])
+            qs = [r["question"] for r in _ld("openai/gsm8k", "main", split="test")][:n_ref]
             SAMPLER.sync()
             # tensor-level check of the sync against the merged checkpoint on disk (generation-free)
             import glob as _glob
@@ -987,10 +987,10 @@ def main():
                     print(f"[online-smoke] layer {L_}: no comparable tensors matched; engine names: "
                           f"{[n for n in vp if f'layers.{L_}.' in n][:12]}", flush=True)
             for arm in ref["gens"]:
-                rows_ = SAMPLER.sample(n_, greedy=True, prompts=qs, constrained=arm != "free", max_tokens=256)
+                rows_ = SAMPLER.sample(n_ref, greedy=True, prompts=qs, constrained=arm != "free", max_tokens=256)
                 gens = [r["ids"][r["prompt_len"]:].tolist() for r in rows_]
                 same = sum(g == rg for g, rg in zip(gens, ref["gens"][arm]))
-                print(f"[online-smoke] {arm}: {same}/{n_} generations identical to the merged checkpoint", flush=True)
+                print(f"[online-smoke] {arm}: {same}/{n_ref} generations identical to the merged checkpoint", flush=True)
             SAMPLER.sleep()
             return
     while seen < A.tokens:
