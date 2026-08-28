@@ -18,7 +18,7 @@ echo "### AF: qwen free gsm8k"
 $PY -u analysis/residency/instruct_genbench_vllm.py --model qwen35_instruct \
     --path /dev/shm/qwen35-35b-a3b-instruct --arms free --presence-penalty 1.5 \
     --max-gen-toks 2048 --backoff-cap 4096 --max-model-len 7168 --gpu-mem 0.94 \
-    --tasks "gsm8k_cot_zeroshot=200" > /tmp/af_qwen.log 2>&1
+    --tasks "gsm8k_cot_zeroshot=0" > /tmp/af_qwen.log 2>&1
 echo "### AF: qwen OK"
 rm -rf /dev/shm/qwen35-35b-a3b-instruct
 echo "### AF: lfm R4 ifeval full"

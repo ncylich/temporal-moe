@@ -50,7 +50,7 @@ echo "### FR: gemma stage"
 stage google/gemma-4-26B-A4B-it /dev/shm/gemma4-26b-it
 $PY -u $G --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms free,R8,R16 \
     --think on --record-as gemma4_think_on --max-gen-toks 2048 --backoff-cap 4096 \
-    --max-model-len 7168 --tasks "gsm8k_cot_zeroshot=200,mmlu_flan_cot_fewshot=4" \
+    --max-model-len 7168 --tasks "gsm8k_cot_zeroshot=0,mmlu_flan_cot_fewshot=4" \
     > /tmp/fr_gemma_on.log 2>&1
 $PY -u $G --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms free,R8,R16 \
     --think on --record-as gemma4_think_on --max-gen-toks 2048 --backoff-cap 8192 \
@@ -86,7 +86,7 @@ rm -rf /dev/shm/gpt-oss-120b
 echo "### FR: olmoe redump"
 $PY -u $G --model olmoe_instruct --arms free,R8 --max-gen-toks 640 --backoff-cap 2048 \
     --max-model-len 4096 \
-    --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
+    --tasks "gsm8k_cot_zeroshot=0,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
     > /tmp/fr_olmoe.log 2>&1
 echo "### FR: olmoe OK"
 ci "OLMoE rerun with token capture"

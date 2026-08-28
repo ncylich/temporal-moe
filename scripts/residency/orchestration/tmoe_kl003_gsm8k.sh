@@ -9,5 +9,5 @@ export VLLM_ENABLE_V1_MULTIPROCESSING=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segme
 CUDA_VISIBLE_DEVICES=$G /workspace/venv_vllm312/bin/python -u \
   analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct \
   --path /root/models/gemma4-kl003-merged --arms free,R8,R16 --record-as gemma4_ce_kl003 \
-  --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94
+  --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94
 echo "### kl003 gsm8k DONE $(date -u +%H:%M)"

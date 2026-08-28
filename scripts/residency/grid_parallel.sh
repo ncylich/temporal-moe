@@ -42,7 +42,7 @@ esac
 pids=()
 CUDA_VISIBLE_DEVICES=${G[0]} $PY -u analysis/residency/instruct_genbench_vllm.py \
   --model $KEY --path $MERGED --arms $ARMS --record-as $REC "${THINK[@]}" \
-  --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94 \
+  --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94 \
   > $LOG/grid_${MODEL}_gsm8k.log 2>&1 &
 pids+=($!)
 CUDA_VISIBLE_DEVICES=${G[1]} $PY -u analysis/residency/instruct_genbench_vllm.py \

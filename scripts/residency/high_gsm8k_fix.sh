@@ -14,7 +14,7 @@ echo "### HG2: 20b high gsm8k"
 $PY -u analysis/residency/instruct_genbench_vllm.py --model gptoss_20b --arms free,R4 \
     --reasoning-effort high --record-as gptoss_20b_high --max-gen-toks 2048 \
     --backoff-cap 4096 --max-model-len 5632 --gpu-mem 0.85 \
-    --tasks "gsm8k_cot_zeroshot=200" > /tmp/hg2_20b.log 2>&1
+    --tasks "gsm8k_cot_zeroshot=0" > /tmp/hg2_20b.log 2>&1
 echo "### HG2: 20b OK"
 rm -rf /dev/shm/gpt-oss-20b
 $PY - <<'PYEOF'
@@ -26,7 +26,7 @@ echo "### HG2: 120b high gsm8k"
 $PY -u analysis/residency/instruct_genbench_vllm.py --model gptoss_120b --arms free,R4,R16 \
     --reasoning-effort high --record-as gptoss_120b_high --max-gen-toks 2048 \
     --backoff-cap 4096 --max-model-len 5632 --gpu-mem 0.92 \
-    --tasks "gsm8k_cot_zeroshot=200" > /tmp/hg2_120b.log 2>&1
+    --tasks "gsm8k_cot_zeroshot=0" > /tmp/hg2_120b.log 2>&1
 echo "### HG2: 120b OK"
 rm -rf /dev/shm/gpt-oss-120b
 git add results/ablations

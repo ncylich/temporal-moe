@@ -16,6 +16,6 @@ for RHO in 0 3.0 3.5 4.0; do
     analysis/residency/instruct_genbench_vllm.py \
     --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms R64 \
     --record-as gemma4r64far_swapmeasure_rho${RHO/./p} --csv-name screening_genbench.csv \
-    --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
+    --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
 done
 echo "### frontier R64 DONE $(date -u +%H:%M)"

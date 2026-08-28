@@ -34,7 +34,7 @@ echo "### FR: qwen think-on $(date -u +%H:%M)"
 $PY -u $G --model qwen35_instruct --path /dev/shm/qwen35-35b-a3b-instruct \
     --arms free,R8,R32 --presence-penalty 1.5 --max-gen-toks 2048 --backoff-cap 4096 \
     --max-model-len 7168 --gpu-mem 0.94 \
-    --tasks "gsm8k_cot_zeroshot=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
+    --tasks "gsm8k_cot_zeroshot=0,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
     > /tmp/fr_qwen_on.log 2>&1
 $PY -u $G --model qwen35_instruct --path /dev/shm/qwen35-35b-a3b-instruct \
     --arms free,R8,R32 --presence-penalty 1.5 --max-gen-toks 2048 --backoff-cap 8192 \
@@ -48,7 +48,7 @@ $PY -u $G --model qwen35_instruct --path /dev/shm/qwen35-35b-a3b-instruct \
     --arms free,R8,R32 --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5 \
     --record-as qwen35_think_off --max-gen-toks 1024 --backoff-cap 2048 \
     --max-model-len 5632 --gpu-mem 0.94 \
-    --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
+    --tasks "gsm8k_cot_zeroshot=0,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
     > /tmp/fr_qwen_off.log 2>&1
 echo "### FR: qwen think-off OK"
 ci "thinking ablation: qwen3.5 think-off (non-thinking card recipe)"
@@ -66,7 +66,7 @@ echo "### FR: gemma stage"
 stage google/gemma-4-26B-A4B-it /dev/shm/gemma4-26b-it
 $PY -u $G --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms free,R8,R16 \
     --think on --record-as gemma4_think_on --max-gen-toks 2048 --backoff-cap 4096 \
-    --max-model-len 7168 --tasks "gsm8k_cot_zeroshot=200,mmlu_flan_cot_fewshot=4" \
+    --max-model-len 7168 --tasks "gsm8k_cot_zeroshot=0,mmlu_flan_cot_fewshot=4" \
     > /tmp/fr_gemma_on.log 2>&1
 $PY -u $G --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms free,R8,R16 \
     --think on --record-as gemma4_think_on --max-gen-toks 2048 --backoff-cap 8192 \
@@ -81,7 +81,7 @@ for eff in low medium high; do
   REC=gptoss_20b_$eff; [ "$eff" = "medium" ] && REC=gptoss_20b
   $PY -u $G --model gptoss_20b --arms free,R4 --reasoning-effort $eff --record-as $REC \
       --max-gen-toks 2048 --backoff-cap 4096 --max-model-len 5632 --gpu-mem 0.85 \
-      --tasks "gsm8k_cot_zeroshot=200,ifeval=200" >> /tmp/fr_goss20.log 2>&1
+      --tasks "gsm8k_cot_zeroshot=0,ifeval=200" >> /tmp/fr_goss20.log 2>&1
 done
 echo "### FR: goss20 OK"
 ci "gpt-oss-20b gsm8k+ifeval redo: native final-channel path, budget-corrected"
@@ -93,7 +93,7 @@ for eff in low medium high; do
   REC=gptoss_120b_$eff; [ "$eff" = "medium" ] && REC=gptoss_120b
   $PY -u $G --model gptoss_120b --arms free,R4,R16 --reasoning-effort $eff --record-as $REC \
       --max-gen-toks 2048 --backoff-cap 4096 --max-model-len 5632 --gpu-mem 0.92 \
-      --tasks "gsm8k_cot_zeroshot=200,ifeval=200" >> /tmp/fr_goss120.log 2>&1
+      --tasks "gsm8k_cot_zeroshot=0,ifeval=200" >> /tmp/fr_goss120.log 2>&1
 done
 echo "### FR: goss120 OK"
 ci "gpt-oss-120b gsm8k+ifeval redo: native final-channel path, budget-corrected"
@@ -102,7 +102,7 @@ rm -rf /dev/shm/gpt-oss-120b
 echo "### FR: olmoe redump"
 $PY -u $G --model olmoe_instruct --arms free,R8 --max-gen-toks 640 --backoff-cap 2048 \
     --max-model-len 4096 \
-    --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
+    --tasks "gsm8k_cot_zeroshot=0,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4" \
     > /tmp/fr_olmoe.log 2>&1
 echo "### FR: olmoe OK"
 ci "OLMoE rerun with token capture"

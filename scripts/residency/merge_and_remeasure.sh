@@ -106,7 +106,7 @@ echo "### $1 VERIFY DONE $(date -u +%H:%M)"
 
 echo "### $1 REMEASURE gsm8k/ifeval/humaneval $(date -u +%H:%M)"
 $VPY -u $G --model $MODEL_KEY --path $MERGED --arms $ARMS --record-as $REC \
-    --tasks "gsm8k_cot_zeroshot=200,ifeval=200,humaneval=0" \
+    --tasks "gsm8k_cot_zeroshot=0,ifeval=200,humaneval=0" \
     --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94 \
     2>&1 | tee $LOG/remeasure_${1}_gen.log
 echo "### $1 REMEASURE MMLU (relaxed, the reported metric) $(date -u +%H:%M)"

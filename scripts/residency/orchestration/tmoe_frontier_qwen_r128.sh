@@ -17,6 +17,6 @@ for RHO in 0 3.0 3.5 4.0; do
     --model qwen35_instruct --path /root/models/qwen35-35b-a3b --arms R128 \
     --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5 \
     --record-as qwenr128_swapmeasure_rho${RHO/./p} --csv-name screening_genbench.csv \
-    --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90
+    --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90
 done
 echo "### frontier qwenR128 DONE $(date -u +%H:%M)"

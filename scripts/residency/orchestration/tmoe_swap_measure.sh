@@ -15,6 +15,6 @@ for RHO in 0 0.5 1.0 1.25 1.5; do
     analysis/residency/instruct_genbench_vllm.py \
     --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms R8 \
     --record-as gemma4_swapmeasure_rho${RHO/./p} --csv-name screening_genbench.csv \
-    --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
+    --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
 done
 echo "### swapmeasure DONE $(date -u +%H:%M)"

@@ -20,6 +20,6 @@ for RHO in ${RHOS//,/ }; do
     analysis/residency/instruct_genbench_vllm.py \
     --model $KEY --path "$MPATH" --arms $ARM "${EXTRA[@]}" \
     --record-as ${PREF}_swapmeasure_rho${RHO/./p} --csv-name screening_genbench.csv \
-    --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90
+    --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90
 done
 echo "### swapmeasure2 $PREF DONE $(date -u +%H:%M)"

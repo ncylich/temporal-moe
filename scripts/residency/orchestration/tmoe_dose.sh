@@ -29,5 +29,5 @@ scripts/residency/disk_budget.sh || exit 3
 export PATH=/workspace/venv_vllm312/bin:$PATH HF_ALLOW_CODE_EVAL=1 VLLM_ENABLE_V1_MULTIPROCESSING=0
 /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
   --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${SUF} \
-  --tasks "gsm8k_cot_zeroshot=200" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94
+  --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.94
 echo "### $SUF GSM8K DONE $(date -u +%H:%M)"

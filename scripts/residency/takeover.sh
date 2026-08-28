@@ -7,7 +7,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True TMOE_ROOT=/workspace/tem
 export HF_TOKEN=$(cat /root/.cache/huggingface/token) HF_ALLOW_CODE_EVAL=1
 export PATH=/opt/venv_vllm/bin:$PATH
 cd /workspace/temporal-moe
-T4="gsm8k_cot_zeroshot=200,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4"
+T4="gsm8k_cot_zeroshot=0,ifeval=200,humaneval_instruct=0,mmlu_flan_cot_fewshot=4"
 PY=/opt/venv_vllm/bin/python
 ci() { git add results/ablations/instruct_genbench_vllm.csv results/ablations/genbench_samples \
         analysis/residency 2>/dev/null || true; git commit -q -m "$1"; git push -q origin layer-lexicality; }
@@ -36,7 +36,7 @@ echo "### TK: goss120 high (cap 4096) $(date -u +%H:%M)"
 $PY -u analysis/residency/instruct_genbench_vllm.py --model gptoss_120b \
     --arms free,R4,R16 --reasoning-effort high --record-as gptoss_120b_high \
     --max-gen-toks 2048 --backoff-cap 4096 --max-model-len 5632 --gpu-mem 0.92 \
-    --tasks "gsm8k_cot_zeroshot=200,ifeval=200" > /tmp/tk_goss120_high.log 2>&1
+    --tasks "gsm8k_cot_zeroshot=0,ifeval=200" > /tmp/tk_goss120_high.log 2>&1
 for arm in free R4 R16; do
   $PY -u analysis/residency/humaneval_gptoss.py --model gptoss_120b --arm $arm \
       --reasoning-effort high --tag gptoss_120b_high --max-tokens 4096 \
