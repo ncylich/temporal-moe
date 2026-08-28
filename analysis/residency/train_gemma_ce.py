@@ -969,7 +969,8 @@ def main():
                     tail = n_.split(f"layers.{L_}.", 1)[1]
                     want = None
                     if tail.endswith("qkv_proj.weight"):
-                        want = torch.cat([ck[pre + f"self_attn.{x}_proj.weight"] for x in "qkv"], 0)
+                        parts = [ck.get(pre + f"self_attn.{x}_proj.weight") for x in "qkv"]
+                        want = torch.cat([q for q in parts if q is not None], 0) if parts[0] is not None else None
                     elif tail.endswith("o_proj.weight"):
                         want = ck.get(pre + "self_attn.o_proj.weight")
                     elif tail.endswith("router.proj.weight"):

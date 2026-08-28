@@ -111,7 +111,10 @@ class OnlineSampler:
                     del dp
                 elif hasattr(mod, "lora_A") and hasattr(mod, "base_layer") and "default" in getattr(mod, "lora_A", {}):
                     base = _hf_name(mod_names[id(mod)])
-                    w = mod.base_layer.weight.data + mod.get_delta_weight("default").to(mod.base_layer.weight.dtype)
+                    # peft merge() does `weight.data += delta` with the delta in the LoRA dtype (fp32 here):
+                    # one rounding. Casting the delta to bf16 first double-rounds (1 ulp off, measured).
+                    w = mod.base_layer.weight.data.clone()
+                    w += mod.get_delta_weight("default")
                     yield base + ".weight", w
             for n, p in self.model.named_parameters():
                 if p.requires_grad and "lora_" not in n and "elora_" not in n:
