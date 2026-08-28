@@ -175,6 +175,12 @@ def main():
                          "student's own prefixes. CE and the free-arm anchor stay on --traj")
     ap.add_argument("--aux-kl-anchor", default=None, help="--precompute-kl output over --aux-traj")
     ap.add_argument("--aux-kl-weight", type=float, default=1.0)
+    ap.add_argument("--aux-loss", choices=("fwdkl", "revkl"), default="fwdkl",
+                    help="fwdkl: teacher-weighted KL over the teacher top-50 at the student's states. "
+                         "revkl: reverse KL, sampled-token estimator: loss = -sum_t A_t log p_s(y_t), "
+                         "A_t = log p_teacher(y_t) - log p_student(y_t) held fixed (the on-policy "
+                         "distillation objective; needs a --precompute-kl file that stores the "
+                         "teacher log-prob at the sampled token)")
     ap.add_argument("--precompute-tokw", default=None,
                     help="forward-only pass over all trajectories computing per-"
                          "response-token CE under free and R8 routing; saves "
@@ -440,14 +446,18 @@ def main():
                 for b, ri in enumerate(ridx):
                     m_ = targets[b] != -100
                     xb = x[b][m_]
-                    tis, tvs = [], []
+                    tb = targets[b][m_]
+                    tis, tvs, tat = [], [], []
                     for j in range(0, xb.shape[0], 512):
                         lg_ = HEAD(xb[j:j + 512]) if DEC is not None else xb[j:j + 512]
                         lp = torch.log_softmax(lg_.float(), -1)
                         top = lp.topk(50, dim=-1)
                         tis.append(top.indices.to(torch.int32).cpu())
                         tvs.append(top.values.half().cpu())
-                    outk[ri] = (torch.cat(tis), torch.cat(tvs))
+                        # teacher log-prob at the trajectory's OWN token: the sampled-token
+                        # estimator of reverse KL needs it (--aux-loss revkl)
+                        tat.append(lp.gather(1, tb[j:j + 512, None]).squeeze(1).float().cpu())
+                    outk[ri] = (torch.cat(tis), torch.cat(tvs), torch.cat(tat))
                 if (c0 // mb) % 100 == 0:
                     print(f"[gce-kl] {c0}/{len(lidx)}", flush=True)
         GL.CFG.update(batch=1)
@@ -877,7 +887,7 @@ def main():
         alidx = sorted(range(len(AUX)), key=lambda i: AUX[i]["ids"].shape[0])
         achunks = [alidx[i:i + mb] for i in range(0, len(alidx), mb)]
         aorder = torch.randperm(len(achunks), generator=torch.Generator().manual_seed(A.data_seed + 1)).tolist()
-        ai = 0; aux_tot = 0.0
+        ai = 0; aux_tot = 0.0; aux_est = 0.0
     while seen < A.tokens:
         opt.zero_grad(set_to_none=True)
         for _ in range(accum_batches):
@@ -930,7 +940,7 @@ def main():
                         GL.CFG.update(on=True, R=A.R, enforce_from=int(plens[b]),
                                       batch=1, cold_start=False)
                     m_ = targets[b] != -100
-                    tid, tlp = KLREF[ri]
+                    tid, tlp = KLREF[ri][:2]
                     tid = tid.to(ids.device).long()
                     tlp = tlp.to(ids.device).float()
                     def _slice_kl(x_, tid_, tlp_):
@@ -972,21 +982,38 @@ def main():
                         continue
                     GL.CFG.update(on=True, R=A.R, enforce_from=int(plens_a[b]), batch=1, cold_start=False)
                     m_ = targets_a[b] != -100
-                    tid, tlp = AUXREF[ri]
-                    tid = tid.to(ids_a.device).long(); tlp = tlp.to(ids_a.device).float()
+                    ref_ = AUXREF[ri]
+                    tid = ref_[0].to(ids_a.device).long(); tlp = ref_[1].to(ids_a.device).float()
+                    if A.aux_loss == "revkl":
+                        if len(ref_) < 3:
+                            raise RuntimeError("--aux-loss revkl needs a --precompute-kl file with the "
+                                               "teacher log-prob at the sampled token; re-run the precompute")
+                        tat = ref_[2].to(ids_a.device).float()
+                        tok = targets_a[b][m_].long()
                     def _aux_kl(x_, tid_, tlp_):
                         lgb = (HEAD(x_) if DEC is not None else x_).float()
                         s_at = lgb.gather(1, tid_) - torch.logsumexp(lgb, -1, keepdim=True)
                         p = tlp_.exp(); p = p / p.sum(1, keepdim=True)
                         return (p * (tlp_ - s_at)).sum()
+                    def _aux_rev(x_, tok_, tat_):
+                        lgb = (HEAD(x_) if DEC is not None else x_).float()
+                        lps = lgb.gather(1, tok_[:, None]).squeeze(1) - torch.logsumexp(lgb, -1)
+                        adv = (tat_ - lps).detach()          # teacher agrees more than the student -> push up
+                        return -(adv * lps).sum(), (lps - tat_).detach().sum()   # loss, reverse-KL estimate
                     if DEC is not None:
                         row_x = DEC(ids_a[b:b + 1], attention_mask=am_a[b:b + 1]).last_hidden_state[0, :-1][m_]
                     else:
                         row_x = model(ids_a[b:b + 1], attention_mask=am_a[b:b + 1]).logits[0, :-1][m_]
                     kl_sum = 0
-                    for j in range(0, row_x.shape[0], 512):
-                        kl_sum = kl_sum + torch.utils.checkpoint.checkpoint(
-                            _aux_kl, row_x[j:j + 512], tid[j:j + 512], tlp[j:j + 512], use_reentrant=False)
+                    if A.aux_loss == "revkl":
+                        for j in range(0, row_x.shape[0], 512):
+                            l_, e_ = torch.utils.checkpoint.checkpoint(
+                                _aux_rev, row_x[j:j + 512], tok[j:j + 512], tat[j:j + 512], use_reentrant=False)
+                            kl_sum = kl_sum + l_; aux_est += float(e_) / kl_den_a / accum_batches
+                    else:
+                        for j in range(0, row_x.shape[0], 512):
+                            kl_sum = kl_sum + torch.utils.checkpoint.checkpoint(
+                                _aux_kl, row_x[j:j + 512], tid[j:j + 512], tlp[j:j + 512], use_reentrant=False)
                     kl_b = (A.aux_kl_weight / kl_den_a / accum_batches) * kl_sum
                     kl_b.backward()
                     aux_tot += float(kl_b)
@@ -1001,8 +1028,12 @@ def main():
             print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*accum_batches:.4f} "
                   f"({seen/(time.time()-t0):.0f} tok/s)", flush=True)
             if AUX is not None:
-                print(f"[gce] aux-kl {aux_tot/50:.4f} nats/tok (constrained arm, own prefixes)", flush=True)
-                aux_tot = 0.0
+                if A.aux_loss == "revkl":
+                    print(f"[gce] aux-revkl loss {aux_tot/50:.4f}; reverse-KL estimate {aux_est/50:.4f} nats/tok "
+                          f"(student constrained || teacher free, student-sampled tokens)", flush=True)
+                else:
+                    print(f"[gce] aux-kl {aux_tot/50:.4f} nats/tok (constrained arm, own prefixes)", flush=True)
+                aux_tot = 0.0; aux_est = 0.0
         if step % A.save_every == 0:
             save()
     save()
