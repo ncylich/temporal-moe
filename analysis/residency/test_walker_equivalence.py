@@ -68,7 +68,7 @@ def run(walker):
     VR.SL.update(rows={}, free=[], next=0, res={}, cap=0, epoch=None, seeded=set())
     got = {}
     for step in schedule:
-        spans = [(rid, e - s, pf) for rid, s, e, pf in step]
+        spans = [(rid, e - s, pf, s) for rid, s, e, pf in step]   # 4th = absolute start, as the glue passes
         VR.set_step(spans)
         flat = torch.cat([reqs[rid]["stream"][s:e, 0] for rid, s, e, _ in step]).to(DEV)
         for layer in (0, 1):                                # two layers: banks must not mix
@@ -111,9 +111,14 @@ if os.environ.get("DEBUG_RID"):
     full = compute_resident_mask(r["stream"].float().to(DEV), R, evict="min_logit", swaps=1)[:, 0].cpu()   # GPU path: the CPU path differs on ~3% of positions (bf16 ties)
     lg = r["stream"][:, 0].to(DEV); st = None; cnt = torch.zeros(2, dtype=torch.int64, device=DEV)
     for si, s_, e_, pf in spans:
+        if s_ == 0:
+            st = None                                   # re-prefill after preemption: cold
         m = RK.chunk_scan(lg[s_:e_], st, R, 0.0, 1, cnt); st = m[-1].clone()
         ok = all(torch.equal(m[j].bool().cpu(), full[s_ + j]) for j in range(e_ - s_))
-        print(f"  chunk step{si} [{s_},{e_}) prefill={pf}: chunked-scan == continuous-ref: {ok}")
+        if not ok:
+            print(f"  chunk step{si} [{s_},{e_}) prefill={pf}: chunked-scan != continuous-ref")
+    mism = sorted({k[2] for k in fast if k[1] == rid and not torch.equal(fast[k], full[k[2]])})
+    print(f"  walker-vs-ref mismatch positions for {rid}: {mism}")
 assert ref_bad == 0
 print("WALKER EQUIVALENCE PASS (fast == slots == reference on a randomised schedule with "
       "chunked prefill, joins, finishes, slot reuse and preemption replay)")

@@ -136,6 +136,8 @@ def _plan(device):
     for sp in STEP["spans"]:
         req, n, is_prefill = sp[0], sp[1], sp[2]
         seeded = req in SL["seeded"]
+        if is_prefill and len(sp) > 3 and sp[3] == 0:     # restart: see the fast walker
+            seeded = False
         if is_prefill:
             pre.append((req, o, n, seeded))
             fresh.append(req)
@@ -321,6 +323,11 @@ def _fast_set_step(spans):
     for sp in spans:
         req, n, is_prefill = sp[0], sp[1], sp[2]
         seeded = req in FAST["seeded"]
+        # A prefill span starting at absolute token 0 is a (re)start: a request preempted at
+        # step s can replay at s+1 with no step in which it was absent, so it was never
+        # pruned and its slot still holds decode state. Cold-fill regardless of `seeded`.
+        if is_prefill and len(sp) > 3 and sp[3] == 0:
+            seeded = False
         row = _fast_row(req)
         if is_prefill:
             pre.append((row, o, n, seeded))
