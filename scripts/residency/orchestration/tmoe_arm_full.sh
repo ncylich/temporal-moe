@@ -21,7 +21,7 @@ scripts/residency/disk_budget.sh || exit 3
   --model $B --family gemma4 --no-unsloth --traj $TRAJ \
   --max-seq 4096 --expert-lora-r 32 --opt adamw --micro-batch 16 --out $A --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
   --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${SUF}_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90

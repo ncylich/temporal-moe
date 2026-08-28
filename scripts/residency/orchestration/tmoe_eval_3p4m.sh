@@ -17,7 +17,7 @@ scripts/residency/disk_budget.sh || exit 3
   --model $B --family gemma4 --no-unsloth --traj gemma4_d7_seq4096_short640 \
   --max-seq 4096 --expert-lora-r 32 --opt adamw --micro-batch 16 --out $A --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 export PATH=/workspace/venv_vllm312/bin:$PATH HF_ALLOW_CODE_EVAL=1 VLLM_ENABLE_V1_MULTIPROCESSING=0
 /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
   --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_short3p4m \

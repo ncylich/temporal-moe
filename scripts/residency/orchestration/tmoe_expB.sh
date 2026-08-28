@@ -25,7 +25,7 @@ echo "### klcons train $(date -u +%H:%M)"
 echo "### klcons merge $(date -u +%H:%M)"
 [ -d $M ] || { $G 120 3600; /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py \
   $COMMON --merge-out $M; cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### klcons eval $(date -u +%H:%M)"
 $G 120 3600
 /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \

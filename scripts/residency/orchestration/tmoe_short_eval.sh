@@ -17,7 +17,7 @@ if [ ! -d $M ]; then
     --expert-lora-r 32 --out $A --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true
 fi
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### short-$SUF VERIFY DONE $(date -u +%H:%M)"
 export PATH=/workspace/venv_vllm312/bin:$PATH HF_ALLOW_CODE_EVAL=1
 export VLLM_ENABLE_V1_MULTIPROCESSING=0

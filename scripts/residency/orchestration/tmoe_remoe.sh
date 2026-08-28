@@ -27,7 +27,7 @@ scripts/residency/wait_gpu_free.sh 120 3600
 echo "### remoe merge $(date -u +%H:%M)"
 [ -d $M ] || { /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py \
   $COMMON --merge-out $M; cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M || true
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M || true
 scripts/residency/wait_gpu_free.sh 120 3600
 echo "### remoe eval $(date -u +%H:%M)"
 /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \

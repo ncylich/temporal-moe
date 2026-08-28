@@ -14,6 +14,6 @@ if [ ! -d $M ]; then
     --expert-lora-r 32 --out $A --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true
 fi
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### armA VERIFY DONE $(date -u +%H:%M)"
 GPU=2 exec scripts/residency/wb_arm.sh $M gemma4_armA R8,R16

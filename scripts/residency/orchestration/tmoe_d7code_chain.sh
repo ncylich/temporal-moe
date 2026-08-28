@@ -28,7 +28,7 @@ echo "### d7code$SFX train $(date -u +%H:%M)"
 echo "### d7code$SFX merge $(date -u +%H:%M)"
 [ -d $M ] || { /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py \
   $COMMON --merge-out $M; cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### d7code$SFX MBPP $(date -u +%H:%M)"
 /workspace/venv_vllm312/bin/python -u analysis/residency/mbpp_gemma.py \
   --path $M --arms free,R8,R16 --tag gemma4_ce_d7code${SFX} --max-model-len 4096 --gpu-mem 0.90

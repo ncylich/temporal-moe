@@ -17,7 +17,7 @@ echo "### selfgen merge (traj=gemma4_d7_seq4096 r=32) $(date -u +%H:%M)"
   --model $B --family gemma4 --no-unsloth --traj gemma4_d7_seq4096 --max-seq 4096 \
   --expert-lora-r 32 --opt adamw --micro-batch 16 --out $A --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### selfgen eval $(date -u +%H:%M)"
 $L /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
   --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_selfgen_n1319 \

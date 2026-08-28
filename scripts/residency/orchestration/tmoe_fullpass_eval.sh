@@ -15,6 +15,6 @@ if [ ! -d $M ]; then
   cp $B/processor_config.json $M/ 2>/dev/null || true
 fi
 echo "### fullpass MERGE DONE $(date -u +%H:%M)"
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### fullpass VERIFY DONE $(date -u +%H:%M)"
 GPUS=1,2,3 exec scripts/residency/grid_parallel.sh gemma $M gemma4_ce_fullpass

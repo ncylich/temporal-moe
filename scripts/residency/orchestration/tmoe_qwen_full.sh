@@ -26,7 +26,7 @@ if [ -n "$SUF" ] && [ ! -d "$MPATH" ]; then
     --model /root/models/qwen35-35b-a3b --family qwen35 --no-unsloth \
     --traj qwen35_d7_seq4096 --max-seq 4096 --expert-lora-r 16 \
     --opt adamw --micro-batch 16 --out $A --merge-out $MPATH
-  /workspace/venv_fla/bin/python analysis/residency/verify_merge.py \
+  scripts/residency/gpu_lease.sh /workspace/venv_fla/bin/python analysis/residency/verify_merge.py \
     --base /root/models/qwen35-35b-a3b --merged $MPATH
 fi
 /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
