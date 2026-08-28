@@ -1,24 +1,37 @@
 #!/usr/bin/env bash
-# Hold the GPU for the duration of a command. Replaces wait_gpu_free.sh, whose check-then-run
-# had a window: chain A's next stage passed the "free" check between chain B's train
-# finishing and B's merge starting, then B's merge took the device and A died in vLLM's
-# memory check (2026-08-27, 05:46). A poll cannot reserve; a lock can.
-#
-#     gpu_lease.sh <cmd...>
-# Blocks on an exclusive flock, THEN waits for memory to actually be released (CUDA frees
-# asynchronously after the previous holder exits), then runs the command holding the lock.
+# Hold-the-device gate for one GPU, ORDERED.
+#   gpu_lease.sh <cmd...>            run <cmd> once the GPU is ours and >=120 GB are free
+# Ordering: waiters take a ticket <prio>-<ns-timestamp>-<pid> in /var/lock/tmoe_gpu<G>.q and
+# the GPU goes to the smallest live ticket: strict FIFO within a priority, lower TMOE_PRIO
+# first (default 5; use 1 for "next", 9 for "whenever"). Dead waiters' tickets are pruned.
+# Chain-level hold: run a whole chain under the lease (gpu_lease.sh bash chain.sh); inner
+# gpu_lease.sh calls see TMOE_LEASE_HELD and exec directly, so no other job can interleave
+# between the chain's stages. The flock is kept for mutual exclusion with older waiters.
 set -uo pipefail
 G=${CUDA_VISIBLE_DEVICES:-0}
-LOCK=/var/lock/tmoe_gpu${G}.lease
-mkdir -p /var/lock
+if [ "${TMOE_LEASE_HELD:-}" = "$G" ]; then
+  exec "$@"
+fi
+LOCK=/var/lock/tmoe_gpu${G}.lease; Q=/var/lock/tmoe_gpu${G}.q
+mkdir -p /var/lock "$Q"
+PRIO=${TMOE_PRIO:-5}
+TICKET="$Q/$(printf '%02d' "$PRIO")-$(date +%s%N)-$$"
+: > "$TICKET"
+trap 'rm -f "$TICKET"' EXIT
 exec {fd}>"$LOCK"
-flock "$fd"
+while :; do
+  first=$(for f in "$Q"/*; do [ -e "$f" ] || continue; p=${f##*-}; if kill -0 "$p" 2>/dev/null; then echo "$f"; else rm -f "$f"; fi; done | sort | head -1)
+  if [ "$first" = "$TICKET" ] && flock -n "$fd"; then break; fi
+  sleep 3
+done
 for i in $(seq 1 90); do
+  [ "${TMOE_LEASE_NOMEM:-}" = 1 ] && { free=999999; break; }     # tests: skip the memory wait
   free=$(env -u CUDA_VISIBLE_DEVICES nvidia-smi -i "$G" --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null)
   [ "${free:-0}" -ge 122880 ] && break
   sleep 20
 done
-echo "[lease] GPU $G acquired (${free:-?}MiB free) $(date -u +%H:%M)"
+echo "[lease] GPU $G acquired (${free:-?}MiB free, prio $PRIO) $(date -u +%H:%M)"
+export TMOE_LEASE_HELD=$G
 "$@"; rc=$?
 echo "[lease] GPU $G released rc=$rc $(date -u +%H:%M)"
 exit $rc
