@@ -13,15 +13,17 @@ export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=${HF_TOKEN:-$(cat /root/.cache/huggingface/token 2>/dev/null)} HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
 START=${1:-digit3}; T=${2:-850000}; EVERY=${3:-16}; N=${4:-256}; NAME=online_${START}_e${EVERY}
+# START=scratch: no adapter, the base under R8 is the initial student; distillation-only from the ground up
 B=/dev/shm/gemma4-26b-it; L=scripts/residency/gpu_lease.sh; D=/workspace/olmoe-adapt/data; PY=/workspace/venv_vllm312/bin/python
 KL=/workspace/instruct-traj/gemma4_d7_seq4096_klref.pt
 COMMON="--model $B --family gemma4 --no-unsloth --traj gemma4_d7_seq4096 --max-seq 4096 --expert-lora-r 32 --opt adamw --micro-batch 16"
 A=$D/gemma_ce_${NAME}_adapter.pt; M=/root/models/gemma4-${NAME}-merged
-SEEN=$($PY -c "import torch,sys; print(int(torch.load(sys.argv[1], weights_only=False, map_location='cpu')['seen']))" $D/gemma_ce_${START}_adapter.pt)
+if [ "$START" = scratch ]; then SEEN=0; INIT=""; else
+  SEEN=$($PY -c "import torch,sys; print(int(torch.load(sys.argv[1], weights_only=False, map_location='cpu')['seen']))" $D/gemma_ce_${START}_adapter.pt); INIT="--resume"; fi
 scripts/residency/disk_budget.sh || exit 3
 echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), refresh every $EVERY steps x $N rows $(date -u +%H:%M)"
-[ -f $A.done ] || { cp $D/gemma_ce_${START}_adapter.pt $A
-  $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A --resume --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
+[ -f $A.done ] || { [ -n "$INIT" ] && cp $D/gemma_ce_${START}_adapter.pt $A; rm -f $A.tmp
+  $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
     --kl-only --kl-anchor $KL --kl-weight 0.05 --aux-loss revkl --aux-kl-weight 1.0 \
     --online-every $EVERY --online-n $N
   touch $A.done; }
