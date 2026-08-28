@@ -1216,3 +1216,18 @@ lever has moved significantly upward on gemma; R8 did not move. Consistent with 
 mode-seeking objective matching the teacher where the bound leaves room. Next: the
 from-scratch run (distillation only, 3.4M tokens), then the deadband surfaces; a second
 round from this adapter is the candidate after those.
+
+### From-scratch on-policy reverse-KL: interim diagnosis before the number (2026-08-28 23:45)
+
+Run `online_scratch_e16` (base under R8 as the initial student, 3.4M tokens, refresh every
+16 steps x 256 rows, sampled-token reverse KL + free anchor, no CE, lr 3e-5): 80 min of
+training. The reverse-KL estimate on the student's own tokens stayed flat, 0.386 / 0.370 /
+0.377 / 0.369 at steps 50/100/150/200, while the W=3 adapter reads ~0.34 on the same
+quantity. The adapter did not under-move: expert LoRA-B norms 1.08 (from scratch) vs 1.17
+(W=3, CE) vs 1.30 (round 1 from W=3) over the same token budget, attention 0.148 vs 0.172.
+So if the accuracy is poor the updates were large but pointed by a noisy signal: the
+sampled-token estimator is a score-function estimate with mostly negative advantages on the
+student's own tokens (it learns what not to say). Since the teacher's top-50 is stored at
+every state, the analytic reverse KL over that support (plus a tail-mass term) is available
+and low-variance: implemented as `--aux-loss revkl_full`; that is the one-change follow-up
+if the GSM8K number confirms the diagnosis.
