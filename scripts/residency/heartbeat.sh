@@ -52,6 +52,8 @@ echo "  rebuild, McNemar z=3.3), R32 +5.3, free +1.2; broke 92->61, fixed 103->1
 echo "  rate at R8 3.77->2.29%. Pending: gemma W=10, qwen surface (IFEval/MMLU/code, records"
 echo "  qwen35_ce_digit10_{full,n_dual,code}). SURFACE LANDED 00:08: R8 IFEval +0.2, HumanEval +3.0,"
 echo "  MMLU -1.3, MBPP +1.4 -> 4-cell mean +1.8 (rebuild -0.4, published +2.7). Not bought elsewhere."
+echo "  QWEN W=3 (05:05): R8 +5.1 (= W=10, z=-0.3), R32 +3.3, free +0.0 -> W=10 stays. Its R8 false-eq"
+echo "  rate 3.94% is NOT below the rebuild (W=10: 2.29%): accuracy moves before the rate at W=3."
 echo "  GEMMA W=10 (21:06): NO GAIN. R8 80.2 (+1.4 vs base, -1.7 vs rebuild z=-1.5), broke 75->101."
 echo "  Lever is qwen-specific so far (gemma rebuild already removes 52% of excess; 403 digit ids"
 echo "  vs qwen 22). Next cells: qwen surface (running), gemma W=3, qwen W=3, distill from digit10."

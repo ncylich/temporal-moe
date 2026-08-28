@@ -970,3 +970,22 @@ than the rebuild's did (IFEval -1.8, MBPP -2.0 against base; rebuild -0.4 and -2
 the usual specialisation cost and is not what the residency number measures. The qwen
 four-cell mean goes from -0.4 (rebuild) to +1.8 against the published +2.7; the remaining gap
 is IFEval, where the published +3.5 has never reproduced under any recipe.
+
+### Qwen dose-response: W=3 against W=10 (2026-08-28)
+
+GSM8K n=1319, same-arm deltas against the base; discordant pairs and paired z in brackets.
+
+| arm | base | rebuild | W=3 | W=10 | W=3 vs W=10 |
+|---|---|---|---|---|---|
+| free | 85.9 | +0.8 | +0.0 | +1.2 | 16/32, z=-2.3 |
+| R8 (3.1%) | 76.6 | +2.1 | +5.1 (135/68, z=4.7) | +5.4 (132/61, z=5.1) | 72/76, z=-0.3 |
+| R32 (12.5%) | 79.8 | +3.2 | +3.3 | +5.3 | 36/62, z=-2.6 |
+
+At R8 the gain saturates by W=3; W=10 adds nothing there but is better at R32 and on the free
+arm, so W=10 stays the qwen setting. The arithmetic metric does not track the dose cleanly:
+W=3's R8 false-equation rate is 3.94% (134/3399), indistinguishable from the rebuild's 3.77%,
+while W=10's is 2.29%. So at R8 the accuracy moves before the measured arithmetic rate does
+(broke 68 against the rebuild's 92 and W=10's 61; fixed 108 against 103 and 115). The parser
+is a lower bound on slips, so this may be a measurement gap rather than a different
+mechanism, but it should be said: W=3 recovers the accuracy without a visible drop in false
+equations, and only W=10 shows both.
