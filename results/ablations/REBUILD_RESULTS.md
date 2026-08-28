@@ -1253,3 +1253,16 @@ at steps 50-200) while the adapter norms grew as much as W=3's, so the sampled-t
 estimator is the suspected limit, not the objective: `--aux-loss revkl_full` (analytic
 reverse KL over the stored teacher top-50 plus a tail-mass term) is running from scratch
 (`gemma4_ce_online_scratch_e16_full`) and then from W=3 (`gemma4_ce_online_digit3_e16_full`).
+
+### What the two recipes fix and break, and the eval noise floor (2026-08-28 23:58)
+
+Per-problem, GSM8K R8, against the base. W=3 (CE): fixes 124, breaks 77, net +47. From-scratch
+reverse-KL: fixes 108, breaks 67, net +41. Round 1 (W=3 then reverse-KL): fixes 122, breaks 79.
+The two fixed sets share 87 problems (Jaccard 0.60; 37 fixed only by W=3, 21 only by
+reverse-KL); the two broken sets share only 18 of 126. Eval noise cannot explain the breaks:
+the same rebuild model evaluated twice flips 10 of 1319 at R8 (0.8%) and 1 of 1319 on the
+free arm. So each adapter perturbs its own set of ~70 borderline problems while repairing
+~110-120; the net gain is the difference of two real effects, and the paired tests are
+sound. Two adapters that fix 145 distinct problems between them but break different ones is
+the concrete reason to look for an objective that keeps the repairs and not the breaks
+(the analytic reverse KL is the first candidate; a CE + reverse-KL mixture is the second).
