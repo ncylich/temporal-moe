@@ -43,6 +43,7 @@ def extract(text, unfinished=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", required=True)
+    ap.add_argument("--adapter", default=None, help="apply this adapter to the engine after boot (--path is the BASE)")
     ap.add_argument("--arm", default=None, choices=("free", "R8", "R16"),
                     help="single arm (legacy)")
     ap.add_argument("--arms", default=None,
@@ -77,6 +78,9 @@ def main():
     assert all(a == "free" or re.fullmatch(r"R\d+", a) for a in arms) and arms, "bad --arm(s)"
     llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=0.85,
               max_model_len=A.max_model_len)
+    if A.adapter:
+        from apply_adapter import apply_adapter
+        apply_adapter(llm, A.adapter, A.path)
     msgs = [[{"role": "user", "content":
               "Complete the following Python function. Provide the complete function "
               "in a single ```python code block.\n\n" + p["prompt"]}] for p in probs]

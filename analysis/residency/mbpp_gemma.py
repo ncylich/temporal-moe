@@ -55,6 +55,7 @@ def extract(text, unfinished=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", required=True)
+    ap.add_argument("--adapter", default=None, help="apply this adapter to the engine after boot (--path is the BASE)")
     ap.add_argument("--arms", default="free,R8,R16",
                     help="comma list run in ONE engine boot (batch-fair protocol)")
     ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv")
@@ -82,6 +83,9 @@ def main():
     assert all(a == "free" or re.fullmatch(r"R\d+", a) for a in arms) and arms, "bad --arms"
     llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
               max_model_len=A.max_model_len)
+    if A.adapter:
+        from apply_adapter import apply_adapter
+        apply_adapter(llm, A.adapter, A.path)
     # MBPP's convention: the asserts are shown so the model knows the required signature.
     msgs = [[{"role": "user", "content":
               "You are an expert Python programmer. Write a Python function for this "

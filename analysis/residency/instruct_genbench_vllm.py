@@ -38,6 +38,7 @@ def main():
                          "Thinking arms 4096; ifeval-thinking 8192")
     ap.add_argument("--max-num-seqs", type=int, default=None)
     ap.add_argument("--path", default=None)
+    ap.add_argument("--adapter", default=None, help="apply this adapter to the engine after boot (--path is then the BASE); no merged checkpoint needed")
     ap.add_argument("--record-as", default=None,
                     help="model column for the CSV rows (adapted/control variants)")
     ap.add_argument("--samples-json", default=None,
@@ -93,6 +94,9 @@ def main():
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
               **vllm_glue.llm_kwargs(),
               **({"dtype": "bfloat16"} | kw))
+    if A.adapter:
+        from apply_adapter import apply_adapter
+        apply_adapter(lm.model, A.adapter, M["path"])
 
     # Thinking-mode control: inject template kwargs at the tokenizer level (unknown
     # jinja context vars are inert, so enable_thinking is safe to pass everywhere);

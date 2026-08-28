@@ -71,6 +71,7 @@ def main():
                          "seed AND their own --record-as/--csv-name so they never "
                          "collide with the authoritative single row per cell")
     ap.add_argument("--path", default=None, help="override checkpoint dir (merged adapters)")
+    ap.add_argument("--adapter", default=None, help="apply this adapter to the engine after boot (--path is the BASE)")
     ap.add_argument("--csv-name", default="instruct_genbench_vllm.csv",
                     help="diagnostics use screening_genbench.csv")
     A = ap.parse_args()
@@ -92,6 +93,9 @@ def main():
     lm = VLLM(pretrained=M["path"], batch_size="auto", max_gen_toks=A.gen_cap,
               max_model_len=A.max_model_len, gpu_memory_utilization=A.gpu_mem,
               **vllm_glue.llm_kwargs(), dtype="auto", **kw)
+    if A.adapter:
+        from apply_adapter import apply_adapter
+        apply_adapter(lm.model, A.adapter, M["path"])
 
     if A.reasoning_effort or A.think != "default":
         _tk = lm.tokenizer
