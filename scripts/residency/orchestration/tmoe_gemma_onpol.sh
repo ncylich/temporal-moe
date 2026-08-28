@@ -17,7 +17,12 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
 SRC=${1:-digit3}; MODE=${2:-mix}
 # MODE=mix : real-data CE (W=3) + free-arm anchor + on-policy KL   (record gemma4_ce_onpol3)
 # MODE=pure: on-policy KL + free-arm anchor only, no CE, no digit weight (record gemma4_ce_onpolpure)
-case $MODE in mix) NAME=onpol3; LOSS="--kl-weight 0.05 --digit-weight 3";; pure) NAME=onpolpure; LOSS="--kl-only --kl-weight 0.05";; *) echo "bad MODE $MODE"; exit 2;; esac
+# MODE=cont: TWO-STEP. Start FROM the $SRC adapter (W=3) and continue it on on-policy KL + free anchor
+#            for 1.7M more tokens (record gemma4_ce_onpolcont). Round 1 done right.
+case $MODE in mix) NAME=onpol3; LOSS="--kl-weight 0.05 --digit-weight 3"; TOK=3400000; INIT="";;
+  pure) NAME=onpolpure; LOSS="--kl-only --kl-weight 0.05"; TOK=3400000; INIT="";;
+  cont) NAME=onpolcont; LOSS="--kl-only --kl-weight 0.05"; TOK=5100000; INIT="--resume";;
+  *) echo "bad MODE $MODE"; exit 2;; esac
 B=/dev/shm/gemma4-26b-it; SRCM=/root/models/gemma4-${SRC}-merged
 TRAJ=gemma4_selfgen_${SRC}R8q; TP=/workspace/instruct-traj/$TRAJ.pt; AKL=/workspace/instruct-traj/${TRAJ}_klref.pt
 KL=/workspace/instruct-traj/gemma4_d7_seq4096_klref.pt
@@ -34,9 +39,11 @@ echo "### gemma-$NAME 2/5 teacher logprobs on the samples $(date -u +%H:%M)"
 [ -s $AKL ] || $L /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON --traj $TRAJ \
   --out /tmp/gce_precompute_unused.pt --precompute-kl $AKL
 echo "### gemma-$NAME 3/5 train from scratch: W=3 recipe + on-policy KL $(date -u +%H:%M)"
-[ -s $A ] || $L /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON --traj gemma4_d7_seq4096 --out $A \
-  --accum 16 --lr 3e-5 --tokens 3400000 --kl-anchor $KL $LOSS \
+[ -f $A.done ] || { [ -n "$INIT" ] && cp /workspace/olmoe-adapt/data/gemma_ce_${SRC}_adapter.pt $A
+  $L /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON --traj gemma4_d7_seq4096 --out $A $INIT \
+  --accum 16 --lr 3e-5 --tokens $TOK --kl-anchor $KL $LOSS \
   --aux-traj $TRAJ --aux-kl-anchor $AKL --aux-kl-weight 1.0
+  touch $A.done; }
 echo "### gemma-$NAME 4/5 merge $(date -u +%H:%M)"
 [ -d $M ] || { $L /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py $COMMON --traj gemma4_d7_seq4096 --out $A --merge-out $M
   $L /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M; }
