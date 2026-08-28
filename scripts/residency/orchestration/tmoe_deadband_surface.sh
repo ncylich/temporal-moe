@@ -31,7 +31,7 @@ if [ "$MODEL" = gemma ]; then
   echo "### $TAG MBPP@8192 $(date -u +%H:%M)"
   $L $PY -u analysis/residency/mbpp_gemma.py --path $M $ADAPTER --arms $ARMS --tag ${TAG}_m8192 --max-tokens 8192 --max-model-len 9216 --gpu-mem 0.90
   echo "### $TAG WritingBench $(date -u +%H:%M)"
-  [ -n "$ADAPTER" ] && echo "### $TAG WritingBench skipped (wb_generate.py has no --adapter yet)" || { export GPU=0; $L scripts/residency/wb_arm.sh $M $TAG R8,R16; }
+  export GPU=0 TMOE_ADAPTER="${ADAPTER#--adapter }"; $L scripts/residency/wb_arm.sh $M $TAG R8,R16
 else
   ARMS=R8,R32; Q="--model qwen35_instruct --path $M --arms $ARMS --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5"
   echo "### $TAG GSM8K n=1319 $(date -u +%H:%M)"

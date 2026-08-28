@@ -31,7 +31,7 @@ gen () {  # arm suffix
   local out=responses/${REC}_${arm}${suf}.jsonl
   [ -s "$out" ] && { echo "skip $out"; return; }
   echo "### wb $REC $arm ${suf:-_sA} $(date -u +%H:%M)"
-  $PY $ROOT/analysis/writingbench/wb_generate.py --model-path $MPATH --record $REC \
+  $PY $ROOT/analysis/writingbench/wb_generate.py --model-path $MPATH ${TMOE_ADAPTER:+--adapter $TMOE_ADAPTER} --record $REC \
       --arm $arm --suffix "$suf" --offset $(off_for "$suf") --n 50 --max-new 4096 \
       --gpu-mem 0.94 --think off > $LOG/wb_${REC}_${arm}${suf}.log 2>&1
   grep -q DONE $LOG/wb_${REC}_${arm}${suf}.log

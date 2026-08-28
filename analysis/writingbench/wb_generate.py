@@ -34,6 +34,7 @@ def main():
     ap.add_argument("--gpu-mem", type=float, default=0.95)
     ap.add_argument("--max-seqs", type=int, default=256)
     ap.add_argument("--think", choices=("default", "on", "off"), default="off")
+    ap.add_argument("--adapter", default=None, help="apply this adapter to the engine after boot (--model-path is then the BASE)")
     A = ap.parse_args()
 
     # fail-loud BEFORE the engine boots: both response homes must be writable
@@ -55,6 +56,11 @@ def main():
 
     llm = LLM(model=A.model_path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
               max_model_len=A.max_new + 2048, max_num_seqs=A.max_seqs)
+    if A.adapter:
+        import sys as _sys, os as _os
+        _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "residency"))
+        from apply_adapter import apply_adapter
+        apply_adapter(llm, A.adapter, A.model_path)
     R = None if A.arm == "free" else int(A.arm.lstrip("R"))
     DEC.update(on=R is not None, R=R or 0, swaps=1)
     DEC["state"].clear()
