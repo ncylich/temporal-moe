@@ -1117,3 +1117,24 @@ its re-prefill was scanned from stale decode state. Fixed by cold-filling any pr
 that starts at token 0. No committed row is known to have hit it (preemption needs KV
 pressure the evals did not have), but the rows before this date were produced without the
 fix.
+
+## Self-distillation reframed: on-policy means the adapter being trained, and reverse KL (2026-08-28)
+
+Noah's correction, recorded verbatim in substance: samples written by a different adapter
+than the one being trained are off-policy, whatever the state distribution looks like; and
+when the student wrote the trajectory, the sampled token is a sample from the student, so
+the natural objective is reverse KL, not the teacher-weighted forward KL. Under a hard
+residency bound that matters: forward KL asks the constrained student to cover the
+teacher's whole distribution, which it structurally cannot; reverse KL asks it to put its
+mass where the teacher agrees.
+
+The round-2 "mix" run (from scratch, CE W=3 + free anchor + forward KL on samples from the
+W=3 student) is kept as an off-policy data point. The "pure" and "cont" variants were
+cancelled before running. Replacement: `tmoe_gemma_onpolicy_loop.sh`, a true loop. Each
+round samples 4524 math-weighted prompts from the CURRENT adapter under R8, labels them with
+the frozen free base, continues that adapter on the reverse-KL sampled-token objective
+(A_t = log p_teacher(y_t) - log p_student(y_t) held fixed, loss -sum A_t log p_student(y_t))
+plus the free-arm anchor and no CE, for 0.85M tokens, then merges and runs GSM8K n=1319; the
+next round samples from the adapter just trained. About 45 minutes per round on the fast
+serving path. Records `gemma4_ce_onp_r{1,2,3}_n1319`, compared same-arm against the base
+(R8 78.8) and the W=3 start point (+3.6).
