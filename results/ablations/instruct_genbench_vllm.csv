@@ -2049,3 +2049,9 @@ qwen35_ce_digit3_code,256,8,R32,32,mbpp_instruct,sample_len,500.000000,full,1536
 qwen35_ce_digit3_code,256,8,R32,32,mbpp_instruct,"pass_at_1,extract_code",0.782000,full,1536,2364
 qwen35_ce_digit3_code,256,8,R32,32,humaneval_instruct,sample_len,164.000000,full,1536,500
 qwen35_ce_digit3_code,256,8,R32,32,humaneval_instruct,"pass@1,create_test",0.908537,full,1536,500
+gemma4_ce_digit3_he8192,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,8192,114
+gemma4_ce_digit3_he8192,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.969512,full,8192,481
+gemma4_ce_digit3_he8192,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.987805,full,8192,179
+gemma4_ce_digit3_m8192,128,8,free,,mbpp_gemma,"pass@1,channel-aware",0.896000,full,8192,365
+gemma4_ce_digit3_m8192,128,8,R8,8,mbpp_gemma,"pass@1,channel-aware",0.766000,full,8192,704
+gemma4_ce_digit3_m8192,128,8,R16,16,mbpp_gemma,"pass@1,channel-aware",0.870000,full,8192,699

@@ -1052,3 +1052,26 @@ At R8 the two weights are the same adapter for practical purposes (four-cell +1.
 therefore W=3: it is the rebuild on gemma and the full gain on qwen at the published bound.
 The gap to the paper on qwen is unchanged: IFEval (+1.3 against +3.5) and GSM8K (+5.1
 against +6.5).
+
+### Gemma W=3 on the full surface: the rebuild, cell for cell (2026-08-28)
+
+Records `gemma4_ce_digit3_{full,full_dual,he8192,m8192}` and WritingBench `gemma4_digit3`
+(three 50-query subsets, critic points out of 10). Same-arm deltas against the matched base.
+
+| benchmark | base R8 | published | rebuild | W=3 | | base R16 | rebuild | W=3 |
+|---|---|---|---|---|---|---|---|---|
+| GSM8K (n=1319) | 78.8 | +6.0 | +3.1 | +3.6 | | 86.6 | +0.9 | -0.4 |
+| IFEval (n=541) | 86.9 | -1.0 | -0.7 | -1.3 | | 87.8 | -0.6 | -1.7 |
+| HumanEval (n=164, @8192) | 94.5 | +4.9 | +2.4 | +2.4 | | 96.3 | +1.8 | +2.4 |
+| MMLU (n=228) | 92.5 | -1.1 | +1.8 | +1.8 | | 92.5 | +0.9 | +0.9 |
+| MBPP (n=500, @8192) | 77.0 | n/a | +1.6 | -0.4 | | 89.0 | -1.4 | -2.0 |
+| WritingBench (n=150) | 7.460 | +0.040 | +0.020 | +0.053 | | 7.465 | -0.018 | +0.106 |
+| **mean, 4 published cells** | | **+2.2** | **+1.6** | **+1.6** | | | +0.8 | +0.3 |
+
+Four-cell mean identical to the rebuild's (+1.6). MMLU and HumanEval are the same numbers;
+GSM8K +0.5 and WritingBench +0.03 for, IFEval -0.6 and MBPP -2.0 against, each inside its
+cell's noise. So one weight across both models, W=3, reproduces the gemma rebuild on every
+cell and delivers the qwen gain (four-cell +1.7 against the rebuild's -0.4). That is the
+standing recipe. What it does not do is close the paper: gemma +1.6 against +2.2 (HumanEval
++2.4 against +4.9 and GSM8K +3.6 against +6.0), qwen +1.7 against +2.7 (IFEval and GSM8K).
+Self-distillation round 2 is the open lever.
