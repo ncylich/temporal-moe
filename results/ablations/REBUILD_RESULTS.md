@@ -1184,3 +1184,15 @@ wake 1.2 s + sync 0.6 s per refresh, sampling 2.9k tok/s at 64 rows, whole refre
 GSM8K n=1319 free 87.1 / R8 82.6 / R16 87.0 (+0.4 / +0.3 / +0.8 vs W=3: intact, no damage
 from the mechanism). First real run: `tmoe_gemma_online.sh digit3 850000 16 256`, record
 `gemma4_ce_online_digit3_e16_n1319`.
+
+### Merged checkpoints retired for gemma evaluation (2026-08-28 22:08)
+
+`analysis/residency/apply_adapter.py`: the eval engine boots the base from /dev/shm and
+receives `base + delta` for every trained surface straight from the adapter file (expert
+LoRA folded in bf16 grouped layout, attention LoRA added as an fp32 delta with one rounding,
+router and norms as trained). Checked against the merged W=3 checkpoint: 325 engine tensors,
+worst max|diff| 0 (EXACT), applied in 8.4 s including the 2 GB torch.load. The merge stage
+(2 min, 49 GB written, 49 GB re-read, 49 GB kept) is gone from the gemma chains;
+`--adapter` on instruct_genbench_vllm / mmlu_gptoss / humaneval_gemma / mbpp_gemma;
+`tmoe_deadband_surface.sh` takes `adapter:<file>`. WritingBench's generator still needs the
+flag. Qwen keeps merging until apply_adapter learns its checkpoint names.
