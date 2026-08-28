@@ -14,7 +14,10 @@ export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=${HF_TOKEN:-$(cat /root/.cache/huggingface/token 2>/dev/null)}
 export HF_ALLOW_CODE_EVAL=1 HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
-SRC=${1:-digit3}; NAME=onpol3
+SRC=${1:-digit3}; MODE=${2:-mix}
+# MODE=mix : real-data CE (W=3) + free-arm anchor + on-policy KL   (record gemma4_ce_onpol3)
+# MODE=pure: on-policy KL + free-arm anchor only, no CE, no digit weight (record gemma4_ce_onpolpure)
+case $MODE in mix) NAME=onpol3; LOSS="--kl-weight 0.05 --digit-weight 3";; pure) NAME=onpolpure; LOSS="--kl-only --kl-weight 0.05";; *) echo "bad MODE $MODE"; exit 2;; esac
 B=/dev/shm/gemma4-26b-it; SRCM=/root/models/gemma4-${SRC}-merged
 TRAJ=gemma4_selfgen_${SRC}R8q; TP=/workspace/instruct-traj/$TRAJ.pt; AKL=/workspace/instruct-traj/${TRAJ}_klref.pt
 KL=/workspace/instruct-traj/gemma4_d7_seq4096_klref.pt
@@ -32,7 +35,7 @@ echo "### gemma-$NAME 2/5 teacher logprobs on the samples $(date -u +%H:%M)"
   --out /tmp/gce_precompute_unused.pt --precompute-kl $AKL
 echo "### gemma-$NAME 3/5 train from scratch: W=3 recipe + on-policy KL $(date -u +%H:%M)"
 [ -s $A ] || $L /workspace/venv_fla/bin/python -u analysis/residency/train_gemma_ce.py $COMMON --traj gemma4_d7_seq4096 --out $A \
-  --accum 16 --lr 3e-5 --tokens 3400000 --kl-anchor $KL --kl-weight 0.05 --digit-weight 3 \
+  --accum 16 --lr 3e-5 --tokens 3400000 --kl-anchor $KL $LOSS \
   --aux-traj $TRAJ --aux-kl-anchor $AKL --aux-kl-weight 1.0
 echo "### gemma-$NAME 4/5 merge $(date -u +%H:%M)"
 [ -d $M ] || { $L /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py $COMMON --traj gemma4_d7_seq4096 --out $A --merge-out $M
