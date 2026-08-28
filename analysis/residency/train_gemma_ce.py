@@ -76,14 +76,18 @@ def add_expert_lora(model, r):
             x = hidden_states.index_select(0, tok)
             offs = torch.bincount(
                 flat_e[order], minlength=Emax).cumsum(0).to(torch.int32)
-            s = self.elora_scale
+            s = self.elora_scale if getattr(self, "elora_on", True) else 0.0
             g = torch._grouped_mm
-            gate_up = g(x, self.gate_up_proj, offs=offs) + s * g(
-                g(x, self.elora_gu_A, offs=offs), self.elora_gu_B, offs=offs)
+            gate_up = g(x, self.gate_up_proj, offs=offs)
+            if s:
+                gate_up = gate_up + s * g(
+                    g(x, self.elora_gu_A, offs=offs), self.elora_gu_B, offs=offs)
             gate, up = gate_up.chunk(2, dim=-1)
             h = self.act_fn(gate) * up
-            down = g(h, self.down_proj, offs=offs) + s * g(
-                g(h, self.elora_dp_A, offs=offs), self.elora_dp_B, offs=offs)
+            down = g(h, self.down_proj, offs=offs)
+            if s:
+                down = down + s * g(
+                    g(h, self.elora_dp_A, offs=offs), self.elora_dp_B, offs=offs)
             w = top_k_weights.reshape(-1)[src_idx].unsqueeze(1)
             # deterministic combine: one unique slot per (token, expert-slot) pair
             # (a single index_add_ over duplicate token ids would use atomics --
@@ -175,6 +179,19 @@ def main():
                          "student's own prefixes. CE and the free-arm anchor stay on --traj")
     ap.add_argument("--aux-kl-anchor", default=None, help="--precompute-kl output over --aux-traj")
     ap.add_argument("--aux-kl-weight", type=float, default=1.0)
+    ap.add_argument("--online-every", type=int, default=0,
+                    help="ON-POLICY: every N optimizer steps, sync the current adapter into an "
+                         "in-process vLLM engine, sample --online-n prompts under the constraint, "
+                         "label them with the frozen base in-process, and make them the aux set "
+                         "(replaces --aux-traj/--aux-kl-anchor). 0 = off")
+    ap.add_argument("--online-n", type=int, default=256, help="rows sampled per refresh (16 steps x 16 rows)")
+    ap.add_argument("--online-prompts", default="/workspace/olmoe-adapt/data/d7_prompts.jsonl")
+    ap.add_argument("--online-quota", default="mathlane_v2=2341,d5_fewshot=1183,domain8k=1000")
+    ap.add_argument("--online-max-new", type=int, default=1024)
+    ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
+    ap.add_argument("--online-smoke", default=None,
+                    help="path of a parity_vllm.py dump made from the MERGED checkpoint of the adapter this "
+                         "run resumes from: sync once, generate the same prompts greedily, compare tokens, exit")
     ap.add_argument("--aux-loss", choices=("fwdkl", "revkl"), default="fwdkl",
                     help="fwdkl: teacher-weighted KL over the teacher top-50 at the student's states. "
                          "revkl: reverse KL, sampled-token estimator: loss = -sum_t A_t log p_s(y_t), "
@@ -426,16 +443,30 @@ def main():
                 den += int(m_.sum())
         return num / den / scale
 
-    if A.precompute_kl:
-        import shutil
+    ORIG_EXTRA = None
+
+    def teacher_ref(rows_, adapted=False):
+        """Frozen free-base top-50 log-probs (+ log-prob at the row's own token) per row. With
+        adapted=True the live model carries an adapter: LoRAs are switched off and the trained
+        router/norm tensors are swapped for their originals for the duration of the pass."""
+        import contextlib
+        was_training = model.training
         model.eval()
         mb = max(1, A.micro_batch)
-        lidx = sorted(range(len(rows)), key=lambda i: rows[i]["ids"].shape[0])
+        lidx = sorted(range(len(rows_)), key=lambda i: rows_[i]["ids"].shape[0])
         outk = {}
-        with torch.no_grad():
+        ctx = model.disable_adapter() if (adapted and hasattr(model, "disable_adapter")) else contextlib.nullcontext()
+        if adapted:
+            for m_ in model.modules():
+                if hasattr(m_, "elora_gu_A"):
+                    m_.elora_on = False
+            saved = [(p_, p_.data.clone()) for p_, _ in ORIG_EXTRA]
+            for p_, o_ in ORIG_EXTRA:
+                p_.data.copy_(o_)
+        with torch.no_grad(), ctx:
             for c0 in range(0, len(lidx), mb):
                 ridx = lidx[c0:c0 + mb]
-                rs = [rows[i] for i in ridx]
+                rs = [rows_[i] for i in ridx]
                 ids, am, tgt, plens, _ = make_batch(rs)
                 GL.CFG.update(on=False, enforce_from=0, batch=len(rs))
                 if DEC is not None:   # chunked head: full [B,S,V] logits OOM at 4608 seq
@@ -458,8 +489,21 @@ def main():
                         # estimator of reverse KL needs it (--aux-loss revkl)
                         tat.append(lp.gather(1, tb[j:j + 512, None]).squeeze(1).float().cpu())
                     outk[ri] = (torch.cat(tis), torch.cat(tvs), torch.cat(tat))
-                if (c0 // mb) % 100 == 0:
+                if (c0 // mb) % 100 == 0 and not adapted:
                     print(f"[gce-kl] {c0}/{len(lidx)}", flush=True)
+        if adapted:
+            for m_ in model.modules():
+                if hasattr(m_, "elora_gu_A"):
+                    m_.elora_on = True
+            for p_, v_ in saved:
+                p_.data.copy_(v_)
+        if was_training:
+            model.train()
+        return outk
+
+    if A.precompute_kl:
+        import shutil
+        outk = teacher_ref(rows)
         GL.CFG.update(batch=1)
         torch.save(outk, "/tmp/gce_kl_tmp.pt")
         shutil.move("/tmp/gce_kl_tmp.pt", A.precompute_kl)
@@ -534,6 +578,7 @@ def main():
             if p.requires_grad and n.endswith("norm.weight"):
                 p.requires_grad_(False); n_off += 1
         print(f"[gce] --router-only: froze {n_off} non-router tensors", flush=True)
+    ORIG_EXTRA = [(p, p.data.clone()) for p in extra]      # pristine router/norms for the in-process teacher
     train_params = [p for p in model.parameters() if p.requires_grad]
     print(f"[gce] stack={'unsloth' if use_unsloth else 'hf+peft'} trainable="
           f"{sum(p.numel() for p in train_params)/1e6:.1f}M (extra router/norm "
@@ -883,12 +928,42 @@ def main():
                     "traj": A.traj, "lr": A.lr}, "/tmp/gce_ckpt_tmp.pt")
         shutil.move("/tmp/gce_ckpt_tmp.pt", A.out)
 
+    AUXS = {"chunks": None, "order": None, "i": 0}
+    aux_tot = 0.0; aux_est = 0.0
+
+    def _rebuild_aux(rows_, seed_):
+        alidx = sorted(range(len(rows_)), key=lambda i: rows_[i]["ids"].shape[0])
+        AUXS["chunks"] = [alidx[i:i + mb] for i in range(0, len(alidx), mb)]
+        AUXS["order"] = torch.randperm(len(AUXS["chunks"]), generator=torch.Generator().manual_seed(seed_)).tolist()
+        AUXS["i"] = 0
+
     if AUX is not None:
-        alidx = sorted(range(len(AUX)), key=lambda i: AUX[i]["ids"].shape[0])
-        achunks = [alidx[i:i + mb] for i in range(0, len(alidx), mb)]
-        aorder = torch.randperm(len(achunks), generator=torch.Generator().manual_seed(A.data_seed + 1)).tolist()
-        ai = 0; aux_tot = 0.0; aux_est = 0.0
+        _rebuild_aux(AUX, A.data_seed + 1)
+    SAMPLER = None
+    if A.online_every:
+        from online_sampler import OnlineSampler
+        SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
+                                max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed)
+        if A.online_smoke:
+            import json as _json
+            from datasets import load_dataset as _ld
+            ref = _json.load(open(A.online_smoke)); n_ = len(ref["gens"]["free"])
+            qs = [r["question"] for r in _ld("openai/gsm8k", "main", split="test")][:n_]
+            SAMPLER.sync()
+            for arm in ref["gens"]:
+                rows_ = SAMPLER.sample(n_, greedy=True, prompts=qs, constrained=arm != "free", max_tokens=256)
+                gens = [r["ids"][r["prompt_len"]:].tolist() for r in rows_]
+                same = sum(g == rg for g, rg in zip(gens, ref["gens"][arm]))
+                print(f"[online-smoke] {arm}: {same}/{n_} generations identical to the merged checkpoint", flush=True)
+            SAMPLER.sleep()
+            return
     while seen < A.tokens:
+        if SAMPLER is not None and step % A.online_every == 0:
+            t_on = time.time()
+            AUX = SAMPLER.refresh(A.online_n)
+            AUXREF = teacher_ref(AUX, adapted=True)
+            _rebuild_aux(AUX, A.data_seed + 1 + step)
+            print(f"[online] refresh at step {step}: {len(AUX)} fresh on-policy rows in {time.time()-t_on:.0f}s total", flush=True)
         opt.zero_grad(set_to_none=True)
         for _ in range(accum_batches):
             ridx = chunks[order[oi % len(order)]]
@@ -971,7 +1046,7 @@ def main():
                 GL.CFG.update(on=not A.no_constraint, R=A.R, enforce_from=plens,
                               batch=len(rs), cold_start=False)
             if AUX is not None:   # on-policy term: one aux micro-batch per main micro-batch
-                ridx_a = achunks[aorder[ai % len(aorder)]]; ai += 1
+                ridx_a = AUXS["chunks"][AUXS["order"][AUXS["i"] % len(AUXS["order"])]]; AUXS["i"] += 1
                 rs_a = [AUX[i] for i in ridx_a]
                 ids_a, am_a, tgt_a, plens_a, _ = make_batch(rs_a)
                 targets_a = tgt_a[:, 1:]
