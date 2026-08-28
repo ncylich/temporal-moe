@@ -35,7 +35,7 @@ echo "### gemma-$NAME 3/5 distill from $SRC adapter $(date -u +%H:%M)"
 echo "### gemma-$NAME 4/5 merge $(date -u +%H:%M)"
 [ -d $M ] || { $L /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py $COMMON --out $A --merge-out $M
   cp $B/processor_config.json $M/ 2>/dev/null || true; }
-/workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+$L /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
 echo "### gemma-$NAME 5/5 eval $(date -u +%H:%M)"
 $L /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
   --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${NAME}_n1319 \

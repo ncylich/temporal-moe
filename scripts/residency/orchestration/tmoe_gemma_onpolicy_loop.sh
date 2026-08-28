@@ -42,7 +42,7 @@ for r in $(seq 1 $ROUNDS); do
   echo "### $NAME 4/5 merge + verify $(date -u +%H:%M)"
   [ -d $M ] || { $L /workspace/venv_fla/bin/python analysis/residency/train_gemma_ce.py $COMMON --traj gemma4_d7_seq4096 --out $A --merge-out $M
     cp $B/processor_config.json $M/ 2>/dev/null || true; }
-  /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
+  $L /workspace/venv_fla/bin/python analysis/residency/verify_merge.py --base $B --merged $M
   echo "### $NAME 5/5 GSM8K n=1319 $(date -u +%H:%M) (expect ~8 min)"
   $L /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py \
     --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${NAME}_n1319 \

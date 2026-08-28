@@ -27,7 +27,7 @@ echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), r
   touch $A.done; }
 echo "### $NAME 2/3 merge + verify $(date -u +%H:%M)"
 [ -d $M ] || { $L $PY analysis/residency/train_gemma_ce.py $COMMON --out $A --merge-out $M; cp $B/processor_config.json $M/ 2>/dev/null || true; }
-$PY analysis/residency/verify_merge.py --base $B --merged $M
+$L $PY analysis/residency/verify_merge.py --base $B --merged $M
 echo "### $NAME 3/3 GSM8K n=1319 $(date -u +%H:%M)"
 $L $PY -u analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_${NAME}_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90

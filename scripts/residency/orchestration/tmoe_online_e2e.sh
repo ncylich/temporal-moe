@@ -23,7 +23,7 @@ $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A --resume --accum
   --kl-only --kl-anchor $KL --kl-weight 0.05 --aux-loss revkl --aux-kl-weight 1.0 --online-every 4 --online-n 64 --save-every 1000000
 echo "### e2e 2/3 merge + verify + GSM8K n=1319 $(date -u +%H:%M) (expect ~12 min)"
 rm -rf $M; $L $PY analysis/residency/train_gemma_ce.py $COMMON --out $A --merge-out $M && cp $B/processor_config.json $M/ 2>/dev/null
-$PY analysis/residency/verify_merge.py --base $B --merged $M
+$L $PY analysis/residency/verify_merge.py --base $B --merged $M
 $L $PY -u analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct --path $M --arms free,R8,R16 --record-as gemma4_ce_onlinesmoke_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90
 echo "### e2e 3/3 checks $(date -u +%H:%M)"
