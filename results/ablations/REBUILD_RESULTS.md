@@ -1231,3 +1231,25 @@ student's own tokens (it learns what not to say). Since the teacher's top-50 is 
 every state, the analytic reverse KL over that support (plus a tail-mass term) is available
 and low-variance: implemented as `--aux-loss revkl_full`; that is the one-change follow-up
 if the GSM8K number confirms the diagnosis.
+
+## From-scratch on-policy reverse-KL matches the CE recipe at R8 with no CE and no data (2026-08-28 23:50)
+
+`tmoe_gemma_online.sh scratch 3400000 16 256`: the untrained base under R8 samples its own
+trajectories (256 rows every 16 steps, refreshed from the adapter being trained), the frozen
+free base labels them in-process, and the adapter trains on the sampled-token reverse KL
+plus the free-arm anchor. No CE, no digit weight, no teacher-written text. 3.4M tokens (the
+W=3 budget), 80 min. GSM8K n=1319:
+
+| arm | base | W=3 | scratch reverse-KL | vs W=3 (paired) |
+|---|---|---|---|---|
+| free | 87.8 | -1.1 | -0.3 | +0.8, 31/21, z=1.4 |
+| R8 (6.25%) | 78.8 | +3.6 | +3.1 (108/67, z=3.1) | -0.5, 80/86, z=-0.5 |
+| R16 (12.5%) | 86.6 | -0.4 | +0.4 | +0.8, 41/31, z=1.2 |
+
+R8 false-equation rate 2.49%, the same as W=3. It reproduces the bound-recovery of the
+best CE recipe from nothing, and does not pay the free/R16 tax the CE recipe pays. It does
+not exceed W=3 at R8, and its reverse-KL estimate was flat (0.386 / 0.370 / 0.377 / 0.369
+at steps 50-200) while the adapter norms grew as much as W=3's, so the sampled-token
+estimator is the suspected limit, not the objective: `--aux-loss revkl_full` (analytic
+reverse KL over the stored teacher top-50 plus a tail-mass term) is running from scratch
+(`gemma4_ce_online_scratch_e16_full`) and then from W=3 (`gemma4_ce_online_digit3_e16_full`).
