@@ -947,3 +947,26 @@ is right for a tokenizer with 22 digit ids is too strong for one with 403; W=3 o
 the queued test. The scorer-FN offsets quoted above were recomputed with a bounded bold-span
 pattern (the unbounded one was cubic on those digit streams): qwen 4.2-5.0 points, gemma
 1.3-1.8, still uniform across arms.
+
+### The qwen digit-weight adapter on the full surface (2026-08-28)
+
+Same-arm deltas against the matched base record (`qwen35_base_full` IFEval, `qwen35_base_n_dual`
+MMLU, `qwen35_base_code_ref` code at gen-cap 1536, `qwen35_think_off_n1319` GSM8K). Records
+`qwen35_ce_digit10_{full,n_dual,code}`.
+
+| benchmark | base R8 | published | rebuild | digit10 | | base R32 | rebuild | digit10 |
+|---|---|---|---|---|---|---|---|---|
+| GSM8K (n=1319) | 76.6 | +6.5 | +2.1 | **+5.4** | | 79.8 | +3.2 | +5.3 |
+| IFEval (n=541) | 82.6 | +3.5 | +0.2 | +0.2 | | 85.2 | -1.3 | -1.5 |
+| HumanEval (n=164) | 90.9 | +3.0 | -1.8 | +3.0 | | 89.0 | +0.6 | +0.6 |
+| MMLU (n=228) | 92.1 | -2.2 | -2.2 | -1.3 | | 93.4 | -1.8 | -0.4 |
+| MBPP (n=500) | 75.2 | n/a | +1.6 | +1.4 | | 76.4 | +2.6 | +0.8 |
+| **mean, 4 published cells** | | **+2.7** | **-0.4** | **+1.8** | | | +0.2 | +1.0 |
+
+The GSM8K gain was not bought elsewhere at the constrained arms: every other R8 cell is at
+or above the rebuild, and HumanEval flips from -1.8 to +3.0 (five problems of 164, inside
+that cell's noise, but the sign is no longer against us). The free arm pays a little more
+than the rebuild's did (IFEval -1.8, MBPP -2.0 against base; rebuild -0.4 and -2.4), which is
+the usual specialisation cost and is not what the residency number measures. The qwen
+four-cell mean goes from -0.4 (rebuild) to +1.8 against the published +2.7; the remaining gap
+is IFEval, where the published +3.5 has never reproduced under any recipe.
