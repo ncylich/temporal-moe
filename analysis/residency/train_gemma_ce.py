@@ -169,6 +169,12 @@ def main():
                          "unconstrained arm (adaptation default); 'constrained' "
                          "distills the constrained-arm distribution toward the ref "
                          "on the trajectory's own states")
+    ap.add_argument("--aux-traj", default=None,
+                    help="second trajectory set (self-generated UNDER the constraint) used only for an "
+                         "on-policy KL term: constrained-arm student vs --aux-kl-anchor (free base) on the "
+                         "student's own prefixes. CE and the free-arm anchor stay on --traj")
+    ap.add_argument("--aux-kl-anchor", default=None, help="--precompute-kl output over --aux-traj")
+    ap.add_argument("--aux-kl-weight", type=float, default=1.0)
     ap.add_argument("--precompute-tokw", default=None,
                     help="forward-only pass over all trajectories computing per-"
                          "response-token CE under free and R8 routing; saves "
@@ -316,6 +322,12 @@ def main():
         print(f"[gce] KL anchor loaded for {len(KLREF)} rows "
               f"(weight {A.kl_weight})", flush=True)
 
+    AUX = None
+    if A.aux_traj:
+        AUX = torch.load(f"/workspace/instruct-traj/{A.aux_traj}.pt", weights_only=False)["rows"]
+        AUXREF = torch.load(A.aux_kl_anchor, weights_only=False)
+        print(f"[gce] aux on-policy KL: {len(AUX)} rows, ref {len(AUXREF)} rows, weight {A.aux_kl_weight}, "
+              f"constrained arm", flush=True)
     TOKW = None
     if A.tok_weights:
         TOKW = torch.load(A.tok_weights, weights_only=False)
@@ -861,6 +873,11 @@ def main():
                     "traj": A.traj, "lr": A.lr}, "/tmp/gce_ckpt_tmp.pt")
         shutil.move("/tmp/gce_ckpt_tmp.pt", A.out)
 
+    if AUX is not None:
+        alidx = sorted(range(len(AUX)), key=lambda i: AUX[i]["ids"].shape[0])
+        achunks = [alidx[i:i + mb] for i in range(0, len(alidx), mb)]
+        aorder = torch.randperm(len(achunks), generator=torch.Generator().manual_seed(A.data_seed + 1)).tolist()
+        ai = 0; aux_tot = 0.0
     while seen < A.tokens:
         opt.zero_grad(set_to_none=True)
         for _ in range(accum_batches):
@@ -943,6 +960,38 @@ def main():
                 loss = loss.detach() + kl_tot
                 GL.CFG.update(on=not A.no_constraint, R=A.R, enforce_from=plens,
                               batch=len(rs), cold_start=False)
+            if AUX is not None:   # on-policy term: one aux micro-batch per main micro-batch
+                ridx_a = achunks[aorder[ai % len(aorder)]]; ai += 1
+                rs_a = [AUX[i] for i in ridx_a]
+                ids_a, am_a, tgt_a, plens_a, _ = make_batch(rs_a)
+                targets_a = tgt_a[:, 1:]
+                kl_den_a = sum(int((targets_a[b] != -100).sum())
+                               for b, ri in enumerate(ridx_a) if ri in AUXREF)
+                for b, ri in enumerate(ridx_a):
+                    if ri not in AUXREF or kl_den_a == 0:
+                        continue
+                    GL.CFG.update(on=True, R=A.R, enforce_from=int(plens_a[b]), batch=1, cold_start=False)
+                    m_ = targets_a[b] != -100
+                    tid, tlp = AUXREF[ri]
+                    tid = tid.to(ids_a.device).long(); tlp = tlp.to(ids_a.device).float()
+                    def _aux_kl(x_, tid_, tlp_):
+                        lgb = (HEAD(x_) if DEC is not None else x_).float()
+                        s_at = lgb.gather(1, tid_) - torch.logsumexp(lgb, -1, keepdim=True)
+                        p = tlp_.exp(); p = p / p.sum(1, keepdim=True)
+                        return (p * (tlp_ - s_at)).sum()
+                    if DEC is not None:
+                        row_x = DEC(ids_a[b:b + 1], attention_mask=am_a[b:b + 1]).last_hidden_state[0, :-1][m_]
+                    else:
+                        row_x = model(ids_a[b:b + 1], attention_mask=am_a[b:b + 1]).logits[0, :-1][m_]
+                    kl_sum = 0
+                    for j in range(0, row_x.shape[0], 512):
+                        kl_sum = kl_sum + torch.utils.checkpoint.checkpoint(
+                            _aux_kl, row_x[j:j + 512], tid[j:j + 512], tlp[j:j + 512], use_reentrant=False)
+                    kl_b = (A.aux_kl_weight / kl_den_a / accum_batches) * kl_sum
+                    kl_b.backward()
+                    aux_tot += float(kl_b)
+                    del row_x
+                GL.CFG.update(on=not A.no_constraint, R=A.R, enforce_from=plens, batch=len(rs), cold_start=False)
             seen += ntok
         GL.CFG.update(batch=1)
         torch.nn.utils.clip_grad_norm_(train_params, 1.0)
@@ -951,6 +1000,9 @@ def main():
         if step % 50 == 0:
             print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*accum_batches:.4f} "
                   f"({seen/(time.time()-t0):.0f} tok/s)", flush=True)
+            if AUX is not None:
+                print(f"[gce] aux-kl {aux_tot/50:.4f} nats/tok (constrained arm, own prefixes)", flush=True)
+                aux_tot = 0.0
         if step % A.save_every == 0:
             save()
     save()
