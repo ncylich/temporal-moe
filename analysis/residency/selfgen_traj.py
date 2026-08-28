@@ -30,6 +30,9 @@ def main():
     ap.add_argument("--R", type=int, required=True)
     ap.add_argument("--prompts", required=True)
     ap.add_argument("--n", type=int, default=4500)
+    ap.add_argument("--quota", default=None,
+                    help="lane=n,... : take up to n prompts per lane (file order) instead of the first --n; "
+                         "the D7 pool is written lane by lane, so --n alone returns only the first lane")
     ap.add_argument("--max-new", type=int, default=1024)
     ap.add_argument("--gpu-mem", type=float, default=0.85)
     ap.add_argument("--max-model-len", type=int, default=2048)
@@ -50,7 +53,18 @@ def main():
     DEC.update(on=True, R=A.R, swaps=1)
     DEC["state"].clear()
 
-    prompts = [json.loads(l) for l in open(A.prompts)][: A.n]
+    prompts = [json.loads(l) for l in open(A.prompts)]
+    if A.quota:
+        q = {k: int(v) for k, v in (x.split("=") for x in A.quota.split(","))}
+        took = {k: 0 for k in q}; sel = []
+        for p in prompts:
+            ln = p.get("lane", "?")
+            if ln in q and took[ln] < q[ln]:
+                took[ln] += 1; sel.append(p)
+        prompts = sel
+        print(f"[sg] lane quota -> {took}", flush=True)
+    else:
+        prompts = prompts[: A.n]
     texts = [p.get("prompt") or p.get("text") for p in prompts]
     msgs = [[{"role": "user", "content": t}] for t in texts]
     sp = SamplingParams(temperature=0.7, top_p=0.8, seed=1234, max_tokens=A.max_new,
