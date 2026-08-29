@@ -188,6 +188,10 @@ def main():
     ap.add_argument("--online-prompts", default="/workspace/olmoe-adapt/data/d7_prompts.jsonl")
     ap.add_argument("--online-quota", default="mathlane_v2=2341,d5_fewshot=1183,domain8k=1000")
     ap.add_argument("--online-max-new", type=int, default=1024)
+    ap.add_argument("--online-temp", type=float, default=0.7, help="student sampling temperature")
+    ap.add_argument("--budget-on", choices=("data", "sampled"), default="data",
+                    help="what --tokens counts: the D7 rows walked (data) or the on-policy tokens trained on (sampled). "
+                         "With --kl-only and no --kl-anchor, 'sampled' also skips the D7 walk entirely")
     ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
     ap.add_argument("--online-smoke", default=None,
                     help="path of a parity_vllm.py dump made from the MERGED checkpoint of the adapter this "
@@ -947,7 +951,7 @@ def main():
         from online_sampler import OnlineSampler
         SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
                                 max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed,
-                                arch=A.family)
+                                arch=A.family, temperature=A.online_temp)
         if A.online_smoke:
             import json as _json
             from datasets import load_dataset as _ld
@@ -1008,6 +1012,7 @@ def main():
             _rebuild_aux(AUX, A.data_seed + 1 + step)
             print(f"[online] refresh at step {step}: {len(AUX)} fresh on-policy rows in {time.time()-t_on:.0f}s total", flush=True)
         opt.zero_grad(set_to_none=True)
+        ntok_a = 0
         for _ in range(accum_batches):
             ridx = chunks[order[oi % len(order)]]
             rs = [rows[i] for i in ridx]
@@ -1091,7 +1096,7 @@ def main():
             if AUX is not None:   # on-policy term: one aux micro-batch per main micro-batch
                 ridx_a = AUXS["chunks"][AUXS["order"][AUXS["i"] % len(AUXS["order"])]]; AUXS["i"] += 1
                 rs_a = [AUX[i] for i in ridx_a]
-                ids_a, am_a, tgt_a, plens_a, _ = make_batch(rs_a)
+                ids_a, am_a, tgt_a, plens_a, ntok_a = make_batch(rs_a)
                 targets_a = tgt_a[:, 1:]
                 kl_den_a = sum(int((targets_a[b] != -100).sum())
                                for b, ri in enumerate(ridx_a) if ri in AUXREF)
@@ -1151,7 +1156,7 @@ def main():
                     aux_tot += float(kl_b)
                     del row_x
                 GL.CFG.update(on=not A.no_constraint, R=A.R, enforce_from=plens, batch=len(rs), cold_start=False)
-            seen += ntok
+            seen += ntok_a if A.budget_on == "sampled" else ntok      # sampled: the on-policy tokens trained on
         GL.CFG.update(batch=1)
         torch.nn.utils.clip_grad_norm_(train_params, 1.0)
         opt.step()

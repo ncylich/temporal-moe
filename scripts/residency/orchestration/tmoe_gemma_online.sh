@@ -25,9 +25,10 @@ if [ "$START" = scratch ]; then SEEN=0; INIT=""; else
 scripts/residency/disk_budget.sh || exit 3
 echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), refresh every $EVERY steps x $N rows $(date -u +%H:%M)"
 [ -f $A.done ] || { [ -n "$INIT" ] && cp $D/gemma_ce_${START}_adapter.pt $A; rm -f $A.tmp
-  $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
+  $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --tokens $((SEEN+T)) \
     $CE_ARGS $ANCHOR_ARGS --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
-    --online-every $EVERY --online-n $N
+    --online-every $EVERY --online-n $N --lr ${TMOE_LR:-3e-5} --online-temp ${TMOE_ONLINE_TEMP:-0.7} \
+    --online-quota "${TMOE_QUOTA:-mathlane_v2=2341,d5_fewshot=1183,domain8k=1000}" --budget-on ${TMOE_BUDGET_ON:-data}
   touch $A.done; }
 if [ "${TMOE_MERGE:-0}" = 1 ]; then
   echo "### $NAME 2/3 merge + verify $(date -u +%H:%M)"

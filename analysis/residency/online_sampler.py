@@ -45,7 +45,7 @@ def _hf_name(param_or_module_name, suffix=""):
 
 class OnlineSampler:
     def __init__(self, model, base_path, R, swaps, prompts_path, quota, max_new=1024,
-                 gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4"):
+                 gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4", temperature=0.7, top_p=0.8):
         assert arch in ("gemma4", "qwen35"), arch
         self.arch = arch
         import vllm_glue
@@ -72,7 +72,8 @@ class OnlineSampler:
             prompts = sel
         self.prompts = [p.get("prompt") or p.get("text") for p in prompts]
         self.rng = random.Random(seed); self.rng.shuffle(self.prompts); self.cursor = 0
-        self.sp_kw = dict(temperature=0.7, top_p=0.8, max_tokens=max_new)
+        self.sp_kw = dict(temperature=temperature, top_p=top_p, max_tokens=max_new)
+        self.max_new = max_new
         if arch == "qwen35":                       # card recipe, non-thinking: presence penalty 1.5
             self.sp_kw["presence_penalty"] = 1.5
         self.chat_kw = {"chat_template_kwargs": {"enable_thinking": False}} if arch == "qwen35" else {}
@@ -172,6 +173,12 @@ class OnlineSampler:
             rows.append({"ids": torch.tensor(pids + gids, dtype=torch.int32), "prompt_len": len(pids)})
         dt = time.time() - t0
         print(f"[online] sampled {len(rows)} rows, {ntok} tokens in {dt:.0f}s ({ntok/max(dt,1e-6):.0f} tok/s)", flush=True)
+        if not greedy:                                    # what the student is producing right now
+            cap = sum(len(o.outputs[0].token_ids) >= mt for o in outs)
+            txt = [o.outputs[0].text for o in outs]; nch = sum(len(t_) for t_ in txt) or 1
+            dig = sum(c.isdigit() for t_ in txt for c in t_) / nch; eq = sum(t_.count("=") for t_ in txt) / len(txt)
+            print(f"[online] sample stats: mean len {ntok/len(rows):.0f} tok, cap-hit {100*cap/len(rows):.0f}%, "
+                  f"digit chars {100*dig:.1f}%, '=' per row {eq:.1f}", flush=True)
         return rows
 
     def sleep(self):
