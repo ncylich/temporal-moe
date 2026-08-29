@@ -56,13 +56,66 @@ class _Base:
 
     def get(self, name):
         from safetensors import safe_open
+        if name not in self.map and name.startswith("model."):
+            name = "model.language_model." + name[len("model."):]       # raw qwen3.5 checkpoint names
         f = self.map[name]
         if f not in self._h:
             self._h[f] = safe_open(f"{self.d}/{f}", "pt", device="cuda")
         return self._h[f].get_tensor(name)
 
 
+def adapter_pairs_qwen35(ck_tensors, base, meta=None):
+    """qwen3.5: textified checkpoint names (model.layers.N...), experts stored PER EXPERT as
+    mlp.experts.{e}.{gate,up,down}_proj.weight, router at mlp.gate.weight, attention LoRA only on
+    the full-attention layers. The trainer holds the experts fused (E,in,out) grouped; the base
+    checkpoint here is the raw HF one, so the merged 3D tensor is split back per expert."""
+    escale = 2.0; lscale = 64 / 32
+    t = {n[len(PREFIX):] if n.startswith(PREFIX) else n: v for n, v in ck_tensors.items()
+         if "visual" not in n and "mtp" not in n}
+    # textify: model.language_model.X -> model.X (both forms appear in adapters depending on load path)
+    t = {re.sub(r"^model\.language_model\.", "model.", n): v for n, v in t.items()}
+    layers = sorted({int(m.group(1)) for n in t for m in [re.search(r"\.layers\.(\d+)\.", n)] if m})
+    with torch.no_grad():
+        for L in layers:
+            p = f"model.layers.{L}."
+            a = t.get(p + "mlp.experts.elora_gu_A")
+            if a is not None:
+                A = a.cuda(); B = t[p + "mlp.experts.elora_gu_B"].cuda()
+                E, H, r = A.shape; twoI = B.shape[-1]; I = twoI // 2
+                delta = escale * torch.bmm(A, B)                                 # (E,H,2I) grouped
+                for e in range(E):
+                    g = base.get(p + f"mlp.experts.{e}.gate_proj.weight")        # (I,H)
+                    u = base.get(p + f"mlp.experts.{e}.up_proj.weight")          # (I,H)
+                    d = delta[e].transpose(0, 1)                                  # (2I,H)
+                    yield p + f"mlp.experts.{e}.gate_proj.weight", g + d[:I]
+                    yield p + f"mlp.experts.{e}.up_proj.weight", u + d[I:]
+                del delta, A, B
+                A = t[p + "mlp.experts.elora_dp_A"].cuda(); B = t[p + "mlp.experts.elora_dp_B"].cuda()
+                delta = escale * torch.bmm(A, B)                                 # (E,I,H) grouped
+                for e in range(E):
+                    dn = base.get(p + f"mlp.experts.{e}.down_proj.weight")       # (H,I)
+                    yield p + f"mlp.experts.{e}.down_proj.weight", dn + delta[e].transpose(0, 1)
+                del delta, A, B
+            for proj in ("q_proj", "k_proj", "v_proj", "o_proj"):
+                a = t.get(p + f"self_attn.{proj}.lora_A.default.weight")
+                if a is None:
+                    continue
+                A = a.cuda(); B = t[p + f"self_attn.{proj}.lora_B.default.weight"].cuda()
+                W = base.get(p + f"self_attn.{proj}.weight").clone()
+                W += (B @ A) * lscale
+                yield p + f"self_attn.{proj}.weight", W
+                del W, A, B
+            for n, v in t.items():
+                if n.startswith(p) and "lora_" not in n and "elora_" not in n:
+                    yield n, v.cuda()
+        if "model.norm.weight" in t:
+            yield "model.norm.weight", t["model.norm.weight"].cuda()
+
+
 def adapter_pairs(ck_tensors, base, meta=None):
+    if (meta or {}).get("family") == "qwen35":
+        yield from adapter_pairs_qwen35(ck_tensors, base, meta)
+        return
     """Yield (hf_name, merged tensor) for every trained language-model surface."""
     r = int((meta or {}).get("expert_lora_r", 32))
     escale = 2.0                                     # elora alpha = 2r  ->  alpha/r
@@ -104,7 +157,7 @@ def adapter_pairs(ck_tensors, base, meta=None):
 def apply_adapter(llm, adapter_path, base_path):
     t0 = time.time()
     ck = torch.load(adapter_path, map_location="cpu", weights_only=False)
-    assert ck.get("family", "gemma4") == "gemma4" and ck.get("stack", "hf+peft") == "hf+peft", ck.get("family")
+    assert ck.get("family", "gemma4") in ("gemma4", "qwen35") and ck.get("stack", "hf+peft") == "hf+peft", ck.get("family")
     vm = find_engine_model(llm)
     base = _Base(base_path)
     loaded = vm.load_weights(adapter_pairs(ck["tensors"], base, ck))
@@ -141,6 +194,8 @@ def main():
         if not m:
             continue
         L, tail = m.group(1), m.group(2); pre = f"model.language_model.layers.{L}."
+        if pre + "input_layernorm.weight" not in ck and f"model.layers.{L}.input_layernorm.weight" in ck:
+            pre = f"model.layers.{L}."                                          # textified (qwen)
         want = None
         if tail.endswith("qkv_proj.weight"):
             parts = [ck.get(pre + f"self_attn.{x}_proj.weight") for x in "qkv"]
