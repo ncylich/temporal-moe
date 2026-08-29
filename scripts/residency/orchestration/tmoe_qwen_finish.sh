@@ -14,7 +14,7 @@ TMOE_PRIO=3 scripts/residency/gpu_lease.sh /workspace/venv_vllm312/bin/python -u
 echo "### qwen-finish 1/3 done rc=$? $(date -u +%H:%M)"; fi
 echo "### qwen-finish 2/3 short on-policy run (0.45M sampled tokens, ~2 refreshes) + GSM8K free/R8/R32 n=1319 $(date -u +%H:%M)"
 TMOE_PRIO=3 TMOE_AUX_LOSS=revkl_full TMOE_NAME_SUFFIX=_e2e bash /workspace/tmoe_qwen_online.sh scratch 450000 16 256 > /workspace/rerun-logs/qwen_online_e2e.out 2>&1
-echo "### qwen-finish 2/3 done rc=$? $(date -u +%H:%M)"
+rc=$?; echo "### qwen-finish 2/3 done rc=$rc $(date -u +%H:%M)"; [ "$rc" = 0 ] || { echo "### qwen-finish 2/3 FAILED rc=$rc; not relaunching the sweep"; exit 1; }
 grep -E "\[online\] (offloaded|restored|wake|sampled|refresh)|\[gce\] step" /workspace/rerun-logs/qwen_online_e2e.out | tail -12
 echo "### qwen-finish 3/3 relaunch the gemma sweep + post-sweep chain $(date -u +%H:%M)"
 nohup /workspace/venv_vllm312/bin/python -u analysis/residency/sweep_online.py --aux-loss revkl_full --prio 4 --best gemma4_ce_online_scratch_e16_lr1e-4_n1319 --cells lr2e-4,klT2,temp1.0,refresh8x128,budget6.8M > /workspace/rerun-logs/sweep_online.out 2>&1 & echo $! > /workspace/pids/sweep_online.pid

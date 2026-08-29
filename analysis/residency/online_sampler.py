@@ -65,8 +65,11 @@ class OnlineSampler:
         self.model, self.R, self.swaps, self.DEC = model, R, swaps, DEC
         vllm_glue.install()
         t0 = time.time()
+        # max_num_seqs 256: we never sample more rows than that at once, and hybrid (linear-attention)
+        # models need one state block per decode sequence; at a 0.55 memory share only ~285 blocks
+        # exist, and CUDA-graph capture refuses the 1024 default.
         self.llm = LLM(model=base_path, enable_sleep_mode=True, gpu_memory_utilization=gpu_mem,
-                       max_model_len=max_model_len, **vllm_glue.llm_kwargs())
+                       max_model_len=max_model_len, max_num_seqs=256, **vllm_glue.llm_kwargs())
         self.vmodel = self._find_model()
         self.tok = AutoTokenizer.from_pretrained(base_path)
         prompts = [json.loads(l) for l in open(prompts_path)]
