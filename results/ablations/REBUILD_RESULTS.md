@@ -1274,3 +1274,16 @@ over CE with the digit reweighting: it is model-agnostic (no tokenizer-specific 
 is what W=3 vs W=10 was), data-free beyond prompts, and costs nothing on the free arm. The
 CE recipe stays as the reference it has to beat at R8. Pending: the analytic reverse KL
 (from scratch, then from W=3), then the qwen replication with no digit weight at all.
+
+### Reframing the on-policy line (user, 2026-08-29 00:20)
+
+No two-stage (CE then on-policy) variants: the from-scratch on-policy adapter is the
+formulation, and it gets the full surface (queued, adapter-direct). Setup work happens
+from scratch, one change at a time. Two facts stated plainly because they were not: in the
+on-policy runs CE is not applied at all (`--kl-only` zeroes it; the D7 rows are iterated
+only for the anchor), and the "anchor" is KL(student free-arm || base) on D7 text at weight
+0.05, inherited from the CE recipe and never justified for this objective; its only
+possible role is protecting the free arm from LoRA leakage, which the from-scratch run
+already shows to be small (-0.3). First setup change: anchor 0 (no anchor forward at all).
+The analytic reverse KL reads 0.55 nats/token at step 50 (exact over the teacher top-50
+plus tail; the sampled-token estimate at the same point was 0.386, a different quantity).
