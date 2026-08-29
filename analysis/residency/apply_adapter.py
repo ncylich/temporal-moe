@@ -65,51 +65,44 @@ class _Base:
 
 
 def adapter_pairs_qwen35(ck_tensors, base, meta=None):
-    """qwen3.5: textified checkpoint names (model.layers.N...), experts stored PER EXPERT as
-    mlp.experts.{e}.{gate,up,down}_proj.weight, router at mlp.gate.weight, attention LoRA only on
-    the full-attention layers. The trainer holds the experts fused (E,in,out) grouped; the base
-    checkpoint here is the raw HF one, so the merged 3D tensor is split back per expert."""
+    """qwen3.5 on the RAW base (model.language_model.layers.N..., experts fused (E,2I,H)/(E,H,I)
+    exactly like gemma; router at mlp.gate.weight; attention LoRA on the full-attention layers).
+    The trainer names are model.layers.N... (text-only load); vLLM's raw-base engine takes the
+    model.language_model.* names."""
     escale = 2.0; lscale = 64 / 32
     t = {n[len(PREFIX):] if n.startswith(PREFIX) else n: v for n, v in ck_tensors.items()
          if "visual" not in n and "mtp" not in n}
-    # textify: model.language_model.X -> model.X (both forms appear in adapters depending on load path)
     t = {re.sub(r"^model\.language_model\.", "model.", n): v for n, v in t.items()}
     layers = sorted({int(m.group(1)) for n in t for m in [re.search(r"\.layers\.(\d+)\.", n)] if m})
     with torch.no_grad():
         for L in layers:
-            p = f"model.layers.{L}."
+            p = f"model.layers.{L}."; raw = f"model.language_model.layers.{L}."
             a = t.get(p + "mlp.experts.elora_gu_A")
             if a is not None:
                 A = a.cuda(); B = t[p + "mlp.experts.elora_gu_B"].cuda()
-                E, H, r = A.shape; twoI = B.shape[-1]; I = twoI // 2
-                delta = escale * torch.bmm(A, B)                                 # (E,H,2I) grouped
-                for e in range(E):
-                    g = base.get(p + f"mlp.experts.{e}.gate_proj.weight")        # (I,H)
-                    u = base.get(p + f"mlp.experts.{e}.up_proj.weight")          # (I,H)
-                    d = delta[e].transpose(0, 1)                                  # (2I,H)
-                    yield p + f"mlp.experts.{e}.gate_proj.weight", g + d[:I]
-                    yield p + f"mlp.experts.{e}.up_proj.weight", u + d[I:]
-                del delta, A, B
+                W = base.get(raw + "mlp.experts.gate_up_proj").transpose(1, 2).contiguous()    # (E,H,2I) grouped
+                W += escale * torch.bmm(A, B)
+                yield raw + "mlp.experts.gate_up_proj", W.transpose(1, 2).contiguous()
+                del W, A, B
                 A = t[p + "mlp.experts.elora_dp_A"].cuda(); B = t[p + "mlp.experts.elora_dp_B"].cuda()
-                delta = escale * torch.bmm(A, B)                                 # (E,I,H) grouped
-                for e in range(E):
-                    dn = base.get(p + f"mlp.experts.{e}.down_proj.weight")       # (H,I)
-                    yield p + f"mlp.experts.{e}.down_proj.weight", dn + delta[e].transpose(0, 1)
-                del delta, A, B
+                W = base.get(raw + "mlp.experts.down_proj").transpose(1, 2).contiguous()       # (E,I,H) grouped
+                W += escale * torch.bmm(A, B)
+                yield raw + "mlp.experts.down_proj", W.transpose(1, 2).contiguous()
+                del W, A, B
             for proj in ("q_proj", "k_proj", "v_proj", "o_proj"):
                 a = t.get(p + f"self_attn.{proj}.lora_A.default.weight")
                 if a is None:
                     continue
                 A = a.cuda(); B = t[p + f"self_attn.{proj}.lora_B.default.weight"].cuda()
-                W = base.get(p + f"self_attn.{proj}.weight").clone()
+                W = base.get(raw + f"self_attn.{proj}.weight").clone()
                 W += (B @ A) * lscale
-                yield p + f"self_attn.{proj}.weight", W
+                yield raw + f"self_attn.{proj}.weight", W
                 del W, A, B
             for n, v in t.items():
                 if n.startswith(p) and "lora_" not in n and "elora_" not in n:
-                    yield n, v.cuda()
+                    yield raw + n[len(p):], v.cuda()
         if "model.norm.weight" in t:
-            yield "model.norm.weight", t["model.norm.weight"].cuda()
+            yield "model.language_model.norm.weight", t["model.norm.weight"].cuda()
 
 
 def adapter_pairs(ck_tensors, base, meta=None):
@@ -188,6 +181,17 @@ def main():
             for k in fh.keys():
                 if "vision" not in k:
                     ck[k] = fh.get_tensor(k)
+    import collections
+    per = collections.defaultdict(dict)
+    for k in list(ck):
+        m = re.match(r"(model\.(?:language_model\.)?layers\.\d+\.mlp\.experts)\.(\d+)\.(gate|up|down)_proj\.weight$", k)
+        if m:
+            per[m.group(1)].setdefault(int(m.group(2)), {})[m.group(3)] = ck[k]
+    for pre_, ex in per.items():                            # textified per-expert -> fused
+        E = max(ex) + 1
+        gu = torch.stack([torch.cat([ex[e]["gate"], ex[e]["up"]], 0) for e in range(E)])   # (E,2I,H)
+        dn = torch.stack([ex[e]["down"] for e in range(E)])                                # (E,H,I)
+        ck[pre_ + ".gate_up_proj"] = gu; ck[pre_ + ".down_proj"] = dn
     worst, n = 0.0, 0
     for name, p in vp.items():
         m = re.search(r"layers\.(\d+)\.(.*)$", name)
@@ -205,9 +209,11 @@ def main():
         elif tail.endswith("router.proj.weight"):
             want = ck.get(pre + "router.proj.weight")
         elif "w13" in tail:
-            want = ck.get(pre + "experts.gate_up_proj")
+            want = ck.get(pre + "experts.gate_up_proj") or ck.get(pre + "mlp.experts.gate_up_proj")
         elif "w2" in tail and "experts" in tail:
-            want = ck.get(pre + "experts.down_proj")
+            want = ck.get(pre + "experts.down_proj") or ck.get(pre + "mlp.experts.down_proj")
+        elif tail.endswith("mlp.gate.weight"):
+            want = ck.get(pre + "mlp.gate.weight")
         elif tail.endswith("norm.weight"):
             want = ck.get(pre + tail)
         if want is None or want.shape != p.shape:

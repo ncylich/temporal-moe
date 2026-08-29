@@ -101,12 +101,7 @@ class OnlineSampler:
 
     # ------------------------------------------------------------------ weights
     def _name(self, n, suffix=""):
-        if self.arch == "qwen35":                    # textified: model.layers.N...
-            m = _TAIL.search(n)
-            if m:
-                return f"model.{m.group(1)}{suffix}"
-            return "model.norm.weight" if n.endswith("norm.weight") or n.endswith("norm") else None
-        return _hf_name(n, suffix)
+        return _hf_name(n, suffix)              # raw-base engine: model.language_model.* for both families
 
     def _pairs(self):
         """(hf_name, merged tensor) for every trainable surface, one layer at a time."""
@@ -118,16 +113,8 @@ class OnlineSampler:
                     s = mod.elora_scale
                     gu = mod.gate_up_proj.data + s * torch.bmm(mod.elora_gu_A.data, mod.elora_gu_B.data)   # (E,H,2I)
                     dp = mod.down_proj.data + s * torch.bmm(mod.elora_dp_A.data, mod.elora_dp_B.data)      # (E,I,H)
-                    if self.arch == "qwen35":            # vLLM's qwen3_next loader takes per-expert tensors
-                        E, H, twoI = gu.shape; I = twoI // 2
-                        for e in range(E):
-                            g_ = gu[e].transpose(0, 1)                              # (2I,H)
-                            yield base + f".{e}.gate_proj.weight", g_[:I].contiguous()
-                            yield base + f".{e}.up_proj.weight", g_[I:].contiguous()
-                            yield base + f".{e}.down_proj.weight", dp[e].transpose(0, 1).contiguous()
-                    else:
-                        yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
-                        yield base + ".down_proj", dp.transpose(1, 2).contiguous()
+                    yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
+                    yield base + ".down_proj", dp.transpose(1, 2).contiguous()
                     del gu, dp
                 elif hasattr(mod, "lora_A") and hasattr(mod, "base_layer") and "default" in getattr(mod, "lora_A", {}):
                     base = self._name(mod_names[id(mod)])
