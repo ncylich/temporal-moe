@@ -71,8 +71,10 @@ def main():
     if A.adapter:
         from apply_adapter import apply_adapter
         apply_adapter(llm, A.adapter, A.path)
-    sp = SamplingParams(temperature=A.temperature, top_p=A.top_p, presence_penalty=A.presence_penalty, seed=A.seed if A.temperature > 0 else None,
-                        max_tokens=A.max_new, logprobs=0)   # logprobs=0: the chosen token's logprob
+    from fast_penalty import sampling_kwargs
+    sp = SamplingParams(temperature=A.temperature, top_p=A.top_p, seed=A.seed if A.temperature > 0 else None,
+                        max_tokens=A.max_new, logprobs=0,     # logprobs=0: the chosen token's logprob
+                        **sampling_kwargs(A.presence_penalty, os.environ.get("TEMPORAL_FAST_PP", "1") == "1"))
     ctk = {} if A.think is None else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}}
     res = {"gens": {}, "lps": {}, "tps": {}, "secs": {}, "swaps": {},
            "cfg": {k: os.environ.get(k) for k in ("TEMPORAL_WALKER", "TEMPORAL_EAGER", "TEMPORAL_RHO")}}

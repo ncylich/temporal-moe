@@ -37,6 +37,9 @@ def llm_kwargs():
     # TEMPORAL_MAMBA_FP32=1: keep the linear-attention (gated delta net) state cache in fp32 during
     # decode; hybrid models default to the model dtype (bf16) and drift from HF over long decodes.
     extra = {"mamba_ssm_cache_dtype": "float32"} if os.environ.get("TEMPORAL_MAMBA_FP32") == "1" else {}
+    if os.environ.get("TEMPORAL_FAST_PP", "1") == "1":       # presence penalty via a persistent mask (fast_penalty.py); native halves throughput
+        from fast_penalty import FastPresencePenalty
+        extra["logits_processors"] = [FastPresencePenalty]
     if os.environ.get("TEMPORAL_EAGER") == "1" or VR._WALKER != "fast":
         return {"enforce_eager": True, "enable_prefix_caching": False, **extra}
     from vllm.config import CompilationConfig, CompilationMode, CUDAGraphMode
