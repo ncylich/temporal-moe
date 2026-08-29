@@ -1342,3 +1342,19 @@ any cell at either arm (the CE recipe loses on IFEval at both arms and on MBPP),
 by 3 questions each (n=228 and 164: inside those cells' noise). Four-cell mean +1.3 vs
 +1.6, the difference being those two small cells. The sweep decides whether the R8 GSM8K
 ceiling moves; this table is the reference the sweep winner's surface is compared against.
+
+## From-scratch on-policy sweep, cells 1-2: the learning rate was the limit (2026-08-29 05:40)
+
+Sweep (`sweep_online.py`, analytic reverse KL, anchor 0, from scratch, 3.4M sampled tokens, refresh 16x256, one knob per cell, GSM8K n=1319):
+
+| arm | base | CE+W=3 | baseline cell (lr 5e-5) | lr 1e-4 | lr 1e-4 vs baseline cell (fixed/broken, z) | vs CE+W=3 |
+|---|---|---|---|---|---|---|
+| free | 87.8 | 86.7 (-1.1) | 86.6 (-1.2) | 87.0 (-0.8) | 23/18, z=+0.8 | 25/22, z=+0.4 |
+| R8 | 78.8 | 82.3 (+3.6) | 81.7 (+2.9) | 84.4 (+5.6) | 85/49, z=+3.1 | 86/59, z=+2.2 |
+| R16 | 86.6 | 86.2 (-0.4) | 86.1 (-0.5) | 86.5 (-0.1) | 30/25, z=+0.7 | 41/37, z=+0.5 |
+
+The baseline cell replicated the earlier analytic run (82.5) within the eval floor (73/84, z=-0.9). Doubling the learning rate to 1e-4 is the first change in this whole line that moved R8: +5.6 against the published +6.0, significant against both the baseline cell and CE+W=3, with the free arm and R16 no worse than CE. The reverse-KL trace on sampled tokens was the same for both cells (0.55 at step 50 to 0.49 at step 250), so the trace does not predict the eval and the runner's KL early-stop gate should not be read as a quality signal.
+
+Consequence: the remaining cells were rebased on lr 1e-4 (runner restarted with `--best gemma4_ce_online_scratch_e16_lr1e-4_n1319`), and an lr 2e-4 cell was inserted first, since the winning knob has not shown saturation. Order now: lr2e-4, klT2, temp1.0, refresh8x128, budget6.8M.
+
+Two things went wrong on the way and were caught: the qwen `apply_adapter --check` first loaded the whole 70 GB textified checkpoint on the host (187 of 233 GiB, killed before the OOM), then read it through per-expert mmap at 50 MB/s (2 h; killed). It now walks each shard by byte offset (3 GB/s) and diffs on the GPU: 30,930 tensors, worst diff 0, EXACT, in about a minute. The qwen trainer plus an in-process engine (70 + 66 GB) also does not fit the 140 GB GPU; the sampler now host-offloads the frozen expert base weights of the first 20 layers while the engine is awake (`--online-offload 20`, `--online-gpu-mem 0.55`).
