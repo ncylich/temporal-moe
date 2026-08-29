@@ -39,6 +39,8 @@ def main():
     ap.add_argument("--warm", type=int, default=4, help="prompts in the warm-up call (0 = none)")
     ap.add_argument("--adapter", default=None, help="adapter .pt to apply to the engine (raw base + adapter, same class as the online sampler)")
     ap.add_argument("--no-hooks", action="store_true", help="plain vLLM: do not install the residency hooks (free arm only)")
+    ap.add_argument("--temperature", type=float, default=0.0); ap.add_argument("--top-p", type=float, default=1.0)
+    ap.add_argument("--presence-penalty", type=float, default=0.0); ap.add_argument("--seed", type=int, default=1234)
     A = ap.parse_args()
     if A.compare:
         a, b = (json.load(open(p)) for p in A.compare)
@@ -68,7 +70,8 @@ def main():
     if A.adapter:
         from apply_adapter import apply_adapter
         apply_adapter(llm, A.adapter, A.path)
-    sp = SamplingParams(temperature=0.0, max_tokens=A.max_new, logprobs=0)   # logprobs=0: the chosen token's logprob
+    sp = SamplingParams(temperature=A.temperature, top_p=A.top_p, presence_penalty=A.presence_penalty, seed=A.seed if A.temperature > 0 else None,
+                        max_tokens=A.max_new, logprobs=0)   # logprobs=0: the chosen token's logprob
     ctk = {} if A.think is None else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}}
     res = {"gens": {}, "lps": {}, "tps": {}, "secs": {}, "swaps": {},
            "cfg": {k: os.environ.get(k) for k in ("TEMPORAL_WALKER", "TEMPORAL_EAGER", "TEMPORAL_RHO")}}
