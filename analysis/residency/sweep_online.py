@@ -73,7 +73,9 @@ def main():
             txt = open(log).read() if os.path.exists(log) else ""
             for st, val in re.findall(r"\[gce\] step (\d+) seen.*?\n\[gce\] aux-\S+ loss [-\d.]+; reverse-KL estimate ([-\d.]+)", txt):
                 kl[int(st)] = float(val)
-            if 50 in kl and 100 in kl and kl[100] >= kl[50]:      # no decrease at all by step 100 (the working run dropped 4%)
+            # The sampled-token KL trace does NOT predict the eval (lr 1e-4 won R8 by 2.7 pt with the same
+            # trace as lr 5e-5, 2026-08-29), so only a real divergence stops a cell early.
+            if 50 in kl and 100 in kl and kl[100] > 1.5 * kl[50]:
                 verdict = f"STALLED (KL {kl[50]:.3f}->{kl[100]:.3f})"
                 # kill the chain: driver, its lease wrapper, the trainer
                 subprocess.run(["bash", "-c", f"for p in $(pgrep -P {proc.pid}); do kill $(pgrep -P $p) $p 2>/dev/null; done; kill {proc.pid}"])
