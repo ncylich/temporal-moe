@@ -19,15 +19,18 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-CELLS = {   # name: (env, tokens, every, n); every cell has anchor 0 -- "baseline" is the reference the rest pair against
-    "baseline":     ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled"}, 3400000, 16, 256),
-    "lr1e-4":       ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4"}, 3400000, 16, 256),
-    # lr 1e-4 won (R8 84.4 vs 81.7, z=+3.1, 2026-08-29): every later cell is rebased on it, one knob each
-    "lr2e-4":       ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "2e-4"}, 3400000, 16, 256),
-    "klT2":         ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4", "TMOE_KL_TEMP": "2"}, 3400000, 16, 256),
-    "temp1.0":      ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4", "TMOE_ONLINE_TEMP": "1.0"}, 3400000, 16, 256),
-    "refresh8x128": ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4"}, 3400000, 8, 128),
-    "budget6.8M":   ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4"}, 6800000, 16, 256),
+# The running best's settings. Each cell is ONE knob changed on top of it; when a cell wins
+# (paired z >= 2 at R8) its delta folds into BASE, so later cells build on the new best without
+# a restart. lr 1e-4 is folded in already (R8 84.4 vs 81.7, z=+3.1, 2026-08-29).
+BASE = {"env": {"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4"}, "tokens": 3400000, "every": 16, "n": 256}
+CELLS = {   # name: (env delta, tokens, every, n); None = inherit from BASE
+    "baseline":     ({"TMOE_LR": "5e-5"}, None, None, None),
+    "lr1e-4":       ({"TMOE_LR": "1e-4"}, None, None, None),
+    "lr2e-4":       ({"TMOE_LR": "2e-4"}, None, None, None),
+    "klT2":         ({"TMOE_KL_TEMP": "2"}, None, None, None),
+    "temp1.0":      ({"TMOE_ONLINE_TEMP": "1.0"}, None, None, None),
+    "refresh8x128": ({}, None, 8, 128),
+    "budget6.8M":   ({}, 6800000, None, None),
 }
 
 
@@ -55,7 +58,9 @@ def main():
         open(table, "w").write("# From-scratch on-policy sweep (one knob per cell; GSM8K n=1319; paired vs the running best)\n\n"
                                "| cell | env | KL@50 -> @100 | free | R8 | R16 | R8 vs best (fixed/broken, z) | verdict |\n|---|---|---|---|---|---|---|---|\n")
     for name in A.cells.split(","):
-        env, tokens, every, n = CELLS[name]
+        delta, d_tokens, d_every, d_n = CELLS[name]
+        env = dict(BASE["env"], **delta)
+        tokens = d_tokens or BASE["tokens"]; every = d_every or BASE["every"]; n = d_n or BASE["n"]
         suffix = f"_{name}"
         full_env = dict(os.environ, TMOE_PRIO=A.prio, TMOE_AUX_LOSS=A.aux_loss, TMOE_NAME_SUFFIX=suffix, **env)
         log = f"/workspace/rerun-logs/sweep_{name}.out"
@@ -83,6 +88,8 @@ def main():
                 row += f"{sc['free'][2]:.1f} | {sc['R8'][2]:.1f} | {sc['R16'][2]:.1f} | {sc['R8'][2]-sc['R8'][1]:+.1f} ({sc['R8'][3]}/{sc['R8'][4]}, z={sc['R8'][5]:+.1f}) | "
                 if sc["R8"][5] >= 2.0:
                     verdict = f"KEEP (new best)"; best = rec
+                    BASE["env"].update(delta); BASE.update({k: v for k, v in (("tokens", d_tokens), ("every", d_every), ("n", d_n)) if v})
+                    print(f"[sweep] BASE is now {BASE}", flush=True)
                 else:
                     verdict = "no gain"
             except Exception as e:
