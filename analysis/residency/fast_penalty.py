@@ -62,9 +62,12 @@ class FastPresencePenalty(LogitsProcessor):
             return
         rr, tt = [], []
         for index, st in self.rows.items():
-            out = st[1]; n = len(out)
-            if n > st[2]:
-                new = out[st[2]:n]; rr.extend([index] * len(new)); tt.extend(new); st[2] = n
+            out = st[1]; n = len(out); k = st[2]
+            # vLLM appends a -1 placeholder for the token being sampled and fills it in later:
+            # consume only real tokens and never advance past a placeholder.
+            while k < n and out[k] >= 0:
+                rr.append(index); tt.append(out[k]); k += 1
+            st[2] = k
         if rr:
             self.mask[torch.tensor(rr, device=self.device, dtype=torch.long),
                       torch.tensor(tt, device=self.device, dtype=torch.long)] = 1.0
