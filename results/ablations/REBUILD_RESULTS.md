@@ -1530,3 +1530,13 @@ Standing recipe (analytic reverse KL, anchor 0, KL T=2, 16x256, 3.4M sampled tok
 | R32 | 79.8 | 85.1 (+5.3) | 85.4 (+5.6) | 112/38, z=+6.0 |
 
 R8 +6.5 equals the published qwen figure, with real prompts, no tokenizer-specific term, no merged-checkpoint class artefact, and no free-arm tax. The lr 6e-5 cell (and 1e-4 if 6e-5 wins) follows; the pick gets the full surface.
+
+### Qwen lr ablation: 3e-5 vs 6e-5 is a tie (2026-08-29 23:58)
+
+| arm | base | lr 3e-5 | lr 6e-5 | 6e-5 vs 3e-5 (fixed/broken, z) |
+|---|---|---|---|---|
+| free | 85.9 | 86.9 (+1.0) | 86.7 (+0.8) | 26/28, z=-0.3 |
+| R8 | 76.6 | 83.2 (+6.5) | 83.1 (+6.4) | 51/52, z=-0.1 |
+| R32 | 79.8 | 85.4 (+5.6) | 84.8 (+5.0) | 39/47, z=-0.9 |
+
+Same picture as gemma: the learning rate is saturated once it is high enough, and the two cells are within noise on every arm. Per the rule (a third cell at 1e-4 only if the scaled lr is better), the ablation stops here; the 1e-4 cell the chain had started on a rounding tie was cancelled after one minute. Pick: lr 3e-5, qwen's original setting, nominally ahead on all three arms. Its full surface (no WritingBench) runs next, adapter-direct on the raw class.
