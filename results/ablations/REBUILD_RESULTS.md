@@ -1425,3 +1425,23 @@ All cells: analytic reverse KL, anchor 0, from scratch, GSM8K n=1319 (full table
 | budget 6.8M | 86.1 | 84.1 | 87.0 | free -1.7; R8 unchanged |
 
 R8 saturates at 84.0-84.4 (+5.2 to +5.6; published +6.0 = 84.8) for every learning rate at or above 1e-4, independent of KL temperature, refresh cadence and token budget; the sampled-token KL trace never predicted any of it (0.50-0.57 in every cell; the runner's stall gate had to be relaxed after it killed a healthy lr 2e-4 cell). The knobs separate only on the free and R16 arms. Winner by the all-arm rule: KL T=2 (lr 1e-4, 16x256, 3.4M): the only cell above base on all three arms and the one with no free-arm tax, which is the property the on-policy formulation was chosen for. Its full surface (no WritingBench) runs next, then the deadband surfaces, then qwen at the same settings.
+
+## Full surface of the sweep winner (KL T=2 on lr 1e-4, on-policy from scratch, no CE, no digit weight) (2026-08-29 17:40)
+
+Adapter-direct, no WritingBench (final version only). Deltas vs the matched base arm; the last column is the mean over the four published cells (GSM8K, IFEval strict, MMLU, HumanEval), the number the paper reports (+2.2 for gemma).
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 78.8 | 86.9 | 92.5 | 94.5 | 78.0 | |
+| CE+W=3 | 82.3 (+3.6) | 85.6 (-1.3) | 94.3 (+1.8) | 97.0 (+2.4) | 76.6 (-1.4) | +1.6 |
+| on-policy lr 5e-5 (prior) | 82.4 (+3.6) | 87.4 (+0.6) | 93.0 (+0.4) | 95.1 (+0.6) | 82.4 (+4.4) | +1.3 |
+| **KL T=2 winner** | 84.0 (+5.2) | 86.7 (-0.2) | 94.3 (+1.8) | 96.3 (+1.8) | 82.2 (+4.2) | **+2.2** |
+
+| R16 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 86.6 | 87.8 | 92.5 | 96.3 | 89.6 | |
+| CE+W=3 | 86.2 (-0.4) | 86.1 (-1.7) | 93.4 (+0.9) | 98.8 (+2.4) | 87.0 (-2.6) | +0.3 |
+| on-policy lr 5e-5 (prior) | 86.4 (-0.2) | 87.6 (-0.2) | 93.9 (+1.3) | 97.6 (+1.2) | 89.2 (-0.4) | +0.5 |
+| **KL T=2 winner** | 87.1 (+0.5) | 88.0 (+0.2) | 93.9 (+1.3) | 98.2 (+1.8) | 88.4 (-1.2) | **+1.0** |
+
+The winner reproduces the published 4-cell mean at R8 (+2.2 vs +2.2) with real data and no tokenizer-specific term, and it does so without the IFEval and MBPP losses the CE recipe pays; GSM8K R8 is +5.2 against the published +6.0. At R16 it is the first adapter above base on every cell except MBPP (-1.2, within that cell's run-to-run spread). MMLU and HumanEval match the CE recipe, which was that recipe's strength. This is the gemma final candidate; WritingBench runs on it once qwen is settled.
