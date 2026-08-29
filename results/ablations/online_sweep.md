@@ -6,3 +6,4 @@
 | lr1e-4 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '1e-4'} | 0.550 -> 0.535 | 87.0 | 84.4 | 86.5 | +1.9 (75/50, z=+2.2) | KEEP (new best) |
 | lr2e-4 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '2e-4'} | 0.558 -> 0.562 | | | | | STALLED (KL 0.558->0.562) |
 | lr2e-4 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '2e-4'} | 0.564 -> 0.565 | 87.9 | 84.0 | 87.0 | -0.4 (57/62, z=-0.5) | no gain |
+| klT2 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '1e-4', 'TMOE_KL_TEMP': '2'} | 1.072 -> 1.013 | 88.2 | 84.2 | 87.2 | -0.2 (64/66, z=-0.2) | no gain |
