@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CELLS = {   # name: (env, tokens, every, n); every cell has anchor 0 -- "baseline" is the reference the rest pair against
     "baseline":     ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled"}, 3400000, 16, 256),
     "lr1e-4":       ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_LR": "1e-4"}, 3400000, 16, 256),
+    "klT2":         ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_KL_TEMP": "2"}, 3400000, 16, 256),
     "temp1.0":      ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled", "TMOE_ONLINE_TEMP": "1.0"}, 3400000, 16, 256),
     "refresh8x128": ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled"}, 3400000, 8, 128),
     "budget6.8M":   ({"TMOE_ANCHOR_W": "0", "TMOE_BUDGET_ON": "sampled"}, 6800000, 16, 256),

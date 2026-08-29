@@ -196,6 +196,9 @@ def main():
     ap.add_argument("--online-smoke", default=None,
                     help="path of a parity_vllm.py dump made from the MERGED checkpoint of the adapter this "
                          "run resumes from: sync once, generate the same prompts greedily, compare tokens, exit")
+    ap.add_argument("--aux-kl-temp", type=float, default=1.0,
+                    help="KL temperature for revkl_full: teacher top-50 and student logits softened by T and "
+                         "renormalised over the top-50 support (tail term dropped for T != 1), loss x T^2")
     ap.add_argument("--aux-loss", choices=("fwdkl", "revkl", "revkl_full"), default="fwdkl",
                     help="fwdkl: teacher-weighted KL over the teacher top-50 at the student's states. "
                          "revkl: reverse KL, sampled-token estimator: loss = -sum_t A_t log p_s(y_t), "
@@ -1120,12 +1123,18 @@ def main():
                         return (p * (tlp_ - s_at)).sum()
                     def _aux_rev_full(x_, tid_, tlp_):
                         lgb = (HEAD(x_) if DEC is not None else x_).float()
-                        ls = lgb - torch.logsumexp(lgb, -1, keepdim=True)            # student log-probs [n,V]
-                        s_in = ls.gather(1, tid_)                                      # on the teacher top-50
-                        p_in = s_in.exp()
-                        m_s = (1.0 - p_in.sum(1)).clamp_min(1e-6)                      # student mass outside
-                        m_t = (1.0 - tlp_.exp().sum(1)).clamp_min(1e-6)                # teacher mass outside
-                        kl = (p_in * (s_in - tlp_)).sum(1) + m_s * (m_s.log() - m_t.log())
+                        T_ = A.aux_kl_temp
+                        if T_ == 1.0:
+                            ls = lgb - torch.logsumexp(lgb, -1, keepdim=True)        # student log-probs [n,V]
+                            s_in = ls.gather(1, tid_)                                  # on the teacher top-50
+                            p_in = s_in.exp()
+                            m_s = (1.0 - p_in.sum(1)).clamp_min(1e-6)                  # student mass outside
+                            m_t = (1.0 - tlp_.exp().sum(1)).clamp_min(1e-6)            # teacher mass outside
+                            kl = (p_in * (s_in - tlp_)).sum(1) + m_s * (m_s.log() - m_t.log())
+                        else:                          # softened, both renormalised over the top-50 support
+                            s_in = torch.log_softmax(lgb.gather(1, tid_) / T_, -1)
+                            t_in = torch.log_softmax(tlp_ / T_, -1)
+                            kl = (s_in.exp() * (s_in - t_in)).sum(1) * (T_ * T_)
                         return kl.sum(), kl.detach().sum()
                     def _aux_rev(x_, tok_, tat_):
                         lgb = (HEAD(x_) if DEC is not None else x_).float()
