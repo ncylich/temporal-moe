@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--no-hooks", action="store_true", help="plain vLLM: do not install the residency hooks (free arm only)")
     ap.add_argument("--temperature", type=float, default=0.0); ap.add_argument("--top-p", type=float, default=1.0)
     ap.add_argument("--presence-penalty", type=float, default=0.0); ap.add_argument("--seed", type=int, default=1234)
+    ap.add_argument("--max-num-seqs", type=int, default=None, help="hybrid models: must not exceed the linear-attention state blocks at small memory shares")
     A = ap.parse_args()
     if A.compare:
         a, b = (json.load(open(p)) for p in A.compare)
@@ -64,7 +65,7 @@ def main():
     qs = [r["question"] for r in load_dataset("openai/gsm8k", "main", split="test")][: A.n]
     msgs = [[{"role": "user", "content": q}] for q in qs]
     llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
-              max_model_len=A.max_model_len, enable_sleep_mode=A.sleep_mode)
+              max_model_len=A.max_model_len, enable_sleep_mode=A.sleep_mode, **({"max_num_seqs": A.max_num_seqs} if A.max_num_seqs else {}))
     if A.sleep_mode:
         llm.sleep(level=1); llm.wake_up(); print("[parity] sleep/wake cycle done", flush=True)
     if A.adapter:
