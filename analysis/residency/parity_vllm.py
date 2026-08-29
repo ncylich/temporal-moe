@@ -34,11 +34,17 @@ def main():
     ap.add_argument("--think", choices=("on", "off"), default=None)
     ap.add_argument("--out")
     ap.add_argument("--compare", nargs=2)
+    ap.add_argument("--max-model-len", type=int, default=2048)
+    ap.add_argument("--sleep-mode", action="store_true", help="enable_sleep_mode + one sleep/wake cycle before generating (what the in-process sampler does)")
+    ap.add_argument("--warm", type=int, default=4, help="prompts in the warm-up call (0 = none)")
     A = ap.parse_args()
     if A.compare:
         a, b = (json.load(open(p)) for p in A.compare)
         for arm in a["gens"]:
             same = sum(x == y for x, y in zip(a["gens"][arm], b["gens"][arm]))
+            div = [next((j for j in range(min(len(x), len(y))) if x[j] != y[j]), "len") for x, y in zip(a["gens"][arm], b["gens"][arm]) if x != y]
+            if div:
+                print(f"{arm:<5} first differing token per non-identical row: {div}")
             print(f"{arm:<5} identical {same}/{len(a['gens'][arm])}  "
                   f"tok/s {a['tps'][arm]:.0f} -> {b['tps'][arm]:.0f} ({b['tps'][arm]/a['tps'][arm]:.2f}x)  "
                   f"swaps/token {a['swaps'][arm]:.4f} -> {b['swaps'][arm]:.4f}")
@@ -53,7 +59,9 @@ def main():
     qs = [r["question"] for r in load_dataset("openai/gsm8k", "main", split="test")][: A.n]
     msgs = [[{"role": "user", "content": q}] for q in qs]
     llm = LLM(model=A.path, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem,
-              max_model_len=2048)
+              max_model_len=A.max_model_len, enable_sleep_mode=A.sleep_mode)
+    if A.sleep_mode:
+        llm.sleep(level=1); llm.wake_up(); print("[parity] sleep/wake cycle done", flush=True)
     sp = SamplingParams(temperature=0.0, max_tokens=A.max_new)
     ctk = {} if A.think is None else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}}
     res = {"gens": {}, "tps": {}, "secs": {}, "swaps": {},
@@ -61,7 +69,8 @@ def main():
     for arm in ("free", f"R{A.R}"):
         DEC.update(on=arm != "free", R=A.R, swaps=1)
         DEC["state"].clear()
-        llm.chat(msgs[:4], sp, use_tqdm=False, **ctk)          # warm (graph capture is at init)
+        if A.warm:
+            llm.chat(msgs[:A.warm], sp, use_tqdm=False, **ctk)   # warm (graph capture is at init)
         DEC["state"].clear()
         t0 = time.time()
         outs = llm.chat(msgs, sp, use_tqdm=False, **ctk)
