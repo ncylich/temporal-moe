@@ -1504,3 +1504,17 @@ The residency walker costs nothing at batch 256 (R8 = free on both models; gemma
 ### Presence penalty made cheap instead of dropped (2026-08-29 21:25)
 
 `analysis/residency/fast_penalty.py`: a vLLM V1 logits processor that keeps a persistent (max_num_seqs x vocab) 0/1 mask per batch row, adds only the newly sampled tokens each step (one small index_put_), and applies one fused `addcmul_` on the fp32 logits, at the same point in the sampler pipeline as the native penalty and with the same rule (output tokens only). One trap found on the way: vLLM appends a `-1` placeholder to a request's output list for the token being sampled and fills it in afterwards; the first version consumed the placeholder and then never masked the real token (greedy identity 3/64). With placeholders skipped: sampled batch 256, seed 1234, temperature 0.7 / top-p 0.8 / pp 1.5, free arm **256/256 generations identical** to native at 3942 vs 2188 tok/s (1.80x; 5% below no-penalty); R8 245/256 with all 11 divergences after token 630, the known CUDA-graph-mode run-to-run nondeterminism of the residency path. `vllm_glue.install()` now rewrites any `presence_penalty > 0` handed to `LLM.generate/chat` into the fast processor (`TEMPORAL_FAST_PP=1`, default), so the on-policy sampler keeps qwen's card recipe and the evals get the same speedup through lm-eval unchanged.
+
+### Qwen at speed parity with gemma (2026-08-29 21:47)
+
+Final harness (32 real on-policy steps, two 256-row refreshes), card recipe on (temperature 0.7, top-p 0.8, presence penalty 1.5 via the fast processor), fla fast path, sampler at a 0.65 memory share with 20 layers offloaded:
+
+| | qwen at start of the day | qwen now | gemma |
+|---|---|---|---|
+| train step (median) | ~28 s | 8.6 s | 7.6 s |
+| sampling, warm | ~1000 tok/s | 5251 tok/s | 3500 tok/s |
+| refresh total, warm | 225 s | 56 s | 71 s |
+| cycle = 16 steps + refresh | ~680 s | 194 s | 193 s |
+| full 3.4M run | ~4.3 h | ~55 min | 57 min |
+
+Three fixes, each measured: the missing `flash-linear-attention` fast path in the HF trainer (3.3x on the step), KV preemption in the sampler at a 0.55 share (1.7x on sampling), and vLLM's native presence-penalty path (1.8x on sampling, now the persistent-mask processor with identical output). Sample statistics are unchanged throughout (mean length ~800, cap-hit ~53%). The qwen lr ablation (3e-5 vs 6e-5 with the winning recipe, then 1e-4 if 6e-5 wins) restarts at this speed.
