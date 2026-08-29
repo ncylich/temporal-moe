@@ -1465,3 +1465,12 @@ Same adapter (KL T=2 on lr 1e-4), full surface at rho=0 vs rho=0.5, swap rate me
 | R16 | 87.1 -> 87.3 (+0.2) | 88.0 -> 89.5 (+1.5) | 93.9 -> 93.9 | 98.2 -> 97.6 (-0.6) | 88.4 -> 87.8 (-0.6) | +1.0 -> +1.2 | 1.000 -> 0.992 |
 
 Same picture as on the base: quality flat within noise (GSM8K identical, the other moves inside their cells' spread and in both directions) for a 2% swap saving at R8 and 1% at R16. With min-logit eviction the deadband at rho=0.5 is not a useful lever on gemma; the earlier sweep showed the saving only becomes material approaching the rho=2.0 cliff, where quality breaks. Conclusion for the paper's speed axis: report the swap rate at rho=0 (about 1.0/token at R8 and R16 with min-logit) and treat the deadband as a measured negative, not a knob. The adapter runs at rho=0.
+
+## Why qwen trained 4.5x slower than gemma, and the fix (2026-08-29 19:50)
+
+Per refresh cycle (16 optimizer steps + one 256-row refresh) gemma took about 200 s and qwen about 680 s. Two causes, both in the log of the first qwen run:
+
+1. Trainer: transformers printed "The fast path is not available because one of the required library is not installed. Falling back to torch implementation". The venv had no `flash-linear-attention`, so qwen's gated-delta-net layers ran a pure-torch chunk loop during training (vLLM has its own kernels, so sampling and evals were unaffected). Installed `flash-linear-attention` (the venv had no pip; bootstrapped with ensurepip). Check: `chunk_gated_delta_rule` vs the torch fallback on a B2/T512/H32 problem, max |d| 7e-4 at an output scale of 3e-3 (bf16 level), 0.8 ms vs 5.9 ms per call.
+2. Sampler: at a 0.55 memory share the engine had 166,826 KV tokens, but 256 concurrent rows at about 900 tokens each need about 230k, so vLLM was preempting and recomputing sequences; measured 950-1060 tok/s against gemma's 4400. The sampler now runs at 0.65 with 20 layers of expert base weights offloaded (trainer about 38 GB + engine about 91 GB on the 140 GB card).
+
+The lr 3e-5 run was restarted from scratch with both fixes (40 min lost); the new per-step and per-refresh timings are recorded below when they land.
