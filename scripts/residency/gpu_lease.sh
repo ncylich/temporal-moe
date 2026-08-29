@@ -12,18 +12,22 @@ G=${CUDA_VISIBLE_DEVICES:-0}
 if [ "${TMOE_LEASE_HELD:-}" = "$G" ]; then
   exec "$@"
 fi
-LOCK=/var/lock/tmoe_gpu${G}.lease; Q=/var/lock/tmoe_gpu${G}.q
+LOCK=/var/lock/tmoe_gpu${G}.lease; Q=/var/lock/tmoe_gpu${G}.q; PAUSE=/var/lock/tmoe_gpu${G}.paused; HOLDER=/var/lock/tmoe_gpu${G}.holder
 mkdir -p /var/lock "$Q"
 PRIO=${TMOE_PRIO:-5}
 TICKET="$Q/$(printf '%02d' "$PRIO")-$(date +%s%N)-$$"
 : > "$TICKET"
 trap 'rm -f "$TICKET"' EXIT
 exec {fd}>"$LOCK"
+# ticket = one line describing the waiter (tmoe_queue.sh list shows it)
+printf '%s\n' "$*" > "$TICKET"
 while :; do
+  if [ -e "$PAUSE" ]; then sleep 3; continue; fi                  # queue paused: nothing new starts
   first=$(for f in "$Q"/*; do [ -e "$f" ] || continue; p=${f##*-}; if kill -0 "$p" 2>/dev/null; then echo "$f"; else rm -f "$f"; fi; done | sort | head -1)
   if [ "$first" = "$TICKET" ] && flock -n "$fd"; then break; fi
   sleep 3
 done
+printf '%s %s %s\n' "$(basename "$TICKET")" "$$" "$*" > "$HOLDER"; trap 'rm -f "$TICKET" "$HOLDER"' EXIT
 for i in $(seq 1 90); do
   [ "${TMOE_LEASE_NOMEM:-}" = 1 ] && { free=999999; break; }     # tests: skip the memory wait
   # host RAM guard: the container limit is ~251 GB and /dev/shm counts; a model load or a
