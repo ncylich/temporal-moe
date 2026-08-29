@@ -175,23 +175,37 @@ def main():
     vm = find_engine_model(llm); vp = dict(vm.named_parameters())
     from safetensors import safe_open
     import glob
-    ck = {}
+    # Stream: index name -> file, fetch tensors per engine param and free them. Holding the
+    # whole textified checkpoint (70 GB, per-expert) plus fused copies took the container to
+    # 187 of 233 GiB on 2026-08-29 and had to be killed.
+    idx, handles = {}, {}
     for f in glob.glob(f"{A.check}/*.safetensors"):
-        with safe_open(f, "pt", device="cpu") as fh:
-            for k in fh.keys():
-                if "vision" not in k:
-                    ck[k] = fh.get_tensor(k)
-    import collections
-    per = collections.defaultdict(dict)
-    for k in list(ck):
-        m = re.match(r"(model\.(?:language_model\.)?layers\.\d+\.mlp\.experts)\.(\d+)\.(gate|up|down)_proj\.weight$", k)
-        if m:
-            per[m.group(1)].setdefault(int(m.group(2)), {})[m.group(3)] = ck[k]
-    for pre_, ex in per.items():                            # textified per-expert -> fused
-        E = max(ex) + 1
-        gu = torch.stack([torch.cat([ex[e]["gate"], ex[e]["up"]], 0) for e in range(E)])   # (E,2I,H)
-        dn = torch.stack([ex[e]["down"] for e in range(E)])                                # (E,H,I)
-        ck[pre_ + ".gate_up_proj"] = gu; ck[pre_ + ".down_proj"] = dn
+        handles[f] = safe_open(f, "pt", device="cpu")
+        for k in handles[f].keys():
+            idx[k] = f
+    def fetch(k):
+        return handles[idx[k]].get_tensor(k) if k in idx else None
+    class _CK(dict):                                        # dict-like view over the index
+        def __contains__(self, k):
+            return k in idx
+        def get(self, k, default=None):
+            v = fetch(k)
+            if v is not None:
+                return v
+            m = re.match(r"(model\.(?:language_model\.)?layers\.\d+\.mlp\.experts)\.(gate_up|down)_proj$", k)
+            if not m:
+                return default
+            pre_, kind = m.groups()
+            E = 0
+            while f"{pre_}.{E}.down_proj.weight" in idx:
+                E += 1
+            if E == 0:
+                return default
+            if kind == "gate_up":
+                return torch.stack([torch.cat([fetch(f"{pre_}.{e}.gate_proj.weight"),
+                                               fetch(f"{pre_}.{e}.up_proj.weight")], 0) for e in range(E)])
+            return torch.stack([fetch(f"{pre_}.{e}.down_proj.weight") for e in range(E)])
+    ck = _CK()
     worst, n = 0.0, 0
     for name, p in vp.items():
         m = re.search(r"layers\.(\d+)\.(.*)$", name)
@@ -209,9 +223,13 @@ def main():
         elif tail.endswith("router.proj.weight"):
             want = ck.get(pre + "router.proj.weight")
         elif "w13" in tail:
-            want = ck.get(pre + "experts.gate_up_proj") or ck.get(pre + "mlp.experts.gate_up_proj")
+            want = ck.get(pre + "mlp.experts.gate_up_proj")
+            if want is None:
+                want = ck.get(pre + "experts.gate_up_proj")
         elif "w2" in tail and "experts" in tail:
-            want = ck.get(pre + "experts.down_proj") or ck.get(pre + "mlp.experts.down_proj")
+            want = ck.get(pre + "mlp.experts.down_proj")
+            if want is None:
+                want = ck.get(pre + "experts.down_proj")
         elif tail.endswith("mlp.gate.weight"):
             want = ck.get(pre + "mlp.gate.weight")
         elif tail.endswith("norm.weight"):
