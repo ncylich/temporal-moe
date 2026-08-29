@@ -1021,6 +1021,22 @@ def main():
                           f"mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
                 dump_ = A.online_smoke.replace(".json", f"_inprocess_{arm}.json")
                 _json.dump({"gens": gens, "prompt_lens": [r["prompt_len"] for r in rows_]}, open(dump_, "w"))
+            # Which vLLM class is faithful to HF? Score each reference's free-arm tokens with the HF model
+            # (adapter on, no residency) and compare with the reference engine's own decode logprobs.
+            import os as _os
+            for rp in [A.online_smoke] + [x for x in _os.environ.get("TMOE_SMOKE_HF_REFS", "").split(":") if x]:
+                rj = _json.load(open(rp))
+                if not rj.get("lps"):
+                    continue
+                rows_h = []
+                for q_, g_ in zip(qs, rj["gens"]["free"]):
+                    enc_ = SAMPLER.tok.apply_chat_template([{"role": "user", "content": q_}], add_generation_prompt=True,
+                                                          tokenize=True, return_dict=True)
+                    p_ = list(enc_["input_ids"]); rows_h.append({"ids": torch.tensor(p_ + list(g_), dtype=torch.int32), "prompt_len": len(p_)})
+                out_h = teacher_ref(rows_h, adapted=False)
+                d_ = [abs(a_ - b_) for i_ in range(len(rows_h)) for a_, b_ in zip(out_h[i_][2].tolist(), rj["lps"]["free"][i_])]
+                print(f"[online-smoke] HF (adapter on, free) vs {_os.path.basename(rp)} decode logprobs: "
+                      f"max |dlogprob| {max(d_):.4f}, mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
             SAMPLER.sleep()
             return
     step0 = step
