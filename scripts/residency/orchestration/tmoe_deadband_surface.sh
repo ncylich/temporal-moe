@@ -30,8 +30,10 @@ if [ "$MODEL" = gemma ]; then
   $L $PY -u analysis/residency/humaneval_gemma.py --path $M $ADAPTER --arms $ARMS --tag ${TAG}_he8192 --max-tokens 8192 --max-model-len 9216
   echo "### $TAG MBPP@8192 $(date -u +%H:%M)"
   $L $PY -u analysis/residency/mbpp_gemma.py --path $M $ADAPTER --arms $ARMS --tag ${TAG}_m8192 --max-tokens 8192 --max-model-len 9216 --gpu-mem 0.90
-  echo "### $TAG WritingBench $(date -u +%H:%M)"
-  export GPU=0 TMOE_ADAPTER="${ADAPTER#--adapter }"; $L scripts/residency/wb_arm.sh $M $TAG R8,R16
+  if [ "${TMOE_WB:-0}" = 1 ]; then      # WritingBench only for the final version: ~30 min, ~0 signal (base R8 -0.073/10)
+    echo "### $TAG WritingBench $(date -u +%H:%M)"
+    export GPU=0 TMOE_ADAPTER="${ADAPTER#--adapter }"; $L scripts/residency/wb_arm.sh $M $TAG R8,R16
+  else echo "### $TAG WritingBench skipped (TMOE_WB=1 to include)"; fi
 else
   ARMS=R8,R32; Q="--model qwen35_instruct --path $M --arms $ARMS --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5"
   echo "### $TAG GSM8K n=1319 $(date -u +%H:%M)"
