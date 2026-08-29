@@ -1014,6 +1014,11 @@ def main():
                     k_ = next((j for j in range(min(len(g), len(rg))) if g[j] != rg[j]), None)
                     if g != rg:
                         print(f"[online-smoke]   {arm} row {i_}: first differing token at {k_} (lens {len(g)} vs {len(rg)}; prompt_len {rows_[i_]['prompt_len']})", flush=True)
+                if arm == "free" and ref.get("lps"):        # distribution-level parity: logprob of the reference tokens here vs there
+                    lp_ = SAMPLER.score(qs, ref["gens"]["free"], constrained=False)
+                    d_ = [abs(a_ - b_) for la, lb in zip(lp_, ref["lps"]["free"]) for a_, b_ in zip(la, lb)]
+                    print(f"[online-smoke] free logprob parity on the reference tokens: max |dlogprob| {max(d_):.4f}, "
+                          f"mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
                 dump_ = A.online_smoke.replace(".json", f"_inprocess_{arm}.json")
                 _json.dump({"gens": gens, "prompt_lens": [r["prompt_len"] for r in rows_]}, open(dump_, "w"))
             SAMPLER.sleep()

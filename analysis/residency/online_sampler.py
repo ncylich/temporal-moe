@@ -201,6 +201,18 @@ class OnlineSampler:
                   f"digit chars {100*dig:.1f}%, '=' per row {eq:.1f}", flush=True)
         return rows
 
+    def score(self, prompts, gens, constrained=False):
+        """Per-token logprobs of given generations under the current engine (teacher-forced via prompt_logprobs)."""
+        self.DEC.update(on=constrained, R=self.R, swaps=self.swaps); self.DEC["state"].clear()
+        sp = self.SamplingParams(max_tokens=1, prompt_logprobs=0, temperature=0.0)
+        ids, plens = [], []
+        for t, g in zip(prompts, gens):
+            enc = self.tok.apply_chat_template([{"role": "user", "content": t}], add_generation_prompt=True,
+                                               tokenize=True, return_dict=True)
+            p_ = list(enc["input_ids"]); ids.append(p_ + list(g)); plens.append(len(p_))
+        outs = self.llm.generate([{"prompt_token_ids": x} for x in ids], sp, use_tqdm=False)
+        return [[o.prompt_logprobs[j][x[j]].logprob for j in range(pl, len(x))] for o, x, pl in zip(outs, ids, plens)]
+
     def sleep(self):
         self.llm.sleep(level=1)
         torch.cuda.empty_cache()

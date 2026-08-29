@@ -62,9 +62,9 @@ def main():
               max_model_len=A.max_model_len, enable_sleep_mode=A.sleep_mode)
     if A.sleep_mode:
         llm.sleep(level=1); llm.wake_up(); print("[parity] sleep/wake cycle done", flush=True)
-    sp = SamplingParams(temperature=0.0, max_tokens=A.max_new)
+    sp = SamplingParams(temperature=0.0, max_tokens=A.max_new, logprobs=0)   # logprobs=0: the chosen token's logprob
     ctk = {} if A.think is None else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}}
-    res = {"gens": {}, "tps": {}, "secs": {}, "swaps": {},
+    res = {"gens": {}, "lps": {}, "tps": {}, "secs": {}, "swaps": {},
            "cfg": {k: os.environ.get(k) for k in ("TEMPORAL_WALKER", "TEMPORAL_EAGER", "TEMPORAL_RHO")}}
     for arm in ("free", f"R{A.R}"):
         DEC.update(on=arm != "free", R=A.R, swaps=1)
@@ -76,6 +76,7 @@ def main():
         outs = llm.chat(msgs, sp, use_tqdm=False, **ctk)
         secs = time.time() - t0
         gens = [list(o.outputs[0].token_ids) for o in outs]
+        res["lps"][arm] = [[d[t].logprob for t, d in zip(o.outputs[0].token_ids, o.outputs[0].logprobs)] for o in outs]
         ntok = sum(len(g) for g in gens)
         sw, rows, rate = TR.swap_stats()
         res["gens"][arm] = gens; res["secs"][arm] = secs; res["tps"][arm] = ntok / secs
