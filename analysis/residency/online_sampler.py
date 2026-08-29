@@ -53,6 +53,7 @@ class OnlineSampler:
         # awake, the frozen expert base weights of the first `offload_layers` layers live on the host
         # (1.6 GB/layer); they come back before training resumes. The merge reads them through .to(cuda).
         self.offload_layers = offload_layers
+        self.model = model
         self.dev = next(model.parameters()).device
         self._offload()
         import vllm_glue
