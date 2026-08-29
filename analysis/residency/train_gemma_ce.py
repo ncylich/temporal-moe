@@ -194,6 +194,7 @@ def main():
                          "With --kl-only and no --kl-anchor, 'sampled' also skips the D7 walk entirely")
     ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
     ap.add_argument("--log-every", type=int, default=50, help="steps between [gce] step lines (each also reports the window's wall time per step)")
+    ap.add_argument("--online-presence-penalty", type=float, default=0.0, help="sampler presence penalty (qwen card: 1.5; halves vLLM throughput)")
     ap.add_argument("--online-offload", type=int, default=0,
                     help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 12)")
     ap.add_argument("--online-smoke", default=None,
@@ -957,7 +958,7 @@ def main():
         from online_sampler import OnlineSampler
         SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
                                 max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed,
-                                arch=A.family, temperature=A.online_temp, offload_layers=A.online_offload)
+                                arch=A.family, temperature=A.online_temp, offload_layers=A.online_offload, presence_penalty=A.online_presence_penalty)
         if A.online_smoke:
             import json as _json
             from datasets import load_dataset as _ld
