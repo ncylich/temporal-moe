@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # After the gemma winner surface: deadband surfaces, then the qwen lr ablation (the only qwen ablation):
+# (fla fast path installed 19:45; sampler at 0.65 memory share / 20 layers offloaded to avoid KV preemption)
 # lr 3e-5 (qwen's original) and 6e-5 (scaled by gemma's 1e-4/5e-5), both with the winning recipe
 # (KL T=2, 16x256, 3.4M sampled tokens, anchor 0, temp 0.7). Pick by paired R8 vs the raw-class base,
 # then the full surface (no WritingBench) on the pick.
@@ -9,7 +10,7 @@ export TMOE_PRIO=4
 # deadband base rho=0.5: done 18:30 (flat, swaps -2%); deadband on W=3 dropped, the winner runs under rho=0.5 separately
 for LR in 3e-5 6e-5; do
   echo "### qwen-lr 3/5 qwen on-policy from scratch, lr $LR, KL T=2 $(date -u +%H:%M)"
-  TMOE_LR=$LR TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_NAME_SUFFIX=_klT2_lr$LR bash /workspace/tmoe_qwen_online.sh scratch 3400000 16 256 > /workspace/rerun-logs/qwen_online_klT2_lr$LR.out 2>&1
+  TMOE_LR=$LR TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_ONLINE_MEM=0.65 TMOE_ONLINE_OFFLOAD=20 TMOE_NAME_SUFFIX=_klT2_lr$LR bash /workspace/tmoe_qwen_online.sh scratch 3400000 16 256 > /workspace/rerun-logs/qwen_online_klT2_lr$LR.out 2>&1
   echo "### qwen-lr 3/5 lr $LR done rc=$? $(date -u +%H:%M)"
 done
 pick() {   # best lr by paired R8 z vs the raw-class base among the completed runs given as arguments
@@ -36,7 +37,7 @@ echo "### qwen-lr 4/5 pick among 3e-5, 6e-5 $(date -u +%H:%M)"
 PICK=$(pick 3e-5 6e-5)
 if [ "$PICK" = 6e-5 ]; then      # the scaled lr won: one more step up, then stop (user rule)
   echo "### qwen-lr 3/5 qwen on-policy from scratch, lr 1e-4, KL T=2 (6e-5 beat 3e-5) $(date -u +%H:%M)"
-  TMOE_LR=1e-4 TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_NAME_SUFFIX=_klT2_lr1e-4 bash /workspace/tmoe_qwen_online.sh scratch 3400000 16 256 > /workspace/rerun-logs/qwen_online_klT2_lr1e-4.out 2>&1
+  TMOE_LR=1e-4 TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_ONLINE_MEM=0.65 TMOE_ONLINE_OFFLOAD=20 TMOE_NAME_SUFFIX=_klT2_lr1e-4 bash /workspace/tmoe_qwen_online.sh scratch 3400000 16 256 > /workspace/rerun-logs/qwen_online_klT2_lr1e-4.out 2>&1
   echo "### qwen-lr 3/5 lr 1e-4 done rc=$? $(date -u +%H:%M)"
   PICK=$(pick 3e-5 6e-5 1e-4)
 fi
