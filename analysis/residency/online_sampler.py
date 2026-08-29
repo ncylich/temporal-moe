@@ -45,9 +45,16 @@ def _hf_name(param_or_module_name, suffix=""):
 
 class OnlineSampler:
     def __init__(self, model, base_path, R, swaps, prompts_path, quota, max_new=1024,
-                 gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4", temperature=0.7, top_p=0.8):
+                 gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4", temperature=0.7, top_p=0.8,
+                 offload_layers=0):
         assert arch in ("gemma4", "qwen35"), arch
         self.arch = arch
+        # qwen35: trainer (70 GB) + engine weights (66 GB) exceed the 140 GB GPU. While the engine is
+        # awake, the frozen expert base weights of the first `offload_layers` layers live on the host
+        # (1.6 GB/layer); they come back before training resumes. The merge reads them through .to(cuda).
+        self.offload_layers = offload_layers
+        self.dev = next(model.parameters()).device
+        self._offload()
         import vllm_glue
         import vllm_residency  # noqa: F401
         from decode_state import DEC
@@ -80,8 +87,31 @@ class OnlineSampler:
         self.SamplingParams = SamplingParams
         self.n_refresh = 0
         self.llm.sleep(level=1)
+        self._restore()
         print(f"[online] engine up and asleep in {time.time()-t0:.0f}s; {len(self.prompts)} prompts "
               f"(quota {quota}); sampling R={R} swaps={swaps}", flush=True)
+
+    def _expert_mods(self):
+        return [m for m in self.model.modules() if hasattr(m, "elora_gu_A")]
+
+    def _offload(self):
+        if not self.offload_layers:
+            return
+        t0 = time.time()
+        for m in self._expert_mods()[:self.offload_layers]:
+            for a in ("gate_up_proj", "down_proj"):
+                t = getattr(m, a); t.data = t.data.to("cpu")
+        torch.cuda.empty_cache()
+        print(f"[online] offloaded {self.offload_layers} layers of expert base weights to host in {time.time()-t0:.1f}s", flush=True)
+
+    def _restore(self):
+        if not self.offload_layers:
+            return
+        for m in self._expert_mods():
+            for a in ("gate_up_proj", "down_proj"):
+                t = getattr(m, a)
+                if not t.data.is_cuda:
+                    t.data = t.data.to(self.dev)
 
     def _find_model(self):
         cands = ["llm_engine.engine_core.engine_core.model_executor.driver_worker.worker.model_runner.model",
@@ -111,8 +141,9 @@ class OnlineSampler:
                 if hasattr(mod, "elora_gu_A"):
                     base = self._name(mod_names[id(mod)])
                     s = mod.elora_scale
-                    gu = mod.gate_up_proj.data + s * torch.bmm(mod.elora_gu_A.data, mod.elora_gu_B.data)   # (E,H,2I)
-                    dp = mod.down_proj.data + s * torch.bmm(mod.elora_dp_A.data, mod.elora_dp_B.data)      # (E,I,H)
+                    dev = mod.elora_gu_A.device
+                    gu = mod.gate_up_proj.data.to(dev) + s * torch.bmm(mod.elora_gu_A.data, mod.elora_gu_B.data)   # (E,H,2I)
+                    dp = mod.down_proj.data.to(dev) + s * torch.bmm(mod.elora_dp_A.data, mod.elora_dp_B.data)      # (E,I,H)
                     yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
                     yield base + ".down_proj", dp.transpose(1, 2).contiguous()
                     del gu, dp
@@ -131,6 +162,7 @@ class OnlineSampler:
                     yield hf, p.data
 
     def sync(self):
+        self._offload()
         torch.cuda.empty_cache()
         t0 = time.time(); self.llm.wake_up(); t1 = time.time()
         loaded = self.vmodel.load_weights(self._pairs())
@@ -171,6 +203,7 @@ class OnlineSampler:
     def sleep(self):
         self.llm.sleep(level=1)
         torch.cuda.empty_cache()
+        self._restore()
 
     def refresh(self, n):
         """sync -> sample n rows from the current adapter -> sleep. Returns trainer rows."""

@@ -22,7 +22,7 @@ echo "### qwen-$NAME 1/2 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T)
 [ -f $A.done ] || { [ -n "$INIT" ] && cp $D/qwen_ce_${START}_adapter.pt $A
   $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
     $CE_ARGS --kl-anchor $KL --kl-weight 0.1 --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
-    --online-every $EVERY --online-n $N --online-max-new 1024 --online-gpu-mem ${TMOE_ONLINE_MEM:-0.45}
+    --online-every $EVERY --online-n $N --online-max-new 1024 --online-gpu-mem ${TMOE_ONLINE_MEM:-0.55} --online-offload ${TMOE_ONLINE_OFFLOAD:-20}
   touch $A.done; }
 echo "### qwen-$NAME 2/2 GSM8K n=1319 via apply_adapter $(date -u +%H:%M)"
 $L $PY -u analysis/residency/instruct_genbench_vllm.py --model qwen35_instruct --path $B --adapter $A --arms free,R8,R32 --think off \

@@ -193,6 +193,8 @@ def main():
                     help="what --tokens counts: the D7 rows walked (data) or the on-policy tokens trained on (sampled). "
                          "With --kl-only and no --kl-anchor, 'sampled' also skips the D7 walk entirely")
     ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
+    ap.add_argument("--online-offload", type=int, default=0,
+                    help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 20)")
     ap.add_argument("--online-smoke", default=None,
                     help="path of a parity_vllm.py dump made from the MERGED checkpoint of the adapter this "
                          "run resumes from: sync once, generate the same prompts greedily, compare tokens, exit")
@@ -954,7 +956,7 @@ def main():
         from online_sampler import OnlineSampler
         SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
                                 max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed,
-                                arch=A.family, temperature=A.online_temp)
+                                arch=A.family, temperature=A.online_temp, offload_layers=A.online_offload)
         if A.online_smoke:
             import json as _json
             from datasets import load_dataset as _ld

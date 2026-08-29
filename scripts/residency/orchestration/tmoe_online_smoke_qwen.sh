@@ -11,5 +11,5 @@ echo "### qwen smoke 2/2 trainer + in-process engine, sync, greedy $(date -u +%H
 cp /workspace/olmoe-adapt/data/qwen_ce_digit3_adapter.pt /tmp/smoke_qwen_adapter.pt
 $L $PY -u analysis/residency/train_gemma_ce.py --model /root/models/qwen35-35b-a3b --family qwen35 --no-unsloth --traj qwen35_d7_seq4096 --max-seq 4096 \
   --expert-lora-r 16 --opt adamw --micro-batch 16 --out /tmp/smoke_qwen_adapter.pt --resume --tokens 1 \
-  --online-every 16 --online-n 32 --online-gpu-mem 0.45 --online-smoke $S/ref_qwen_digit3_eager.json
+  --online-every 16 --online-n 32 --online-gpu-mem 0.55 --online-offload 20 --online-smoke $S/ref_qwen_digit3_eager.json
 echo "### qwen smoke DONE rc=$? $(date -u +%H:%M)"
