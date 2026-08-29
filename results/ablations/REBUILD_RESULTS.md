@@ -1518,3 +1518,15 @@ Final harness (32 real on-policy steps, two 256-row refreshes), card recipe on (
 | full 3.4M run | ~4.3 h | ~55 min | 57 min |
 
 Three fixes, each measured: the missing `flash-linear-attention` fast path in the HF trainer (3.3x on the step), KV preemption in the sampler at a 0.55 share (1.7x on sampling), and vLLM's native presence-penalty path (1.8x on sampling, now the persistent-mask processor with identical output). Sample statistics are unchanged throughout (mean length ~800, cap-hit ~53%). The qwen lr ablation (3e-5 vs 6e-5 with the winning recipe, then 1e-4 if 6e-5 wins) restarts at this speed.
+
+## Qwen on-policy at full budget, lr 3e-5 (2026-08-29 22:54)
+
+Standing recipe (analytic reverse KL, anchor 0, KL T=2, 16x256, 3.4M sampled tokens, temp 0.7, card presence penalty via the fast processor), qwen's original lr 3e-5, raw class + adapter-direct eval (no class confound). Training 56 min, eval 10 min. GSM8K n=1319, paired vs the raw-class base:
+
+| arm | base | digit10 (merged, text class; confounded) | lr 3e-5, KL T=2 | paired vs base |
+|---|---|---|---|---|
+| free | 85.9 | 87.1 (+1.2) | 86.9 (+1.0) | 35/22, z=+1.7 |
+| R8 | 76.6 | 82.0 (+5.4) | 83.2 (+6.5) | 139/53, z=+6.2 |
+| R32 | 79.8 | 85.1 (+5.3) | 85.4 (+5.6) | 112/38, z=+6.0 |
+
+R8 +6.5 equals the published qwen figure, with real prompts, no tokenizer-specific term, no merged-checkpoint class artefact, and no free-arm tax. The lr 6e-5 cell (and 1e-4 if 6e-5 wins) follows; the pick gets the full surface.
