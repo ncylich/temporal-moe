@@ -8,3 +8,4 @@
 | lr2e-4 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '2e-4'} | 0.564 -> 0.565 | 87.9 | 84.0 | 87.0 | -0.4 (57/62, z=-0.5) | no gain |
 | klT2 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '1e-4', 'TMOE_KL_TEMP': '2'} | 1.072 -> 1.013 | 88.2 | 84.2 | 87.2 | -0.2 (64/66, z=-0.2) | no gain |
 | temp1.0 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '1e-4', 'TMOE_ONLINE_TEMP': '1.0'} | 0.553 -> 0.527 | 87.5 | 82.6 | 85.8 | -1.8 (46/70, z=-2.2) | no gain |
+| refresh8x128 | {'TMOE_ANCHOR_W': '0', 'TMOE_BUDGET_ON': 'sampled', 'TMOE_LR': '1e-4'} | 0.552 -> 0.517 | 85.9 | 84.0 | 86.1 | -0.4 (51/56, z=-0.5) | no gain |
