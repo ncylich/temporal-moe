@@ -1301,3 +1301,18 @@ fixed by the analytic from-scratch result. Runner: `analysis/residency/sweep_onl
 table: `results/ablations/online_sweep.md`. Per-refresh sample stats (mean length, cap-hit,
 digit share, '=' per row) are now logged so a knob that changes the student's behaviour is
 visible before the eval.
+
+## Analytic reverse KL from scratch: identical to the sampled-token estimator and to W=3 (2026-08-29 01:20)
+
+| arm | base | W=3 (CE) | scratch sampled-token | scratch analytic |
+|---|---|---|---|---|
+| free | 87.8 | -1.1 | -0.3 | -0.9 |
+| R8 | 78.8 | +3.6 | +3.1 | +3.7 |
+| R16 | 86.6 | -0.4 | +0.4 | -0.2 |
+
+Analytic vs sampled-token (paired): R8 +0.6 (85/77, z=0.6), free -0.6 (z=-1.3), R16 -0.6
+(z=-1.2). Analytic vs W=3: +0.2 on each arm (z=0.2). Same cost (80 min for 3.4M). Analytic
+reverse-KL trace 0.550 / 0.518 / 0.518 / 0.506 at steps 50-200 (the sampled-token estimate
+was flat at ~0.37). Three recipes now stop at R8 82.3 +/- 0.3 at this budget and learning
+rate; the sweep (analytic estimator, anchor 0 baseline, then lr, temperature, refresh,
+budget) starts from here.
