@@ -193,6 +193,7 @@ def main():
                     help="what --tokens counts: the D7 rows walked (data) or the on-policy tokens trained on (sampled). "
                          "With --kl-only and no --kl-anchor, 'sampled' also skips the D7 walk entirely")
     ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
+    ap.add_argument("--log-every", type=int, default=50, help="steps between [gce] step lines (each also reports the window's wall time per step)")
     ap.add_argument("--online-offload", type=int, default=0,
                     help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 12)")
     ap.add_argument("--online-smoke", default=None,
@@ -1215,9 +1216,10 @@ def main():
         torch.nn.utils.clip_grad_norm_(train_params, 1.0)
         opt.step()
         step += 1; aux_steps += 1
-        if step % 50 == 0:
+        if step % A.log_every == 0:
+            now_ = time.time(); w_ = now_ - globals().get("_T_LAST_LOG", t0); globals()["_T_LAST_LOG"] = now_
             print(f"[gce] step {step} seen {seen/1e6:.2f}M loss {loss.item()*accum_batches:.4f} "
-                  f"({seen/(time.time()-t0):.0f} tok/s)", flush=True)
+                  f"({seen/(now_-t0):.0f} tok/s) window {w_/A.log_every:.1f} s/step", flush=True)
             if AUX is not None:
                 if A.aux_loss in ("revkl", "revkl_full"):
                     print(f"[gce] aux-{A.aux_loss} loss {aux_tot/max(1,aux_steps):.4f}; reverse-KL estimate {aux_est/max(1,aux_steps):.4f} nats/tok "
