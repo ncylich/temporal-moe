@@ -1474,3 +1474,17 @@ Per refresh cycle (16 optimizer steps + one 256-row refresh) gemma took about 20
 2. Sampler: at a 0.55 memory share the engine had 166,826 KV tokens, but 256 concurrent rows at about 900 tokens each need about 230k, so vLLM was preempting and recomputing sequences; measured 950-1060 tok/s against gemma's 4400. The sampler now runs at 0.65 with 20 layers of expert base weights offloaded (trainer about 38 GB + engine about 91 GB on the 140 GB card).
 
 The lr 3e-5 run was restarted from scratch with both fixes (40 min lost); the new per-step and per-refresh timings are recorded below when they land.
+
+### Speed harness after the fixes (2026-08-29 20:17)
+
+`tmoe_speed.sh`: the real on-policy path for 32 steps with two 256-row refreshes, per-4-step timing, same settings on both models (KL T=2, 16x256, micro-batch 16).
+
+| | qwen before | qwen now | gemma |
+|---|---|---|---|
+| train step (median) | ~28 s | 8.6 s | 7.6 s |
+| sampling, warm | ~1000 tok/s | 2121 tok/s | 3500 tok/s |
+| refresh total, warm | 225 s | 125 s | 71 s |
+| cycle = 16 steps + refresh | ~680 s | 263 s | 193 s |
+| full 3.4M run | ~4.3 h | ~75 min | 57 min |
+
+Qwen went from 3.4x to 1.36x gemma per cycle. The training step is within 13%; the residual is the sampler at 1.65x per token. `causal-conv1d` does not build against torch 2.13 / CUDA 13; its torch fallback is a depthwise conv and not a measurable cost. The next probe isolates our own share of the sampler gap (walker on vs off at batch 256).
