@@ -21,6 +21,12 @@ PY
 export TMOE_PRIO=4 TMOE_AUX_LOSS=revkl_full
 echo "### post-sweep queue: best=$BEST adapter=$ADAPTER tokens=$TOKENS every=$EVERY n=$N lr=${TMOE_LR:-} klT=${TMOE_KL_TEMP:-1.0} temp=${TMOE_ONLINE_TEMP:-0.7} $(date -u +%H:%M)"
 [ -f "$ADAPTER" ] || { echo "### post-sweep queue: winner adapter missing: $ADAPTER"; exit 2; }
+echo "### post-sweep 0/4 qwen class confound: textified raw base (text class) GSM8K free,R8 n=1319 vs the raw-class base $(date -u +%H:%M)"
+until grep -q "\[textify\] done" /workspace/rerun-logs/textify_qwen_base.out 2>/dev/null; do sleep 60; done
+scripts/residency/gpu_lease.sh /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py --model qwen35_instruct --path /root/models/qwen35-base-text \
+  --arms free,R8 --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5 --record-as qwen35_instruct_textclass_n1319 \
+  --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90 > /workspace/rerun-logs/qwen_textclass_base.out 2>&1
+echo "### post-sweep 0/4 done rc=$? $(date -u +%H:%M)"
 echo "### post-sweep 1/4 qwen on-policy from scratch $(date -u +%H:%M)"
 bash /workspace/tmoe_qwen_online.sh scratch $TOKENS $EVERY $N > /workspace/rerun-logs/qwen_online_scratch.out 2>&1
 echo "### post-sweep 2/4 gemma full surface on the winner (no WB) $(date -u +%H:%M)"
