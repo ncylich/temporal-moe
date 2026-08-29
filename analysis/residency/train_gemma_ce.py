@@ -946,7 +946,8 @@ def main():
     if A.online_every:
         from online_sampler import OnlineSampler
         SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
-                                max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed)
+                                max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed,
+                                arch=A.family)
         if A.online_smoke:
             import json as _json
             from datasets import load_dataset as _ld

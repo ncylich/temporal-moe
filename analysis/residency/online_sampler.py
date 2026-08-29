@@ -46,7 +46,8 @@ def _hf_name(param_or_module_name, suffix=""):
 class OnlineSampler:
     def __init__(self, model, base_path, R, swaps, prompts_path, quota, max_new=1024,
                  gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4"):
-        assert arch == "gemma4", "online sampler is written for gemma4 checkpoint names"
+        assert arch in ("gemma4", "qwen35"), arch
+        self.arch = arch
         import vllm_glue
         import vllm_residency  # noqa: F401
         from decode_state import DEC
@@ -72,6 +73,9 @@ class OnlineSampler:
         self.prompts = [p.get("prompt") or p.get("text") for p in prompts]
         self.rng = random.Random(seed); self.rng.shuffle(self.prompts); self.cursor = 0
         self.sp_kw = dict(temperature=0.7, top_p=0.8, max_tokens=max_new)
+        if arch == "qwen35":                       # card recipe, non-thinking: presence penalty 1.5
+            self.sp_kw["presence_penalty"] = 1.5
+        self.chat_kw = {"chat_template_kwargs": {"enable_thinking": False}} if arch == "qwen35" else {}
         self.SamplingParams = SamplingParams
         self.n_refresh = 0
         self.llm.sleep(level=1)
@@ -95,22 +99,37 @@ class OnlineSampler:
         raise RuntimeError("[online] cannot locate the in-process vLLM model object")
 
     # ------------------------------------------------------------------ weights
+    def _name(self, n, suffix=""):
+        if self.arch == "qwen35":                    # textified: model.layers.N...
+            m = _TAIL.search(n)
+            if m:
+                return f"model.{m.group(1)}{suffix}"
+            return "model.norm.weight" if n.endswith("norm.weight") or n.endswith("norm") else None
+        return _hf_name(n, suffix)
+
     def _pairs(self):
         """(hf_name, merged tensor) for every trainable surface, one layer at a time."""
         mod_names = {id(m): n for n, m in self.model.named_modules()}
         with torch.no_grad():
             for mod in self.model.modules():
                 if hasattr(mod, "elora_gu_A"):
-                    base = _hf_name(mod_names[id(mod)])
+                    base = self._name(mod_names[id(mod)])
                     s = mod.elora_scale
-                    gu = mod.gate_up_proj.data + s * torch.bmm(mod.elora_gu_A.data, mod.elora_gu_B.data)
-                    yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
-                    del gu
-                    dp = mod.down_proj.data + s * torch.bmm(mod.elora_dp_A.data, mod.elora_dp_B.data)
-                    yield base + ".down_proj", dp.transpose(1, 2).contiguous()
-                    del dp
+                    gu = mod.gate_up_proj.data + s * torch.bmm(mod.elora_gu_A.data, mod.elora_gu_B.data)   # (E,H,2I)
+                    dp = mod.down_proj.data + s * torch.bmm(mod.elora_dp_A.data, mod.elora_dp_B.data)      # (E,I,H)
+                    if self.arch == "qwen35":            # vLLM's qwen3_next loader takes per-expert tensors
+                        E, H, twoI = gu.shape; I = twoI // 2
+                        for e in range(E):
+                            g_ = gu[e].transpose(0, 1)                              # (2I,H)
+                            yield base + f".{e}.gate_proj.weight", g_[:I].contiguous()
+                            yield base + f".{e}.up_proj.weight", g_[I:].contiguous()
+                            yield base + f".{e}.down_proj.weight", dp[e].transpose(0, 1).contiguous()
+                    else:
+                        yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
+                        yield base + ".down_proj", dp.transpose(1, 2).contiguous()
+                    del gu, dp
                 elif hasattr(mod, "lora_A") and hasattr(mod, "base_layer") and "default" in getattr(mod, "lora_A", {}):
-                    base = _hf_name(mod_names[id(mod)])
+                    base = self._name(mod_names[id(mod)])
                     # peft merge() does `weight.data += delta` with the delta in the LoRA dtype (fp32 here):
                     # one rounding. Casting the delta to bf16 first double-rounds (1 ulp off, measured).
                     w = mod.base_layer.weight.data.clone()
@@ -118,8 +137,8 @@ class OnlineSampler:
                     yield base + ".weight", w
             for n, p in self.model.named_parameters():
                 if p.requires_grad and "lora_" not in n and "elora_" not in n:
-                    hf = _hf_name(n)
-                    if hf is None or "vision" in n:
+                    hf = self._name(n)
+                    if hf is None or "vision" in n or "visual" in n or "mtp" in n:
                         continue
                     yield hf, p.data
 
@@ -144,7 +163,7 @@ class OnlineSampler:
         self.DEC.update(on=constrained, R=self.R, swaps=self.swaps)
         self.DEC["state"].clear()
         t0 = time.time()
-        outs = self.llm.chat(msgs, sp, use_tqdm=False)
+        outs = self.llm.chat(msgs, sp, use_tqdm=False, **self.chat_kw)
         rows, ntok = [], 0
         for t, o in zip(prompts, outs):
             enc = self.tok.apply_chat_template([{"role": "user", "content": t}], add_generation_prompt=True,
