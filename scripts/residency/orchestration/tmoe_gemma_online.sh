@@ -24,7 +24,7 @@ scripts/residency/disk_budget.sh || exit 3
 echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), refresh every $EVERY steps x $N rows $(date -u +%H:%M)"
 [ -f $A.done ] || { [ -n "$INIT" ] && cp $D/gemma_ce_${START}_adapter.pt $A; rm -f $A.tmp
   $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
-    ${TMOE_CE:+--digit-weight ${TMOE_W:-3}} ${TMOE_CE:---kl-only} --kl-anchor $KL --kl-weight 0.05 --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
+    ${TMOE_CE:+--digit-weight ${TMOE_W:-3}} ${TMOE_CE:---kl-only} --kl-anchor $KL --kl-weight ${TMOE_ANCHOR_W:-0.05} --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
     --online-every $EVERY --online-n $N
   touch $A.done; }
 if [ "${TMOE_MERGE:-0}" = 1 ]; then
