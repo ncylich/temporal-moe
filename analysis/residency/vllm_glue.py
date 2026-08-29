@@ -34,10 +34,13 @@ def llm_kwargs():
     captured and replayed and prefill/mixed steps stay eager where the python part of the
     walker runs. TEMPORAL_EAGER=1 or a non-fast TEMPORAL_WALKER keeps the old
     enforce_eager=True behaviour. Prefix caching stays off in every mode (see module doc)."""
+    # TEMPORAL_MAMBA_FP32=1: keep the linear-attention (gated delta net) state cache in fp32 during
+    # decode; hybrid models default to the model dtype (bf16) and drift from HF over long decodes.
+    extra = {"mamba_ssm_cache_dtype": "float32"} if os.environ.get("TEMPORAL_MAMBA_FP32") == "1" else {}
     if os.environ.get("TEMPORAL_EAGER") == "1" or VR._WALKER != "fast":
-        return {"enforce_eager": True, "enable_prefix_caching": False}
+        return {"enforce_eager": True, "enable_prefix_caching": False, **extra}
     from vllm.config import CompilationConfig, CompilationMode, CUDAGraphMode
-    return {"enforce_eager": False, "enable_prefix_caching": False,
+    return {"enforce_eager": False, "enable_prefix_caching": False, **extra,
             "compilation_config": CompilationConfig(mode=CompilationMode.NONE,
                                                     cudagraph_mode=CUDAGraphMode.FULL_DECODE_ONLY)}
 

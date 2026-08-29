@@ -1019,6 +1019,15 @@ def main():
                     d_ = [abs(a_ - b_) for la, lb in zip(lp_, ref["lps"]["free"]) for a_, b_ in zip(la, lb)]
                     print(f"[online-smoke] free logprob parity on the reference tokens: max |dlogprob| {max(d_):.4f}, "
                           f"mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
+                if arm == "free":                            # HF-argmax agreement of THIS engine's greedy tokens
+                    SAMPLER.sleep()
+                    rows_g = [{"ids": r["ids"], "prompt_len": r["prompt_len"]} for r in rows_]
+                    out_g = teacher_ref(rows_g, adapted=False)
+                    am_g = sum(int(t_ == a_) for i_ in range(len(rows_g)) for t_, a_ in zip(gens[i_], out_g[i_][0][:, 0].tolist()))
+                    n_g = sum(len(g) for g in gens); lp_g = [v for i_ in range(len(rows_g)) for v in out_g[i_][2].tolist()]
+                    print(f"[online-smoke] HF (adapter on, free) on THIS engine's greedy tokens: {am_g}/{n_g} are HF's argmax; "
+                          f"mean HF logprob {sum(lp_g)/len(lp_g):.4f}", flush=True)
+                    SAMPLER.sync()
                 dump_ = A.online_smoke.replace(".json", f"_inprocess_{arm}.json")
                 _json.dump({"gens": gens, "prompt_lens": [r["prompt_len"] for r in rows_]}, open(dump_, "w"))
             SAMPLER.sleep()                                 # engine asleep, expert base weights back on the GPU
