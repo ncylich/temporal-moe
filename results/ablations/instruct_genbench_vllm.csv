@@ -2145,3 +2145,15 @@ gemma4_ce_online_scratch_e16_lr1e-4_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_m
 gemma4_ce_online_scratch_e16_lr1e-4_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,130
 gemma4_ce_online_scratch_e16_lr1e-4_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,130
 gemma4_ce_online_scratch_e16_lr1e-4_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.865049,full,2048,130
+gemma4_base_rho0p5_n1319,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,135
+gemma4_base_rho0p5_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,135
+gemma4_base_rho0p5_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.799090,full,2048,135
+gemma4_base_rho0p5_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,134
+gemma4_base_rho0p5_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,134
+gemma4_base_rho0p5_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.871114,full,2048,134
+qwen35_instruct_textclass_n1319,256,8,free,,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,257
+qwen35_instruct_textclass_n1319,256,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,257
+qwen35_instruct_textclass_n1319,256,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.853677,full,2048,257
+qwen35_instruct_textclass_n1319,256,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,326
+qwen35_instruct_textclass_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,326
+qwen35_instruct_textclass_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.777862,full,2048,326

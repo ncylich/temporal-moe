@@ -1366,3 +1366,22 @@ Found while validating the in-process qwen sampler. The sampler loads the raw mu
 Why it matters beyond the smoke: every historical qwen *base* arm ran on the raw dir (multimodal class) and every qwen *adapted* arm ran on a merged text-only dir, so the qwen base-vs-adapted deltas (digit-weight +5.4, the rebuild, the published +6.5 if it followed the same path) carry a class confound of unknown sign and size. Measurement queued: the raw base textified with no adapter (`textify_qwen_base.py`), GSM8K n=1319 free/R8 under the text class, paired against the recorded raw-class base. From now on qwen adapted arms are evaluated adapter-direct on the raw dir (`--adapter`), the same class as the base arm.
 
 What went wrong in the diagnosis: the first two smoke runs compared across classes, and the `--check` compared only adapted tensors, so "EXACT" was true but not sufficient; the per-token logprob comparison and the class-name grep were what settled it.
+
+### Class confound measured (2026-08-29 07:45)
+
+Same base weights, GSM8K n=1319, identical sampling recipe; only the vLLM class differs (`textify_qwen_base.py` writes the raw checkpoint in the text layout with no adapter):
+
+| arm | raw class (ConditionalGeneration) base | text class (ForCausalLM) base | text vs raw (fixed/broken, z) |
+|---|---|---|---|
+| free | 85.9 | 85.4 | 16/23, z=-1.1 (-0.5) |
+| R8 | 76.6 | 77.8 | 117/102, z=+1.0 (+1.1) |
+
+The aggregate difference is about 1 point, inside the noise floor, but 219 of 1319 R8 items change outcome between the classes, so they are not the same model at the item level. Consequence for the recorded qwen deltas, all measured as merged (text class) against the raw-class base:
+
+| adapter (merged, text class) | R8 vs raw-class base (as recorded) | R8 vs text-class base (like for like) | free, like for like |
+|---|---|---|---|
+| rebuild | +2.1 (z=+1.9) | +1.0 (z=+0.9) | +1.3 (z=+2.0) |
+| CE+W=3 | +5.1 (z=+4.7) | +3.9 (z=+3.8) | +0.5 (z=+0.9) |
+| digit-weight 10 | +5.4 (z=+5.1) | +4.2 (z=+4.3) | +1.7 (z=+3.0) |
+
+So the digit-weight result on qwen stands (z=+3.8 and +4.3 like for like) but is about 1.2 points smaller than recorded, and the rebuild's R8 gain on qwen is not significant once the class is held fixed. Which class is faithful to HF transformers is measured next (HF argmax agreement on each class's greedy tokens); the rule from here is that base and adapted arms use the same class, and the default is the raw dir with `--adapter` unless HF sides with the text class.
