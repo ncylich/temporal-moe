@@ -6,10 +6,7 @@
 set -uo pipefail; cd /workspace/temporal-moe
 until grep -q "SURFACE DONE" /workspace/rerun-logs/winner_full_surface.out 2>/dev/null; do sleep 120; done
 export TMOE_PRIO=4
-echo "### qwen-lr 1/5 deadband base rho=0.5 $(date -u +%H:%M)"
-bash /workspace/tmoe_deadband_surface.sh gemma 0.5 /dev/shm/gemma4-26b-it gemma4_base > /workspace/rerun-logs/deadband_base.out 2>&1
-echo "### qwen-lr 2/5 deadband W=3 rho=0.5 $(date -u +%H:%M)"
-bash /workspace/tmoe_deadband_surface.sh gemma 0.5 adapter:/workspace/olmoe-adapt/data/gemma_ce_digit3_adapter.pt gemma4_ce_digit3 > /workspace/rerun-logs/deadband_digit3.out 2>&1
+# deadband base rho=0.5: done 18:30 (flat, swaps -2%); deadband on W=3 dropped, the winner runs under rho=0.5 separately
 for LR in 3e-5 6e-5; do
   echo "### qwen-lr 3/5 qwen on-policy from scratch, lr $LR, KL T=2 $(date -u +%H:%M)"
   TMOE_LR=$LR TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_NAME_SUFFIX=_klT2_lr$LR bash /workspace/tmoe_qwen_online.sh scratch 3400000 16 256 > /workspace/rerun-logs/qwen_online_klT2_lr$LR.out 2>&1
