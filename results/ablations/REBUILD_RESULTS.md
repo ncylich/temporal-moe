@@ -1407,3 +1407,21 @@ At 13% of the budget the recipe already gives R8 +3.3 (z=+3.0) with the free arm
 Mechanism timings (qwen, 35B-A3B): refresh 221-229 s per 256 rows, of which sampling 196-205 s at 985-1063 tok/s (gemma: 47 s at 4418 tok/s for the same rows), offload 0.5 s, wake 1.5 s, sync 1.0 s, restore 0.4 s. Training between refreshes ~375 tok/s (gemma ~430). So qwen's sampling is about 4x slower per token than gemma's, which makes a refresh ~28% of wall time; a full 3.4M run is ~4.3 h. The gap is in vLLM's hybrid (gated delta net) decode at batch 256, not in our plumbing; worth a look on the speed axis but not a blocker.
 
 Fixed on the way: CUDA-graph capture refused `max_num_seqs` 1024 with only 285 linear-attention state blocks at a 0.55 memory share (the sampler now sets 256, which is all it ever batches); the eager smokes could not have caught it.
+
+## From-scratch on-policy sweep: complete (2026-08-29 16:50)
+
+All cells: analytic reverse KL, anchor 0, from scratch, GSM8K n=1319 (full table with paired z in `online_sweep.md`). One knob per cell on the running best (lr 1e-4 after cell 2):
+
+| cell | free | R8 | R16 | note |
+|---|---|---|---|---|
+| base | 87.8 | 78.8 | 86.6 | |
+| CE+W=3 (reference) | 86.7 | 82.3 | 86.2 | |
+| lr 5e-5 (baseline) | 86.6 | 81.7 | 86.1 | replicate of the earlier analytic run |
+| lr 1e-4 | 87.0 | 84.4 | 86.5 | first move: R8 +5.6, z=+3.1 vs baseline |
+| lr 2e-4 | 87.9 | 84.0 | 87.0 | R8 tie |
+| KL T=2 | 88.2 | 84.2 | 87.2 | above base on every arm; free z=+2.5 vs lr 1e-4 |
+| sample temp 1.0 | 87.5 | 82.6 | 85.8 | R8 -1.8, z=-2.2: worse |
+| refresh 8x128 | 85.9 | 84.0 | 86.1 | free -1.9 vs lr 1e-4 (z=-2.1): worse |
+| budget 6.8M | 86.1 | 84.1 | 87.0 | free -1.7; R8 unchanged |
+
+R8 saturates at 84.0-84.4 (+5.2 to +5.6; published +6.0 = 84.8) for every learning rate at or above 1e-4, independent of KL temperature, refresh cadence and token budget; the sampled-token KL trace never predicted any of it (0.50-0.57 in every cell; the runner's stall gate had to be relaxed after it killed a healthy lr 2e-4 cell). The knobs separate only on the free and R16 arms. Winner by the all-arm rule: KL T=2 (lr 1e-4, 16x256, 3.4M): the only cell above base on all three arms and the one with no free-arm tax, which is the property the on-policy formulation was chosen for. Its full surface (no WritingBench) runs next, then the deadband surfaces, then qwen at the same settings.
