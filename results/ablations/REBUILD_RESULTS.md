@@ -1287,3 +1287,17 @@ possible role is protecting the free arm from LoRA leakage, which the from-scrat
 already shows to be small (-0.3). First setup change: anchor 0 (no anchor forward at all).
 The analytic reverse KL reads 0.55 nats/token at step 50 (exact over the teacher top-50
 plus tail; the sampled-token estimate at the same point was 0.386, a different quantity).
+
+### Optimising the from-scratch on-policy recipe: plan (2026-08-29 00:45)
+
+One knob per cell from the best from-scratch run, GSM8K R8 n=1319 paired against the running
+best (keep at z >= 2), KL trace as the early stop (a run whose reverse-KL estimate has not
+decreased at all by step 100 is killed; the working sampled-token run dropped 0.386 -> 0.370
+by then, so the bar is "any decrease"). Full surface only for the final candidate. Cells, in
+order: anchor 0 (remove the inherited free-arm term; with `--budget-on sampled` the D7 pool
+leaves the on-policy path entirely), lr 1e-4, student sampling temperature 1.0, math-only
+prompts, refresh 8 x 128, budget 6.8M. Objective (sampled-token vs analytic reverse KL) is
+fixed by the analytic from-scratch result. Runner: `analysis/residency/sweep_online.py`;
+table: `results/ablations/online_sweep.md`. Per-refresh sample stats (mean length, cap-hit,
+digit share, '=' per row) are now logged so a knob that changes the student's behaviour is
+visible before the eval.

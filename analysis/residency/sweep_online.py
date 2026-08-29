@@ -2,7 +2,7 @@
 """Sequential one-knob sweep of the from-scratch on-policy recipe, with a KL-based early stop.
 
 Each cell launches tmoe_gemma_online.sh scratch with its env, watches the reverse-KL trace, and
-kills the run if the estimate at step 100 is not below 95% of the step-50 value (the objective is
+kills the run if the estimate at step 100 has not decreased at all from step 50 (the objective is
 not moving: do not wait 80 minutes). Finished cells are scored on GSM8K n=1319 against --best
 (paired fixed/broken, z) and appended to results/ablations/online_sweep.md.
 
@@ -66,7 +66,7 @@ def main():
             txt = open(log).read() if os.path.exists(log) else ""
             for st, val in re.findall(r"\[gce\] step (\d+) seen.*?\n\[gce\] aux-\S+ loss [-\d.]+; reverse-KL estimate ([-\d.]+)", txt):
                 kl[int(st)] = float(val)
-            if 50 in kl and 100 in kl and kl[100] > 0.95 * kl[50]:
+            if 50 in kl and 100 in kl and kl[100] >= kl[50]:      # no decrease at all by step 100 (the working run dropped 4%)
                 verdict = f"STALLED (KL {kl[50]:.3f}->{kl[100]:.3f})"
                 # kill the chain: driver, its lease wrapper, the trainer
                 subprocess.run(["bash", "-c", f"for p in $(pgrep -P {proc.pid}); do kill $(pgrep -P $p) $p 2>/dev/null; done; kill {proc.pid}"])
