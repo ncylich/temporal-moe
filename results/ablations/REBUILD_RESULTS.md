@@ -1316,3 +1316,29 @@ reverse-KL trace 0.550 / 0.518 / 0.518 / 0.506 at steps 50-200 (the sampled-toke
 was flat at ~0.37). Three recipes now stop at R8 82.3 +/- 0.3 at this budget and learning
 rate; the sweep (analytic estimator, anchor 0 baseline, then lr, temperature, refresh,
 budget) starts from here.
+
+## Full surface of the from-scratch on-policy adapter (analytic reverse KL, no CE) (2026-08-29 02:25)
+
+Adapter-direct evaluation (no merge). Same-arm deltas vs the untrained base. WritingBench
+skipped (no signal; final version only).
+
+| benchmark | arm | base | W=3 (CE) | on-policy from scratch |
+|---|---|---|---|---|
+| GSM8K (n=1319) | R8 | 78.8 | +3.6 | +3.7 |
+| | R16 | 86.6 | -0.4 | -0.2 |
+| IFEval (n=541) | R8 | 86.9 | -1.3 | +0.6 |
+| | R16 | 87.8 | -1.7 | -0.2 |
+| MMLU (n=228) | R8 | 92.5 | +1.8 | +0.4 |
+| | R16 | 92.5 | +0.9 | +1.3 |
+| HumanEval@8192 (n=164) | R8 | 94.5 | +2.4 | +0.6 |
+| | R16 | 96.3 | +2.4 | +1.2 |
+| MBPP@8192 (n=500) | R8 | 77.0 | -0.4 | +5.4 |
+| | R16 | 89.0 | -2.0 | +0.2 |
+| **R8 mean, 4 published cells** | | | **+1.6** | **+1.3** |
+
+Published gemma four-cell mean: +2.2. The on-policy adapter never lands below the base on
+any cell at either arm (the CE recipe loses on IFEval at both arms and on MBPP), and gains
++5.4 on MBPP at R8 where CE lost 0.4. Its MMLU and HumanEval gains are smaller than CE's
+by 3 questions each (n=228 and 164: inside those cells' noise). Four-cell mean +1.3 vs
++1.6, the difference being those two small cells. The sweep decides whether the R8 GSM8K
+ceiling moves; this table is the reference the sweep winner's surface is compared against.
