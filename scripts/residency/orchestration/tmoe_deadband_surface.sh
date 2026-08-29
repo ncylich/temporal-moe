@@ -9,7 +9,7 @@ set -euo pipefail
 cd /workspace/temporal-moe
 MODEL=$1; RHO=$2; M=$3; PFX=$4; TAG=${PFX}_rho${RHO/./p}
 # third arg: a merged checkpoint dir, or adapter:<file> (engine boots from the base and applies it, gemma only)
-ADAPTER=""; case "$M" in adapter:*) ADAPTER="--adapter ${M#adapter:}"; M=/dev/shm/gemma4-26b-it;; esac
+ADAPTER=""; case "$M" in adapter:*) ADAPTER="--adapter ${M#adapter:}"; if [ "$MODEL" = gemma ]; then M=/dev/shm/gemma4-26b-it; else M=/root/models/qwen35-35b-a3b; fi;; esac   # qwen: raw dir (same vLLM class as the base arm)
 export TMOE_ROOT=/workspace/temporal-moe PATH=/workspace/venv_vllm312/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=${HF_TOKEN:-$(cat /root/.cache/huggingface/token 2>/dev/null)}
@@ -35,13 +35,13 @@ if [ "$MODEL" = gemma ]; then
     export GPU=0 TMOE_ADAPTER="${ADAPTER#--adapter }"; $L scripts/residency/wb_arm.sh $M $TAG R8,R16
   else echo "### $TAG WritingBench skipped (TMOE_WB=1 to include)"; fi
 else
-  ARMS=R8,R32; Q="--model qwen35_instruct --path $M --arms $ARMS --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5"
+  ARMS=R8,R32; Q="--model qwen35_instruct --path $M $ADAPTER --arms $ARMS --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5"
   echo "### $TAG GSM8K n=1319 $(date -u +%H:%M)"
   $L $PY -u analysis/residency/instruct_genbench_vllm.py $Q --record-as ${TAG}_n1319 --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90
   echo "### $TAG IFEval $(date -u +%H:%M)"
   $L $PY -u analysis/residency/instruct_genbench_vllm.py $Q --record-as ${TAG}_full --tasks "ifeval=0" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90
   echo "### $TAG MMLU $(date -u +%H:%M)"
-  $L $PY -u analysis/residency/mmlu_gptoss.py --model qwen35_instruct --path $M --arms $ARMS --think off --record-as ${TAG}_n_dual --gpu-mem 0.90
+  $L $PY -u analysis/residency/mmlu_gptoss.py --model qwen35_instruct --path $M $ADAPTER --arms $ARMS --think off --record-as ${TAG}_n_dual --gpu-mem 0.90
   echo "### $TAG HumanEval + MBPP $(date -u +%H:%M)"
   $L $PY -u analysis/residency/instruct_genbench_vllm.py $Q --record-as ${TAG}_code --tasks "mbpp_instruct=0,humaneval_instruct=0" --gen-cap 1536 --max-model-len 4096 --gpu-mem 0.90
 fi
