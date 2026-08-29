@@ -48,7 +48,39 @@ def llm_kwargs():
                                                     cudagraph_mode=CUDAGraphMode.FULL_DECODE_ONLY)}
 
 
+def _install_fast_penalty():
+    """TEMPORAL_FAST_PP=1 (default): any SamplingParams with presence_penalty > 0 handed to LLM.generate/chat
+    is rewritten to the FastPresencePenalty logits processor (fast_penalty.py; same math, 1.8x the
+    throughput at batch 256). Transparent to lm-eval and every producer."""
+    if os.environ.get("TEMPORAL_FAST_PP", "1") != "1":
+        return
+    from vllm import LLM
+    from fast_penalty import KEY
+    if getattr(LLM, "_tmoe_fast_pp", False):
+        return
+    def rewrite(sp):
+        if sp is None or isinstance(sp, (list, tuple)):
+            return [rewrite(x) for x in sp] if sp is not None else sp
+        pp = getattr(sp, "presence_penalty", 0.0) or 0.0
+        if pp <= 0:
+            return sp
+        sp = sp.clone(); sp.presence_penalty = 0.0
+        sp.extra_args = dict(sp.extra_args or {}, **{KEY: pp})
+        return sp
+    for name in ("generate", "chat"):
+        orig = getattr(LLM, name)
+        def wrapped(self, *a, _orig=orig, **k):
+            if "sampling_params" in k:
+                k["sampling_params"] = rewrite(k["sampling_params"])
+            elif len(a) >= 2:
+                a = (a[0], rewrite(a[1])) + tuple(a[2:])
+            return _orig(self, *a, **k)
+        setattr(LLM, name, wrapped)
+    LLM._tmoe_fast_pp = True
+
+
 def install():
+    _install_fast_penalty()
     if VR._WALKER == "fast":          # the evals read swap traffic from the router module
         from temporal import temporal_router as TR
         TR.swap_stats = VR.swap_stats

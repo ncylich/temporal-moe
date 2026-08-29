@@ -88,9 +88,8 @@ class OnlineSampler:
         # qwen's card recipe adds presence_penalty 1.5 for non-thinking chat; vLLM implements penalties with a
         # per-step vocab-sized count per sequence and it HALVES batch-256 throughput (4171 -> 2220 tok/s,
         # 2026-08-29). Off by default in the sampler (the objective and the cap bound repetition); evals keep it.
-        if presence_penalty:
-            from fast_penalty import sampling_kwargs
-            self.sp_kw.update(sampling_kwargs(presence_penalty, os.environ.get("TEMPORAL_FAST_PP", "1") == "1"))
+        if presence_penalty:                       # vllm_glue routes it to the fast processor (TEMPORAL_FAST_PP=1)
+            self.sp_kw["presence_penalty"] = presence_penalty
         self.chat_kw = {"chat_template_kwargs": {"enable_thinking": False}} if arch == "qwen35" else {}
         self.SamplingParams = SamplingParams
         self.n_refresh = 0

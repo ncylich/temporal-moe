@@ -9,7 +9,7 @@ L=scripts/residency/gpu_lease.sh; PY=/workspace/venv_vllm312/bin/python; D=/work
 if [ "$MODEL" = gemma ]; then
   COMMON="--model /dev/shm/gemma4-26b-it --family gemma4 --no-unsloth --traj gemma4_d7_seq4096 --max-seq 4096 --expert-lora-r 32 --opt adamw --micro-batch 16"; MEM="--online-gpu-mem ${TMOE_ONLINE_MEM:-0.45}"
 else
-  COMMON="--model /root/models/qwen35-35b-a3b --family qwen35 --no-unsloth --traj qwen35_d7_seq4096 --max-seq 4096 --expert-lora-r 16 --opt adamw --micro-batch 16"; MEM="--online-gpu-mem ${TMOE_ONLINE_MEM:-0.65} --online-offload ${TMOE_ONLINE_OFFLOAD:-20}"
+  COMMON="--model /root/models/qwen35-35b-a3b --family qwen35 --no-unsloth --traj qwen35_d7_seq4096 --max-seq 4096 --expert-lora-r 16 --opt adamw --micro-batch 16"; MEM="--online-gpu-mem ${TMOE_ONLINE_MEM:-0.65} --online-offload ${TMOE_ONLINE_OFFLOAD:-20} --online-presence-penalty ${TMOE_ONLINE_PP:-1.5}"
 fi
 rm -f /tmp/speed_${MODEL}_adapter.pt
 echo "### speed $MODEL $TAG: 32 steps, refresh every 16 x 256, $(date -u +%H:%M)" | tee $OUT
