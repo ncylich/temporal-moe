@@ -2166,3 +2166,12 @@ qwen35_ce_online_scratch_e16_e2e_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_matc
 qwen35_ce_online_scratch_e16_e2e_n1319,256,8,R32,32,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,229
 qwen35_ce_online_scratch_e16_e2e_n1319,256,8,R32,32,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,229
 qwen35_ce_online_scratch_e16_e2e_n1319,256,8,R32,32,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.824109,full,2048,229
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,free,,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,205
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,205
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,free,,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.879454,full,2048,205
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,203
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,203
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.840030,full,2048,203
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,R16,16,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,238
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,238
+gemma4_ce_online_scratch_e16_lr2e-4_n1319,128,8,R16,16,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.870356,full,2048,238
