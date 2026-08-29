@@ -1266,3 +1266,11 @@ free arm. So each adapter perturbs its own set of ~70 borderline problems while 
 sound. Two adapters that fix 145 distinct problems between them but break different ones is
 the concrete reason to look for an objective that keeps the repairs and not the breaks
 (the analytic reverse KL is the first candidate; a CE + reverse-KL mixture is the second).
+
+### Standing formulation (2026-08-29 00:05)
+
+On-policy reverse-KL self-distillation under the residency bound is the preferred recipe
+over CE with the digit reweighting: it is model-agnostic (no tokenizer-specific term, which
+is what W=3 vs W=10 was), data-free beyond prompts, and costs nothing on the free arm. The
+CE recipe stays as the reference it has to beat at R8. Pending: the analytic reverse KL
+(from scratch, then from W=3), then the qwen replication with no digit weight at all.
