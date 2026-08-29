@@ -1021,6 +1021,7 @@ def main():
                           f"mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
                 dump_ = A.online_smoke.replace(".json", f"_inprocess_{arm}.json")
                 _json.dump({"gens": gens, "prompt_lens": [r["prompt_len"] for r in rows_]}, open(dump_, "w"))
+            SAMPLER.sleep()                                 # engine asleep, expert base weights back on the GPU
             # Which vLLM class is faithful to HF? Score each reference's free-arm tokens with the HF model
             # (adapter on, no residency) and compare with the reference engine's own decode logprobs.
             import os as _os
@@ -1037,7 +1038,6 @@ def main():
                 d_ = [abs(a_ - b_) for i_ in range(len(rows_h)) for a_, b_ in zip(out_h[i_][2].tolist(), rj["lps"]["free"][i_])]
                 print(f"[online-smoke] HF (adapter on, free) vs {_os.path.basename(rp)} decode logprobs: "
                       f"max |dlogprob| {max(d_):.4f}, mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
-            SAMPLER.sleep()
             return
     step0 = step
     while seen < A.tokens:
