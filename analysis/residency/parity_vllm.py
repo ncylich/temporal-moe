@@ -37,6 +37,7 @@ def main():
     ap.add_argument("--max-model-len", type=int, default=2048)
     ap.add_argument("--sleep-mode", action="store_true", help="enable_sleep_mode + one sleep/wake cycle before generating (what the in-process sampler does)")
     ap.add_argument("--warm", type=int, default=4, help="prompts in the warm-up call (0 = none)")
+    ap.add_argument("--adapter", default=None, help="adapter .pt to apply to the engine (raw base + adapter, same class as the online sampler)")
     A = ap.parse_args()
     if A.compare:
         a, b = (json.load(open(p)) for p in A.compare)
@@ -62,6 +63,9 @@ def main():
               max_model_len=A.max_model_len, enable_sleep_mode=A.sleep_mode)
     if A.sleep_mode:
         llm.sleep(level=1); llm.wake_up(); print("[parity] sleep/wake cycle done", flush=True)
+    if A.adapter:
+        from apply_adapter import apply_adapter
+        apply_adapter(llm, A.adapter, A.path)
     sp = SamplingParams(temperature=0.0, max_tokens=A.max_new, logprobs=0)   # logprobs=0: the chosen token's logprob
     ctk = {} if A.think is None else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}}
     res = {"gens": {}, "lps": {}, "tps": {}, "secs": {}, "swaps": {},
