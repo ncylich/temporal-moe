@@ -1036,8 +1036,11 @@ def main():
                     p_ = list(enc_["input_ids"]); rows_h.append({"ids": torch.tensor(p_ + list(g_), dtype=torch.int32), "prompt_len": len(p_)})
                 out_h = teacher_ref(rows_h, adapted=False)
                 d_ = [abs(a_ - b_) for i_ in range(len(rows_h)) for a_, b_ in zip(out_h[i_][2].tolist(), rj["lps"]["free"][i_])]
-                print(f"[online-smoke] HF (adapter on, free) vs {_os.path.basename(rp)} decode logprobs: "
-                      f"max |dlogprob| {max(d_):.4f}, mean {sum(d_)/len(d_):.5f} over {len(d_)} tokens", flush=True)
+                lp_own = [v for i_ in range(len(rows_h)) for v in out_h[i_][2].tolist()]
+                am_ = sum(int(t_ == a_) for i_ in range(len(rows_h)) for t_, a_ in zip(rj["gens"]["free"][i_], out_h[i_][0][:, 0].tolist()))
+                print(f"[online-smoke] HF (adapter on, free) on {_os.path.basename(rp)}: {am_}/{len(lp_own)} reference tokens are HF's argmax; "
+                      f"mean HF logprob of the reference tokens {sum(lp_own)/len(lp_own):.4f}; "
+                      f"vs recorded decode logprobs max |d| {max(d_):.4f}, mean {sum(d_)/len(d_):.5f}", flush=True)
             return
     step0 = step
     while seen < A.tokens:
