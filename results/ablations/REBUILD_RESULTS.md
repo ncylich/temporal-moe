@@ -1488,3 +1488,15 @@ The lr 3e-5 run was restarted from scratch with both fixes (40 min lost); the ne
 | full 3.4M run | ~4.3 h | ~75 min | 57 min |
 
 Qwen went from 3.4x to 1.36x gemma per cycle. The training step is within 13%; the residual is the sampler at 1.65x per token. `causal-conv1d` does not build against torch 2.13 / CUDA 13; its torch fallback is a depthwise conv and not a measurable cost. The next probe isolates our own share of the sampler gap (walker on vs off at batch 256).
+
+### The sampler gap was the presence penalty (2026-08-29 20:45)
+
+Standalone qwen engine at the sampler's configuration (0.65 share, 256 sequences, 1024 cap), batch 256:
+
+| sampling params | tok/s (free / R8) |
+|---|---|
+| greedy | 4523 / 4631 |
+| temperature 0.7, top-p 0.8 | 4171 / 4165 |
+| + presence penalty 1.5 (the card recipe) | 2220 / 2324 |
+
+The residency walker costs nothing at batch 256 (R8 = free on both models; gemma standalone 5864 / 6548). Temperature and top-p cost 8%. The presence penalty halves throughput: vLLM applies it by materialising a vocab-sized token count per sequence per step (256 x 248k). The in-process sampler's 2121 tok/s was exactly this. The sampler now runs without it (`--online-presence-penalty`, default 0); evals keep the card recipe so qwen eval numbers stay comparable. Expected: refresh 125 s -> about 75 s, cycle 263 s -> about 215 s, i.e. 1.1x gemma.
