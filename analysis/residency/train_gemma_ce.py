@@ -1010,6 +1010,12 @@ def main():
                 gens = [r["ids"][r["prompt_len"]:].tolist() for r in rows_]
                 same = sum(g == rg for g, rg in zip(gens, ref["gens"][arm]))
                 print(f"[online-smoke] {arm}: {same}/{n_ref} generations identical to the merged checkpoint", flush=True)
+                for i_, (g, rg) in enumerate(zip(gens, ref["gens"][arm])):      # where does each one diverge?
+                    k_ = next((j for j in range(min(len(g), len(rg))) if g[j] != rg[j]), None)
+                    if g != rg:
+                        print(f"[online-smoke]   {arm} row {i_}: first differing token at {k_} (lens {len(g)} vs {len(rg)}; prompt_len {rows_[i_]['prompt_len']})", flush=True)
+                dump_ = A.online_smoke.replace(".json", f"_inprocess_{arm}.json")
+                _json.dump({"gens": gens, "prompt_lens": [r["prompt_len"] for r in rows_]}, open(dump_, "w"))
             SAMPLER.sleep()
             return
     step0 = step
