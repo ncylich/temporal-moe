@@ -1391,3 +1391,19 @@ So the digit-weight result on qwen stands (z=+3.8 and +4.3 like for like) but is
 Scored with the HF transformers model (adapter on, free arm) on each engine's own greedy tokens: raw class 1696/1851 tokens are HF's argmax (91.6%, mean HF logprob -0.293); text class 1684/1841 (91.5%, -0.297); raw class with the linear-attention state cache forced to fp32: identical tokens, 1696/1851. The residency hooks are a no-op on the free arm (hooks vs plain vLLM, greedy: qwen raw + adapter 8/8 identical, gemma base 8/8 identical; the plain engine is 1.35x faster in eager mode on gemma, a cost the CUDA-graph eval path does not pay the same way). So the two vLLM classes are equidistant from HF and differ from each other at the bf16-noise level that flips near-tied argmaxes; there is no "wrong" class, only the requirement that base and adapted arms use the same one. Default from here: the raw dir (`Qwen3_5MoeForConditionalGeneration`) with `--adapter`, for the base arm, every adapted arm, and the in-process sampler. The merged text-only dirs are retired for qwen evaluation (WritingBench, which needed a merged dir, can use `apply_adapter` too).
 
 Cost of getting here: five smoke runs and three diag chains, about 1.5 h of GPU, plus the class-confound eval. What was learned about the instruments: per-token decode logprobs recorded by vLLM (`logprobs=0`) disagree with teacher-forced scoring (vLLM `prompt_logprobs` and HF alike) by 0.235 nats mean and up to 14 nats on this model even when the tokens match exactly, so they are not usable as a parity metric; greedy token identity across engines of the same class, plus the exact tensor compare, is the parity test.
+
+## Qwen on-policy sampler, first real run (short, 0.45M sampled tokens) (2026-08-29 09:05)
+
+Standing recipe on qwen (analytic reverse KL, anchor 0, lr 1e-4, refresh 16x256, raw class, adapter-direct eval), stopped after 0.45M sampled tokens (36 steps, 3 refreshes) to measure the mechanism and get a first reading. GSM8K n=1319, paired against the raw-class base:
+
+| arm | base (raw class) | digit-weight 10 (merged, text class; class-confounded) | on-policy short 0.45M | paired vs base (fixed/broken, z) |
+|---|---|---|---|---|
+| free | 85.9 | 87.1 (+1.2) | 85.7 (-0.2) | 34/36, z=-0.2 |
+| R8 | 76.6 | 82.0 (+5.4) | 80.0 (+3.3) | 131/87, z=+3.0 |
+| R32 | 79.8 | 85.1 (+5.3) | 82.4 (+2.6) | 91/57, z=+2.8 |
+
+At 13% of the budget the recipe already gives R8 +3.3 (z=+3.0) with the free arm flat, and without any digit weighting; the full-budget run at the sweep's best settings is queued after the gemma sweep and the deadband surfaces.
+
+Mechanism timings (qwen, 35B-A3B): refresh 221-229 s per 256 rows, of which sampling 196-205 s at 985-1063 tok/s (gemma: 47 s at 4418 tok/s for the same rows), offload 0.5 s, wake 1.5 s, sync 1.0 s, restore 0.4 s. Training between refreshes ~375 tok/s (gemma ~430). So qwen's sampling is about 4x slower per token than gemma's, which makes a refresh ~28% of wall time; a full 3.4M run is ~4.3 h. The gap is in vLLM's hybrid (gated delta net) decode at batch 256, not in our plumbing; worth a look on the speed axis but not a blocker.
+
+Fixed on the way: CUDA-graph capture refused `max_num_seqs` 1024 with only 285 linear-attention state blocks at a 0.55 memory share (the sampler now sets 256, which is all it ever batches); the eager smokes could not have caught it.
