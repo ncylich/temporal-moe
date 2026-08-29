@@ -1454,3 +1454,14 @@ The winner reproduces the published 4-cell mean at R8 (+2.2 vs +2.2) with real d
 | R16 | 86.6 -> 87.0 (+0.5) | 87.8 -> 87.1 (-0.7) | 92.5 -> 95.6 (+3.1) | 96.3 -> 97.6 (+1.2) | 89.6 -> 88.6 (-1.0) | 1.000 -> 0.992 |
 
 Quality is flat within each cell's noise (the moves are inside the floors and go both ways) and the deadband removes 2% of swaps at R8 and 1% at R16 (measured with TEMPORAL_COUNT_SWAPS=1). On gemma rho=0.5 is a no-op on both axes; the saving only becomes material near the rho=2.0 quality cliff found earlier. The W=3 adapter under the same deadband runs next for the paired adapted-arm reading; the decision on running the on-policy winner under a deadband waits for it.
+
+## The on-policy winner under the eviction deadband rho=0.5 (2026-08-29 19:28)
+
+Same adapter (KL T=2 on lr 1e-4), full surface at rho=0 vs rho=0.5, swap rate measured on GSM8K:
+
+| arm | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean vs base | swaps/token |
+|---|---|---|---|---|---|---|---|
+| R8 | 84.0 -> 84.0 | 86.7 -> 87.1 (+0.4) | 94.3 -> 93.0 (-1.3) | 96.3 -> 96.3 | 82.2 -> 79.8 (-2.4) | +2.2 -> +1.9 | 0.9985 -> 0.980 |
+| R16 | 87.1 -> 87.3 (+0.2) | 88.0 -> 89.5 (+1.5) | 93.9 -> 93.9 | 98.2 -> 97.6 (-0.6) | 88.4 -> 87.8 (-0.6) | +1.0 -> +1.2 | 1.000 -> 0.992 |
+
+Same picture as on the base: quality flat within noise (GSM8K identical, the other moves inside their cells' spread and in both directions) for a 2% swap saving at R8 and 1% at R16. With min-logit eviction the deadband at rho=0.5 is not a useful lever on gemma; the earlier sweep showed the saving only becomes material approaching the rho=2.0 cliff, where quality breaks. Conclusion for the paper's speed axis: report the swap rate at rho=0 (about 1.0/token at R8 and R16 with min-logit) and treat the deadband as a measured negative, not a knob. The adapter runs at rho=0.

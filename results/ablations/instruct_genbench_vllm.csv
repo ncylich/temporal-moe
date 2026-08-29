@@ -2275,3 +2275,11 @@ gemma4_ce_online_scratch_e16_klT2_rho0p5_full,128,8,R16,16,ifeval,"prompt_level_
 gemma4_ce_online_scratch_e16_klT2_rho0p5_full,128,8,R16,16,ifeval,"inst_level_strict_acc,none",0.925659,full,2048,110
 gemma4_ce_online_scratch_e16_klT2_rho0p5_full,128,8,R16,16,ifeval,"prompt_level_loose_acc,none",0.913124,full,2048,110
 gemma4_ce_online_scratch_e16_klT2_rho0p5_full,128,8,R16,16,ifeval,"inst_level_loose_acc,none",0.938849,full,2048,110
+gemma4_ce_online_scratch_e16_klT2_rho0p5_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.929825,4,2048,171
+gemma4_ce_online_scratch_e16_klT2_rho0p5_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.464912,4,2048,171
+gemma4_ce_online_scratch_e16_klT2_rho0p5_full_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.938596,4,2048,163
+gemma4_ce_online_scratch_e16_klT2_rho0p5_full_dual,128,8,R16,16,mmlu_gptoss_relaxed,"acc,strict-flan",0.464912,4,2048,163
+gemma4_ce_online_scratch_e16_klT2_rho0p5_he8192,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.963415,full,8192,19
+gemma4_ce_online_scratch_e16_klT2_rho0p5_he8192,128,8,R16,16,humaneval_gemma_fixed,"pass@1,channel-aware",0.975610,full,8192,19
+gemma4_ce_online_scratch_e16_klT2_rho0p5_m8192,128,8,R8,8,mbpp_gemma,"pass@1,channel-aware",0.798000,full,8192,118
+gemma4_ce_online_scratch_e16_klT2_rho0p5_m8192,128,8,R16,16,mbpp_gemma,"pass@1,channel-aware",0.878000,full,8192,115
