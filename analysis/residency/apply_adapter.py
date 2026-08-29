@@ -160,21 +160,10 @@ def apply_adapter(llm, adapter_path, base_path):
     return loaded
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--base", default="/dev/shm/gemma4-26b-it")
-    ap.add_argument("--adapter", required=True)
-    ap.add_argument("--check", required=True, help="merged checkpoint dir to compare engine tensors against")
-    ap.add_argument("--gpu-mem", type=float, default=0.85)
-    A = ap.parse_args()
-    import vllm_glue
-    vllm_glue.install()
-    from vllm import LLM
-    llm = LLM(model=A.base, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem, max_model_len=2048)
-    apply_adapter(llm, A.adapter, A.base)
-    vm = find_engine_model(llm); vp = dict(vm.named_parameters())
-    from safetensors import safe_open
+def check_engine(vm, ckdir):
+    """Diff every adapted engine tensor against a merged checkpoint on disk; returns (worst max|diff|, n compared)."""
     import glob
+    vp = dict(vm.named_parameters())
     # Stream each shard sequentially by byte offset (no mmap page faults: per-expert get_tensor
     # ran at ~50 MB/s, and loading the whole 70 GB checkpoint took the container to 187 of
     # 233 GiB) and diff every tensor against its engine slice on the GPU.
@@ -193,7 +182,7 @@ def main():
         elif "w2" in tail and "experts" in tail: eng[(L, "w2")] = p
         elif tail.endswith("norm.weight"): eng[(L, tail)] = p
     worst, n, skipped = 0.0, 0, 0
-    for f in sorted(glob.glob(f"{A.check}/*.safetensors")):
+    for f in sorted(glob.glob(f"{ckdir}/*.safetensors")):
         with open(f, "rb") as fh:
             hlen = struct.unpack("<Q", fh.read(8))[0]; hdr = json.loads(fh.read(hlen)); hdr.pop("__metadata__", None)
             shapes = {k: v["shape"] for k, v in hdr.items()}
@@ -232,8 +221,27 @@ def main():
                 if d != 0:
                     print(f"[apply_adapter-check] MISMATCH {k}: max diff {d:.3e}", flush=True)
     print(f"[apply_adapter-check] skipped {skipped} checkpoint tensors with no adapted engine target", flush=True)
-    print(f"[apply_adapter-check] {n} checkpoint tensors compared against {A.check}: worst max|diff| = {worst:.3e} -> "
+    print(f"[apply_adapter-check] {n} checkpoint tensors compared against {ckdir}: worst max|diff| = {worst:.3e} -> "
           f"{'EXACT' if worst == 0 else 'NOT EXACT'}", flush=True)
+    return worst, n
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--base", default="/dev/shm/gemma4-26b-it")
+    ap.add_argument("--adapter", required=True)
+    ap.add_argument("--check", required=True, help="merged checkpoint dir to compare engine tensors against")
+    ap.add_argument("--gpu-mem", type=float, default=0.85)
+    A = ap.parse_args()
+    import vllm_glue
+    vllm_glue.install()
+    from vllm import LLM
+    llm = LLM(model=A.base, **vllm_glue.llm_kwargs(), gpu_memory_utilization=A.gpu_mem, max_model_len=2048)
+    apply_adapter(llm, A.adapter, A.base)
+    vm = find_engine_model(llm); vp = dict(vm.named_parameters())
+    from safetensors import safe_open
+    import glob
+    worst, n = check_engine(vm, A.check)
     sys.exit(0 if worst == 0 else 1)
 
 

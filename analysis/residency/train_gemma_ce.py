@@ -1001,6 +1001,10 @@ def main():
                 if hits == 0:
                     print(f"[online-smoke] layer {L_}: no comparable tensors matched; engine names: "
                           f"{[n for n in vp if f'layers.{L_}.' in n][:12]}", flush=True)
+            if A.family == "qwen35":                    # exact streaming compare against the merged W=3 qwen
+                from apply_adapter import check_engine
+                w_, n_ = check_engine(SAMPLER.vmodel, ref.get("merged_dir") or "/root/models/qwen35-digit3-merged")
+                print(f"[online-smoke] qwen tensor check: {n_} tensors, worst max|diff| = {w_:.3e} -> {'EXACT' if w_ == 0 else 'NOT EXACT'}", flush=True)
             for arm in ref["gens"]:
                 rows_ = SAMPLER.sample(n_ref, greedy=True, prompts=qs, constrained=arm != "free", max_tokens=256)
                 gens = [r["ids"][r["prompt_len"]:].tolist() for r in rows_]
