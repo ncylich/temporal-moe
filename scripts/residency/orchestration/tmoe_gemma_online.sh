@@ -17,6 +17,7 @@ START=${1:-digit3}; T=${2:-850000}; EVERY=${3:-16}; N=${4:-256}; NAME=online_${S
 B=/dev/shm/gemma4-26b-it; L=scripts/residency/gpu_lease.sh; D=/workspace/olmoe-adapt/data; PY=/workspace/venv_vllm312/bin/python
 KL=/workspace/instruct-traj/gemma4_d7_seq4096_klref.pt
 case "${TMOE_ANCHOR_W:-0.05}" in 0|0.0) ANCHOR_ARGS="";; *) ANCHOR_ARGS="--kl-anchor $KL --kl-weight ${TMOE_ANCHOR_W:-0.05}";; esac
+if [ -n "${TMOE_CE:-}" ]; then CE_ARGS="--digit-weight ${TMOE_W:-3}"; else CE_ARGS="--kl-only"; fi
 COMMON="--model $B --family gemma4 --no-unsloth --traj gemma4_d7_seq4096 --max-seq 4096 --expert-lora-r 32 --opt adamw --micro-batch 16"
 A=$D/gemma_ce_${NAME}_adapter.pt; M=/root/models/gemma4-${NAME}-merged
 if [ "$START" = scratch ]; then SEEN=0; INIT=""; else
@@ -25,7 +26,7 @@ scripts/residency/disk_budget.sh || exit 3
 echo "### $NAME 1/3 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T))), refresh every $EVERY steps x $N rows $(date -u +%H:%M)"
 [ -f $A.done ] || { [ -n "$INIT" ] && cp $D/gemma_ce_${START}_adapter.pt $A; rm -f $A.tmp
   $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr 3e-5 --tokens $((SEEN+T)) \
-    ${TMOE_CE:+--digit-weight ${TMOE_W:-3}} ${TMOE_CE:---kl-only} $ANCHOR_ARGS --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
+    $CE_ARGS $ANCHOR_ARGS --aux-loss ${TMOE_AUX_LOSS:-revkl} --aux-kl-weight ${TMOE_AUX_W:-1.0} \
     --online-every $EVERY --online-n $N
   touch $A.done; }
 if [ "${TMOE_MERGE:-0}" = 1 ]; then
