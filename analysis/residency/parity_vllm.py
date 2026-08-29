@@ -38,6 +38,7 @@ def main():
     ap.add_argument("--sleep-mode", action="store_true", help="enable_sleep_mode + one sleep/wake cycle before generating (what the in-process sampler does)")
     ap.add_argument("--warm", type=int, default=4, help="prompts in the warm-up call (0 = none)")
     ap.add_argument("--adapter", default=None, help="adapter .pt to apply to the engine (raw base + adapter, same class as the online sampler)")
+    ap.add_argument("--no-hooks", action="store_true", help="plain vLLM: do not install the residency hooks (free arm only)")
     A = ap.parse_args()
     if A.compare:
         a, b = (json.load(open(p)) for p in A.compare)
@@ -51,8 +52,9 @@ def main():
                   f"swaps/token {a['swaps'][arm]:.4f} -> {b['swaps'][arm]:.4f}")
         return
     import vllm_glue
-    vllm_glue.install()
-    import vllm_residency  # noqa: F401
+    if not A.no_hooks:
+        vllm_glue.install()
+        import vllm_residency  # noqa: F401
     from decode_state import DEC
     from vllm import LLM, SamplingParams
     from datasets import load_dataset
@@ -70,7 +72,7 @@ def main():
     ctk = {} if A.think is None else {"chat_template_kwargs": {"enable_thinking": A.think == "on"}}
     res = {"gens": {}, "lps": {}, "tps": {}, "secs": {}, "swaps": {},
            "cfg": {k: os.environ.get(k) for k in ("TEMPORAL_WALKER", "TEMPORAL_EAGER", "TEMPORAL_RHO")}}
-    for arm in ("free", f"R{A.R}"):
+    for arm in (("free",) if A.no_hooks else ("free", f"R{A.R}")):
         DEC.update(on=arm != "free", R=A.R, swaps=1)
         DEC["state"].clear()
         if A.warm:
@@ -82,7 +84,7 @@ def main():
         gens = [list(o.outputs[0].token_ids) for o in outs]
         res["lps"][arm] = [[d[t].logprob for t, d in zip(o.outputs[0].token_ids, o.outputs[0].logprobs)] for o in outs]
         ntok = sum(len(g) for g in gens)
-        sw, rows, rate = TR.swap_stats()
+        sw, rows, rate = TR.swap_stats() if not A.no_hooks else (0, 0, 0.0)
         res["gens"][arm] = gens; res["secs"][arm] = secs; res["tps"][arm] = ntok / secs
         res["swaps"][arm] = rate
         print(f"[parity] {arm}: {ntok} tokens in {secs:.1f}s = {ntok/secs:.0f} tok/s; "

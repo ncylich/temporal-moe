@@ -6,11 +6,12 @@ set -uo pipefail; cd /workspace/temporal-moe
 export TMOE_ROOT=/workspace/temporal-moe PATH=/workspace/venv_vllm312/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=$(cat /root/.cache/huggingface/token) HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
 until grep -q "qwen smoke DONE" /workspace/rerun-logs/online_smoke_qwen.out 2>/dev/null; do sleep 30; done
+if [ -s results/ablations/genbench_samples/qwen35_instruct_textclass_n1319_R8_gsm8k_cot_zeroshot.json ]; then echo "### qwen-finish 1/3 already recorded"; else
 echo "### qwen-finish 1/3 class confound: textified raw base (text class) GSM8K free,R8 n=1319 $(date -u +%H:%M)"
 TMOE_PRIO=3 scripts/residency/gpu_lease.sh /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py --model qwen35_instruct --path /root/models/qwen35-base-text \
   --arms free,R8 --think off --temperature 0.7 --top-p 0.8 --presence-penalty 1.5 --record-as qwen35_instruct_textclass_n1319 \
   --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 5632 --gpu-mem 0.90 > /workspace/rerun-logs/qwen_textclass_base.out 2>&1
-echo "### qwen-finish 1/3 done rc=$? $(date -u +%H:%M)"
+echo "### qwen-finish 1/3 done rc=$? $(date -u +%H:%M)"; fi
 echo "### qwen-finish 2/3 short on-policy run (0.45M sampled tokens, ~2 refreshes) + GSM8K free/R8/R32 n=1319 $(date -u +%H:%M)"
 TMOE_PRIO=3 TMOE_AUX_LOSS=revkl_full TMOE_NAME_SUFFIX=_e2e bash /workspace/tmoe_qwen_online.sh scratch 450000 16 256 > /workspace/rerun-logs/qwen_online_e2e.out 2>&1
 echo "### qwen-finish 2/3 done rc=$? $(date -u +%H:%M)"
