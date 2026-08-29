@@ -194,7 +194,7 @@ def main():
                          "With --kl-only and no --kl-anchor, 'sampled' also skips the D7 walk entirely")
     ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
     ap.add_argument("--online-offload", type=int, default=0,
-                    help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 20)")
+                    help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 12)")
     ap.add_argument("--online-smoke", default=None,
                     help="path of a parity_vllm.py dump made from the MERGED checkpoint of the adapter this "
                          "run resumes from: sync once, generate the same prompts greedily, compare tokens, exit")

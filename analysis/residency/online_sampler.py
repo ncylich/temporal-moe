@@ -96,23 +96,37 @@ class OnlineSampler:
         return [m for m in self.model.modules() if hasattr(m, "elora_gu_A")]
 
     def _offload(self):
+        """Move the frozen expert base weights of the first `offload_layers` layers to pinned host
+        buffers (allocated once; pinned copies run at PCIe speed, ~4x faster than pageable)."""
         if not self.offload_layers:
             return
         t0 = time.time()
-        for m in self._expert_mods()[:self.offload_layers]:
+        if not hasattr(self, "_pinned"):
+            self._pinned = {}
+        for i, m in enumerate(self._expert_mods()[:self.offload_layers]):
             for a in ("gate_up_proj", "down_proj"):
-                t = getattr(m, a); t.data = t.data.to("cpu")
-        torch.cuda.empty_cache()
-        print(f"[online] offloaded {self.offload_layers} layers of expert base weights to host in {time.time()-t0:.1f}s", flush=True)
+                t = getattr(m, a)
+                if not t.data.is_cuda:
+                    continue
+                key = (i, a)
+                if key not in self._pinned:
+                    self._pinned[key] = torch.empty_like(t.data, device="cpu", pin_memory=True)
+                self._pinned[key].copy_(t.data, non_blocking=True)
+                t.data = self._pinned[key]
+        torch.cuda.synchronize(); torch.cuda.empty_cache()
+        print(f"[online] offloaded {self.offload_layers} layers of expert base weights to pinned host memory in {time.time()-t0:.1f}s", flush=True)
 
     def _restore(self):
         if not self.offload_layers:
             return
+        t0 = time.time()
         for m in self._expert_mods():
             for a in ("gate_up_proj", "down_proj"):
                 t = getattr(m, a)
                 if not t.data.is_cuda:
-                    t.data = t.data.to(self.dev)
+                    t.data = t.data.to(self.dev, non_blocking=True)
+        torch.cuda.synchronize()
+        print(f"[online] restored expert base weights to the GPU in {time.time()-t0:.1f}s", flush=True)
 
     def _find_model(self):
         cands = ["llm_engine.engine_core.engine_core.model_executor.driver_worker.worker.model_runner.model",
