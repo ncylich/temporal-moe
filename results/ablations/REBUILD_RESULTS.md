@@ -1445,3 +1445,12 @@ Adapter-direct, no WritingBench (final version only). Deltas vs the matched base
 | **KL T=2 winner** | 87.1 (+0.5) | 88.0 (+0.2) | 93.9 (+1.3) | 98.2 (+1.8) | 88.4 (-1.2) | **+1.0** |
 
 The winner reproduces the published 4-cell mean at R8 (+2.2 vs +2.2) with real data and no tokenizer-specific term, and it does so without the IFEval and MBPP losses the CE recipe pays; GSM8K R8 is +5.2 against the published +6.0. At R16 it is the first adapter above base on every cell except MBPP (-1.2, within that cell's run-to-run spread). MMLU and HumanEval match the CE recipe, which was that recipe's strength. This is the gemma final candidate; WritingBench runs on it once qwen is settled.
+
+## Deadband rho=0.5 on the gemma base, full surface at R8 (2026-08-29 18:30)
+
+| arm | GSM8K | IFEval | MMLU | HumanEval | MBPP | swaps/token (GSM8K) |
+|---|---|---|---|---|---|---|
+| R8 | 78.8 -> 79.8 (+1.1) | 86.9 -> 87.2 (+0.4) | 92.5 -> 94.7 (+2.2) | 94.5 -> 92.1 (-2.4) | 78.0 -> 79.2 (+1.2) | 0.9985 -> 0.980 |
+| R16 | 86.6 -> 87.0 (+0.5) | 87.8 -> 87.1 (-0.7) | 92.5 -> 95.6 (+3.1) | 96.3 -> 97.6 (+1.2) | 89.6 -> 88.6 (-1.0) | 1.000 -> 0.992 |
+
+Quality is flat within each cell's noise (the moves are inside the floors and go both ways) and the deadband removes 2% of swaps at R8 and 1% at R16 (measured with TEMPORAL_COUNT_SWAPS=1). On gemma rho=0.5 is a no-op on both axes; the saving only becomes material near the rho=2.0 quality cliff found earlier. The W=3 adapter under the same deadband runs next for the paired adapted-arm reading; the decision on running the on-policy winner under a deadband waits for it.
