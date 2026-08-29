@@ -175,71 +175,64 @@ def main():
     vm = find_engine_model(llm); vp = dict(vm.named_parameters())
     from safetensors import safe_open
     import glob
-    # Stream: index name -> file, fetch tensors per engine param and free them. Holding the
-    # whole textified checkpoint (70 GB, per-expert) plus fused copies took the container to
-    # 187 of 233 GiB on 2026-08-29 and had to be killed.
-    idx, handles = {}, {}
-    for f in glob.glob(f"{A.check}/*.safetensors"):
-        handles[f] = safe_open(f, "pt", device="cpu")
-        for k in handles[f].keys():
-            idx[k] = f
-    def fetch(k):
-        return handles[idx[k]].get_tensor(k) if k in idx else None
-    class _CK(dict):                                        # dict-like view over the index
-        def __contains__(self, k):
-            return k in idx
-        def get(self, k, default=None):
-            v = fetch(k)
-            if v is not None:
-                return v
-            m = re.match(r"(model\.(?:language_model\.)?layers\.\d+\.mlp\.experts)\.(gate_up|down)_proj$", k)
-            if not m:
-                return default
-            pre_, kind = m.groups()
-            E = 0
-            while f"{pre_}.{E}.down_proj.weight" in idx:
-                E += 1
-            if E == 0:
-                return default
-            if kind == "gate_up":
-                return torch.stack([torch.cat([fetch(f"{pre_}.{e}.gate_proj.weight"),
-                                               fetch(f"{pre_}.{e}.up_proj.weight")], 0) for e in range(E)])
-            return torch.stack([fetch(f"{pre_}.{e}.down_proj.weight") for e in range(E)])
-    ck = _CK()
-    worst, n = 0.0, 0
+    # Stream each shard sequentially by byte offset (no mmap page faults: per-expert get_tensor
+    # ran at ~50 MB/s, and loading the whole 70 GB checkpoint took the container to 187 of
+    # 233 GiB) and diff every tensor against its engine slice on the GPU.
+    import json, struct
+    DT = {"BF16": torch.bfloat16, "F16": torch.float16, "F32": torch.float32}
+    eng = {}
     for name, p in vp.items():
         m = re.search(r"layers\.(\d+)\.(.*)$", name)
         if not m:
             continue
-        L, tail = m.group(1), m.group(2); pre = f"model.language_model.layers.{L}."
-        if pre + "input_layernorm.weight" not in ck and f"model.layers.{L}.input_layernorm.weight" in ck:
-            pre = f"model.layers.{L}."                                          # textified (qwen)
-        want = None
-        if tail.endswith("qkv_proj.weight"):
-            parts = [ck.get(pre + f"self_attn.{x}_proj.weight") for x in "qkv"]
-            want = torch.cat([q for q in parts if q is not None], 0) if parts[0] is not None else None
-        elif tail.endswith("o_proj.weight"):
-            want = ck.get(pre + "self_attn.o_proj.weight")
-        elif tail.endswith("router.proj.weight"):
-            want = ck.get(pre + "router.proj.weight")
-        elif "w13" in tail:
-            want = ck.get(pre + "mlp.experts.gate_up_proj")
-            if want is None:
-                want = ck.get(pre + "experts.gate_up_proj")
-        elif "w2" in tail and "experts" in tail:
-            want = ck.get(pre + "mlp.experts.down_proj")
-            if want is None:
-                want = ck.get(pre + "experts.down_proj")
-        elif tail.endswith("mlp.gate.weight"):
-            want = ck.get(pre + "mlp.gate.weight")
-        elif tail.endswith("norm.weight"):
-            want = ck.get(pre + tail)
-        if want is None or want.shape != p.shape:
-            continue
-        d = (p.detach().float().cpu() - want.float()).abs().max().item(); worst = max(worst, d); n += 1
-        if d != 0:
-            print(f"[apply_adapter-check] MISMATCH {name}: max diff {d:.3e}", flush=True)
-    print(f"[apply_adapter-check] {n} engine tensors compared against {A.check}: worst max|diff| = {worst:.3e} -> "
+        L, tail = int(m.group(1)), m.group(2)
+        if tail.endswith("qkv_proj.weight"): eng[(L, "qkv")] = p
+        elif tail.endswith("self_attn.o_proj.weight") or tail.endswith("attn.o_proj.weight"): eng[(L, "o")] = p
+        elif tail.endswith("router.proj.weight") or tail.endswith("mlp.gate.weight"): eng[(L, "router")] = p
+        elif "w13" in tail: eng[(L, "w13")] = p
+        elif "w2" in tail and "experts" in tail: eng[(L, "w2")] = p
+        elif tail.endswith("norm.weight"): eng[(L, tail)] = p
+    worst, n, skipped = 0.0, 0, 0
+    for f in sorted(glob.glob(f"{A.check}/*.safetensors")):
+        with open(f, "rb") as fh:
+            hlen = struct.unpack("<Q", fh.read(8))[0]; hdr = json.loads(fh.read(hlen)); hdr.pop("__metadata__", None)
+            shapes = {k: v["shape"] for k, v in hdr.items()}
+            def rows(L, x):                             # q/k/v row counts from the header
+                for k in (f"model.layers.{L}.self_attn.{x}_proj.weight", f"model.language_model.layers.{L}.self_attn.{x}_proj.weight"):
+                    if k in shapes: return shapes[k][0]
+                return 0
+            for k in sorted(hdr, key=lambda k: hdr[k]["data_offsets"][0]):
+                o0, o1 = hdr[k]["data_offsets"]
+                m = re.match(r"model\.(?:language_model\.)?layers\.(\d+)\.(.*)$", k)
+                if not m or "vision" in k:
+                    continue
+                L, rest = int(m.group(1)), m.group(2)
+                target = None
+                mm = re.match(r"mlp\.experts\.(\d+)\.(gate|up|down)_proj\.weight$", rest)
+                if mm:
+                    e, kind = int(mm.group(1)), mm.group(2); I = shapes[k][0] if kind != "down" else shapes[k][1]
+                    if kind == "gate" and (L, "w13") in eng: target = eng[(L, "w13")][e, :I]
+                    elif kind == "up" and (L, "w13") in eng: target = eng[(L, "w13")][e, I:]
+                    elif kind == "down" and (L, "w2") in eng: target = eng[(L, "w2")][e]
+                elif rest.endswith("experts.gate_up_proj"): target = eng.get((L, "w13"))
+                elif rest.endswith("experts.down_proj"): target = eng.get((L, "w2"))
+                elif rest.endswith("self_attn.q_proj.weight") and (L, "qkv") in eng: target = eng[(L, "qkv")][:rows(L, "q")]
+                elif rest.endswith("self_attn.k_proj.weight") and (L, "qkv") in eng: target = eng[(L, "qkv")][rows(L, "q"):rows(L, "q") + rows(L, "k")]
+                elif rest.endswith("self_attn.v_proj.weight") and (L, "qkv") in eng: target = eng[(L, "qkv")][rows(L, "q") + rows(L, "k"):]
+                elif rest.endswith("self_attn.o_proj.weight"): target = eng.get((L, "o"))
+                elif rest.endswith("router.proj.weight") or rest.endswith("mlp.gate.weight"): target = eng.get((L, "router"))
+                elif rest.endswith("norm.weight"): target = eng.get((L, rest))
+                if target is None:
+                    skipped += 1; continue
+                fh.seek(8 + hlen + o0); buf = fh.read(o1 - o0)
+                want = torch.frombuffer(bytearray(buf), dtype=DT[hdr[k]["dtype"]]).reshape(shapes[k])
+                if tuple(want.shape) != tuple(target.shape):
+                    print(f"[apply_adapter-check] SHAPE {k}: ck {tuple(want.shape)} vs engine {tuple(target.shape)}", flush=True); skipped += 1; continue
+                d = (target.detach().float() - want.cuda().float()).abs().max().item(); worst = max(worst, d); n += 1
+                if d != 0:
+                    print(f"[apply_adapter-check] MISMATCH {k}: max diff {d:.3e}", flush=True)
+    print(f"[apply_adapter-check] skipped {skipped} checkpoint tensors with no adapted engine target", flush=True)
+    print(f"[apply_adapter-check] {n} checkpoint tensors compared against {A.check}: worst max|diff| = {worst:.3e} -> "
           f"{'EXACT' if worst == 0 else 'NOT EXACT'}", flush=True)
     sys.exit(0 if worst == 0 else 1)
 
