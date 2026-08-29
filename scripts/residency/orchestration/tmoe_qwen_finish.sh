@@ -3,6 +3,8 @@
 # measurement (textified base, text class, GSM8K free/R8 n=1319), (3) short real on-policy run with refreshes
 # + GSM8K (timing + first reading), then (4) relaunch the gemma sweep and the post-sweep chain.
 set -uo pipefail; cd /workspace/temporal-moe
+export TMOE_ROOT=/workspace/temporal-moe PATH=/workspace/venv_vllm312/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
+export HF_TOKEN=$(cat /root/.cache/huggingface/token) HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0
 until grep -q "qwen smoke DONE" /workspace/rerun-logs/online_smoke_qwen.out 2>/dev/null; do sleep 30; done
 echo "### qwen-finish 1/3 class confound: textified raw base (text class) GSM8K free,R8 n=1319 $(date -u +%H:%M)"
 TMOE_PRIO=3 scripts/residency/gpu_lease.sh /workspace/venv_vllm312/bin/python -u analysis/residency/instruct_genbench_vllm.py --model qwen35_instruct --path /root/models/qwen35-base-text \
