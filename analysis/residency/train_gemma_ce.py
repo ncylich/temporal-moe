@@ -954,12 +954,14 @@ def main():
             ref = _json.load(open(A.online_smoke)); n_ref = len(ref["gens"]["free"])
             qs = [r["question"] for r in _ld("openai/gsm8k", "main", split="test")][:n_ref]
             SAMPLER.sync()
-            # tensor-level check of the sync against the merged checkpoint on disk (generation-free)
+            # tensor-level check of the sync against the merged checkpoint on disk (generation-free; gemma names)
+            if A.family != "gemma4":
+                ref.setdefault("merged_dir", None)
             import glob as _glob
             from safetensors import safe_open as _so
-            mdir = ref.get("merged_dir") or "/root/models/gemma4-digit3-merged"
+            mdir = ref.get("merged_dir") or ("/root/models/gemma4-digit3-merged" if A.family == "gemma4" else None)
             ck = {}
-            for f in _glob.glob(f"{mdir}/*.safetensors"):
+            for f in (_glob.glob(f"{mdir}/*.safetensors") if mdir else []):
                 with _so(f, "pt", device="cpu") as fh:
                     for k in fh.keys():
                         if "layers.0." in k or "layers.29." in k or k.endswith("language_model.norm.weight"):
