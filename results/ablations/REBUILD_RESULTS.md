@@ -1560,3 +1560,15 @@ lr 3e-5, KL T=2, 16x256, 3.4M, raw class, adapter-direct, no WritingBench. Match
 | on-policy lr 3e-5, KL T=2 | 85.4 (+5.6) | 82.3 (-3.0) | 91.7 (-1.8) | 90.2 (+1.2) | 77.6 (+1.2) | +0.5 |
 
 GSM8K reproduces the published +6.5 on both arms, but the four-cell mean at R8 (+1.4) is half the published +2.7 and R32 loses on IFEval and MMLU. Like for like, digit10 would be near +1.5, so on qwen the on-policy adapter is level with the best prior rather than ahead of it as on gemma. Not final. The next single knob is the on-policy prompt mix (the quota is math-heavy: mathlane_v2 2341, d5_fewshot 1183, domain8k 1000), since the arms that slip are the instruction and knowledge ones.
+
+## Qwen prompt-mix cell: 25% math instead of 52% (2026-08-30 01:48)
+
+Same recipe (lr 3e-5, KL T=2, 16x256, 3.4M), quota mathlane_v2 1200 / d5_fewshot 1183 / domain8k 2500 instead of 2341 / 1183 / 1000. Sample statistics moved as intended (digit chars 1.4% vs 2.2%, '=' per row 6 vs 10). GSM8K n=1319:
+
+| arm | base | math-heavy | balanced mix | mix vs math-heavy (fixed/broken, z) |
+|---|---|---|---|---|
+| free | 85.9 | 86.9 (+1.0) | 86.0 (+0.1) | 15/27, z=-1.9 |
+| R8 | 76.6 | 83.2 (+6.5) | 80.9 (+4.2) | 47/77, z=-2.7 |
+| R32 | 79.8 | 85.4 (+5.6) | 83.5 (+3.6) | 37/63, z=-2.6 |
+
+Halving the math share costs about 2 points on every GSM8K arm, so the math prompts carry the constrained-arm gain. The surface (IFEval, MMLU, code) on this adapter decides whether general prompts buy anything on the other cells; it runs regardless of the chain's GSM8K gate because that trade-off is the question.
