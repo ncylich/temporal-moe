@@ -1606,3 +1606,7 @@ The prompt mix is a genuine lever with a trade: at R8 the mean is unchanged (GSM
 | 39% math | 83.9 (+4.1) | 83.9 (-1.3) | 93.4 (0.0) | 92.1 (+3.0) | 77.4 (+1.0) | +1.5 |
 
 The two mixes with 2500 general prompts behave alike regardless of the math count, so the general-prompt share is the lever: it recovers the R32 IFEval/MMLU losses and lifts HumanEval at a cost of about 2 points of GSM8K on both arms. No mix reaches the math-heavy GSM8K while keeping the recovered cells. Continuation: the 25% cell (best mean over both arms) resumes to 1.0x prompt coverage (+0.6M sampled tokens) with the Adam state and prompt cursor carried over, then its surface.
+
+### Continuation of the 25% cell to 1.0x prompt coverage (2026-08-30 05:03)
+
+Resumed from its 3.4M checkpoint with the AdamW state and the prompt cursor carried over (new in `train_gemma_ce.py --resume`: the adapter file stores the optimizer state; the sampler cursor is advanced by step/every x n), +0.6M sampled tokens = the 3 refreshes needed to draw every prompt of the 4,883-prompt quota once. GSM8K n=1319: free 86.2 (+0.3), R8 81.7 (+5.0; vs the 3.4M checkpoint 68/58, z=+0.9), R32 83.5 (+3.6; 48/48). A small, non-significant gain; the full surface follows. (The 52% pool of 4,524 prompts is already at 0.96x coverage after 3.4M, so 1.0x adds nothing measurable there.)
