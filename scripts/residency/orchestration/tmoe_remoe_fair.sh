@@ -17,7 +17,7 @@ else B=/root/models/qwen35-35b-a3b; COMMON="--model $B --family qwen35 --no-unsl
 for LR in 1e-4 3e-4 1e-3; do
   A=$D/${PFX}_lr${LR}_adapter.pt
   echo "### remoe $MODEL lr $LR train (router-only, residency off, 3.4M) $(date -u +%H:%M)"
-  [ -f $A.done ] || { $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A --router-only --no-constraint --remoe-lambda 1.0 --remoe-gamma 0.9 --accum 16 --lr $LR --tokens 3400000 && touch $A.done; }
+  [ -f $A.done ] || { $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A --router-only --no-constraint --remoe-lambda 1.0 --remoe-gamma 0.9 --extra-lr-div 1 --accum 16 --lr $LR --tokens 3400000 && touch $A.done; }
   echo "### remoe $MODEL lr $LR GSM8K free,R8 n=1319 $(date -u +%H:%M)"
   $L $PY -u analysis/residency/instruct_genbench_vllm.py $G --adapter $A --arms $ARMS --record-as ${PFX}_lr${LR}_n1319 --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len $ML --gpu-mem 0.90
 done
