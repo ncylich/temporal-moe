@@ -1622,3 +1622,21 @@ Resumed from its 3.4M checkpoint with the AdamW state and the prompt cursor carr
 | 25% math -> 1.0x coverage (4.0M) | 83.5 (+3.6) | 83.9 (-1.3) | 93.4 (0.0) | 89.0 (0.0) | 78.8 (+2.4) | +0.6 |
 
 The continuation adds +0.8 on GSM8K R8 and nothing else; its lower means are HumanEval swinging back (-1.9 / -3.1 vs the 3.4M checkpoint, a cell with SE about 2.4 that has moved by +-2 between every pair of adapters). Across four qwen on-policy adapters (52 / 25 / 39% math, and the continuation) only GSM8K responds to the levers, IFEval and MMLU stay within +-1.3 of base at R8, and the code cells are noise. The qwen four-cell mean is capped near +1.4 by the cells that do not move, not by the recipe; the published +2.7 is not reachable like for like (the best prior, like for like, is also about +1.5). Qwen final candidate: the 52% recipe (lr 3e-5, KL T=2, 16x256, 3.4M): GSM8K R8 +6.5 = published, no cell below base beyond noise at R8, and the same recipe as gemma up to the learning rate.
+
+## Full honest prompt pool on qwen: 0.5x coverage (2026-08-30 08:38)
+
+Pool = `d7_prompts.jsonl` + `codelane_2500.jsonl` = 10,982 prompts (general 4958, math 2341, fewshot 1183, code 2500; the code lane enters the on-policy quota for the first time). Recipe unchanged (lr 3e-5, KL T=2, 16x256, temp 0.7, card penalty). Stage 1 stops at 4.3M sampled tokens = every prompt drawn about once per two (0.5x); stage 2 resumes to 8.6M (1.0x).
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 76.6 | 82.6 | 92.1 | 90.9 | 75.2 | |
+| 52% math, d7 pool (3.4M) | 83.2 (+6.5) | 83.2 (+0.6) | 92.5 (+0.4) | 89.0 (-1.8) | 76.4 (+1.2) | +1.4 |
+| full pool, 0.5x (4.3M) | 82.8 (+6.1) | 82.1 (-0.6) | 94.3 (+2.2) | 89.6 (-1.2) | 75.6 (+0.4) | +1.6 |
+
+| R32 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 79.8 | 85.2 | 93.4 | 89.0 | 76.4 | |
+| 52% math, d7 pool (3.4M) | 85.4 (+5.6) | 82.3 (-3.0) | 91.7 (-1.8) | 90.2 (+1.2) | 77.6 (+1.2) | +0.5 |
+| full pool, 0.5x (4.3M) | 85.7 (+5.8) | 83.7 (-1.5) | 92.1 (-1.3) | 92.7 (+3.7) | 77.4 (+1.0) | +1.7 |
+
+Best qwen four-cell means so far on both arms, with GSM8K at the math-heavy level although math is 21% of this pool: the full pool combines what the earlier mixes traded against each other. The eval surface takes 47 min on qwen, 25 of them the code stage (two arms x HumanEval + MBPP at 500 items).
