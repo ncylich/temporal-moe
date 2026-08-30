@@ -15,7 +15,7 @@ for LAM in 0 0.05 0.1 0.2 0.4; do
   echo "### skliar $MODEL C=$TEMPORAL_CB_C lambda=$LAM GSM8K n=1319 $(date -u +%H:%M)"
   $L $PY -u analysis/residency/instruct_genbench_vllm.py $G --record-as ${TAG}_n1319 --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len $ML --gpu-mem 0.90
 done
-# operating points for the surface: the lambda whose loads/token is closest to ours (1.0) and the best-GSM8K lambda
+# operating points for the surface: plain LRU (lambda 0) and the knee (largest lambda within 1 pt of plain LRU on GSM8K)
 PICKS=$(/workspace/venv_vllm312/bin/python - "$MODEL" "$TAGP" <<'PY'
 import sys, re, csv, glob
 model, tagp = sys.argv[1], sys.argv[2]
@@ -28,9 +28,10 @@ for lam in ("0", "0.05", "0.1", "0.2", "0.4"):
     acc = [float(r["value"]) for r in rows if r["model"] == tag and r["arm"] == "R8" and r["task"] == "gsm8k_cot_zeroshot" and r["metric"] == "exact_match,flexible-extract"]
     m = re.findall(rf"\[swaps\] {re.escape(tag)} R8 gsm8k_cot_zeroshot: \d+ swaps over \d+ stepped rows = ([\d.]+)/token", log)
     if acc and m: res[lam] = (acc[-1], float(m[-1]))
-if not res: print("0.1 0.4"); sys.exit()
-speed = min(res, key=lambda l: abs(res[l][1] - 1.0)); best = max(res, key=lambda l: res[l][0])
-print(speed, best if best != speed else "")
+if not res: print("0 0.1"); sys.exit()
+ref = res.get("0", None) or res[min(res, key=float)]
+knee = max((l for l in res if res[l][0] >= ref[0] - 0.010), key=float)   # largest lambda within 1 pt of plain LRU
+print("0", knee if knee != "0" else "")
 for l, (a, s) in res.items(): print(f"[skliar-pick] lambda {l}: GSM8K R8 {100*a:.1f}, loads/token {s:.3f}", file=sys.stderr)
 PY
 )
