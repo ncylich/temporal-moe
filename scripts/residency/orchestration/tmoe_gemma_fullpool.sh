@@ -3,7 +3,7 @@
 # (lr 3e-5, KL T=2, 16x256). Stage 1: from scratch to 4.3M sampled tokens (0.5x coverage) -> GSM8K + full surface.
 # Stage 2: resume (Adam state + prompt cursor carried) to 8.6M (1.0x) -> GSM8K + full surface.
 set -uo pipefail; cd /workspace/temporal-moe
-export TMOE_PRIO=4 TMOE_LR=1e-4 TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_ONLINE_MEM=0.45
+export TMOE_PRIO=4 TMOE_LR=1e-4 TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_ONLINE_MEM=0.45 TMOE_ANCHOR_W=0 TMOE_BUDGET_ON=sampled
 export TMOE_PROMPTS=/workspace/olmoe-adapt/data/fullpool_prompts.jsonl TMOE_QUOTA="mathlane_v2=2341,d5_fewshot=1183,domain8k=4958,codelane=2500"
 D=/workspace/olmoe-adapt/data; S=scripts/residency/gpu_lease.sh
 echo "### fullpool 1/4 stage 1: from scratch to 4.3M (0.5x coverage) $(date -u +%H:%M)"
