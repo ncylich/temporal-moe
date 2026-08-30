@@ -1588,3 +1588,21 @@ Halving the math share costs about 2 points on every GSM8K arm, so the math prom
 | balanced (25% math) | 83.5 (+3.6) | 84.5 (-0.7) | 93.0 (-0.4) | 92.1 (+3.0) | 78.4 (+2.0) | +1.4 |
 
 The prompt mix is a genuine lever with a trade: at R8 the mean is unchanged (GSM8K -2.3 against HumanEval +2.4), at R32 the IFEval and MMLU losses disappear and the mean goes from +0.5 to +1.4. The balanced adapter is the first qwen adapter with no cell meaningfully below base on either arm. Next single cell: the intermediate mix (all 2341 math prompts kept, domain8k raised to 2500; about 39% math).
+
+### Three prompt mixes (2026-08-30 04:16)
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 76.6 | 82.6 | 92.1 | 90.9 | 75.2 | |
+| 52% math (math 2341 / fewshot 1183 / general 1000) | 83.2 (+6.5) | 83.2 (+0.6) | 92.5 (+0.4) | 89.0 (-1.8) | 76.4 (+1.2) | +1.4 |
+| 25% math (1200 / 1183 / 2500) | 80.9 (+4.2) | 82.8 (+0.2) | 92.1 (0.0) | 91.5 (+0.6) | 76.8 (+1.6) | +1.3 |
+| 39% math (2341 / 1183 / 2500) | 81.1 (+4.5) | 83.7 (+1.1) | 90.8 (-1.3) | 90.9 (0.0) | 77.6 (+2.4) | +1.1 |
+
+| R32 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 79.8 | 85.2 | 93.4 | 89.0 | 76.4 | |
+| 52% math | 85.4 (+5.6) | 82.3 (-3.0) | 91.7 (-1.8) | 90.2 (+1.2) | 77.6 (+1.2) | +0.5 |
+| 25% math | 83.5 (+3.6) | 84.5 (-0.7) | 93.0 (-0.4) | 92.1 (+3.0) | 78.4 (+2.0) | +1.4 |
+| 39% math | 83.9 (+4.1) | 83.9 (-1.3) | 93.4 (0.0) | 92.1 (+3.0) | 77.4 (+1.0) | +1.5 |
+
+The two mixes with 2500 general prompts behave alike regardless of the math count, so the general-prompt share is the lever: it recovers the R32 IFEval/MMLU losses and lifts HumanEval at a cost of about 2 points of GSM8K on both arms. No mix reaches the math-heavy GSM8K while keeping the recovered cells. Continuation: the 25% cell (best mean over both arms) resumes to 1.0x prompt coverage (+0.6M sampled tokens) with the Adam state and prompt cursor carried over, then its surface.
