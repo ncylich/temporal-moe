@@ -313,3 +313,30 @@ Quality flat at the free level for every lambda while loads fall twelvefold. Wit
 | Skliar, lambda 0.4 | 50% | 85.8 (-0.1) | 85.6 (-0.9) | 93.0 (-0.4) | 95.7 (+3.0) | 78.6 (-0.8) | 0.07, 0.05, 0.06 |
 
 Lossless within noise at half the experts resident, at 0.05-0.84 loads per token-layer. The plain-LRU point is close to our swap rate (0.84 vs 1.00) at sixteen times our resident memory and free-level quality: on qwen the comparison reduces to the memory axis. (The lm-eval code tasks need HF_ALLOW_CODE_EVAL=1; the Skliar script now exports it.)
+
+### ReMoE at its setting, gemma (2026-08-30 20:09)
+
+Router-only finetune with the recency-bias reuse objective, residency constraint OFF during
+training (their setting: the free model is the product), lr swept on 3.4M tokens of the d7
+pool; GSM8K n=1319 free and R8-trigger per lr. Base free 87.8 / R8 78.8.
+
+| lr | GSM8K free | GSM8K R8 |
+|---|---|---|
+| 1e-4 | 87.6 | 78.1 |
+| 3e-4 (pick, by free) | 88.9 | 80.4 |
+| 1e-3 | 79.3 | 65.2 |
+
+Full surface of the pick on its own (free) arm, full budgets:
+
+| run | resident memory | GSM8K | IFEval | MMLU | HumanEval | MBPP | loads or swaps / token-layer |
+|---|---|---|---|---|---|---|---|
+| base, free | 100% | 87.8 | 88.7 | 93.0 | 99.4 | 91.2 | 0 |
+| ReMoE lr 3e-4, free | 100% | 88.8 (+1.0) | 89.6 (+0.9) | 93.4 (+0.4) | 98.8 (-0.6) | 89.8 (-1.4) | 0 |
+| ReMoE lr 3e-4, LRU C=64 | 50% | 88.8 (+1.0) | | | | | 0.29 |
+| ours, R8 adapted (KL T=2, d7 pool) | 6.25% | 84.0 | 86.7 | 94.3 | 96.3 | 82.2 | 1.00 |
+
+Reading: at its own setting ReMoE is quality-neutral (5-cell mean -0.1, noise floor ~1/cell)
+and its router regularizer does not reduce cache traffic below the untrained base under the
+same LRU (0.29 vs 0.31 at C=64), though it stays lossless there (GSM8K 88.8 = its free arm).
+Its R8 arm (80.4, +1.6 over base) trails our R8-adapted 84.0 by 3.6: training never sees the
+residency bound. Qwen ReMoE runs the same chain next.
