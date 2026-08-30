@@ -1640,3 +1640,7 @@ Pool = `d7_prompts.jsonl` + `codelane_2500.jsonl` = 10,982 prompts (general 4958
 | full pool, 0.5x (4.3M) | 85.7 (+5.8) | 83.7 (-1.5) | 92.1 (-1.3) | 92.7 (+3.7) | 77.4 (+1.0) | +1.7 |
 
 Best qwen four-cell means so far on both arms, with GSM8K at the math-heavy level although math is 21% of this pool: the full pool combines what the earlier mixes traded against each other. The eval surface takes 47 min on qwen, 25 of them the code stage (two arms x HumanEval + MBPP at 500 items).
+
+### Full pool at 1.0x coverage, GSM8K (2026-08-30 10:05)
+
+Resumed from the 0.5x checkpoint (Adam state and prompt cursor carried) to 8.6M sampled tokens. GSM8K n=1319: free 86.1 (+0.2), R8 83.5 (+6.9), R32 85.1 (+5.3); vs the 0.5x checkpoint R8 60/50 (z=+1.0), R32 41/48 (z=-0.7), free 21/27 (z=-0.9): the second pass over the pool changes nothing beyond noise on GSM8K. R8 +6.9 is the first qwen number above the published +6.5. Surface follows.
