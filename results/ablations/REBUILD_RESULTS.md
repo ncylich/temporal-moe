@@ -1540,3 +1540,23 @@ R8 +6.5 equals the published qwen figure, with real prompts, no tokenizer-specif
 | R32 | 79.8 | 85.4 (+5.6) | 84.8 (+5.0) | 39/47, z=-0.9 |
 
 Same picture as gemma: the learning rate is saturated once it is high enough, and the two cells are within noise on every arm. Per the rule (a third cell at 1e-4 only if the scaled lr is better), the ablation stops here; the 1e-4 cell the chain had started on a rounding tie was cancelled after one minute. Pick: lr 3e-5, qwen's original setting, nominally ahead on all three arms. Its full surface (no WritingBench) runs next, adapter-direct on the raw class.
+
+## Qwen on-policy winner, full surface (2026-08-30 00:40)
+
+lr 3e-5, KL T=2, 16x256, 3.4M, raw class, adapter-direct, no WritingBench. Matched base records (`qwen35_think_off_n1319`, `qwen35_base_full`/`_r32`, `qwen35_base_n_dual`, `qwen35_base_code_ref`). The merged-checkpoint rows carry the text-class confound (about +1.2 on GSM8K R8 in their favour).
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base (raw class) | 76.6 | 82.6 | 92.1 | 90.9 | 75.2 | |
+| digit10 (merged; confounded) | 82.0 (+5.4) | 82.8 (+0.2) | 90.8 (-1.3) | 93.9 (+3.0) | 76.6 (+1.4) | +1.8 |
+| CE+W=3 (merged; confounded) | 81.7 (+5.1) | 83.9 (+1.3) | 92.5 (+0.4) | 90.9 (0.0) | 75.8 (+0.6) | +1.7 |
+| on-policy lr 3e-5, KL T=2 | 83.2 (+6.5) | 83.2 (+0.6) | 92.5 (+0.4) | 89.0 (-1.8) | 76.4 (+1.2) | +1.4 |
+
+| R32 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base (raw class) | 79.8 | 85.2 | 93.4 | 89.0 | 76.4 | |
+| digit10 (merged; confounded) | 85.1 (+5.3) | 83.7 (-1.5) | 93.0 (-0.4) | 89.6 (+0.6) | 77.2 (+0.8) | +1.0 |
+| CE+W=3 (merged; confounded) | 83.2 (+3.3) | 84.3 (-0.9) | 91.2 (-2.2) | 90.9 (+1.8) | 78.2 (+1.8) | +0.5 |
+| on-policy lr 3e-5, KL T=2 | 85.4 (+5.6) | 82.3 (-3.0) | 91.7 (-1.8) | 90.2 (+1.2) | 77.6 (+1.2) | +0.5 |
+
+GSM8K reproduces the published +6.5 on both arms, but the four-cell mean at R8 (+1.4) is half the published +2.7 and R32 loses on IFEval and MMLU. Like for like, digit10 would be near +1.5, so on qwen the on-policy adapter is level with the best prior rather than ahead of it as on gemma. Not final. The next single knob is the on-policy prompt mix (the quota is math-heavy: mathlane_v2 2341, d5_fewshot 1183, domain8k 1000), since the arms that slip are the instruction and knowledge ones.
