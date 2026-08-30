@@ -1660,3 +1660,15 @@ Resumed from the 0.5x checkpoint (Adam state and prompt cursor carried) to 8.6M 
 | full pool 1.0x (8.6M) | 85.1 (+5.3) | 84.3 (-0.9) | 91.2 (-2.2) | 92.1 (+3.0) | 76.6 (+0.2) | +1.31 |
 
 The 1.0x checkpoint meets the agreed bar (four-cell mean >= 2.0 at R8: +2.07) with GSM8K R8 +6.9 above the published +6.5 and no cell below base beyond noise. The two checkpoints differ mostly through HumanEval and MMLU noise (HumanEval 89.6 vs 92.7, MMLU 94.3 vs 91.7), so the recipe's R8 mean is best stated as +1.6 to +2.1 across checkpoints; it is the best honest qwen adapter on either reading and ahead of the class-confounded digit-weight adapter like for like. Qwen final candidate: full pool, lr 3e-5, KL T=2, 16x256, 1.0x coverage (adapter `qwen_ce_online_online_scratch_e16_fullpool_e16_full_adapter.pt`). Gemma now runs the same data setup on its own recipe (lr 1e-4, KL T=2), 0.5x then 1.0x, for the one-recipe claim.
+
+## Gemma on the full pool (same data setup as qwen), 0.5x: GSM8K (2026-08-30 12:12)
+
+Gemma's optimized recipe (lr 1e-4, KL T=2, 16x256, anchor 0, sampled budget) on the 10,982-prompt pool, 4.3M sampled tokens:
+
+| arm | base | KL T=2, d7 pool (3.4M) | full pool 0.5x (4.3M) | full vs d7 (fixed/broken, z) |
+|---|---|---|---|---|
+| free | 87.8 | 88.2 (+0.4) | 87.3 (-0.5) | 12/23, z=-1.9 |
+| R8 | 78.8 | 84.2 (+5.5) | 82.0 (+3.3) | 61/90, z=-2.4 |
+| R16 | 86.6 | 87.2 (+0.6) | 87.1 (+0.5) | 26/27, z=-0.1 |
+
+The broader pool costs gemma 2.2 points of GSM8K R8 (significant), the same trade the general-prompt share produced on qwen. Whether MMLU/HumanEval repay it, as they did on qwen, is decided by the surface and the 1.0x stage; the gemma final is chosen automatically by the mean of the R8 and R16 four-cell means between this run and the d7-pool winner.
