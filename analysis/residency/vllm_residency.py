@@ -57,6 +57,9 @@ def set_step(spans):
                 FAST["seeded"].discard(req)
     if _WALKER == "fast":
         _fast_set_step(spans)
+    if _WALKER == "cache_bias" and spans is not None:
+        import cache_bias as CB
+        CB.prune({sp[0] for sp in spans})
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +414,9 @@ def _apply_fast(layer, router_logits):
 def swap_stats():
     """(swaps performed, decode rows stepped, swaps per decode token) since the last
     arm reset; on-device counters, one sync here. Prefill observation is not counted."""
+    if _WALKER == "cache_bias":
+        import cache_bias as CB
+        return CB.stats()
     if FAST["count"] is None:
         return 0, 0, 0.0
     sw, tk = (int(x) for x in FAST["count"].tolist())
@@ -426,6 +432,9 @@ def apply(layer, router_logits):
     kernel-launch-bound -- the exact pathology this stack exists to escape."""
     if _WALKER == "fast" and router_logits.is_cuda:
         return _apply_fast(layer, router_logits)
+    if _WALKER == "cache_bias":                 # Skliar's cache-conditional experts at their own setting
+        import cache_bias as CB
+        return CB.apply(layer, router_logits, STEP["spans"], DEC["on"])
     if not DEC["on"] or STEP["spans"] is None:
         return router_logits
     # DEFAULT SLOTS as of 2026-08-24: validated bit-exact + real wall-clock win
