@@ -1610,3 +1610,15 @@ The two mixes with 2500 general prompts behave alike regardless of the math coun
 ### Continuation of the 25% cell to 1.0x prompt coverage (2026-08-30 05:03)
 
 Resumed from its 3.4M checkpoint with the AdamW state and the prompt cursor carried over (new in `train_gemma_ce.py --resume`: the adapter file stores the optimizer state; the sampler cursor is advanced by step/every x n), +0.6M sampled tokens = the 3 refreshes needed to draw every prompt of the 4,883-prompt quota once. GSM8K n=1319: free 86.2 (+0.3), R8 81.7 (+5.0; vs the 3.4M checkpoint 68/58, z=+0.9), R32 83.5 (+3.6; 48/48). A small, non-significant gain; the full surface follows. (The 52% pool of 4,524 prompts is already at 0.96x coverage after 3.4M, so 1.0x adds nothing measurable there.)
+
+### Continued adapter on the surface, and where qwen stands (2026-08-30 05:55)
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| 25% math -> 1.0x coverage (4.0M) | 81.7 (+5.0) | 83.0 (+0.4) | 92.1 (0.0) | 89.6 (-1.2) | 76.8 (+1.6) | +1.0 |
+
+| R32 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| 25% math -> 1.0x coverage (4.0M) | 83.5 (+3.6) | 83.9 (-1.3) | 93.4 (0.0) | 89.0 (0.0) | 78.8 (+2.4) | +0.6 |
+
+The continuation adds +0.8 on GSM8K R8 and nothing else; its lower means are HumanEval swinging back (-1.9 / -3.1 vs the 3.4M checkpoint, a cell with SE about 2.4 that has moved by +-2 between every pair of adapters). Across four qwen on-policy adapters (52 / 25 / 39% math, and the continuation) only GSM8K responds to the levers, IFEval and MMLU stay within +-1.3 of base at R8, and the code cells are noise. The qwen four-cell mean is capped near +1.4 by the cells that do not move, not by the recipe; the published +2.7 is not reachable like for like (the best prior, like for like, is also about +1.5). Qwen final candidate: the 52% recipe (lr 3e-5, KL T=2, 16x256, 3.4M): GSM8K R8 +6.5 = published, no cell below base beyond noise at R8, and the same recipe as gemma up to the learning rate.
