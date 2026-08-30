@@ -245,3 +245,9 @@ sizes, not their memory, and at R=k there is no slack for a deadband to exploit,
 why quality is flat until the swap rate falls too far. Refer to those rows as "eviction
 deadband (ours, inspired by Skliar)" and never as a Skliar baseline. Skliar's method at its
 own configuration has not been run.
+
+## Skliar (cache-conditional experts) at their own setting: implemented (2026-08-30)
+
+`analysis/residency/cache_bias.py`, selected with `TEMPORAL_WALKER=cache_bias`. Per MoE layer and decode token: an LRU cache of `C` experts (`TEMPORAL_CB_C`; half the pool, gemma 64/128, qwen 128/256, the paper's 50% regime), ranking logits `z' = z + lambda * delta_avg[layer] * cached` with `delta_avg` the online running mean of `max(z) - min(z)` per layer, top-k by `z'` with the top-J experts of the original `z` guaranteed (`TEMPORAL_CB_J`, 1), gate weights from the original `z` (non-selected experts are masked to -inf, so vLLM's own top-k and softmax reproduce the paper's step 3), and every selected non-cached expert counted as a load (the swap axis) before the LRU update. Prefill is observed unbiased and warms the cache (LRU state after a sequential pass = the C most recently used experts); prefill loads are not counted, matching our own metric. Unit tests: lambda 0 equals plain top-k; the top-1 guarantee holds; exactly k experts per token; the cache never exceeds C; on random logits (E=32, k=4, C=16) loads per token fall 1.99 -> 0.70 -> 0.50 -> 0.48 for lambda 0 / 0.25 / 0.5 / 1.0. Batch-1 semantics are kept per request even though the eval batches requests.
+
+Plan (`tmoe_skliar.sh <model>`): lambda in {0.25, 0.5, 0.75, 1.0} on GSM8K n=1319 with loads/token, then the full surface at lambda 0.5 and 1.0. Three axes per cell: resident fraction 50% (vs ours 6.25% gemma / 3.1% qwen), loads per layer per token, quality vs the unadapted base at the same setting.
