@@ -46,7 +46,7 @@ def _hf_name(param_or_module_name, suffix=""):
 class OnlineSampler:
     def __init__(self, model, base_path, R, swaps, prompts_path, quota, max_new=1024,
                  gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4", temperature=0.7, top_p=0.8,
-                 offload_layers=0, presence_penalty=0.0):
+                 offload_layers=0, presence_penalty=0.0, think=False):
         assert arch in ("gemma4", "qwen35"), arch
         self.arch = arch
         # qwen35: trainer (70 GB) + engine weights (66 GB) exceed the 140 GB GPU. While the engine is
@@ -90,7 +90,9 @@ class OnlineSampler:
         # 2026-08-29). Off by default in the sampler (the objective and the cap bound repetition); evals keep it.
         if presence_penalty:                       # vllm_glue routes it to the fast processor (TEMPORAL_FAST_PP=1)
             self.sp_kw["presence_penalty"] = presence_penalty
-        self.chat_kw = {"chat_template_kwargs": {"enable_thinking": False}} if arch == "qwen35" else {}
+        # thinking off is the default on both templates (gemma's default already emits an empty thought channel);
+        # think=True opens it on both (the on-policy rows then contain the thinking tokens the teacher scores too)
+        self.chat_kw = {"chat_template_kwargs": {"enable_thinking": bool(think)}}
         self.SamplingParams = SamplingParams
         self.n_refresh = 0
         self.llm.sleep(level=1)

@@ -197,6 +197,7 @@ def main():
     ap.add_argument("--online-presence-penalty", type=float, default=0.0, help="sampler presence penalty (qwen card: 1.5; halves vLLM throughput)")
     ap.add_argument("--save-opt", action="store_true", default=True, help="store the AdamW state in the adapter file so --resume continues as one long run")
     ap.add_argument("--no-save-opt", dest="save_opt", action="store_false")
+    ap.add_argument("--online-think", choices=("on", "off"), default="off", help="sampler generates with the model's thinking mode")
     ap.add_argument("--online-offload", type=int, default=0,
                     help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 12)")
     ap.add_argument("--online-smoke", default=None,
@@ -966,7 +967,7 @@ def main():
         from online_sampler import OnlineSampler
         SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
                                 max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed,
-                                arch=A.family, temperature=A.online_temp, offload_layers=A.online_offload, presence_penalty=A.online_presence_penalty)
+                                arch=A.family, temperature=A.online_temp, offload_layers=A.online_offload, presence_penalty=A.online_presence_penalty, think=A.online_think == "on")
         if step:                                     # resumed: continue the prompt pool where the first run stopped
             SAMPLER.cursor = (step // A.online_every) * A.online_n
             print(f"[online] prompt cursor advanced to {SAMPLER.cursor} for the resumed run", flush=True)
