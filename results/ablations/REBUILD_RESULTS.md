@@ -1688,3 +1688,21 @@ The broader pool costs gemma 2.2 points of GSM8K R8 (significant), the same trad
 | full pool 0.5x (4.3M) | 87.2 (+0.6) | 87.6 (-0.2) | 93.0 (+0.4) | 99.4 (+3.0) | 87.6 (-2.0) | +0.98 |
 
 Same trade as on qwen: the broader pool gives up about 2 points of GSM8K R8 and buys MMLU (+2.6, best measured) and MBPP (+6.4, best measured), above base on every R8 cell. On the paper's four-cell mean it trails the d7-pool winner (+1.70 vs +2.16) because MBPP is not in that mean; on all five cells they tie (+2.64 vs +2.56). R16 is identical. The 1.0x stage follows; the gemma final is picked by the mean of the R8 and R16 four-cell means.
+
+### Gemma full pool 1.0x, full surface; gemma final (2026-08-30 14:43)
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean | 5-cell mean |
+|---|---|---|---|---|---|---|---|
+| base | 78.8 | 86.9 | 92.5 | 94.5 | 78.0 | | |
+| KL T=2, d7 pool (3.4M) | 84.0 (+5.2) | 86.7 (-0.2) | 94.3 (+1.8) | 96.3 (+1.8) | 82.2 (+4.2) | +2.16 | +2.57 |
+| full pool 0.5x (4.3M) | 82.0 (+3.2) | 87.2 (+0.4) | 95.2 (+2.6) | 95.1 (+0.6) | 84.4 (+6.4) | +1.70 | +2.64 |
+| full pool 1.0x (8.6M) | 82.6 (+3.9) | 86.3 (-0.6) | 94.3 (+1.8) | 97.0 (+2.4) | 85.0 (+7.0) | +1.88 | +2.90 |
+
+| R16 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean | 5-cell mean |
+|---|---|---|---|---|---|---|---|
+| base | 86.6 | 87.8 | 92.5 | 96.3 | 89.6 | | |
+| KL T=2, d7 pool (3.4M) | 87.1 (+0.5) | 88.0 (+0.2) | 93.9 (+1.3) | 98.2 (+1.8) | 88.4 (-1.2) | +0.97 | +0.53 |
+| full pool 0.5x (4.3M) | 87.2 (+0.6) | 87.6 (-0.2) | 93.0 (+0.4) | 99.4 (+3.0) | 87.6 (-2.0) | +0.98 | +0.38 |
+| full pool 1.0x (8.6M) | 86.4 (-0.2) | 86.9 (-0.9) | 93.9 (+1.3) | 97.6 (+1.2) | 89.4 (-0.2) | +0.35 | +0.24 |
+
+On gemma the full pool does not recover the 2 points of GSM8K R8 and trails the d7-pool winner on the four published cells (+1.88 vs +2.16) while leading on all five (+2.90 vs +2.57; MBPP +7.0 is the best code cell measured). The same data setup therefore works on both models with the same qualitative trade, and the four-cell mean prefers the d7 pool on gemma and the full pool on qwen. One recipe holds for the method (on-policy reverse KL, KL T=2, 16x256, each model's saturated lr, no CE, no digit weight, no self-generated data); the prompt pool is the one data choice that differs, or the full pool can be used on both at a 0.3-point cost on gemma's four-cell mean. Gemma final: the d7-pool KL T=2 adapter (mean of the two arms' four-cell means +1.56 vs +1.34 and +1.11); qwen final: the full pool at 1.0x (+2.07 R8). Baselines at their own settings run next (Skliar started 14:43, then ReMoE), then WritingBench on both finals.
