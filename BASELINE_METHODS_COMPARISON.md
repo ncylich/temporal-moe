@@ -287,3 +287,17 @@ Quality vs the free model (100% resident), the right reference for a 50%-memory 
 | Skliar, lambda 0.4 | 50% | 87.9 (+0.2) | 89.6 (+0.9) | 93.0 (0.0) | 99.4 (0.0) | 90.4 (-0.8) | 0.03 |
 
 At half the experts resident their method is lossless on every cell and needs 0.03-0.31 loads per token-layer: better quality and fewer loads than ours, at eight times our resident memory. The two methods occupy different corners of the memory/speed/quality space; ours is the one defined at 6.25%. Qwen (C=128 of 256): plain LRU needs 0.84 loads per token-layer at free-level GSM8K (86.0); sweep in progress.
+
+### Skliar, qwen sweep (2026-08-30 17:19)
+
+LRU cache of 128 of 256 experts (50% resident), top-J=1, k=8, no training; GSM8K n=1319 (free arm 85.9; ours at R8: 3.1% resident, 1.0 swaps per token-layer, 83.5 adapted / 76.6 unadapted).
+
+| lambda | loads / token-layer | GSM8K R8-trigger |
+|---|---|---|
+| 0 (plain LRU) | 0.837 | 86.0 |
+| 0.05 | 0.294 | 86.4 |
+| 0.1 | 0.160 | 86.1 |
+| 0.2 | 0.087 | 85.6 |
+| 0.4 | 0.069 | 85.8 |
+
+Quality flat at the free level for every lambda while loads fall twelvefold. With 256 experts a plain LRU at 50% needs 0.84 loads per token-layer, close to our 1.0, so on qwen the lambda-0 point is nearly an equal-speed comparison: same swap traffic, sixteen times our resident memory, free-level quality against our 83.5. Surfaces at lambda 0 and 0.4 (the lm-eval code stages needed HF_ALLOW_CODE_EVAL and are re-run in a follow-up).
