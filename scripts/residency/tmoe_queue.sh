@@ -3,7 +3,7 @@
 #   tmoe_queue.sh list                    tickets in service order, the current holder, pause state
 #   tmoe_queue.sh pause | resume          pause: the running job finishes its stage; nothing new starts until resume
 #   tmoe_queue.sh kill <ticket|pid>       kill a waiting or running lease entry and its process tree (the ticket disappears)
-#   tmoe_queue.sh killchain <pid>         kill a chain script (bash ...chain.sh) and everything under it
+#   tmoe_queue.sh killchain <pid> [--force]  kill a chain script and everything under it (refuses if it contains the lease holder)
 #   tmoe_queue.sh add <prio> <log> <cmd>  queue one command under the lease at <prio> (0 = first), output to <log>
 #   tmoe_queue.sh hold <prio> <log> <chain.sh args>   queue a whole chain under ONE lease (no interleaving between its stages)
 G=${CUDA_VISIBLE_DEVICES:-0}; Q=/var/lock/tmoe_gpu${G}.q; PAUSE=/var/lock/tmoe_gpu${G}.paused; HOLDER=/var/lock/tmoe_gpu${G}.holder
@@ -20,7 +20,10 @@ case "${1:-list}" in
   resume) rm -f "$PAUSE"; echo "resumed";;
   kill) t=$2; if [ -e "$Q/$t" ]; then p=${t##*-}; else p=$t; fi
     for x in $(tree "$p" | tac); do kill "$x" 2>/dev/null; done; sleep 3; for x in $(tree "$p" | tac); do kill -9 "$x" 2>/dev/null; done; rm -f "$Q/$t" 2>/dev/null; echo "killed $p and its tree";;
-  killchain) p=$2; for x in $(tree "$p" | tac); do kill "$x" 2>/dev/null; done; sleep 3; for x in $(tree "$p" | tac); do kill -9 "$x" 2>/dev/null; done; echo "killed chain $p and its tree";;
+  killchain) p=$2
+    if [ "${3:-}" != "--force" ] && [ -e "$HOLDER" ]; then read -r _t hp _c < "$HOLDER"
+      if tree "$p" | grep -qx "$hp"; then echo "REFUSED: chain $p contains the current lease holder (pid $hp); use 'kill <ticket>' for the running job or add --force"; exit 1; fi; fi
+    for x in $(tree "$p" | tac); do kill "$x" 2>/dev/null; done; sleep 3; for x in $(tree "$p" | tac); do kill -9 "$x" 2>/dev/null; done; echo "killed chain $p and its tree";;
   add) prio=$2; log=$3; shift 3; TMOE_PRIO=$prio nohup "$L" "$@" > "$log" 2>&1 & echo "queued pid $! at prio $prio -> $log";;
   hold) prio=$2; log=$3; shift 3; TMOE_PRIO=$prio nohup "$L" bash "$@" > "$log" 2>&1 & echo "queued chain pid $! at prio $prio (held lease) -> $log";;
   *) sed -n 2,9p "$0";;
