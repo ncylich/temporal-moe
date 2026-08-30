@@ -1672,3 +1672,19 @@ Gemma's optimized recipe (lr 1e-4, KL T=2, 16x256, anchor 0, sampled budget) on 
 | R16 | 86.6 | 87.2 (+0.6) | 87.1 (+0.5) | 26/27, z=-0.1 |
 
 The broader pool costs gemma 2.2 points of GSM8K R8 (significant), the same trade the general-prompt share produced on qwen. Whether MMLU/HumanEval repay it, as they did on qwen, is decided by the surface and the 1.0x stage; the gemma final is chosen automatically by the mean of the R8 and R16 four-cell means between this run and the d7-pool winner.
+
+### Gemma full pool 0.5x, full surface (2026-08-30 12:49)
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 78.8 | 86.9 | 92.5 | 94.5 | 78.0 | |
+| KL T=2, d7 pool (3.4M) | 84.0 (+5.2) | 86.7 (-0.2) | 94.3 (+1.8) | 96.3 (+1.8) | 82.2 (+4.2) | +2.16 |
+| full pool 0.5x (4.3M) | 82.0 (+3.2) | 87.2 (+0.4) | 95.2 (+2.6) | 95.1 (+0.6) | 84.4 (+6.4) | +1.70 |
+
+| R16 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 86.6 | 87.8 | 92.5 | 96.3 | 89.6 | |
+| KL T=2, d7 pool (3.4M) | 87.1 (+0.5) | 88.0 (+0.2) | 93.9 (+1.3) | 98.2 (+1.8) | 88.4 (-1.2) | +0.97 |
+| full pool 0.5x (4.3M) | 87.2 (+0.6) | 87.6 (-0.2) | 93.0 (+0.4) | 99.4 (+3.0) | 87.6 (-2.0) | +0.98 |
+
+Same trade as on qwen: the broader pool gives up about 2 points of GSM8K R8 and buys MMLU (+2.6, best measured) and MBPP (+6.4, best measured), above base on every R8 cell. On the paper's four-cell mean it trails the d7-pool winner (+1.70 vs +2.16) because MBPP is not in that mean; on all five cells they tie (+2.64 vs +2.56). R16 is identical. The 1.0x stage follows; the gemma final is picked by the mean of the R8 and R16 four-cell means.
