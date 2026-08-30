@@ -1644,3 +1644,19 @@ Best qwen four-cell means so far on both arms, with GSM8K at the math-heavy leve
 ### Full pool at 1.0x coverage, GSM8K (2026-08-30 10:05)
 
 Resumed from the 0.5x checkpoint (Adam state and prompt cursor carried) to 8.6M sampled tokens. GSM8K n=1319: free 86.1 (+0.2), R8 83.5 (+6.9), R32 85.1 (+5.3); vs the 0.5x checkpoint R8 60/50 (z=+1.0), R32 41/48 (z=-0.7), free 21/27 (z=-0.9): the second pass over the pool changes nothing beyond noise on GSM8K. R8 +6.9 is the first qwen number above the published +6.5. Surface follows.
+
+### Full pool at 1.0x, full surface; qwen passes the bar (2026-08-30 10:49)
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 76.6 | 82.6 | 92.1 | 90.9 | 75.2 | |
+| full pool 0.5x (4.3M) | 82.8 (+6.1) | 82.1 (-0.6) | 94.3 (+2.2) | 89.6 (-1.2) | 75.6 (+0.4) | +1.64 |
+| full pool 1.0x (8.6M) | 83.5 (+6.9) | 82.6 (0.0) | 91.7 (-0.4) | 92.7 (+1.8) | 76.4 (+1.2) | +2.07 |
+
+| R32 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 79.8 | 85.2 | 93.4 | 89.0 | 76.4 | |
+| full pool 0.5x (4.3M) | 85.7 (+5.8) | 83.7 (-1.5) | 92.1 (-1.3) | 92.7 (+3.7) | 77.4 (+1.0) | +1.68 |
+| full pool 1.0x (8.6M) | 85.1 (+5.3) | 84.3 (-0.9) | 91.2 (-2.2) | 92.1 (+3.0) | 76.6 (+0.2) | +1.31 |
+
+The 1.0x checkpoint meets the agreed bar (four-cell mean >= 2.0 at R8: +2.07) with GSM8K R8 +6.9 above the published +6.5 and no cell below base beyond noise. The two checkpoints differ mostly through HumanEval and MMLU noise (HumanEval 89.6 vs 92.7, MMLU 94.3 vs 91.7), so the recipe's R8 mean is best stated as +1.6 to +2.1 across checkpoints; it is the best honest qwen adapter on either reading and ahead of the class-confounded digit-weight adapter like for like. Qwen final candidate: full pool, lr 3e-5, KL T=2, 16x256, 1.0x coverage (adapter `qwen_ce_online_online_scratch_e16_fullpool_e16_full_adapter.pt`). Gemma now runs the same data setup on its own recipe (lr 1e-4, KL T=2), 0.5x then 1.0x, for the one-recipe claim.
