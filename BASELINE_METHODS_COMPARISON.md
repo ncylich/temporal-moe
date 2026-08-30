@@ -301,3 +301,15 @@ LRU cache of 128 of 256 experts (50% resident), top-J=1, k=8, no training; GSM8K
 | 0.4 | 0.069 | 85.8 |
 
 Quality flat at the free level for every lambda while loads fall twelvefold. With 256 experts a plain LRU at 50% needs 0.84 loads per token-layer, close to our 1.0, so on qwen the lambda-0 point is nearly an equal-speed comparison: same swap traffic, sixteen times our resident memory, free-level quality against our 83.5. Surfaces at lambda 0 and 0.4 (the lm-eval code stages needed HF_ALLOW_CODE_EVAL and are re-run in a follow-up).
+
+### Skliar, qwen, full surfaces on the three axes (2026-08-30 18:28)
+
+| run | resident memory | GSM8K | IFEval | MMLU | HumanEval | MBPP | loads or swaps / token-layer (GSM8K, IFEval, code) |
+|---|---|---|---|---|---|---|---|
+| base, free | 100% | 85.9 | 86.5 | 93.4 | 92.7 | 79.4 | 0 |
+| base at R8, unadapted | 3.1% | 76.6 | 82.6 | 92.1 | 90.9 | 75.2 | 1.00 |
+| ours, R8 adapted (full pool 1.0x) | 3.1% | 83.5 (-2.4) | 82.6 (-3.9) | 91.7 (-1.8) | 92.7 (0.0) | 76.4 (-3.0) | 1.00 |
+| Skliar, plain LRU (lambda 0) | 50% | 86.0 (+0.1) | 86.9 (+0.4) | 92.1 (-1.3) | 95.7 (+3.0) | 80.6 (+1.2) | 0.84, 0.53, 0.76 |
+| Skliar, lambda 0.4 | 50% | 85.8 (-0.1) | 85.6 (-0.9) | 93.0 (-0.4) | 95.7 (+3.0) | 78.6 (-0.8) | 0.07, 0.05, 0.06 |
+
+Lossless within noise at half the experts resident, at 0.05-0.84 loads per token-layer. The plain-LRU point is close to our swap rate (0.84 vs 1.00) at sixteen times our resident memory and free-level quality: on qwen the comparison reduces to the memory axis. (The lm-eval code tasks need HF_ALLOW_CODE_EVAL=1; the Skliar script now exports it.)
