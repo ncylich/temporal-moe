@@ -1572,3 +1572,19 @@ Same recipe (lr 3e-5, KL T=2, 16x256, 3.4M), quota mathlane_v2 1200 / d5_fewshot
 | R32 | 79.8 | 85.4 (+5.6) | 83.5 (+3.6) | 37/63, z=-2.6 |
 
 Halving the math share costs about 2 points on every GSM8K arm, so the math prompts carry the constrained-arm gain. The surface (IFEval, MMLU, code) on this adapter decides whether general prompts buy anything on the other cells; it runs regardless of the chain's GSM8K gate because that trade-off is the question.
+
+### Balanced mix, full surface (2026-08-30 02:27)
+
+| R8 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 76.6 | 82.6 | 92.1 | 90.9 | 75.2 | |
+| math-heavy (52% math) | 83.2 (+6.5) | 83.2 (+0.6) | 92.5 (+0.4) | 89.0 (-1.8) | 76.4 (+1.2) | +1.4 |
+| balanced (25% math) | 80.9 (+4.2) | 82.8 (+0.2) | 92.1 (0.0) | 91.5 (+0.6) | 76.8 (+1.6) | +1.3 |
+
+| R32 | GSM8K | IFEval | MMLU | HumanEval | MBPP | 4-cell mean |
+|---|---|---|---|---|---|---|
+| base | 79.8 | 85.2 | 93.4 | 89.0 | 76.4 | |
+| math-heavy (52% math) | 85.4 (+5.6) | 82.3 (-3.0) | 91.7 (-1.8) | 90.2 (+1.2) | 77.6 (+1.2) | +0.5 |
+| balanced (25% math) | 83.5 (+3.6) | 84.5 (-0.7) | 93.0 (-0.4) | 92.1 (+3.0) | 78.4 (+2.0) | +1.4 |
+
+The prompt mix is a genuine lever with a trade: at R8 the mean is unchanged (GSM8K -2.3 against HumanEval +2.4), at R32 the IFEval and MMLU losses disappear and the mean goes from +0.5 to +1.4. The balanced adapter is the first qwen adapter with no cell meaningfully below base on either arm. Next single cell: the intermediate mix (all 2341 math prompts kept, domain8k raised to 2500; about 39% math).
