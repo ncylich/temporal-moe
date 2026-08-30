@@ -33,8 +33,12 @@ PY
 )
 echo "### qwen-continue pick: $PICK $(date -u +%H:%M)"; [ -n "$PICK" ] || exit 1
 Q="mathlane_v2=2341,d5_fewshot=1183,domain8k=1000"; case "$PICK" in *mix39) Q="mathlane_v2=2341,d5_fewshot=1183,domain8k=2500";; *mix) Q="mathlane_v2=1200,d5_fewshot=1183,domain8k=2500";; esac
-echo "### qwen-continue 1/2 resume $PICK for +3.4M sampled tokens (quota $Q) $(date -u +%H:%M)"
-TMOE_PRIO=4 TMOE_LR=3e-5 TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_ONLINE_MEM=0.65 TMOE_ONLINE_OFFLOAD=20 TMOE_QUOTA="$Q" TMOE_NAME_SUFFIX=_cont bash /workspace/tmoe_qwen_online.sh $PICK 3400000 16 256 > /workspace/rerun-logs/qwen_online_cont.out 2>&1
+# 1.0x prompt coverage: continue only until every prompt of the quota has been drawn once (256 per refresh,
+# ~200k sampled tokens per refresh); the 3.4M run drew 17 x 256 = 4352 prompts.
+POOL=$(echo "$Q" | tr ',' '\n' | cut -d= -f2 | paste -sd+ | bc); LEFT=$(( (POOL - 4352 + 255) / 256 )); [ "$LEFT" -gt 0 ] || LEFT=1
+T=$(( LEFT * 200000 ))
+echo "### qwen-continue 1/2 resume $PICK: pool $POOL prompts, $LEFT refreshes left to 1.0x coverage = +$T sampled tokens (quota $Q) $(date -u +%H:%M)"
+TMOE_PRIO=4 TMOE_LR=3e-5 TMOE_KL_TEMP=2 TMOE_AUX_LOSS=revkl_full TMOE_ONLINE_MEM=0.65 TMOE_ONLINE_OFFLOAD=20 TMOE_QUOTA="$Q" TMOE_NAME_SUFFIX=_cont bash /workspace/tmoe_qwen_online.sh $PICK $T 16 256 > /workspace/rerun-logs/qwen_online_cont.out 2>&1
 rc=$?; echo "### qwen-continue 1/2 done rc=$rc $(date -u +%H:%M)"; [ "$rc" = 0 ] || exit 1
 A=/workspace/olmoe-adapt/data/qwen_ce_online_${PICK}_e16_cont_adapter.pt
 echo "### qwen-continue 2/2 full surface (no WB) $(date -u +%H:%M)"
