@@ -24,7 +24,7 @@ echo "### qwen-$NAME 1/2 online reverse-KL from $START (seen=$SEEN -> $((SEEN+T)
 [ -f $A.done ] || { [ -n "$INIT" ] && cp $D/qwen_ce_${START}_adapter.pt $A
   $L $PY -u analysis/residency/train_gemma_ce.py $COMMON --out $A $INIT --accum 16 --lr ${TMOE_LR:-1e-4} --tokens $((SEEN+T)) \
     $CE_ARGS $ANCHOR_ARGS --aux-loss ${TMOE_AUX_LOSS:-revkl_full} --aux-kl-weight ${TMOE_AUX_W:-1.0} --aux-kl-temp ${TMOE_KL_TEMP:-1.0} \
-    --online-every $EVERY --online-n $N --online-max-new 1024 --online-quota "${TMOE_QUOTA:-mathlane_v2=2341,d5_fewshot=1183,domain8k=1000}" --online-temp ${TMOE_ONLINE_TEMP:-0.7} --budget-on ${TMOE_BUDGET_ON:-sampled} \
+    --online-every $EVERY --online-n $N --online-max-new 1024 --online-quota "${TMOE_QUOTA:-mathlane_v2=2341,d5_fewshot=1183,domain8k=1000}" --online-prompts ${TMOE_PROMPTS:-/workspace/olmoe-adapt/data/d7_prompts.jsonl} --online-temp ${TMOE_ONLINE_TEMP:-0.7} --budget-on ${TMOE_BUDGET_ON:-sampled} \
     --online-gpu-mem ${TMOE_ONLINE_MEM:-0.55} --online-offload ${TMOE_ONLINE_OFFLOAD:-20} --online-presence-penalty ${TMOE_ONLINE_PP:-1.5}
   touch $A.done; }
 echo "### qwen-$NAME 2/2 GSM8K n=1319 via apply_adapter $(date -u +%H:%M)"
