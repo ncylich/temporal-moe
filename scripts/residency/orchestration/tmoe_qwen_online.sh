@@ -15,7 +15,7 @@ KL=/workspace/instruct-traj/qwen35_d7_seq4096_klref.pt
 # same switches as tmoe_gemma_online.sh; defaults = the from-scratch formulation (anchor 0, lr 1e-4 = gemma's sweep best)
 case "${TMOE_ANCHOR_W:-0}" in 0|0.0) ANCHOR_ARGS="";; *) ANCHOR_ARGS="--kl-anchor $KL --kl-weight ${TMOE_ANCHOR_W}";; esac
 if [ -n "${TMOE_CE:-}" ]; then CE_ARGS="--digit-weight ${TMOE_W:-3}"; else CE_ARGS="--kl-only"; fi
-COMMON="--model $B --family qwen35 --no-unsloth --traj qwen35_d7_seq4096 --max-seq 4096 --expert-lora-r 16 --opt adamw --micro-batch 16"
+COMMON="--model $B --family qwen35 --no-unsloth --traj qwen35_d7_seq4096 --max-seq 4096 --expert-lora-r ${TMOE_ELORA_R:-16} --opt adamw --micro-batch 16"
 A=$D/qwen_ce_${NAME}_adapter.pt
 if [ "$START" = scratch ]; then SEEN=0; INIT=""; else
   SEEN=$($PY -c "import torch,sys; print(int(torch.load(sys.argv[1], weights_only=False, map_location='cpu')['seen']))" $D/qwen_ce_${START}_adapter.pt); INIT="--resume"; fi

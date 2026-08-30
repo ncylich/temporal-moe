@@ -81,7 +81,7 @@ def _install_fast_penalty():
 
 def install():
     _install_fast_penalty()
-    if VR._WALKER == "fast":          # the evals read swap traffic from the router module
+    if VR._WALKER in ("fast", "cache_bias"):   # the evals read swap traffic from the router module
         from temporal import temporal_router as TR
         TR.swap_stats = VR.swap_stats
     # transformers 5.15 heterogeneity guard: gemma4 marks head_dim per-layer and vLLM
