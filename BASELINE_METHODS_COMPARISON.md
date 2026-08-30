@@ -340,3 +340,30 @@ and its router regularizer does not reduce cache traffic below the untrained bas
 same LRU (0.29 vs 0.31 at C=64), though it stays lossless there (GSM8K 88.8 = its free arm).
 Its R8 arm (80.4, +1.6 over base) trails our R8-adapted 84.0 by 3.6: training never sees the
 residency bound. Qwen ReMoE runs the same chain next.
+
+### ReMoE at its setting, qwen (2026-08-30 21:47)
+
+Same chain as gemma (router-only, recency-bias reuse objective, residency OFF in training,
+3.4M tokens); GSM8K n=1319 per lr. Base free 85.9 / R8 76.6.
+
+| lr | GSM8K free | GSM8K R8 |
+|---|---|---|
+| 1e-4 (pick, by free) | 86.1 | 63.1 |
+| 3e-4 | 85.4 | 65.4 |
+| 1e-3 | 49.0 | 34.0 |
+
+On qwen the objective actively damages the residency-bounded arm (R8 63-65 vs base 76.6)
+while the free model stays at base level. Full surface of the pick on its own (free) arm:
+
+| run | resident memory | GSM8K | IFEval | MMLU | HumanEval | MBPP | loads or swaps / token-layer |
+|---|---|---|---|---|---|---|---|
+| base, free | 100% | 85.9 | 86.5 | 93.4 | 92.7 | 79.4 | 0 |
+| ReMoE lr 1e-4, free | 100% | 86.1 (+0.2) | 85.0 (-1.5) | 93.4 (0.0) | 92.7 (0.0) | 79.4 (0.0) | 0 |
+| ReMoE lr 1e-4, LRU C=128 | 50% | 86.9 (+1.0) | | | | | 0.79 |
+| ours, R8 adapted (full pool 1.0x) | 3.1% | 83.5 | 82.6 | 91.7 | 92.7 | 76.4 | 1.00 |
+
+Reading: quality-neutral at its own setting (5-cell mean -0.3), lossless under the 50% LRU,
+and, as on gemma, the regularizer does not cut cache traffic below the untrained base under
+the same cache (0.79 vs 0.84). ReMoE on both models: a free-model method; it neither
+survives the residency bound (R8 63-80) nor reduces loads; its axis of merit is that the
+free model costs nothing to keep.

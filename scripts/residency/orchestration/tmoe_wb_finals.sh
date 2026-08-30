@@ -32,7 +32,7 @@ PY
 )
 set -- $GPICK; GREC=$1; GAD=$2
 echo "### wb finals: gemma $GREC, qwen full pool 1.0x $(date -u +%H:%M)"
-rm -f results/ablations/writingbench/responses/${GREC}_*.jsonl results/ablations/writingbench/responses/qwen35_ce_online_fullpool_full_rho0_*.jsonl
+rm -f /workspace/writingbench/responses/${GREC}_*.jsonl results/ablations/writingbench/responses/qwen35_ce_online_fullpool_full_rho0_*.jsonl
 TMOE_ADAPTER=$D/$GAD $L scripts/residency/wb_arm.sh /dev/shm/gemma4-26b-it $GREC free,R8,R16
 echo "### wb gemma done rc=$? $(date -u +%H:%M)"
 TMOE_ADAPTER=$D/qwen_ce_online_online_scratch_e16_fullpool_e16_full_adapter.pt $L scripts/residency/wb_arm.sh /root/models/qwen35-35b-a3b qwen35_ce_online_fullpool_full_rho0 free,R8,R32
