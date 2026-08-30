@@ -273,3 +273,17 @@ Cache-conditional experts with an LRU cache of 64 of 128 experts per layer (50% 
 | 0.4 | 0.032 | 87.9 |
 
 Reading: at half the experts resident, a plain LRU cache already needs only 0.31 loads per token-layer at base quality, and the bias takes that down tenfold (0.032 at lambda 0.4) with GSM8K flat within noise (87.2-87.9 vs free 87.8). The operating point our speed axis would call "equal" (1.0 swaps per token-layer) does not exist for them: they are faster than us at every lambda, at 8x our resident memory. Full surfaces run at lambda 0 (plain LRU reference) and lambda 0.4 (best GSM8K, fewest loads); qwen follows (C=128 of 256).
+
+### Skliar, gemma, full surfaces on the three axes (2026-08-30 16:26)
+
+Quality vs the free model (100% resident), the right reference for a 50%-memory method; ours is shown against the same reference.
+
+| run | resident memory | GSM8K | IFEval | MMLU | HumanEval | MBPP | swaps or loads / token-layer |
+|---|---|---|---|---|---|---|---|
+| base, free | 100% | 87.8 | 88.7 | 93.0 | 99.4 | 91.2 | 0 |
+| base at R8, unadapted | 6.25% | 78.8 | 86.9 | 92.5 | 94.5 | 78.0 | 1.00 |
+| ours, R8 adapted (KL T=2, d7 pool) | 6.25% | 84.0 (-3.8) | 86.7 (-2.0) | 94.3 (+1.3) | 96.3 (-3.0) | 82.2 (-9.0) | 1.00 |
+| Skliar, plain LRU (lambda 0) | 50% | 87.9 (+0.1) | 88.7 (0.0) | 92.5 (-0.4) | 98.8 (-0.6) | 91.2 (0.0) | 0.31 |
+| Skliar, lambda 0.4 | 50% | 87.9 (+0.2) | 89.6 (+0.9) | 93.0 (0.0) | 99.4 (0.0) | 90.4 (-0.8) | 0.03 |
+
+At half the experts resident their method is lossless on every cell and needs 0.03-0.31 loads per token-layer: better quality and fewer loads than ours, at eight times our resident memory. The two methods occupy different corners of the memory/speed/quality space; ours is the one defined at 6.25%. Qwen (C=128 of 256): plain LRU needs 0.84 loads per token-layer at free-level GSM8K (86.0); sweep in progress.

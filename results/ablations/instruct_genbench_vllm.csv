@@ -2623,3 +2623,8 @@ gemma4_skliar_C64_lam0p4_full,128,8,R8,8,ifeval,"prompt_level_loose_acc,none",0.
 gemma4_skliar_C64_lam0p4_full,128,8,R8,8,ifeval,"inst_level_loose_acc,none",0.938849,full,2048,291
 gemma4_skliar_C64_lam0p4_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.929825,4,2048,284
 gemma4_skliar_C64_lam0p4_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.513158,4,2048,284
+gemma4_skliar_C64_lam0p4_he8192,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.993902,full,8192,313
+gemma4_skliar_C64_lam0p4_m8192,128,8,R8,8,mbpp_gemma,"pass@1,channel-aware",0.904000,full,8192,612
+qwen35_skliar_C128_lam0_n1319,256,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,484
+qwen35_skliar_C128_lam0_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.000000,full,2048,484
+qwen35_skliar_C128_lam0_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.859742,full,2048,484
