@@ -195,6 +195,8 @@ def main():
     ap.add_argument("--online-gpu-mem", type=float, default=0.5, help="vLLM share of GPU memory (fraction of total)")
     ap.add_argument("--log-every", type=int, default=50, help="steps between [gce] step lines (each also reports the window's wall time per step)")
     ap.add_argument("--online-presence-penalty", type=float, default=0.0, help="sampler presence penalty (qwen card: 1.5; halves vLLM throughput)")
+    ap.add_argument("--save-opt", action="store_true", default=True, help="store the AdamW state in the adapter file so --resume continues as one long run")
+    ap.add_argument("--no-save-opt", dest="save_opt", action="store_false")
     ap.add_argument("--online-offload", type=int, default=0,
                     help="expert layers whose frozen base weights sit on the host while the engine is awake (qwen35: 12)")
     ap.add_argument("--online-smoke", default=None,
@@ -925,8 +927,13 @@ def main():
         seen = ck["seen"]
         step = ck.get("step", A.resume_step)
         oi = step * accum_batches      # data order is deterministic (seed-0 perm)
-        print(f"[gce] resumed {A.out}: seen={seen/1e6:.2f}M step={step} "
-              f"(fresh Adam state)", flush=True)
+        adam = "fresh Adam state"
+        if ck.get("opt") is not None:  # continuation = one long run: Adam moments restored
+            try:
+                opt.load_state_dict(ck["opt"]); adam = "Adam state restored"
+            except Exception as e_:
+                adam = f"Adam state NOT restored ({type(e_).__name__})"
+        print(f"[gce] resumed {A.out}: seen={seen/1e6:.2f}M step={step} ({adam})", flush=True)
 
     def save():
         # torch.save straight onto the quota-limited network mount produced a
@@ -937,6 +944,7 @@ def main():
                  if p.requires_grad}
         torch.save({"tensors": named, "seen": seen, "step": step, "family": A.family, "stack":
                     "unsloth" if use_unsloth else "hf+peft",
+                    "opt": {k: v for k, v in opt.state_dict().items()} if A.save_opt else None,
                     "R": 0 if A.no_constraint else A.R, "expert_lora_r": A.expert_lora_r,
                     "elora_layout": "grouped(E,in,out)",
                     "traj": A.traj, "lr": A.lr}, "/tmp/gce_ckpt_tmp.pt")
@@ -959,6 +967,9 @@ def main():
         SAMPLER = OnlineSampler(model, A.model, A.R, 1, A.online_prompts, A.online_quota,
                                 max_new=A.online_max_new, gpu_mem=A.online_gpu_mem, seed=A.data_seed,
                                 arch=A.family, temperature=A.online_temp, offload_layers=A.online_offload, presence_penalty=A.online_presence_penalty)
+        if step:                                     # resumed: continue the prompt pool where the first run stopped
+            SAMPLER.cursor = (step // A.online_every) * A.online_n
+            print(f"[online] prompt cursor advanced to {SAMPLER.cursor} for the resumed run", flush=True)
         if A.online_smoke:
             import json as _json
             from datasets import load_dataset as _ld
