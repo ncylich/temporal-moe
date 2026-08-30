@@ -259,3 +259,17 @@ Queued behind the gemma full-pool run, in this order, each on both models, each 
 1. **Skliar** at their setting (`tmoe_skliar.sh`): LRU cache of half the experts (gemma 64/128, qwen 128/256), lambda in {0, 0.05, 0.1, 0.2, 0.4} on GSM8K n=1319 with loads/token (lambda 0 is the plain-LRU reference, i.e. what a cache of that size costs with no method at all), then the full surface at two operating points chosen from the sweep: the lambda whose loads/token is closest to ours (1.0, equal speed) and the best-GSM8K lambda. Smoke inside vLLM passed (gemma, 8 prompts: same generation lengths as the free arm; at lambda 0.5 the bias is so strong that only the top-J guarantee forces loads, 0.047 per token-layer, which is why the sweep starts at 0.05).
 2. **ReMoE** at their setting (`tmoe_remoe_fair.sh`): router-only finetune, recency-reuse objective (lambda 1.0, gamma 0.9), residency OFF during training, our d7 trajectories at 3.4M CE tokens, lr in {1e-4, 3e-4, 1e-3}; per lr GSM8K n=1319 on the free arm (their operating point, 100% resident) and R8 (the bounded ablation); the best free-arm lr gets the full surface on the free arm and its loads/token under a plain LRU cache of half the experts (the only way to put a swap number on an unbounded method).
 3. **CoSMoEs**: NOT runnable on this pod tonight. It is a pretraining-time loss and needs the FLAME isoFLOP sweep in the Megatron stack, whose submodules are empty here (`import megatron` fails; TransformerEngine and apex must be built from source, then a sweep of dozens of 1e16 runs). This is a day of environment work plus the sweep, not an overnight item. Until then the paper compares against CoSMoEs' reported numbers with that stated, as Appendix E already does.
+
+## Skliar at their setting, gemma sweep (2026-08-30 15:17)
+
+Cache-conditional experts with an LRU cache of 64 of 128 experts per layer (50% resident), top-J=1, k=8, no training; GSM8K n=1319 with loads per token-layer measured on the generations. For scale, ours at R8: 6.25% resident, 1.0 swaps per token-layer, GSM8K 84.0 (adapted) / 78.8 (unadapted); the free arm is 87.8.
+
+| lambda | loads / token-layer | GSM8K R8-trigger |
+|---|---|---|
+| 0 (plain LRU) | 0.307 | 87.9 |
+| 0.05 | 0.165 | 87.7 |
+| 0.1 | 0.104 | 87.2 |
+| 0.2 | 0.057 | 87.5 |
+| 0.4 | 0.032 | 87.9 |
+
+Reading: at half the experts resident, a plain LRU cache already needs only 0.31 loads per token-layer at base quality, and the bias takes that down tenfold (0.032 at lambda 0.4) with GSM8K flat within noise (87.2-87.9 vs free 87.8). The operating point our speed axis would call "equal" (1.0 swaps per token-layer) does not exist for them: they are faster than us at every lambda, at 8x our resident memory. Full surfaces run at lambda 0 (plain LRU reference) and lambda 0.4 (best GSM8K, fewest loads); qwen follows (C=128 of 256).
