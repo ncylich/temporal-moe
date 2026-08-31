@@ -1764,3 +1764,10 @@ WritingBench, think-on adapters (thinking-mode generation, cap 8192, same protoc
 
 Flat within the (noisier) thinking-mode subset spread; thinking lifts gemma's absolute
 prose score over think-off (7.92 vs 7.51). No fluency tax at R8 in any of the four finals.
+
+Paired significance at R8 (adapted vs base, both think-on, McNemar z, |z|>1.96 = real):
+gemma MBPP z=+4.00 REAL; qwen HumanEval z=+2.67 (14 fixed / 3 broken) REAL;
+GSM8K z=+0.73 (gemma) / z=0.00 (qwen) NOT resolved -- the GSM8K delta rides on the free
+arm; the think-on adaptation claim is code-damage recovery, not a GSM8K result.
+(CSV note: the four missing qwen35_think_on_fulln_code constrained rows were appended
+from the verified genbench_samples JSONs; durations blank.)
