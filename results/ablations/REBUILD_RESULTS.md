@@ -1743,3 +1743,14 @@ Readings:
 Adapters: gemma_ce_online_scratch_e16_think_adapter.pt, qwen_ce_online_scratch_e16_think_adapter.pt.
 WritingBench for both think-on adapters runs after the think-off finals' WB (thinking-mode
 generation, cap 8192).
+
+## WritingBench on the finals (2026-08-31, 150 queries x 3 subsets, local critic /10)
+
+| adapter | free | R8 | R16/R32 |
+|---|---|---|---|
+| gemma klT2 (d7 pool) | 7.511 | 7.508 | 7.537 (R16) |
+| qwen full pool 1.0x | 7.855 | 7.799 | 7.797 (R32) |
+
+No fluency tax at R8 on either final (deltas -0.003 / -0.056, subset SD ~0.14; published
+reference: base free 7.533, base R8 7.460, D12 R8 7.504). Think-on adapters' WB
+(thinking-mode generation, cap 8192) runs next.
