@@ -397,11 +397,20 @@ def _mean_total(rec, arm, task, keys=None):
 TASK = {"GSM8K": "gsm8k_cot_zeroshot", "IFEval": "ifeval",
         "HumanEval": "humaneval_gemma_fixed", "MMLU": "mmlu_dual"}
 ARMS = [("R8", "8 resident"), ("R16", "16 resident")]
-PANELS = [("thinking on", "gemma4_think_on", "gemma4_ce_think3k",
-           ["GSM8K", "IFEval"]),
-          ("thinking off", "gemma4_instruct", "gemma4_ce_d12_freshregen",
+PANELS = [("thinking on",
+           {"GSM8K": "gemma4_think_on_fulln_n1319", "IFEval": "gemma4_think_on_fulln_full",
+            "HumanEval": "gemma4_think_on_fulln_he8192"},
+           {"GSM8K": "gemma4_ce_online_think_n1319", "IFEval": "gemma4_ce_online_think_full",
+            "HumanEval": "gemma4_ce_online_think_he8192"},
+           ["GSM8K", "IFEval", "HumanEval"]),
+          ("thinking off",
+           {"GSM8K": "gemma4_instruct_n1319", "IFEval": "gemma4_instruct_full",
+            "HumanEval": "gemma4_instruct_he8192"},
+           {"GSM8K": "gemma4_ce_online_scratch_e16_klT2_n1319",
+            "IFEval": "gemma4_ce_online_scratch_e16_klT2_rho0_full",
+            "HumanEval": "gemma4_ce_online_scratch_e16_klT2_rho0_he8192"},
            ["GSM8K", "IFEval", "HumanEval", "WritingBench"])]
-WB_PAIR = ("gemma4_base", "gemma4_d12")
+WB_PAIR = ("gemma4_base", "gemma4_ce_online_scratch_e16_klT2_rho0")
 
 BARS = [("released, constrained", "#d1605e", 0),
         ("adapted, unconstrained", "#9dbcd8", 1),
@@ -436,12 +445,12 @@ def adapt_length():
                 r = _wb_ratio(arm)
             else:
                 t = TASK[surf]
-                bfm, ks = _mean_total(brec, "free", t)
+                bfm, ks = _mean_total(brec[surf], "free", t)
                 if bfm is None:
                     continue
-                bcm, _ = _mean_total(brec, arm, t, ks)
-                afm, _ = _mean_total(arec, "free", t, ks)
-                acm, _ = _mean_total(arec, arm, t, ks)
+                bcm, _ = _mean_total(brec[surf], arm, t, ks)
+                afm, _ = _mean_total(arec[surf], "free", t, ks)
+                acm, _ = _mean_total(arec[surf], arm, t, ks)
                 r = None if None in (bcm, afm, acm) else (bcm / bfm, afm / bfm, acm / bfm)
             if r is None:
                 continue
@@ -478,12 +487,12 @@ def adapt_length():
                     r = _wb_ratio(arm)
                 else:
                     t = TASK[surf]
-                    bfm, ks = _mean_total(brec, "free", t)
+                    bfm, ks = _mean_total(brec[surf], "free", t)
                     if bfm is None:
                         continue
-                    bcm, _ = _mean_total(brec, arm, t, ks)
-                    afm, _ = _mean_total(arec, "free", t, ks)
-                    acm, _ = _mean_total(arec, arm, t, ks)
+                    bcm, _ = _mean_total(brec[surf], arm, t, ks)
+                    afm, _ = _mean_total(arec[surf], "free", t, ks)
+                    acm, _ = _mean_total(arec[surf], arm, t, ks)
                     r = None if None in (bcm, afm, acm) else (bcm/bfm, afm/bfm, acm/bfm)
                 if r is None:
                     continue

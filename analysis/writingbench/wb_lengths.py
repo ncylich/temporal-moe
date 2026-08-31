@@ -17,8 +17,8 @@ OUT = "/workspace/temporal-moe/results/ablations/writingbench/response_lengths.c
 
 TOK = {  # record prefix -> tokenizer source (model's own)
     "gemma4": "google/gemma-4-26B-A4B-it",
-    "qwen35": "/workspace/instruct-models/qwen35-35b-a3b-instruct",
-    "smoke_qwen": "/workspace/instruct-models/qwen35-35b-a3b-instruct",
+    "qwen35": "/root/models/qwen35-35b-a3b",
+    "smoke_qwen": "/root/models/qwen35-35b-a3b",
     "oss20": "openai/gpt-oss-20b",
     "oss120": "openai/gpt-oss-120b",
     "lfm25": "LiquidAI/LFM2.5-8B-A1B",
