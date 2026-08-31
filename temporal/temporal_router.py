@@ -718,7 +718,8 @@ def temporal_forward(self, input: torch.Tensor):
         save_to_aux_losses_tracker("bursty_loss", bw.detach(),
                                    self.layer_number, self.config.num_layers)
     # CoSMoEs (Huber et al., arXiv:2503.00245) -- BASELINE_METHODS_COMPARISON baseline #1.
-    # Penalises how many DISTINCT experts a fixed-length block uses. Nothing is forbidden,
+    # BlES (Eq. 4-7): hard replacement count times soft L1 of consecutive routing-weight
+    # deltas, sequence-level. Nothing is forbidden,
     # switching is only made expensive, so unlike rolling residency it never BOUNDS the
     # resident set -- which is the whole comparison: their locality buys a smaller R, ours
     # buys R = k. Appendix E currently rebuts CoSMoEs by quoting their table rather than
@@ -728,7 +729,7 @@ def temporal_forward(self, input: torch.Tensor):
     if cos_lam > 0 and self.training:
         from megatron.core.transformer.moe.moe_utils import (
             MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
-        cos = ab.cosmoes_block_loss(logits, int(os.environ.get("COSMOES_BLOCK", "32")))
+        cos = ab.cosmoes_bles_loss(logits, k, float(os.environ.get("COSMOES_TAU", "1.0")))
         logits = MoEAuxLossAutoScaler.apply(logits, cos_lam * cos)
         save_to_aux_losses_tracker("cosmoes_loss", cos.detach(),
                                    self.layer_number, self.config.num_layers)
