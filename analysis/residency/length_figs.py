@@ -434,8 +434,8 @@ def _wb_ratio(arm):
 
 
 def adapt_length():
-    fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.0) if PAPER else (13.2, 4.7),
-                             sharey=True, gridspec_kw={"width_ratios": [1, 2]})
+    fig, axes = plt.subplots(1, 2, figsize=(12.8, 3.3) if PAPER else (13.2, 4.7),
+                             sharey=True, gridspec_kw={"width_ratios": [3, 4]})
     for ax, (title, brec, arec, surfs) in zip(axes, PANELS):
         cols = [(s, a) for a, _ in ARMS for s in surfs]
         vals = {i: [] for i in range(3)}
@@ -470,8 +470,10 @@ def adapt_length():
         ax.grid(alpha=0.25, axis="y")
         ax.set_axisbelow(True)
     axes[0].set_ylabel("total generation length,\nvs released model unconstrained")
-    axes[0].legend(fontsize=9, loc="upper left")
-    axes[0].set_ylim(0, 1.62)
+    axes[0].legend(fontsize=9, loc="upper right")
+    # every ratio sits in 0.93-1.31; a zero floor would spend most of the panel
+    # on empty axis, and the printed values keep truncated bars honest
+    axes[0].set_ylim(0.8, 1.42)
     if not PAPER:
         fig.suptitle("Total generation length (thinking + answer), gemma4-26B, same "
                      "items\nblack line = the released checkpoint under free routing, "
