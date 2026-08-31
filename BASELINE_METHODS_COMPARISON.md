@@ -400,3 +400,25 @@ GSM8K n=1319: free 87.2 / R8 67.6 (base 85.9 / 76.6, faithful router-only 86.1 /
 ours 83.5 at R8). Same verdict as gemma on the identical surface, lr and data: the recency
 objective leaves the free model healthy and damages the bounded arm on either surface.
 The fair-surface cell closes the ReMoE comparison on both models.
+
+## Skliar at OUR memory budget, C=8 (2026-08-31 20:15) — the cross-setting cells
+
+GSM8K n=1319, loads/token-layer measured. Gemma C=8 of 128 (6.25%, a 16x reduction),
+qwen C=8 of 256 (3.1%, 32x). Ours at the same memory: gemma adapted 84.0, qwen 83.5, at a
+HARD cap of 1.0 swap/token-layer.
+
+| cell | quality | loads/token-layer (mean, unbounded per token) |
+|---|---|---|
+| gemma C8 plain LRU (lam 0) | 87.8 | 4.67 |
+| gemma C8 lam 0.4 | 85.8 | 1.33 |
+| qwen C8 plain LRU (lam 0) | 86.0 | 5.63 |
+| qwen C8 lam 0.4 | 74.5 | 1.01 |
+
+Reading: their cache stays lossless at aggressive memory only by paying ~5x our traffic
+(the LRU thrashes: 8 active experts vs 8 slots). Biasing traffic down toward our budget is
+where the methods separate: on qwen at matched memory AND traffic they lose 9 points to us
+(74.5 vs 83.5); on gemma the bias holds up better (85.8 at 1.33x our traffic, above our
+84.0), so at a 16x reduction the two methods genuinely compete and ours wins on the traffic
+guarantee (hard cap vs mean), while at a 32x reduction ours is clearly ahead. Framing per
+the user: these methods work well at ~2x memory reductions; ours is the frontier for
+aggressive 5-30x reductions, with the gap widening as the budget tightens.
