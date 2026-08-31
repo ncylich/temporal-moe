@@ -367,3 +367,21 @@ and, as on gemma, the regularizer does not cut cache traffic below the untrained
 the same cache (0.79 vs 0.84). ReMoE on both models: a free-model method; it neither
 survives the residency bound (R8 63-80) nor reduces loads; its axis of merit is that the
 free model costs nothing to keep.
+
+## Speed axis restated hardware-independently (2026-08-31)
+
+Wall-clock on our H100 harness is not a claim (hooks simulate residency with all experts in
+HBM, and H100 link bandwidth says nothing about a deployment target). The speed axis the
+paper reports is BYTES MOVED PER TOKEN, measured swap/load rate x expert size (bf16; gemma
+expert 11.9MB x 30 layers, qwen 6.3MB x 40 layers). The reader divides by their own link.
+
+| method | gemma MB/token (resident) | qwen MB/token (resident) |
+|---|---|---|
+| ours, R8-trigger | 357 (6.25%) | 252 (3.1%) |
+| Skliar plain LRU C=E/2 | 110 (50%) | 212 (50%) |
+| Skliar lambda 0.4 | 11 (50%) | 18 (50%) |
+| ReMoE pick under the same LRU | 102 (50%) | 200 (50%) |
+
+ReMoE 2b (fair-surface variant) launched per this doc's own rule: the faithful arm
+underperformed at R8, so one cell holds D12's LoRA surface and lr fixed and varies only the
+objective (recency reuse, constraint off). Gemma first.
