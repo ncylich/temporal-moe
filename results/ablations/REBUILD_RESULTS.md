@@ -1770,4 +1770,4 @@ gemma MBPP z=+4.00 REAL; qwen HumanEval z=+2.67 (14 fixed / 3 broken) REAL;
 GSM8K z=+0.73 (gemma) / z=0.00 (qwen) NOT resolved -- the GSM8K delta rides on the free
 arm; the think-on adaptation claim is code-damage recovery, not a GSM8K result.
 (CSV note: the four missing qwen35_think_on_fulln_code constrained rows were appended
-from the verified genbench_samples JSONs; durations blank.)
+from the verified genbench_samples JSONs (HumanEval per-item pass) and the run log (MBPP: per-item pass not dumped); durations blank.)

@@ -2896,3 +2896,7 @@ qwen35_think_on_fulln_code,256,8,free,,mbpp_instruct,sample_len,500.000000,full,
 qwen35_think_on_fulln_code,256,8,free,,mbpp_instruct,"pass_at_1,extract_code",0.804000,full,8192,390
 qwen35_think_on_fulln_code,256,8,free,,humaneval_instruct,sample_len,164.000000,full,8192,138
 qwen35_think_on_fulln_code,256,8,free,,humaneval_instruct,"pass@1,create_test",0.932927,full,8192,138
+qwen35_think_on_fulln_code,256,8,R8,8,humaneval_instruct,"pass@1,create_test",0.865854,full,8192,
+qwen35_think_on_fulln_code,256,8,R32,32,humaneval_instruct,"pass@1,create_test",0.896341,full,8192,
+qwen35_think_on_fulln_code,256,8,R8,8,mbpp_instruct,"pass_at_1,extract_code",0.752000,full,8192,
+qwen35_think_on_fulln_code,256,8,R32,32,mbpp_instruct,"pass_at_1,extract_code",0.768000,full,8192,
