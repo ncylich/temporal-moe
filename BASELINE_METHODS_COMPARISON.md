@@ -422,3 +422,23 @@ where the methods separate: on qwen at matched memory AND traffic they lose 9 po
 guarantee (hard cap vs mean), while at a 32x reduction ours is clearly ahead. Framing per
 the user: these methods work well at ~2x memory reductions; ours is the frontier for
 aggressive 5-30x reductions, with the gap widening as the budget tightens.
+
+### Skliar C=8 pushed to matched traffic, gemma (2026-08-31 20:55)
+
+Full traffic-quality curve at our memory (C=8 of 128, GSM8K n=1319):
+
+| lambda | loads/token-layer | GSM8K |
+|---|---|---|
+| 0 (plain LRU) | 4.67 | 87.8 |
+| 0.4 | 1.33 | 85.8 |
+| 0.5 | 0.94 | 80.7 |
+| 0.6 | 0.70 | 69.5 |
+| 0.8 | 0.52 | 50.2 |
+| 1.2 | 0.49 | 45.1 |
+
+At matched traffic (0.94 vs our hard 1.00) their best point is 80.7 against our adapted
+84.0 (paired on shared items: n=1319 ours_fixes=114 skliar_fixes=67 z=+3.49), and below our budget they fall off a cliff (69.5 at
+0.70, 45.1 at 0.49). Combined with qwen (74.5 at 1.01 vs our 83.5), the cross-setting
+claim is uniform: at 5-30x memory reductions, no measured Skliar operating point matches
+our quality at or under our traffic budget on either model, and only the burst-unbounded
+1.33x point on gemma comes within two points.
