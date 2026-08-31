@@ -4,6 +4,7 @@
 # arms only -- the engage check then compared free vs free (50/50 identical, assert fires).
 # Gemma also had a stale 06:04 free-arm file in /workspace/writingbench/responses (deleted here).
 set -uo pipefail; cd /workspace/temporal-moe
+for m in gemma qwen; do until grep -q "### think-surface $m ALL DONE" /workspace/rerun-logs/think_surface_$m.out 2>/dev/null; do sleep 300; done; done  # WB strictly last (user 2026-08-31)
 export TMOE_ROOT=/workspace/temporal-moe PATH=/workspace/venv_vllm312/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
 export HF_TOKEN=$(cat /root/.cache/huggingface/token) HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=6
 L=scripts/residency/gpu_lease.sh; D=/workspace/olmoe-adapt/data
