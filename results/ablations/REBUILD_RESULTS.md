@@ -1789,14 +1789,17 @@ on-policy think-on adapter; think-off = gemma4_instruct vs the klT2 final (free-
 | think off | WritingBench | 0.98 | 1.03 | 1.02 |
 
 Proposed placeholder paragraph (paper agent: replaces main.tex:555, cites the regenerated
-figures/adapt_length_nocaption.png):
+figures/adapt_length_nocaption.png; user constraints: keep it short, no em dashes and no
+colon standing in for one, no clipped single-clause sentences):
 
-  Residency also lengthens generations, and adaptation removes most of that too.
-  With thinking on, the released checkpoint under R8 runs 16-21% longer than its own
-  free-routing lengths on GSM8K, IFEval and HumanEval; the adapted model generates at
-  0.95-1.00x the same reference unconstrained and 1.00-1.12x constrained
-  (Figure fig:adaptlen). With thinking off the inflation is confined to code
-  (HumanEval 1.31x -> 1.14x adapted; GSM8K, IFEval and WritingBench sit within 6% of
-  the reference on every bar), matching where the residency quality damage lives.
-  Measured on the shared item sets, full n, both panels normalized by the released
-  model's free-routing mean.
+  Residency lengthens generations as well as degrading them, and the same adaptation
+  removes most of that inflation. With thinking on, the released checkpoint under R8
+  generates 1.16 to 1.21 times its own free-routing length on GSM8K, IFEval and
+  HumanEval, while the adapted model stays between 0.95 and 1.00 times that reference
+  unconstrained and between 1.00 and 1.12 constrained on the shared items
+  (Figure fig:adaptlen). With thinking off the inflation appears only on code, where
+  adaptation trims it from 1.31 to 1.14 times the reference, which is also where the
+  think-off quality damage concentrates.
+
+(The old caption's "thinking off is the control: no inflation" should soften to match the
+code row.)
