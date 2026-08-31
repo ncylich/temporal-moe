@@ -1754,3 +1754,13 @@ generation, cap 8192).
 No fluency tax at R8 on either final (deltas -0.003 / -0.056, subset SD ~0.14; published
 reference: base free 7.533, base R8 7.460, D12 R8 7.504). Think-on adapters' WB
 (thinking-mode generation, cap 8192) runs next.
+
+WritingBench, think-on adapters (thinking-mode generation, cap 8192, same protocol):
+
+| adapter | free | R8 | R16/R32 |
+|---|---|---|---|
+| gemma think-on | 7.923 | 7.891 | 7.905 (R16) |
+| qwen think-on | 7.860 | 7.701 | 7.756 (R32) |
+
+Flat within the (noisier) thinking-mode subset spread; thinking lifts gemma's absolute
+prose score over think-off (7.92 vs 7.51). No fluency tax at R8 in any of the four finals.
