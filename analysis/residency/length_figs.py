@@ -397,40 +397,52 @@ def _mean_total(rec, arm, task, keys=None):
 TASK = {"GSM8K": "gsm8k_cot_zeroshot", "IFEval": "ifeval",
         "HumanEval": "humaneval_gemma_fixed", "MMLU": "mmlu_dual"}
 ARMS = [("R8", "8 resident"), ("R16", "16 resident")]
+QARMS = [("R8", "8 resident"), ("R32", "32 resident")]
 QTASK = TASK | {"HumanEval": "humaneval_instruct"}
-# per panel: title, base records, adapted records, surfaces, arms, surface->task
+# per panel: title, base records, adapted records, surfaces, arms, surface->task,
+# WritingBench (base, adapted) record pair or None. A record value may be a dict
+# arm->record where base arms ran in separate boots, each with its own free arm.
 PANELS = [("gemma4, thinking on",
            {"GSM8K": "gemma4_think_on_fulln_n1319", "IFEval": "gemma4_think_on_fulln_full",
             "HumanEval": "gemma4_think_on_fulln_he8192"},
            {"GSM8K": "gemma4_ce_online_think_n1319", "IFEval": "gemma4_ce_online_think_full",
             "HumanEval": "gemma4_ce_online_think_he8192"},
-           ["GSM8K", "IFEval", "HumanEval"], ARMS, TASK),
-          ("Qwen3.5, thinking on",
-           {"GSM8K": "qwen35_think_on_fulln_n1319", "IFEval": "qwen35_think_on_fulln_full",
-            "HumanEval": "qwen35_think_on_fulln_code"},
-           {"GSM8K": "qwen35_ce_online_think_n1319", "IFEval": "qwen35_ce_online_think_full",
-            "HumanEval": "qwen35_ce_online_think_code"},
-           ["GSM8K", "IFEval", "HumanEval"], [("R8", "8 resident")], QTASK),
+           ["GSM8K", "IFEval", "HumanEval"], ARMS, TASK, None),
           ("gemma4, thinking off",
            {"GSM8K": "gemma4_instruct_n1319", "IFEval": "gemma4_instruct_full",
             "HumanEval": "gemma4_instruct_he8192"},
            {"GSM8K": "gemma4_ce_online_scratch_e16_klT2_n1319",
             "IFEval": "gemma4_ce_online_scratch_e16_klT2_rho0_full",
             "HumanEval": "gemma4_ce_online_scratch_e16_klT2_rho0_he8192"},
-           ["GSM8K", "IFEval", "HumanEval", "WritingBench"], ARMS, TASK)]
-WB_PAIR = ("gemma4_base", "gemma4_ce_online_scratch_e16_klT2_rho0")
+           ["GSM8K", "IFEval", "HumanEval", "WritingBench"], ARMS, TASK,
+           ("gemma4_base", "gemma4_ce_online_scratch_e16_klT2_rho0")),
+          ("Qwen3.5, thinking on",
+           {"GSM8K": "qwen35_think_on_fulln_n1319", "IFEval": "qwen35_think_on_fulln_full",
+            "HumanEval": "qwen35_think_on_fulln_code"},
+           {"GSM8K": "qwen35_ce_online_think_n1319", "IFEval": "qwen35_ce_online_think_full",
+            "HumanEval": "qwen35_ce_online_think_code"},
+           ["GSM8K", "IFEval", "HumanEval"], QARMS, QTASK, None),
+          ("Qwen3.5, thinking off",
+           {"GSM8K": "qwen35_think_off_n1319",
+            "IFEval": {"R8": "qwen35_base_full", "R32": "qwen35_base_r32"},
+            "HumanEval": "qwen35_base_code_ref"},
+           {"GSM8K": "qwen35_ce_online_online_scratch_e16_fullpool_e16_full_n1319",
+            "IFEval": "qwen35_ce_online_fullpool_full_rho0_full",
+            "HumanEval": "qwen35_ce_online_fullpool_full_rho0_code"},
+           ["GSM8K", "IFEval", "HumanEval", "WritingBench"], QARMS, QTASK,
+           ("qwen35_base", "qwen35_ce_online_fullpool_full_rho0"))]
 
 BARS = [("released, constrained", "#d1605e", 0),
         ("adapted, unconstrained", "#9dbcd8", 1),
         ("adapted, constrained", "#4878b0", 2)]
 
 
-def _wb_ratio(arm):
+def _wb_ratio(arm, pair):
     """(released constrained, adapted free, adapted constrained), each over the
     released free mean, on the shared queries."""
     L = _wb_lengths_by_cell()
-    bf, bc = L.get(f"{WB_PAIR[0]}_free"), L.get(f"{WB_PAIR[0]}_{arm}")
-    af, ac = L.get(f"{WB_PAIR[1]}_free"), L.get(f"{WB_PAIR[1]}_{arm}")
+    bf, bc = L.get(f"{pair[0]}_free"), L.get(f"{pair[0]}_{arm}")
+    af, ac = L.get(f"{pair[1]}_free"), L.get(f"{pair[1]}_{arm}")
     if not all((bf, bc, af, ac)):
         return None
     ks = sorted(set(bf) & set(bc) & set(af) & set(ac))
@@ -441,27 +453,34 @@ def _wb_ratio(arm):
             sum(ac[k] for k in ks) / ref)
 
 
+def _rec(v, arm):
+    return v if isinstance(v, str) else v[arm]
+
+
+def _panel_ratio(brec, arec, surfs_wb, surf, arm, tasks):
+    """(released constrained, adapted free, adapted constrained) over the released
+    free mean of the boot that ran this arm, on the shared items."""
+    if surf == "WritingBench":
+        return _wb_ratio(arm, surfs_wb)
+    task = tasks[surf]
+    bfm, ks = _mean_total(_rec(brec[surf], arm), "free", task)
+    if bfm is None:
+        return None
+    bcm, _ = _mean_total(_rec(brec[surf], arm), arm, task, ks)
+    afm, _ = _mean_total(arec[surf], "free", task, ks)
+    acm, _ = _mean_total(arec[surf], arm, task, ks)
+    return None if None in (bcm, afm, acm) else (bcm / bfm, afm / bfm, acm / bfm)
+
+
 def adapt_length():
-    widths = [len(p[3]) * len(p[4]) for p in PANELS]
-    fig, axes = plt.subplots(1, len(PANELS),
-                             figsize=(14.2, 3.3) if PAPER else (14.4, 4.7),
-                             sharey=True, gridspec_kw={"width_ratios": widths})
-    for ax, (title, brec, arec, surfs, arms, tasks) in zip(axes, PANELS):
+    fig, axes = plt.subplots(2, 2, figsize=(13.6, 5.8) if PAPER else (14.0, 6.6),
+                             sharey=True)
+    for ax, (title, brec, arec, surfs, arms, tasks, wb) in zip(axes.flat, PANELS):
         cols = [(s, a) for a, _ in arms for s in surfs]
         vals = {i: [] for i in range(3)}
         xs = {i: [] for i in range(3)}
         for ci, (surf, arm) in enumerate(cols):
-            if surf == "WritingBench":
-                r = _wb_ratio(arm)
-            else:
-                t = tasks[surf]
-                bfm, ks = _mean_total(brec[surf], "free", t)
-                if bfm is None:
-                    continue
-                bcm, _ = _mean_total(brec[surf], arm, t, ks)
-                afm, _ = _mean_total(arec[surf], "free", t, ks)
-                acm, _ = _mean_total(arec[surf], arm, t, ks)
-                r = None if None in (bcm, afm, acm) else (bcm / bfm, afm / bfm, acm / bfm)
+            r = _panel_ratio(brec, arec, wb, surf, arm, tasks)
             if r is None:
                 continue
             for i in range(3):
@@ -469,7 +488,7 @@ def adapt_length():
                 vals[i].append(r[i])
         for i, (lab, col, _) in enumerate(BARS):
             ax.bar(xs[i], vals[i], width=0.25, color=col, edgecolor="black", lw=0.5,
-                   label=lab if ax is axes[0] else None, zorder=2)
+                   label=lab if ax is axes.flat[0] else None, zorder=2)
             for x, y in zip(xs[i], vals[i]):
                 ax.annotate(f"{y:.2f}", (x, y), textcoords="offset points",
                             xytext=(0, 3), ha="center", fontsize=8)
@@ -479,36 +498,28 @@ def adapt_length():
         ax.set_title(title, fontsize=11)
         ax.grid(alpha=0.25, axis="y")
         ax.set_axisbelow(True)
-    axes[0].set_ylabel("total generation length,\nvs released model unconstrained")
-    axes[0].legend(fontsize=9, loc="upper right")
-    # every ratio sits in 0.93-1.31; a zero floor would spend most of the panel
+    for ax in axes[:, 0]:
+        ax.set_ylabel("total generation length,\nvs released unconstrained")
+    axes.flat[0].legend(fontsize=9, loc="upper right")
+    # every ratio sits in 0.93-1.64; a zero floor would spend most of the panel
     # on empty axis, and the printed values keep truncated bars honest
-    axes[0].set_ylim(0.8, 1.52)
+    axes.flat[0].set_ylim(0.8, 1.74)
     if not PAPER:
-        fig.suptitle("Total generation length (thinking + answer), gemma4-26B, same "
-                     "items\nblack line = the released checkpoint under free routing, "
+        fig.suptitle("Total generation length (thinking + answer), same items\n"
+                     "black line = the released checkpoint under free routing, "
                      "the shared reference for every bar", fontsize=10)
     fig.tight_layout()
     _save(fig, "adapt_length")
-    print(f"\n{'panel':13} {'surface':13} {'arm':5} | {'rel.constr':>10} "
+    print(f"\n{'panel':22} {'surface':13} {'arm':5} | {'rel.constr':>10} "
           f"{'adpt.free':>10} {'adpt.constr':>12}")
-    for title, brec, arec, surfs, arms, tasks in PANELS:
+    for title, brec, arec, surfs, arms, tasks, wb in PANELS:
         for arm, _ in arms:
             for surf in surfs:
-                if surf == "WritingBench":
-                    r = _wb_ratio(arm)
-                else:
-                    t = tasks[surf]
-                    bfm, ks = _mean_total(brec[surf], "free", t)
-                    if bfm is None:
-                        continue
-                    bcm, _ = _mean_total(brec[surf], arm, t, ks)
-                    afm, _ = _mean_total(arec[surf], "free", t, ks)
-                    acm, _ = _mean_total(arec[surf], arm, t, ks)
-                    r = None if None in (bcm, afm, acm) else (bcm/bfm, afm/bfm, acm/bfm)
+                r = _panel_ratio(brec, arec, wb, surf, arm, tasks)
                 if r is None:
+                    print(f"{title:22} {surf:13} {arm:5} | MISSING")
                     continue
-                print(f"{title:13} {surf:13} {arm:5} | {r[0]:10.2f} {r[1]:10.2f} "
+                print(f"{title:22} {surf:13} {arm:5} | {r[0]:10.2f} {r[1]:10.2f} "
                       f"{r[2]:12.2f}")
 
 
