@@ -1771,3 +1771,32 @@ GSM8K z=+0.73 (gemma) / z=0.00 (qwen) NOT resolved -- the GSM8K delta rides on t
 arm; the think-on adaptation claim is code-damage recovery, not a GSM8K result.
 (CSV note: the four missing qwen35_think_on_fulln_code constrained rows were appended
 from the verified genbench_samples JSONs (HumanEval per-item pass) and the run log (MBPP: per-item pass not dumped); durations blank.)
+
+## fig:adaptlen rebuilt (2026-08-31) — data for the paper's length placeholder
+
+length_figs.py adapt_length now uses: think-on = full-n base (gemma4_think_on_fulln) vs the
+on-policy think-on adapter; think-off = gemma4_instruct vs the klT2 final (free-arm IFEval
+89.1 / HumanEval 98.2 filled 16:45-16:55). Ratios (total gen length / released free):
+
+| panel | task | base R8 | adapted free | adapted R8 |
+|---|---|---|---|---|
+| think on | GSM8K | 1.17 | 0.95 | 1.00 |
+| think on | IFEval | 1.16 | 1.00 | 1.05 |
+| think on | HumanEval | 1.21 | 0.95 | 1.12 |
+| think off | GSM8K | 1.04 | 0.99 | 1.00 |
+| think off | IFEval | 0.94 | 1.02 | 0.98 |
+| think off | HumanEval | 1.31 | 0.99 | 1.14 |
+| think off | WritingBench | 0.98 | 1.03 | 1.02 |
+
+Proposed placeholder paragraph (paper agent: replaces main.tex:555, cites the regenerated
+figures/adapt_length_nocaption.png):
+
+  Residency also lengthens generations, and adaptation removes most of that too.
+  With thinking on, the released checkpoint under R8 runs 16-21% longer than its own
+  free-routing lengths on GSM8K, IFEval and HumanEval; the adapted model generates at
+  0.95-1.00x the same reference unconstrained and 1.00-1.12x constrained
+  (Figure fig:adaptlen). With thinking off the inflation is confined to code
+  (HumanEval 1.31x -> 1.14x adapted; GSM8K, IFEval and WritingBench sit within 6% of
+  the reference on every bar), matching where the residency quality damage lives.
+  Measured on the shared item sets, full n, both panels normalized by the released
+  model's free-routing mean.

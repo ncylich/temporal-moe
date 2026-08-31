@@ -2900,3 +2900,9 @@ qwen35_think_on_fulln_code,256,8,R8,8,humaneval_instruct,"pass@1,create_test",0.
 qwen35_think_on_fulln_code,256,8,R32,32,humaneval_instruct,"pass@1,create_test",0.896341,full,8192,
 qwen35_think_on_fulln_code,256,8,R8,8,mbpp_instruct,"pass_at_1,extract_code",0.752000,full,8192,
 qwen35_think_on_fulln_code,256,8,R32,32,mbpp_instruct,"pass_at_1,extract_code",0.768000,full,8192,
+gemma4_ce_online_scratch_e16_klT2_rho0_full,128,8,free,,ifeval,sample_len,541.000000,full,2048,110
+gemma4_ce_online_scratch_e16_klT2_rho0_full,128,8,free,,ifeval,"prompt_level_strict_acc,none",0.890943,full,2048,110
+gemma4_ce_online_scratch_e16_klT2_rho0_full,128,8,free,,ifeval,"inst_level_strict_acc,none",0.924460,full,2048,110
+gemma4_ce_online_scratch_e16_klT2_rho0_full,128,8,free,,ifeval,"prompt_level_loose_acc,none",0.909427,full,2048,110
+gemma4_ce_online_scratch_e16_klT2_rho0_full,128,8,free,,ifeval,"inst_level_loose_acc,none",0.937650,full,2048,110
+gemma4_ce_online_scratch_e16_klT2_rho0_he8192,128,8,free,,humaneval_gemma_fixed,"pass@1,channel-aware",0.981707,full,8192,15
