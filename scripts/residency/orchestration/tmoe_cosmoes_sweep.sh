@@ -9,7 +9,7 @@
 # Achieved swaps/token-layer come from the run logs; the comparison point is (R needed, BPB).
 set -uo pipefail; cd /workspace/temporal-moe
 until grep -q "### tok16k rebuild DONE" /workspace/rerun-logs/tok16k_rebuild.out 2>/dev/null; do sleep 300; done
-until .venv/bin/python -c "import transformer_engine" 2>/dev/null; do sleep 300; done
+until (cd /workspace/temporal-moe && .venv/bin/python -c "import transformer_engine.pytorch") 2>/dev/null; do sleep 300; done
 . scripts/env.sh
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568 EVAL_AT_END=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=5
