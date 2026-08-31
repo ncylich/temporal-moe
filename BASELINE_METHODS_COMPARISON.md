@@ -393,3 +393,10 @@ GSM8K n=1319: free 86.9 / R8 77.3, vs the faithful router-only arm 88.9 / 80.4, 
 answers the confound: with D12's own LoRA surface the recency objective does WORSE under
 the bound than router-only, so the faithful arm's R8 gap is the objective, not the surface.
 Training cost 14 min (plain CE + recency term, 4.1k tok/s). Qwen 2b runs the same chain.
+
+### ReMoE 2b result, qwen (2026-08-31 18:22)
+
+GSM8K n=1319: free 87.2 / R8 67.6 (base 85.9 / 76.6, faithful router-only 86.1 / 63.1,
+ours 83.5 at R8). Same verdict as gemma on the identical surface, lr and data: the recency
+objective leaves the free model healthy and damages the bounded arm on either surface.
+The fair-surface cell closes the ReMoE comparison on both models.

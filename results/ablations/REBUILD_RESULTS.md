@@ -1803,3 +1803,10 @@ colon standing in for one, no clipped single-clause sentences):
 
 (The old caption's "thinking off is the control: no inflation" should soften to match the
 code row.)
+
+## Free-arm fill for the finals (2026-08-31 18:28) — "no free-arm tax" rows complete
+
+gemma klT2 free: GSM8K 88.2 / IFEval 89.1 / MMLU 93.9 / HumanEval 98.2 / MBPP 90.0 vs base
+free 87.8 / 88.7 / 93.0 / 99.4 / 91.1 (mean -0.2). qwen full-pool free: GSM8K 86.2 /
+IFEval 86.3 / MMLU 93.0 / HumanEval 93.9 / MBPP 78.4 vs base free 85.9 / 86.5 / 93.4 /
+92.7 / 79.4 (mean -0.1). Both finals are free-arm neutral on the full surface.
