@@ -1706,3 +1706,40 @@ Same trade as on qwen: the broader pool gives up about 2 points of GSM8K R8 and 
 | full pool 1.0x (8.6M) | 86.4 (-0.2) | 86.9 (-0.9) | 93.9 (+1.3) | 97.6 (+1.2) | 89.4 (-0.2) | +0.35 | +0.24 |
 
 On gemma the full pool does not recover the 2 points of GSM8K R8 and trails the d7-pool winner on the four published cells (+1.88 vs +2.16) while leading on all five (+2.90 vs +2.57; MBPP +7.0 is the best code cell measured). The same data setup therefore works on both models with the same qualitative trade, and the four-cell mean prefers the d7 pool on gemma and the full pool on qwen. One recipe holds for the method (on-policy reverse KL, KL T=2, 16x256, each model's saturated lr, no CE, no digit weight, no self-generated data); the prompt pool is the one data choice that differs, or the full pool can be used on both at a 0.3-point cost on gemma's four-cell mean. Gemma final: the d7-pool KL T=2 adapter (mean of the two arms' four-cell means +1.56 vs +1.34 and +1.11); qwen final: the full pool at 1.0x (+2.07 R8). Baselines at their own settings run next (Skliar started 14:43, then ReMoE), then WritingBench on both finals.
+
+## Think-on adaptation, on-policy recipe (2026-08-31)
+
+Same recipe and 8.6M sampled-token budget as the think-off full-pool runs, sampler
+`--online-think on` (cap 8192, mean rollout ~2.4k tokens, cap-hit 2-8%); evals `--think on`
+at the ablation's fair budgets (IFEval 16384, others 8192, GSM8K 16384). Both models trained
+in 2h16m. Full-n base think-on surfaces were run for the deltas (the old n=200 base rows
+were off by up to 6 points: qwen base IFEval R8 76.5 -> 82.6 at n=541).
+
+R8 arm, adapted vs base (both think-on, full n):
+
+| task | gemma base | gemma adapted | delta | qwen base | qwen adapted | delta |
+|---|---|---|---|---|---|---|
+| GSM8K n=1319 | 84.8 | 85.9 | +1.1 | 85.1 | 85.7 | +0.6 |
+| IFEval | 91.7 | 94.3 | +2.6 | 82.6 | 79.9 | -2.7 |
+| MMLU relaxed | 94.3 | 93.4 | -0.9 | 87.3 | 91.7 | +4.4 |
+| HumanEval@8192 | 94.5 | 98.8 | +4.3 | 86.6 | 93.3 | +6.7 |
+| MBPP@8192 | 77.8 | 86.2 | +8.4 | 75.2 | 76.4 | +1.2 |
+| mean | | | +3.1 | | | +2.0 |
+
+Free arms: gemma flat (mean -0.1), qwen pays -1.3 (IFEval -1.7, MBPP -2.4). Damage vs own
+free arm at R8: gemma -0.6 mean (think-off adapted: -3.3), qwen -2.0.
+
+Readings:
+* Thinking absorbs most residency damage on math/IFEval but NOT on code: base R8 code cells
+  still lose 5-10 (gemma MBPP -9.6, qwen HumanEval -6.7) and adaptation recovers them
+  (+8.4, +6.7). GSM8K R8 85.9 (gemma) / 85.7 (qwen) are the best R8 numbers in any mode.
+* The published B2 qwen claim "IFEval R8 improved 5.5" REVERSES at full n: base 82.6 vs
+  adapted 79.9 (the old n=200 base read 76.5). Quote the new full-n numbers only.
+* R16/R32 are reported as free benefit, not comparison arms (user rule 2026-08-31).
+* Bookkeeping: the qwen base code stage (`qwen35_think_on_fulln_code`) wrote only the free
+  arm to instruct_genbench_vllm.csv; R8/R32 values above come from the run log and the
+  verified genbench_samples JSONs.
+
+Adapters: gemma_ce_online_scratch_e16_think_adapter.pt, qwen_ce_online_scratch_e16_think_adapter.pt.
+WritingBench for both think-on adapters runs after the think-off finals' WB (thinking-mode
+generation, cap 8192).
