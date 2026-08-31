@@ -397,19 +397,27 @@ def _mean_total(rec, arm, task, keys=None):
 TASK = {"GSM8K": "gsm8k_cot_zeroshot", "IFEval": "ifeval",
         "HumanEval": "humaneval_gemma_fixed", "MMLU": "mmlu_dual"}
 ARMS = [("R8", "8 resident"), ("R16", "16 resident")]
-PANELS = [("thinking on",
+QTASK = TASK | {"HumanEval": "humaneval_instruct"}
+# per panel: title, base records, adapted records, surfaces, arms, surface->task
+PANELS = [("gemma4, thinking on",
            {"GSM8K": "gemma4_think_on_fulln_n1319", "IFEval": "gemma4_think_on_fulln_full",
             "HumanEval": "gemma4_think_on_fulln_he8192"},
            {"GSM8K": "gemma4_ce_online_think_n1319", "IFEval": "gemma4_ce_online_think_full",
             "HumanEval": "gemma4_ce_online_think_he8192"},
-           ["GSM8K", "IFEval", "HumanEval"]),
-          ("thinking off",
+           ["GSM8K", "IFEval", "HumanEval"], ARMS, TASK),
+          ("Qwen3.5, thinking on",
+           {"GSM8K": "qwen35_think_on_fulln_n1319", "IFEval": "qwen35_think_on_fulln_full",
+            "HumanEval": "qwen35_think_on_fulln_code"},
+           {"GSM8K": "qwen35_ce_online_think_n1319", "IFEval": "qwen35_ce_online_think_full",
+            "HumanEval": "qwen35_ce_online_think_code"},
+           ["GSM8K", "IFEval", "HumanEval"], [("R8", "8 resident")], QTASK),
+          ("gemma4, thinking off",
            {"GSM8K": "gemma4_instruct_n1319", "IFEval": "gemma4_instruct_full",
             "HumanEval": "gemma4_instruct_he8192"},
            {"GSM8K": "gemma4_ce_online_scratch_e16_klT2_n1319",
             "IFEval": "gemma4_ce_online_scratch_e16_klT2_rho0_full",
             "HumanEval": "gemma4_ce_online_scratch_e16_klT2_rho0_he8192"},
-           ["GSM8K", "IFEval", "HumanEval", "WritingBench"])]
+           ["GSM8K", "IFEval", "HumanEval", "WritingBench"], ARMS, TASK)]
 WB_PAIR = ("gemma4_base", "gemma4_ce_online_scratch_e16_klT2_rho0")
 
 BARS = [("released, constrained", "#d1605e", 0),
@@ -434,17 +442,19 @@ def _wb_ratio(arm):
 
 
 def adapt_length():
-    fig, axes = plt.subplots(1, 2, figsize=(12.8, 3.3) if PAPER else (13.2, 4.7),
-                             sharey=True, gridspec_kw={"width_ratios": [3, 4]})
-    for ax, (title, brec, arec, surfs) in zip(axes, PANELS):
-        cols = [(s, a) for a, _ in ARMS for s in surfs]
+    widths = [len(p[3]) * len(p[4]) for p in PANELS]
+    fig, axes = plt.subplots(1, len(PANELS),
+                             figsize=(14.2, 3.3) if PAPER else (14.4, 4.7),
+                             sharey=True, gridspec_kw={"width_ratios": widths})
+    for ax, (title, brec, arec, surfs, arms, tasks) in zip(axes, PANELS):
+        cols = [(s, a) for a, _ in arms for s in surfs]
         vals = {i: [] for i in range(3)}
         xs = {i: [] for i in range(3)}
         for ci, (surf, arm) in enumerate(cols):
             if surf == "WritingBench":
                 r = _wb_ratio(arm)
             else:
-                t = TASK[surf]
+                t = tasks[surf]
                 bfm, ks = _mean_total(brec[surf], "free", t)
                 if bfm is None:
                     continue
@@ -465,7 +475,7 @@ def adapt_length():
                             xytext=(0, 3), ha="center", fontsize=8)
         ax.axhline(1.0, color="black", lw=1.1, zorder=1)
         ax.set_xticks(range(len(cols)))
-        ax.set_xticklabels([f"{s}\n{dict(ARMS)[a]}" for s, a in cols], fontsize=8.5)
+        ax.set_xticklabels([f"{s}\n{dict(arms)[a]}" for s, a in cols], fontsize=8.0)
         ax.set_title(title, fontsize=11)
         ax.grid(alpha=0.25, axis="y")
         ax.set_axisbelow(True)
@@ -473,7 +483,7 @@ def adapt_length():
     axes[0].legend(fontsize=9, loc="upper right")
     # every ratio sits in 0.93-1.31; a zero floor would spend most of the panel
     # on empty axis, and the printed values keep truncated bars honest
-    axes[0].set_ylim(0.8, 1.42)
+    axes[0].set_ylim(0.8, 1.52)
     if not PAPER:
         fig.suptitle("Total generation length (thinking + answer), gemma4-26B, same "
                      "items\nblack line = the released checkpoint under free routing, "
@@ -482,13 +492,13 @@ def adapt_length():
     _save(fig, "adapt_length")
     print(f"\n{'panel':13} {'surface':13} {'arm':5} | {'rel.constr':>10} "
           f"{'adpt.free':>10} {'adpt.constr':>12}")
-    for title, brec, arec, surfs in PANELS:
-        for arm, _ in ARMS:
+    for title, brec, arec, surfs, arms, tasks in PANELS:
+        for arm, _ in arms:
             for surf in surfs:
                 if surf == "WritingBench":
                     r = _wb_ratio(arm)
                 else:
-                    t = TASK[surf]
+                    t = tasks[surf]
                     bfm, ks = _mean_total(brec[surf], "free", t)
                     if bfm is None:
                         continue
