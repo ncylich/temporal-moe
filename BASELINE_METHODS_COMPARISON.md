@@ -385,3 +385,11 @@ expert 11.9MB x 30 layers, qwen 6.3MB x 40 layers). The reader divides by their 
 ReMoE 2b (fair-surface variant) launched per this doc's own rule: the faithful arm
 underperformed at R8, so one cell holds D12's LoRA surface and lr fixed and varies only the
 objective (recency reuse, constraint off). Gemma first.
+
+### ReMoE 2b result, gemma (2026-08-31 17:45)
+
+GSM8K n=1319: free 86.9 / R8 77.3, vs the faithful router-only arm 88.9 / 80.4, base
+87.8 / 78.8, ours 84.0 at R8 on the identical surface, lr and data. The fair-surface cell
+answers the confound: with D12's own LoRA surface the recency objective does WORSE under
+the bound than router-only, so the faithful arm's R8 gap is the objective, not the surface.
+Training cost 14 min (plain CE + recency term, 4.1k tok/s). Qwen 2b runs the same chain.
