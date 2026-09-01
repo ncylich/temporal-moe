@@ -442,3 +442,25 @@ At matched traffic (0.94 vs our hard 1.00) their best point is 80.7 against our 
 claim is uniform: at 5-30x memory reductions, no measured Skliar operating point matches
 our quality at or under our traffic budget on either model, and only the burst-unbounded
 1.33x point on gemma comes within two points.
+
+## CoSMoEs BlES on the isoFLOP venue (2026-09-01, first pass): quality axis
+
+Faithful BlES loss (Eq 4-7 of 2503.00245, unit-tested), vanilla routing at R=E; refs
+retrained on the rebuilt corpus (bit-identical tokenizer; the fresh g3 vanilla ref matches
+the original pre-wipe checkpoint's final CE to 0.19%, validating the pipeline). s0 @ 1e16,
+locked phase0 HPs, rope fusion off everywhere (TE 2.16). Test BPB:
+
+| cell | grain 1 | grain 3 |
+|---|---|---|
+| vanilla MoE (reference) | 1.4486 | 1.4629 |
+| temporal MoE (ours, hard 1-swap cap) | 1.4625 (+0.96%) | 1.4807 (+1.2%) |
+| BlES lambda 0.1 | 1.5379 (+6.2%) | 1.5373 (+5.1%) |
+| BlES lambda 1 | 1.6001 (+10.5%) | 1.5976 (+9.2%) |
+| BlES lambda 10 | 1.7757 (+22.6%) | 1.7581 (+20.2%) |
+| BlES lambda 100 | 1.9225 (+32.7%) | 1.8103 (+23.7%) |
+
+At every weight measured, BlES costs 5-25x our constraint tax before any switching benefit
+is priced in. Their paper states no lambda; a low tail (0.01, 0.03) runs next to trace the
+knee fairly, then the router-probe pass adds the other axes: achieved switch rate (their
+loads), effective experts, over-use share, neglected-expert count (user note: fewer
+switches via collapse is not locality).
