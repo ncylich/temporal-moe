@@ -572,3 +572,24 @@ Same shape as gemma, sharper: quality holds only while traffic is 1.4x our budge
 (74.5 at 1.01), and below it the cache collapses (69.8 -> 66.6). At 32x memory reduction no
 Skliar point matches our quality at or under 1.0 loads; the curve is now fully carved on
 both models. Figure updated (frontier_argument.html + artifact).
+
+### Matched-point fills (2026-09-01 evening)
+
+Gemma C=8 upper curve completed: lambda 0.1 -> 3.56 loads / 87.2, lambda 0.2 -> 2.62 / 87.3
+(quality holds only while traffic is 2.6x+ our budget). Qwen per-token transfer histogram
+at its matched point (lambda 0.4, 1.01 mean) recorded in results/ablations/
+skliar_c8_qwen_lam04_hist.json; ours is 100% at exactly 1 on both models.
+
+Full surface at gemma's matched point (C=8, lambda 0.5, 0.94 loads) vs ours at R8:
+
+| task | Skliar matched | ours adapted R8 |
+|---|---|---|
+| GSM8K | 80.7 | 84.0 |
+| IFEval | 88.9 | 86.7 |
+| MMLU | 94.3 | 94.3 |
+| HumanEval@8192 | 94.5 | 96.3 |
+| MBPP@8192 | 84.8 | 82.2 |
+
+Mixed by task at matched traffic on gemma: they hold IFEval/MBPP, we hold GSM8K/HumanEval,
+MMLU ties -- with the guarantee difference (mean vs hard cap; their IFEval traffic 0.84)
+still ours. Qwen matched-point surface follows.
