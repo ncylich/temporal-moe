@@ -632,3 +632,10 @@ the gap grows with the reduction factor, and at both points their 1.0 is an aver
 bursts (qwen matched distribution: 26% zero / 56% one / 18% >=2, tail to 6; gemma 33/47/20
 to 7) while ours is exactly 1 for every token. Gemma upper curve completed too:
 lam0.1 = 3.56 loads / 87.2, lam0.2 = 2.62 / 87.3.
+
+Paired significance at the matched points (McNemar on shared items; |z|>1.96 = real):
+gemma GSM8K ours z=+3.49 REAL; gemma IFEval theirs z=-1.81 (not resolved); qwen GSM8K ours
+(+9.0 pts, unpaired SE 1.2, clearly real); qwen HumanEval ours z=+2.50 REAL; qwen IFEval
+theirs z=-1.18 (not resolved). gemma HumanEval/MBPP and qwen MBPP have no per-item dumps
+(producer limitation): unpaired only. Net: every resolved cell is ours (GSM8K x2, HumanEval);
+none of theirs resolves. The 16x "tie" is a tie of unresolved cells, not a resolved split.
