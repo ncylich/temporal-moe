@@ -524,3 +524,17 @@ In transfer units the gap is stark: even at maximum collapse (74% of experts aba
 +24-33% BPB) BlES still demands 1.9-7.3 loads per token-layer, while our models SERVE at
 1.0 by construction at a +1% tax. No BlES operating point reaches our runtime cost at any
 quality. (cosmoes_metrics.csv regenerated with k and xfers_tl; v1 kept alongside.)
+
+Consolidated CoSMoEs table (all axes in one view; supersedes the two partial tables above):
+
+| cell | xfers/tok-layer g1 / g3 | effective experts (of 64 / 192) | neglected g1 / g3 | BPB tax g1 / g3 |
+|---|---|---|---|---|
+| vanilla anchor | 4.79 / 14.13 | 63.7 / 190.9 | 0 / 0 | -- |
+| temporal (ours), raw demand | 3.73 / 11.39 | 61.7 / 186.0 | 0 / 0 | +1.0% / +1.2% |
+| temporal (ours), SERVED | 1.00 / 1.00 (hard cap) | 61.7 / 186.0 | 0 / 0 | (same models) |
+| BlES 0.01 | 4.42 / 12.85 | 59.4 / 157.8 | 0.3 / 14.7 | +0.9% / +0.8% |
+| BlES 0.03 | 3.70 / 11.93 | 43.1 / 120.0 | 12.3 / 41.3 | +3.6% / +3.2% |
+| BlES 0.1 | 3.14 / 10.19 | 20.5 / 68.4 | 32.7 / 84.7 | +6.2% / +5.1% |
+| BlES 1 | 3.28 / 10.44 | 19.8 / 64.6 | 34.7 / 88.7 | +10.5% / +9.2% |
+| BlES 10 | 2.48 / 8.58 | 12.5 / 43.4 | 47.3 / 129.0 | +22.6% / +20.2% |
+| BlES 100 | 1.91 / 7.33 | 10.2 / 36.1 | 51.0 / 142.3 | +32.7% / +23.7% |
