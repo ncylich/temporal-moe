@@ -34,6 +34,6 @@ for G in 1 3; do
   # "vanilla full MoE" mode) so the COSMOES_LAMBDA hook is live -- TEMPORAL=0 would route through
   # stock pretrain_gpt.py and silently train with no BlES loss.
   RE=$((64*G))  # router accepts numeric R only; R=num_experts == unconstrained
-  for LAM in 0.1 1 10 100; do run_one g${G}_bles${LAM}_1e16 $G 1 $LAM $RE; done
+  for LAM in 0.01 0.03 0.1 1 10 100; do run_one g${G}_bles${LAM}_1e16 $G 1 $LAM $RE; done
 done
 echo "### cosmoes sweep ALL DONE $(date -u +%H:%M)"
