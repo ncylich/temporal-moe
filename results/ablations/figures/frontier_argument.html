@@ -120,9 +120,8 @@ function draw(){
 }
 function pdfPanel(){
   const W=500,H=300,L=44,R=12,T=16,B=36, id='pdf';
-  // loads per token-layer at the matched points (gemma lam0.5 9.2M samples; qwen lam0.4 17.5M)
+  // Skliar C=8 lam0.5, gemma, GSM8K n=1319: loads per token-layer over 9.20M samples
   const h=[3013940,4359240,1327737,402077,86592,13299,1253,72]; const tot=h.reduce((a,b)=>a+b,0);
-  const hq=[25.9,56.2,11.7,4.1,1.4,0.4,0.1,0.0]; // qwen, percent
   const hq=[4537155, 9866202, 2056892, 721109, 253411, 75644, 22112, 6240]; const totq=hq.reduce((a,b)=>a+b,0);
   const x=i=>L+18+i*(W-L-R-30)/8, bw=(W-L-R-30)/8*0.68;
   const y=v=>T+(1-v)*(H-T-B);
