@@ -554,3 +554,21 @@ Consolidated CoSMoEs table (all axes in one view; supersedes the two partial tab
   the tok16k rebuild chain (tokenizer verified bit-identical to the original).
 Claim: at ~2x reductions the serving caches win; at 5-30x, ours is the only method holding
 quality, balance, and a hard 1-transfer budget simultaneously.
+
+### Skliar C=8 qwen, full lambda curve (2026-09-01 17:43)
+
+| lambda | loads/token-layer | GSM8K |
+|---|---|---|
+| 0 | 5.63 | 86.0 |
+| 0.1 | 3.44 | 86.0 |
+| 0.2 | 2.13 | 84.9 |
+| 0.3 | 1.41 | 82.6 |
+| 0.4 | 1.01 | 74.5 |
+| 0.5 | 0.81 | 69.8 |
+| 0.7 | 0.66 | 66.6 |
+
+Same shape as gemma, sharper: quality holds only while traffic is 1.4x our budget or more
+(82.6 at 1.41 is already below our 83.5), crossing the budget costs 8-9 points at once
+(74.5 at 1.01), and below it the cache collapses (69.8 -> 66.6). At 32x memory reduction no
+Skliar point matches our quality at or under 1.0 loads; the curve is now fully carved on
+both models. Figure updated (frontier_argument.html + artifact).
