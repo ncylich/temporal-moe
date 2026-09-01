@@ -464,3 +464,15 @@ is priced in. Their paper states no lambda; a low tail (0.01, 0.03) runs next to
 knee fairly, then the router-probe pass adds the other axes: achieved switch rate (their
 loads), effective experts, over-use share, neglected-expert count (user note: fewer
 switches via collapse is not locality).
+
+Low-lambda knee (pass 2, 2026-09-01 15:21) — complete BlES quality curve:
+
+| BlES lambda | g1 BPB (delta vs vanilla) | g3 BPB (delta) |
+|---|---|---|
+| 0.01 | 1.4619 (+0.9%) | 1.4753 (+0.8%) |
+| 0.03 | 1.5002 (+3.6%) | 1.5100 (+3.2%) |
+
+At lambda 0.01 BlES matches OUR tax (+0.9% vs our +1.0/1.2%); everything above it is
+strictly worse. The probe pass decides the verdict: if lambda 0.01 barely moves the switch
+rate off vanilla, their method at matched quality buys no locality, while ours delivers
+R=k at the same price.
