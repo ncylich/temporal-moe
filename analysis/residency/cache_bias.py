@@ -18,6 +18,7 @@ CFG = {"C": int(os.environ.get("TEMPORAL_CB_C", "64")), "lam": float(os.environ.
 STATE = {}          # (req_id, layer) -> {"last": [E] float (-inf = not cached), "t": int}
 DELTA = {}          # layer -> [sum, n]
 COUNT = [0, 0]      # loads on decode rows, decode rows
+HIST = [0]*64       # loads-per-token-layer histogram (env TEMPORAL_SWAP_HIST=<json path> dumps it)
 NEG = float("-inf")
 
 
@@ -98,8 +99,12 @@ def apply(layer, router_logits, spans, on):
             last = torch.stack([STATE[kk]["last"] for kk in dec_keys])              # [D,E]
             t = torch.tensor([float(STATE[kk]["t"]) for kk in dec_keys], device=lt.device)[:, None]
             sel = select(lt, last, delta, lam, J, k)
-            loads = (sel & ~(last > NEG)).sum().item()
+            per_row = (sel & ~(last > NEG)).sum(dim=-1)
+            loads = per_row.sum().item()
             COUNT[0] += int(loads); COUNT[1] += len(dec_rows)
+            if os.environ.get("TEMPORAL_SWAP_HIST"):
+                for v, c in zip(*torch.unique(per_row, return_counts=True)):
+                    HIST[min(int(v), 63)] += int(c)
             last = _cap(torch.where(sel, t, last), C)
             for j, kk in enumerate(dec_keys):
                 STATE[kk]["last"] = last[j]; STATE[kk]["t"] += 1
@@ -108,5 +113,9 @@ def apply(layer, router_logits, spans, on):
 
 
 def stats():
+    hp = os.environ.get("TEMPORAL_SWAP_HIST")
+    if hp:
+        import json
+        json.dump({"hist": HIST, "loads": COUNT[0], "rows": COUNT[1]}, open(hp, "w"))
     sw, tk = COUNT
     return sw, tk, (sw / tk if tk else 0.0)
