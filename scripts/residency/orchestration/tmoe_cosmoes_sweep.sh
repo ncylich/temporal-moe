@@ -19,7 +19,7 @@ export EXTRA_ARGS="--no-rope-fusion"
 L=scripts/residency/gpu_lease.sh
 run_one () { # NAME GRAIN TEMPORAL COSMOES_LAMBDA RESIDENCY_R(optional, "E" = patched router unconstrained)
   local tag=iter_done_marker; local d=$ROOT/results/phase0/runs/$1
-  read _N ITERS < <("$PY" analysis/shapes.py iters s0 1e16 256)
+  read _N ITERS < <(GRAIN=$2 "$PY" analysis/shapes.py iters s0 1e16 256)
   [ -d "$d/ckpt/$(printf iter_%07d $ITERS)" ] && { echo "[cosmoes] SKIP $1"; return 0; }
   echo "### cosmoes cell $1 (grain=$2 temporal=$3 lambda=$4) $(date -u +%H:%M)"
   GRAIN=$2 TEMPORAL=$3 TEMPORAL_EVICT=min_logit COSMOES_LAMBDA=$4 TEMPORAL_RESIDENCY_R=${5:-0} \
