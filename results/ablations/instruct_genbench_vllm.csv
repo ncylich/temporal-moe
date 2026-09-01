@@ -2992,3 +2992,9 @@ gemma4_skliar_C8_lam0p5_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-ex
 gemma4_skliar_C8_lam0p5_full_dual,128,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.495614,4,2048,286
 gemma4_skliar_C8_lam0p5_he8192,128,8,R8,8,humaneval_gemma_fixed,"pass@1,channel-aware",0.945122,full,8192,249
 gemma4_skliar_C8_lam0p5_m8192,128,8,R8,8,mbpp_gemma,"pass@1,channel-aware",0.848000,full,8192,613
+qwen35_skliar_C8_lam0p4_n_dual,256,8,R8,8,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.929825,4,2048,397
+qwen35_skliar_C8_lam0p4_n_dual,256,8,R8,8,mmlu_gptoss_relaxed,"acc,strict-flan",0.526316,4,2048,397
+qwen35_skliar_C8_lam0p4_code,256,8,R8,8,mbpp_instruct,sample_len,500.000000,full,1536,431
+qwen35_skliar_C8_lam0p4_code,256,8,R8,8,mbpp_instruct,"pass_at_1,extract_code",0.744000,full,1536,431
+qwen35_skliar_C8_lam0p4_code,256,8,R8,8,humaneval_instruct,sample_len,164.000000,full,1536,257
+qwen35_skliar_C8_lam0p4_code,256,8,R8,8,humaneval_instruct,"pass@1,create_test",0.865854,full,1536,257

@@ -593,3 +593,21 @@ Full surface at gemma's matched point (C=8, lambda 0.5, 0.94 loads) vs ours at R
 Mixed by task at matched traffic on gemma: they hold IFEval/MBPP, we hold GSM8K/HumanEval,
 MMLU ties -- with the guarantee difference (mean vs hard cap; their IFEval traffic 0.84)
 still ours. Qwen matched-point surface follows.
+
+Full surface at qwen's matched point (C=8, lambda 0.4, 1.01 loads) vs ours at R8:
+
+| task | Skliar matched | ours adapted R8 |
+|---|---|---|
+| GSM8K | 74.5 | 83.5 |
+| IFEval | 84.5 | 82.6 |
+| MMLU | 93.0 | 91.7 |
+| HumanEval | 86.6 | 92.7 |
+| MBPP | 74.4 | 76.4 |
+| 5-cell mean | 82.6 | 85.4 (+2.8) |
+
+Honest multi-task reading of the matched-traffic comparison: on qwen (32x) ours leads the
+5-cell mean by 2.8 with the wins on GSM8K/HumanEval/MBPP and theirs on IFEval/MMLU; on
+gemma (16x) the 5-cell means TIE (ours 88.7 vs 88.6) with the same task split. The
+frontier claim at matched traffic therefore rests on (a) the reasoning/code tasks, (b) the
+32x regime, and (c) the guarantee type (their mean-with-bursts vs our hard cap) -- not on
+a uniform per-task win at 16x. State it that way in the paper.
