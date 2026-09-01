@@ -476,3 +476,30 @@ At lambda 0.01 BlES matches OUR tax (+0.9% vs our +1.0/1.2%); everything above i
 strictly worse. The probe pass decides the verdict: if lambda 0.01 barely moves the switch
 rate off vanilla, their method at matched quality buys no locality, while ours delivers
 R=k at the same price.
+
+### CoSMoEs verdict: the three axes together (2026-09-01 15:42, probe pass complete)
+
+Fair-usage probe (one fixed batch per trained cell, raw router logits; vanilla anchors:
+g1 0.799 switches/token-layer with 63.7/64 effective experts, g3 0.785 with 190.9/192):
+
+| cell | switches/tok-layer (g1 / g3) | effective experts | neglected (<10% uniform) | BPB tax |
+|---|---|---|---|---|
+| temporal (ours) | 0.62 / 0.63 | 61.7/64, 186/192 | 0 / 0 | +1.0% / +1.2% |
+| BlES 0.01 | 0.74 / 0.71 | 59.4, 157.8 | 0.3 / 14.7 | +0.9% / +0.8% |
+| BlES 0.03 | 0.62 / 0.66 | 43.1, 120.0 | 12.3 / 41.3 | +3.6% / +3.2% |
+| BlES 0.1 | 0.52 / 0.57 | 20.5, 68.4 | 32.7 / 84.7 | +6.2% / +5.1% |
+| BlES 1 | 0.55 / 0.58 | 19.8, 64.6 | 34.7 / 88.7 | +10.5% / +9.2% |
+| BlES 10 | 0.41 / 0.48 | 12.5, 43.4 | 47.3 / 129.0 | +22.6% / +20.2% |
+| BlES 100 | 0.32 / 0.41 | 10.2, 36.1 | 51.0 / 142.3 | +32.7% / +23.7% |
+
+Readings:
+1. At matched quality (lambda 0.01, the knee), BlES removes only 8-9% of the switching and
+   already starts neglecting experts; it buys essentially no locality.
+2. To merely MATCH our raw-demand reuse (0.62), BlES needs lambda 0.03 and pays 3x our
+   quality tax while abandoning 19-22% of the expert pool -- the "fewer switches by
+   over-dependence" failure mode, measured (user prediction confirmed).
+3. Every further switching gain is bought by collapse (up to 74% of experts neglected),
+   the demanded set never becomes bounded (mean 0.32+ switches with unbounded per-token
+   misses), so no BlES point can serve at R=k; ours serves at R=k (9.4% resident) by
+   construction with full balance and a +1% tax.
+Appendix E's argument against CoSMoEs is now a measurement, not a citation.
