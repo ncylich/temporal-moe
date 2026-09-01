@@ -8,7 +8,7 @@ export TMOE_ROOT=/workspace/temporal-moe PATH=/workspace/venv_vllm312/bin:$PATH 
 export HF_TOKEN=$(cat /root/.cache/huggingface/token) HF_HUB_DISABLE_XET=1 VLLM_ENABLE_V1_MULTIPROCESSING=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CUDA_VISIBLE_DEVICES=0 TMOE_PRIO=4
 L=scripts/residency/gpu_lease.sh; PY=/workspace/venv_vllm312/bin/python
 CB="TEMPORAL_WALKER=cache_bias TEMPORAL_CB_J=1 TEMPORAL_CB_K=8 TEMPORAL_COUNT_SWAPS=1"
-for LAM in 0 0.2 0.4 0.6; do
+for LAM in 0.2 0.4 0.6; do
   echo "### skliar C16 gemma lam$LAM $(date -u +%H:%M)"
   ( export $CB TEMPORAL_CB_LAMBDA=$LAM TEMPORAL_CB_C=16; $L $PY -u analysis/residency/instruct_genbench_vllm.py --model gemma4_instruct --path /dev/shm/gemma4-26b-it --arms R8 --record-as gemma4_skliar_C16_lam${LAM/./p}_n1319 --tasks "gsm8k_cot_zeroshot=0" --gen-cap 2048 --max-model-len 4096 --gpu-mem 0.90 )
   echo "### skliar C32 qwen lam$LAM $(date -u +%H:%M)"

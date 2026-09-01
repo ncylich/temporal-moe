@@ -8,7 +8,7 @@ set -uo pipefail; cd /workspace/temporal-moe
 until grep -q "### dclm50k rebuild DONE" /workspace/rerun-logs/dclm50k_rebuild.out 2>/dev/null; do sleep 300; done
 . scripts/env.sh
 export TOKENIZER_MODEL=EleutherAI/pythia-12b DATA_DIR=$ROOT/data/dclm_tokenized
-export CE_FUSION=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=4 EXTRA_ARGS="--no-rope-fusion"
+export CE_FUSION=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=5 EXTRA_ARGS="--no-rope-fusion"
 export HF_TOKEN=$(cat /root/.cache/huggingface/token)
 echo "### moe_fine_g3_1e19 START $(date -u +%H:%M)"
 GRAIN=3 TEMPORAL=0 SHAPE=s19opt TARGET_FLOPS=1e19 PEAK_LR=3e-3 WARMUP_FRAC=0.05 GLOBAL_BATCH=1024 MICRO_BATCH=8 SEED=1234 \
