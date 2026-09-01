@@ -13,6 +13,9 @@ until (cd /workspace/temporal-moe && .venv/bin/python -c "import torch, transfor
 . scripts/env.sh
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568 EVAL_AT_END=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=5
+# TE 2.16 (the only cu12+torch2.8 build NVIDIA ships) fails Megatron's fused-rope probe; fusion
+# off for EVERY cell, so all references and BlES cells stay internally consistent.
+export EXTRA_ARGS="--no-rope-fusion"
 L=scripts/residency/gpu_lease.sh
 run_one () { # NAME GRAIN TEMPORAL COSMOES_LAMBDA RESIDENCY_R(optional, "E" = patched router unconstrained)
   local tag=iter_done_marker; local d=$ROOT/results/phase0/runs/$1
@@ -30,6 +33,7 @@ for G in 1 3; do
   # BlES cells run the PATCHED router at R=E (unconstrained, mask all-true: the documented
   # "vanilla full MoE" mode) so the COSMOES_LAMBDA hook is live -- TEMPORAL=0 would route through
   # stock pretrain_gpt.py and silently train with no BlES loss.
-  for LAM in 0.1 1 10 100; do run_one g${G}_bles${LAM}_1e16 $G 1 $LAM E; done
+  RE=$((64*G))  # router accepts numeric R only; R=num_experts == unconstrained
+  for LAM in 0.1 1 10 100; do run_one g${G}_bles${LAM}_1e16 $G 1 $LAM $RE; done
 done
 echo "### cosmoes sweep ALL DONE $(date -u +%H:%M)"
