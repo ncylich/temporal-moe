@@ -538,3 +538,19 @@ Consolidated CoSMoEs table (all axes in one view; supersedes the two partial tab
 | BlES 1 | 3.28 / 10.44 | 19.8 / 64.6 | 34.7 / 88.7 | +10.5% / +9.2% |
 | BlES 10 | 2.48 / 8.58 | 12.5 / 43.4 | 47.3 / 129.0 | +22.6% / +20.2% |
 | BlES 100 | 1.91 / 7.33 | 10.2 / 36.1 | 51.0 / 142.3 | +32.7% / +23.7% |
+
+## The argument package (2026-09-01) — everything needed for the frontier claim, in-repo
+
+- Frontier scatter + transfer PDF + CoSMoEs panel, PI-ready one-pager:
+  results/ablations/figures/frontier_argument.html (also live as a private artifact).
+- Skliar: lambda sweeps + full surfaces at 50% and C=8 (this doc), per-token transfer
+  histogram results/ablations/skliar_c8_lam05_hist.json (33%/47%/20% at 0/1/>=2, tail 7;
+  ours is 100% at exactly 1 by the hard cap, mean 1.00 over 8.75M token-layers).
+- ReMoE: faithful + fair-surface (2b) on both models (this doc).
+- CoSMoEs: 16-cell BlES sweep + fair-usage probe, consolidated table above;
+  per-cell metrics results/phase0/cosmoes_metrics.csv, per-cell train.log/run.meta in
+  results/phase0/runs/, checkpoints on HF ncylich/temporal-moe-ckpts/cosmoes/.
+- Env reproducibility: scripts/residency/orchestration/megatron_torch28_numpy2.patch +
+  the tok16k rebuild chain (tokenizer verified bit-identical to the original).
+Claim: at ~2x reductions the serving caches win; at 5-30x, ours is the only method holding
+quality, balance, and a hard 1-transfer budget simultaneously.
