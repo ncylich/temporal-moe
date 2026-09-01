@@ -611,3 +611,24 @@ gemma (16x) the 5-cell means TIE (ours 88.7 vs 88.6) with the same task split. T
 frontier claim at matched traffic therefore rests on (a) the reasoning/code tasks, (b) the
 32x regime, and (c) the guarantee type (their mean-with-bursts vs our hard cap) -- not on
 a uniform per-task win at 16x. State it that way in the paper.
+
+### Matched-point FULL surfaces at C=8 (2026-09-01 20:35) + qwen transfer distribution
+
+Skliar at our memory, forced to our traffic (gemma lam0.5 ~0.94 loads, qwen lam0.4 1.01),
+all five tasks, vs our R8-adapted finals:
+
+| task | gemma: Skliar / ours | qwen: Skliar / ours |
+|---|---|---|
+| GSM8K | 80.7 / 84.0 (paired z +3.5) | 74.5 / 83.5 |
+| IFEval | 88.9 / 86.7 | 84.5 / 82.6 |
+| MMLU | 94.3 / 94.3 | 93.0 / 91.7 |
+| HumanEval | 94.5 / 96.3 | 86.6 / 92.7 |
+| MBPP | 84.8 / 82.2 | 74.4 / 76.4 |
+| 5-cell mean | 88.6 / 88.7 (tie) | 82.6 / 85.4 (ours +2.8) |
+
+Honest reading: at 16x the matched-point surface MEAN is a tie (task mix splits: they hold
+IFEval/MBPP, we hold GSM8K decisively and HumanEval); at 32x ours wins the mean by 2.8 --
+the gap grows with the reduction factor, and at both points their 1.0 is an average with
+bursts (qwen matched distribution: 26% zero / 56% one / 18% >=2, tail to 6; gemma 33/47/20
+to 7) while ours is exactly 1 for every token. Gemma upper curve completed too:
+lam0.1 = 3.56 loads / 87.2, lam0.2 = 2.62 / 87.3.

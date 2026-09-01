@@ -59,14 +59,14 @@ footer{margin-top:14px; color:var(--muted); font-size:11.5px; font-family:"IBM P
   <div class="panel"><h2>Qwen3.5-35B <small>free = 85.9 · 32× reduction</small></h2><svg id="q" viewBox="0 0 500 300" width="100%"></svg></div>
 </div>
 <div class="panels" style="margin-top:18px">
-  <div class="panel"><h2>Per-token transfer distribution <small>matched point: 6.25% memory, ≈1 mean</small></h2><svg id="pdf" viewBox="0 0 500 300" width="100%"></svg></div>
+  <div class="panel"><h2>Per-token transfer distribution <small>matched points, both models, ≈1 mean</small></h2><svg id="pdf" viewBox="0 0 500 300" width="100%"></svg></div>
   <div class="panel"><h2>CoSMoEs (BlES loss, grain 3) <small>trained venue · vanilla anchor: 14.1 transfers, 191/192 experts</small></h2><svg id="cos" viewBox="0 0 500 300" width="100%"></svg></div>
 </div>
 <div class="takeaways">
   <div class="take t1"><b>Their regime: ~2× reduction</b>
     At 50% resident, Skliar is lossless at <span class="num">0.03–0.84</span> loads/token·layer. ReMoE is quality-neutral only with all experts resident.</div>
   <div class="take t2"><b>Our regime: 5–30× reduction</b>
-    At matched memory <i>and</i> traffic, ours wins on both models: <span class="num">84.0 vs 80.7</span> (gemma, paired z=+3.5) and <span class="num">83.5 vs 74.5</span> (qwen). Below the budget their cache collapses (<span class="num">69.5→45.1</span>).</div>
+    At matched memory <i>and</i> traffic, ours wins on both models: <span class="num">84.0 vs 80.7</span> (gemma, paired z=+3.5) and <span class="num">83.5 vs 74.5</span> (qwen). Below the budget their cache collapses (<span class="num">69.5→45.1</span>). Full 5-task surface at the matched points: ours <span class="num">+2.8</span> mean at 32×, tied at 16× — the gap grows with the reduction.</div>
   <div class="take t3"><b>The guarantee differs in kind</b>
     Their traffic is a mean with unbounded per-token bursts; ours is a hard 1-swap cap you can provision bandwidth for. Their only nearby point needs <span class="num">1.33×</span> our traffic. And CoSMoEs, the one trained-loss competitor: higher CE at every weight, expert collapse, and it still demands <span class="num">7–13</span> transfers/token·layer — slow at runtime no matter the λ.</div>
 </div>
@@ -110,7 +110,7 @@ function panel(id, D){
 }
 function draw(){
   panel('g',{free:87.8, ours:[1.00,84.0], base:[1.00,78.8], remoe:[1.00,80.4],
-    skliar:[[0.49,45.1],[0.52,50.2],[0.70,69.5],[0.94,80.7],[1.33,85.8],[4.67,87.8]],
+    skliar:[[0.49,45.1],[0.52,50.2],[0.70,69.5],[0.94,80.7],[1.33,85.8],[2.62,87.3],[3.56,87.2],[4.67,87.8]],
     skliar50:[[0.031,87.9],[0.31,87.9]],
     notes:[[0.94,80.7,'80.7 @ matched traffic',-165,14],[0.52,50.2,'cache collapses',8,10],[0.31,87.9,'50% memory',8,-8],[1.00,78.8,'ours, no training',10,13],[1.00,80.4,'ReMoE',-52,4]]});
   panel('q',{free:85.9, ours:[1.00,83.5], base:[1.00,76.6], remoe:[1.00,63.1],
@@ -120,21 +120,25 @@ function draw(){
 }
 function pdfPanel(){
   const W=500,H=300,L=44,R=12,T=16,B=36, id='pdf';
-  // Skliar C=8 lam0.5, gemma, GSM8K n=1319: loads per token-layer over 9.20M samples
+  // loads per token-layer at the matched points (gemma lam0.5 9.2M samples; qwen lam0.4 17.5M)
   const h=[3013940,4359240,1327737,402077,86592,13299,1253,72]; const tot=h.reduce((a,b)=>a+b,0);
+  const hq=[25.9,56.2,11.7,4.1,1.4,0.4,0.1,0.0]; // qwen, percent
+  const hq=[4537155, 9866202, 2056892, 721109, 253411, 75644, 22112, 6240]; const totq=hq.reduce((a,b)=>a+b,0);
   const x=i=>L+18+i*(W-L-R-30)/8, bw=(W-L-R-30)/8*0.68;
   const y=v=>T+(1-v)*(H-T-B);
   let s='';
   for(const gy of [0,.25,.5,.75,1]) s+=`<line x1="${L}" x2="${W-R}" y1="${y(gy)}" y2="${y(gy)}" stroke="${css('--grid')}"/><text x="${L-6}" y="${y(gy)+3.5}" text-anchor="end">${Math.round(gy*100)}%</text>`;
-  h.forEach((c,i)=>{const f=c/tot;
-    s+=`<rect x="${x(i)-bw/2}" y="${y(f)}" width="${bw}" height="${y(0)-y(f)}" fill="${css('--skliar')}" opacity="0.85"/>`;
-    if(f>0.005) s+=`<text x="${x(i)}" y="${y(f)-4}" text-anchor="middle">${(f*100).toFixed(1)}%</text>`;
+  h.forEach((c,i)=>{const f=c/tot, fq=hq[i]/totq;
+    s+=`<rect x="${x(i)-bw/2}" y="${y(f)}" width="${bw/2}" height="${y(0)-y(f)}" fill="${css('--skliar')}" opacity="0.9"/>`;
+    s+=`<rect x="${x(i)}" y="${y(fq)}" width="${bw/2}" height="${y(0)-y(fq)}" fill="${css('--skliar')}" opacity="0.45"/>`;
+    if(f>0.005) s+=`<text x="${x(i)-bw/4}" y="${y(f)-4}" text-anchor="middle">${(f*100).toFixed(0)}</text>`;
+    if(fq>0.005) s+=`<text x="${x(i)+bw/4}" y="${y(fq)-4}" text-anchor="middle">${(fq*100).toFixed(0)}</text>`;
     s+=`<text x="${x(i)}" y="${H-B+14}" text-anchor="middle">${i}</text>`;});
   // ours: Dirac at 1
   s+=`<rect x="${x(1)-bw/2-3}" y="${y(1)}" width="6" height="${y(0)-y(1)}" fill="${css('--ours')}"/>`;
   s+=`<text class="pt-label" x="${x(1)+8}" y="${y(1)+12}" fill="${css('--ours')}">ours: 100% at exactly 1 (hard cap)</text>`;
-  s+=`<text class="pt-label" x="${x(3)}" y="${y(0.28)}" fill="${css('--skliar')}">Skliar λ0.5: mean 0.94,</text>`;
-  s+=`<text class="pt-label" x="${x(3)}" y="${y(0.28)+13}" fill="${css('--skliar')}">20% of tokens need ≥2, tail to 7</text>`;
+  s+=`<text class="pt-label" x="${x(3)}" y="${y(0.30)}" fill="${css('--skliar')}">Skliar at ≈1 mean: dark = gemma (λ0.5),</text>`;
+  s+=`<text class="pt-label" x="${x(3)}" y="${y(0.30)+13}" fill="${css('--skliar')}">light = qwen (λ0.4); 20–25% of tokens need ≥2</text>`;
   s+=`<text x="${(L+W-R)/2}" y="${H-4}" text-anchor="middle">expert transfers in one token·layer</text>`;
   s+=`<text transform="rotate(-90 12 ${(T+H-B)/2})" x="12" y="${(T+H-B)/2}" text-anchor="middle">fraction of tokens</text>`;
   document.getElementById(id).innerHTML=s;
