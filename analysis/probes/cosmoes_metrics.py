@@ -2,7 +2,10 @@
 """Fair-usage metrics for the CoSMoEs sweep (user note 2026-09-01): BlES can shrink switching
 by OVER-USING a few experts and neglecting the rest, so switching alone is not the story.
 Per run and layer, from router_log.pt (one fixed batch, raw logits pre-mask):
-  swaps_tl   consecutive-token top-k set replacements / (k) per token-layer (their operating cost)
+  swaps_tl   per-SLOT replacement fraction (CoSMoEs Eq.5 normalization, 0..1)
+  xfers_tl   swaps_tl * k = expert TRANSFERS per token-layer if only the previous token's
+             set were resident -- the closest demand-side proxy for real runtime cost
+             (ours serves at a HARD <=1 transfer/token-layer regardless of demand)
   eff_exp    exp(entropy(marginal top-k load)) -- effective number of experts in use
   max_share  largest single expert's share of top-k selections (over-use)
   neglected  experts with share < 0.1/E (neglect), out of E
@@ -23,14 +26,15 @@ for ln, r in d["layers"].items():
     swaps = float(np.abs(sel[1:].astype(int)-sel[:-1].astype(int)).sum()) / 2 / (B*(T-1)) / k
     load = sel.sum((0,1)).astype(float); p = load/load.sum()
     nz = p[p>0]; eff = float(np.exp(-(nz*np.log(nz)).sum()))
-    rows.append(dict(run=run, layer=ln, swaps_tl=round(swaps,4), eff_exp=round(eff,1),
+    rows.append(dict(run=run, layer=ln, swaps_tl=round(swaps,4), xfers_tl=round(swaps*k,3), k=k, eff_exp=round(eff,1),
                      max_share=round(float(p.max()),4), neglected=int((p < 0.1/E).sum()), E=E,
                      union_seq=round(float(sel.any(0).sum(-1).mean()),1)))
-mean = {k2: round(float(np.mean([r[k2] for r in rows])),4) for k2 in ("swaps_tl","eff_exp","max_share","neglected","union_seq")}
+mean = {k2: round(float(np.mean([r[k2] for r in rows])),4) for k2 in ("swaps_tl","xfers_tl","eff_exp","max_share","neglected","union_seq")}
+mean["k"]=rows[0]["k"]
 rows.append(dict(run=run, layer="MEAN", E=rows[0]["E"], **mean))
 out = "results/phase0/cosmoes_metrics.csv"; new = not os.path.exists(out)
 with open(out,"a",newline="") as f:
-    w = csv.DictWriter(f, fieldnames=["run","layer","E","swaps_tl","eff_exp","max_share","neglected","union_seq"])
+    w = csv.DictWriter(f, fieldnames=["run","layer","E","k","swaps_tl","xfers_tl","eff_exp","max_share","neglected","union_seq"])
     if new: w.writeheader()
     for r in rows: w.writerow(r)
 print(f"[metrics] {run}: " + " ".join(f"{k}={v}" for k,v in mean.items()))

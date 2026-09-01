@@ -503,3 +503,24 @@ Readings:
    misses), so no BlES point can serve at R=k; ours serves at R=k (9.4% resident) by
    construction with full balance and a +1% tax.
 Appendix E's argument against CoSMoEs is now a measurement, not a citation.
+
+Runtime-cost column added (user note): xfers/token-layer = per-slot churn x k, the experts
+that must LOAD if only the previous token's set is resident -- the closest demand-side
+proxy for real transfer cost. Ours serves at a hard 1.0 regardless of demand.
+
+| cell | g1 xfers/tok-layer (k=6) | g3 xfers/tok-layer (k=18) | BPB tax (g1/g3) |
+|---|---|---|---|
+| vanilla anchor | 4.79 | 14.13 | -- |
+| temporal (ours), raw demand | 3.73 | 11.39 | +1.0% / +1.2% |
+| temporal (ours), SERVED | 1.00 (hard cap) | 1.00 (hard cap) | (same models) |
+| BlES 0.01 | 4.42 | 12.85 | +0.9% / +0.8% |
+| BlES 0.03 | 3.70 | 11.93 | +3.6% / +3.2% |
+| BlES 0.1 | 3.14 | 10.19 | +6.2% / +5.1% |
+| BlES 1 | 3.28 | 10.44 | +10.5% / +9.2% |
+| BlES 10 | 2.48 | 8.58 | +22.6% / +20.2% |
+| BlES 100 | 1.91 | 7.33 | +32.7% / +23.7% |
+
+In transfer units the gap is stark: even at maximum collapse (74% of experts abandoned,
++24-33% BPB) BlES still demands 1.9-7.3 loads per token-layer, while our models SERVE at
+1.0 by construction at a +1% tax. No BlES operating point reaches our runtime cost at any
+quality. (cosmoes_metrics.csv regenerated with k and xfers_tl; v1 kept alongside.)
