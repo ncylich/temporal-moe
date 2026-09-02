@@ -11,6 +11,11 @@ cache_bias counters) and are recorded per lambda in
 BASELINE_METHODS_COMPARISON.md; they are carried here as literals keyed by the
 same record names. The histogram is skliar_c8_lam05_hist.json (9.2M token-layers).
 
+Layout: loads run right-to-left on a log axis so the upper right is best; the two
+50%-resident points below 0.2 loads are omitted so the panels stay readable at our
+budget; the histogram shows Skliar and ours side by side over counts 0 to 4 (bins 5
+to 7 hold under 0.2% between them).
+
 Writes results/ablations/figures/baseline_frontier.png (the paper figure).
 """
 import csv
@@ -31,7 +36,7 @@ HIST = os.path.join(ABLATIONS, "skliar_c8_lam05_hist.json")
 
 OURS = "#0C6B66"
 SKLIAR = "#B4532A"
-REMOE = "#64748B"
+REMOE = "#7B3FA0"
 REF = "#9AA1AB"
 
 # loads per token-layer per record, measured on the eval generations
@@ -44,8 +49,8 @@ LOADS = {
     "qwen35_skliar_C8_lam0p2_n1319": 2.13, "qwen35_skliar_C8_lam0p3_n1319": 1.41,
     "qwen35_skliar_C8_lam0p4_n1319": 1.01, "qwen35_skliar_C8_lam0p5_n1319": 0.81,
     "qwen35_skliar_C8_lam0p7_n1319": 0.66,
-    "gemma4_skliar_C64_lam0_n1319": 0.307, "gemma4_skliar_C64_lam0p4_n1319": 0.032,
-    "qwen35_skliar_C128_lam0_n1319": 0.837, "qwen35_skliar_C128_lam0p4_n1319": 0.069,
+    "gemma4_skliar_C64_lam0_n1319": 0.307,
+    "qwen35_skliar_C128_lam0_n1319": 0.837,
 }
 
 PANELS = [
@@ -76,55 +81,62 @@ def draw():
     fig, axes = plt.subplots(1, 3, figsize=(13.2, 3.1))
     for ax, (title, free, ours, base, remoe, curve, own50) in zip(axes, PANELS):
         ax.set_xscale("log")
-        ax.set_xlim(0.022, 8.5)
+        ax.set_xlim(8.5, 0.2)   # fewer loads to the right, so upper right is best
         ax.set_ylim(40, 93)
         ax.axhline(free, color=REF, lw=1.1, ls=(0, (5, 4)), zorder=1)
-        ax.text(0.024, free + 1.4, f"free model {free:.1f}", ha="left",
+        ax.text(0.21, free + 1.4, f"free model {free:.1f}", ha="right",
                 fontsize=7.5, color=REF)
         ax.axvline(1.0, color=OURS, lw=0.9, ls=(0, (4, 3)), alpha=0.5, zorder=1)
         pts = sorted((LOADS[r], acc(r)) for r in curve)
         ax.plot(*zip(*pts), "-o", color=SKLIAR, ms=4.5, lw=1.4,
-                label="Skliar cache at our memory ($\\lambda$ sweep)", zorder=3)
+                label="Skliar cache at our memory ($\\lambda$ sweep)", zorder=2)
         for r in own50:
             ax.plot(LOADS[r], acc(r), "o", mfc="none", mec=SKLIAR, mew=1.7,
                     ms=5.2, zorder=3,
-                    label="Skliar at 50% resident" if r == own50[0] else None)
+                    label="Skliar at 50% resident" if (r == own50[0] and ax is axes[0]) else None)
         ax.plot(1.0, acc(remoe), "s", color=REMOE, ms=5.5,
-                label="ReMoE, best learning rate", zorder=3)
+                label="ReMoE, best learning rate", zorder=4)
         ax.plot(1.0, acc(base), "D", mfc="none", mec=OURS, mew=1.7, ms=5.5,
-                label="released model, hard 1-swap cap", zorder=4)
+                label="released model, hard 1-swap cap", zorder=3)
         a = acc(ours)
-        ax.plot(1.0, a, "D", color=OURS, ms=6.5, zorder=5,
+        ax.plot(1.0, a, "D", color=OURS, ms=5.5, zorder=6,
                 label="ours, adapted (hard 1-swap cap)")
+        off = (-32, -11) if title.startswith("gemma") else (10, -12)
         ax.annotate(f"{a:.1f}", (1.0, a), textcoords="offset points",
-                    xytext=(7, 4), fontsize=8, color=OURS)
+                    xytext=off, fontsize=8, color=OURS)
         ax.set_title(title, fontsize=9.5)
-        ax.set_xlabel("expert loads / token-layer (log)", fontsize=8.5)
-        ax.set_xticks([0.03, 0.1, 0.3, 1, 3])
-        ax.set_xticklabels(["0.03", "0.1", "0.3", "1", "3"])
+        ax.set_xlabel("expert loads / token-layer (log, fewer to the right)", fontsize=8.5)
+        ax.set_xticks([0.3, 1, 3])
+        ax.set_xticklabels(["0.3", "1", "3"])
         ax.grid(alpha=0.25)
         ax.set_axisbelow(True)
         ax.tick_params(labelsize=8)
     axes[0].set_ylabel("GSM8K", fontsize=9)
-    axes[0].legend(fontsize=6.8, loc="lower right", framealpha=0.9)
+    axes[0].legend(fontsize=6.8, loc="lower left", bbox_to_anchor=(0.0, 0.06), framealpha=0.9)
 
     ax = axes[2]
     h = json.load(open(HIST))["hist"]
     tot = sum(h)
-    xs = list(range(8))
+    xs = list(range(5))          # bins 5 to 7 hold under 0.2% between them
     fr = [100 * h[i] / tot for i in xs]
-    ax.bar(xs, fr, width=0.62, color=SKLIAR, alpha=0.88,
+    w, d = 0.36, 0.19
+    ax.bar([x - d for x in xs], fr, width=w, color=SKLIAR, alpha=0.88,
            label="Skliar, $\\lambda{=}0.5$ (mean 0.94)")
-    ax.bar([1], [100], width=0.16, color=OURS, label="ours (every token-layer)")
+    ours_fr = [100.0 if i == 1 else 0.0 for i in xs]
+    ax.bar([x + d for x in xs], ours_fr, width=w, color=OURS, label="ours (hard cap)")
     for i, f in zip(xs, fr):
         if f > 0.5:
-            ax.annotate(f"{f:.0f}%", (i, f), textcoords="offset points",
+            ax.annotate(f"{f:.0f}%", (i - d, f), textcoords="offset points",
                         xytext=(0, 3), ha="center", fontsize=7.5)
-    ax.annotate("20% need $\\geq$2:\neach stalls the layer\nin proportion",
-                (2.4, 40), fontsize=8, color=SKLIAR)
+    ax.annotate("100%", (1 + d, 100), textcoords="offset points", xytext=(0, 3),
+                ha="center", fontsize=7.5, color=OURS)
+    ax.annotate("20% need $\\geq$2, tail to 7:\neach stalls the layer\nin proportion",
+                (2.0, 40), fontsize=8, color=SKLIAR)
     ax.set_title("transfers in one token-layer (gemma4)", fontsize=9.5)
     ax.set_xlabel("expert transfers", fontsize=8.5)
     ax.set_ylabel("share of token-layers (%)", fontsize=9)
+    ax.set_ylim(0, 110)
+    ax.set_yticks([0, 20, 40, 60, 80, 100])
     ax.set_xticks(xs)
     ax.tick_params(labelsize=8)
     ax.legend(fontsize=6.8, loc="upper right")
