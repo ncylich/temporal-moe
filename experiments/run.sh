@@ -180,7 +180,7 @@ LOG_ARGS=(
   --tensorboard-dir "$OUT/tb"     # sets a writer so track_moe_metrics logs each aux loss
 )                                 # (load_balancing_loss, z_loss, coherence_loss) individually in
                                   # the train log + tensorboard, separate from (not summed into) 'lm loss'.
-[ "${DENSE:-0}" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
+[ "${DENSE:-0}" != "1" ] && [ -z "${MOE_NO_LAYER_LOG:-}" ] && LOG_ARGS+=(--moe-per-layer-logging)
 
 cd Megatron-LM
 if [ "${PROBE:-0}" = "1" ]; then
@@ -257,6 +257,18 @@ elif [ "${SWEEPEVAL:-0}" = "1" ]; then
     --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
     --save /tmp/probe_junk_ckpt $EXTRA_ARGS ${SWEEP_EXTRA:-} \
     2>&1 | tee "$OUT/sweepeval.log"
+elif [ "${SUBSTEVAL:-0}" = "1" ]; then
+  # Substitution tolerance (Appendix B): one process per checkpoint, every perturbation arm scored
+  # in-process on the same cached test micro-batches. Same frozen-weight, throwaway-save discipline
+  # as SWEEPEVAL. The temporal router is always installed; a full MoE runs with R = num_experts.
+  export TEMPORAL=1 TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  echo "[substeval] R=$TEMPORAL_RESIDENCY_R regime=${SUBST_REGIME:-?} nseq=${SUBST_NSEQ:-512} out=${SUBST_OUT:-}"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/substitution_eval.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters ${SUBST_EVAL_ITERS:-1} --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/substeval.log"
 elif [ "${CAUSALPROBE:-0}" = "1" ]; then
   # C8 / N6: causal token-versus-context substitution. One invocation per arm (CAUSAL_ARM in
   # ref|token|context); the three are compared offline and the analysis refuses to compare arms whose

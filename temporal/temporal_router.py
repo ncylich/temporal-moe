@@ -574,6 +574,11 @@ def step_accel_mask(lt, resident):
     return _graph_step(lt, resident).clone()
 
 
+# Optional callable(self, raw_logits, mask, probs, routing_map) -> (probs, routing_map), applied
+# after routing. None during training and normal evaluation; set only by eval-time probes.
+POST_ROUTING_HOOK = None
+
+
 def temporal_forward(self, input: torch.Tensor):
     """Drop-in replacement for TopKRouter.forward: restrict selection to the resident set.
 
@@ -752,6 +757,7 @@ def temporal_forward(self, input: torch.Tensor):
             # H3: labels centered on each expert's own baseline — popularity unlearnable.
             tgt = ab.centered_demand_labels(tgt, float(os.environ.get("HEAD_GAMMA_C", "0.015625")))
         head_bce = ab.anticipatory_bce_loss(head_logits, tgt, valid)
+    raw_logits = logits
     logits = logits.masked_fill(~mask, float("-inf"))       # only resident experts are selectable
     if auxfree:
         # Selection over the k unmasked residents is a no-op top-k, but sigmoid(-inf)=0 plus a
@@ -767,6 +773,11 @@ def temporal_forward(self, input: torch.Tensor):
             self.expert_bias = saved_bias
     else:
         probs, routing_map = self.routing(logits)
+    if POST_ROUTING_HOOK is not None:
+        # Eval-time perturbation of the selected set AFTER the residency mask and top-k have run
+        # exactly as trained (analysis/probes/substitution_eval.py). `raw_logits` is pre-mask,
+        # `mask` is the resident set, so a hook can score substitutes as the router would have.
+        probs, routing_map = POST_ROUTING_HOOK(self, raw_logits, mask, probs, routing_map)
     if head_bce is not None:
         # Attach the head loss to the model loss via the aux-loss autoscaler hooked on the
         # routing OUTPUT (gate probs) — deliberately NOT on the router logits (the Track-B

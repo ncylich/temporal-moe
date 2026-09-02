@@ -1810,3 +1810,94 @@ gemma klT2 free: GSM8K 88.2 / IFEval 89.1 / MMLU 93.9 / HumanEval 98.2 / MBPP 90
 free 87.8 / 88.7 / 93.0 / 99.4 / 91.1 (mean -0.2). qwen full-pool free: GSM8K 86.2 /
 IFEval 86.3 / MMLU 93.0 / HumanEval 93.9 / MBPP 78.4 vs base free 85.9 / 86.5 / 93.4 /
 92.7 / 79.4 (mean -0.1). Both finals are free-arm neutral on the full surface.
+
+## Substitution tolerance: temporal experts are more replaceable, in every pair (2026-09-02 23:30)
+
+**Verdict: replacing active experts at inference costs the temporal model less than its matched
+full MoE in every pair, with paired bootstrap intervals well clear of zero. The margin is modest,
+about ten to twenty-seven percent of the full-MoE cost, and it narrows at 1e19.** Section 4 can
+say that experts are measurably more substitutable. It still cannot say that this is why quality
+survives the constraint.
+
+What was measured. On 512 cached test sequences per checkpoint (1,048,576 tokens, about 1,320
+documents), a hook after the residency mask and top-k replaces `m` of the k active experts at
+every MoE layer and records the per-token cross-entropy change against the unperturbed pass on
+the same tensors. The full MoE runs through the same router with every expert resident, so both
+regimes take one code path. The substitute is a random unselected expert (headline), the
+next-best unselected expert by raw router score, an expert selected at the previous token and
+not at this one (what a refused swap forces), or nothing at all (the displaced expert is dropped).
+The substitute takes the weight the router itself would assign it: its softmax-over-E probability
+in the full MoE, the renormalised softmax over the new resident set in the temporal model. An
+inherited-weight variant, where the substitute takes the displaced expert's weight, is reported
+alongside. Matched fraction means one of six or three of eighteen. Deltas are BPB, intervals are
+95% percentile bootstraps over documents, pair rows subtract the two models document by
+document. Data: `substitution_tolerance.csv`, records in `substitution/`, figure
+`figures/substitution_depth.png`.
+
+| pair (all layers, matched fraction, random substitute at its own weight) | full MoE | temporal | temporal minus full [95% CI] |
+|---|---|---|---|
+| 1e17 fine, 18 of 192 | +0.0403 | +0.0294 | -0.0109 [-0.0114, -0.0104] |
+| 1e18 coarse, 6 of 64, seeds 1/2/3 | +0.0439 / +0.0448 / +0.0443 | +0.0362 / +0.0363 / +0.0356 | -0.0076 / -0.0086 / -0.0086, every CI within 0.0007 |
+| 1e18 fine, 18 of 192, seeds 1/2/3 | +0.0362 / +0.0367 / +0.0362 | +0.0288 / +0.0284 / +0.0294 | -0.0074 / -0.0083 / -0.0068, every CI within 0.0006 |
+| 1e19 coarse, 6 of 64 | +0.0413 | +0.0373 | -0.0039 [-0.0046, -0.0033] |
+| 1e19 fine, 18 of 192 (temporal only, no full MoE at this budget) | | +0.0364 | |
+
+The ordering holds under every substitute. Next-best expert: 1e17 -0.0124, 1e18 coarse -0.0094 to
+-0.0108, 1e18 fine -0.0042 to -0.0063, 1e19 coarse -0.0070. Dropping the expert outright: 1e17
+-0.0096, 1e18 coarse -0.0067 to -0.0079, 1e18 fine -0.0069 to -0.0082, 1e19 coarse -0.0020
+[-0.0026, -0.0014]. Inherited weight: -0.0225, -0.0358 to -0.0413, -0.0208 to -0.0223, -0.0308.
+One expert instead of three at fine grain: 1e17 -0.0027, 1e18 -0.0014 to -0.0017. The
+temporal model's reference BPB is below the full MoE's at 1e18 and above it at 1e17 and 1e19,
+so the lower substitution cost is not the better model absorbing more.
+
+Two readings that keep the claim honest. First, a random substitute at its own router weight
+costs almost exactly what dropping the expert costs, in both regimes (1e18 coarse full MoE
++0.0439 against +0.0444, temporal +0.0362 against +0.0378), because a random expert's own weight
+is tiny. The headline therefore measures tolerance to losing an active expert more than the
+substitute doing the displaced expert's job. The next-best condition is where a substitute
+carries real weight, and there the temporal model recovers more of the dropped expert's
+contribution at 1e17, 1e18 coarse and 1e19 coarse (15 to 17 percent of the zeroed cost against
+3 to 6 for the full MoE), but not at 1e18 fine, where both recover under ten percent. Second,
+the gap narrows with budget on the coarse pair, from 19 percent of the full-MoE cost at 1e18 to
+10 percent at 1e19, so the appendix should not extrapolate upward.
+
+Depth. Perturbing one layer at a time, the 1e18 models both peak at the second MoE layer and
+the temporal advantage sits in the middle and late layers, with the second MoE layer equal or
+slightly worse for temporal. At 1e19 the cost rises steeply with depth for both regimes, the
+temporal model is markedly more fragile in the first two MoE layers (coarse layer 2: 0.0045
+against 0.0019), and less fragile from layer 5 on, with the advantage widest at the last
+layers. The substitutability advantage deepens with depth the way the routing shift in Section 4
+does, and reverses at the entry layers.
+
+Decisions changed once the data were in. The specification asked for a random resident
+substitute as the temporal model's realistic condition. At R = k the resident set is the selected
+set, so that condition has no candidates. Its replacement, the previous token's selection, is
+what a refused swap actually forces, and it is count-matched only at coarse grain, where it
+favours temporal in every pair (1e18 -0.0075 to -0.0090, 1e19 -0.0039). At fine grain the
+temporal model changes at most one expert per token, so at most one stale candidate exists and
+the arm realises 1.0 substitutions per token-layer against 3.0 for the full MoE. Those rows are
+in the CSV with the realised count and are not comparable at matched fraction. The gate rule
+also changed from the default of inheriting the displaced weight to the weight the router would
+assign, which is what the masked router in `temporal_router.py` computes for its residents. The
+inherited variant is kept because it bounds the headline from above.
+
+What went wrong on the way. The July checkpoints lack the layernorm `_extra_state` entries that
+Transformer Engine 2.16 registers, so the strict model load failed. The distributed loader was
+run in logging mode, which listed exactly those keys and nothing else, and the model is loaded
+non-strictly with the reference CE checked against the published test CE (both 1e18 coarse
+models read 0.017 above their full-test values on this slice, the same offset, so the slice is
+slightly harder and the pairs are unaffected). The fine-grained experts are 58 wide, which
+breaks the 16-byte row alignment PyTorch's grouped matmul needs, so those models fall back to
+the original grouped GEMM. The first records were written relative to the evaluator's working
+directory, which is the Megatron checkout, and the aggregator found no files. The 1e17 runs
+have a global batch of 256, so Megatron's test split held 256 sequences and the cache of 512
+raised StopIteration, and eval iterations are now sized from the requested sequence count. The
+stale condition's candidate shortage was noticed because the temporal fine model's stale cost
+equalled its one-expert cost, and the whole sweep was rerun with a realised-count column. The
+rerun reproduced the first pass to the last digit, as the seeded perturbations should. A
+killed chain kept running through its pipeline subshell and briefly competed for the lease
+with its replacement.
+
+Reproduce: `bash scripts/residency/orchestration/tmoe_substitution.sh` (about 45 minutes on
+one H200 for the 17 checkpoints, pulled with `scripts/artifacts.py pull --repo ckpts --run
+...`), then `$PY analysis/residency/substitution_tolerance.py [--no-caption]`.

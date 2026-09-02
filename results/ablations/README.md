@@ -190,6 +190,7 @@ archive README; `olmoe_gatemass_remeasure.csv` quantifies the error: same untrai
 | `olmoe_cal2.csv` | Cal-2 calibrated-init training screen: NULL, undone-to-single-basin (final 0.9262 vs C@50M 0.8791; cos-to-init 1.0->0.17, cos-to-C -0.03->0.44; init axis closed). | h100@9f0ca8ae |
 | `olmoe_adapt_RESULTS.md` | Full adaptation-study writeup (11-arm table, four-part mechanism story, recommendations). | h100@0101 closeout |
 | `adapt_ckpts/*.safetensors` | Router-only checkpoints (~4MB each): LR-sweep arms, bake-off router arms (B/C/D), Cal-2. LoRA-bearing ckpts (474MB) remain pod-local by policy. | h100 arm commits |
+| `substitution_tolerance.csv` | Substitution tolerance (Appendix B): per-token test CE change when active experts are replaced at inference (random / next-best / stale-resident / zeroed; substitute at its own router weight or inheriting the displaced weight; one of six or three of eighteen, and one expert; all layers and one layer at a time), temporal vs matched full MoE at 1e17 fine, 1e18 both grains x 3 seeds, 1e19 coarse pair plus fine temporal only; 512 cached test sequences per model, document bootstrap CIs, paired rows. Records: `substitution/<run>.npz`. Narrative: [REBUILD_RESULTS.md](REBUILD_RESULTS.md) (substitution tolerance section). | h100, `analysis/probes/substitution_eval.py` + `analysis/residency/substitution_tolerance.py` (figure `figures/substitution_depth.png`) |
 
 
 Everything above is a result someone may cite. These rows are the exceptions, and each one is listed
