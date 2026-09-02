@@ -639,3 +639,20 @@ gemma GSM8K ours z=+3.49 REAL; gemma IFEval theirs z=-1.81 (not resolved); qwen 
 theirs z=-1.18 (not resolved). gemma HumanEval/MBPP and qwen MBPP have no per-item dumps
 (producer limitation): unpaired only. Net: every resolved cell is ours (GSM8K x2, HumanEval);
 none of theirs resolves. The 16x "tie" is a tie of unresolved cells, not a resolved split.
+
+### APPENDIX: Skliar at the 8x points (2026-09-02) — within-model reduction test
+
+Skliar's cache sized to the 8x arms we hold ours at (gemma C=16 vs our R16 87.2 at a hard
+1.0; qwen C=32 vs our R32 84.4 at 1.0). GSM8K n=1319, loads/token-layer.
+
+| lambda | gemma C16 loads / GSM8K | qwen C32 loads / GSM8K |
+|---|---|---|
+| 0 | 3.27 / 87.8 | 3.71 / 86.0 |
+| 0.2 | 1.31 / 87.6 | 0.65 / 84.5 |
+| 0.4 | 0.52 / 84.1 | 0.35 / 76.7 |
+| 0.6 | 0.33 / 65.7 | 0.34 / 75.7 |
+
+Reading: at 8x their cache reaches our quality at or near our budget (qwen 84.5 at 0.65
+loads vs our 84.4; gemma 87.6 at 1.31 vs our 87.2) -- their regime. Tightening to 16x/32x
+(the C=8 curves above) flips it to -3.3 / -9.0 for them at matched traffic. Same model, same
+instrument: the gap opens as the reduction grows. Appendix material by the user's call.
