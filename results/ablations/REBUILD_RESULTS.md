@@ -2106,3 +2106,56 @@ layer was recorded and the run produced an empty record without an error. A forw
 fixed it. The unmask chain that was
 running when `run.sh` gained the new branch read the edited file at a shifted offset after its
 own work was done and exited 2 with intact results, the in-place edit hazard again.
+
+## The 1e19 fine full MoE in every matched-pair table (2026-09-03 23:40)
+
+**Every "in every matched pair" statement survives the fourth 1e19 cell.** The fine full MoE
+was added to the structural table, the weight and activation kurtosis files, and the fake-quant
+degradation curve, all on the same protocol as the July cells and with the old rows verified
+unchanged after each regeneration.
+
+| 1e19 fine pair | full MoE (new) | temporal (July) |
+|---|---|---|
+| participation ratio (median over layers) | 0.18 | 0.51 |
+| generalist fraction | 10 % | 53 % |
+| router entropy | 0.84 | 0.95 |
+| centroid distance / pairwise weight cosine | 0.91 / 0.003 | 0.91 / 0.003 |
+| routed-weight excess kurtosis, median / p99 / max | 0.22 / 0.89 / 2.12 | 0.14 / 0.66 / 1.50 |
+| FFN-intermediate activation kurtosis, median / p99 / max | 0.76 / 5.78 / 21.3 | 0.29 / 1.39 / 5.12 |
+| fake-quant CE degradation at 8 / 4 / 3 bits | +0.0000 / +0.0072 / +0.0421 | +0.0001 / +0.0059 / +0.0340 |
+
+The usage shift is the largest of the four 1e19 cells (participation ratio 0.18 against the
+coarse full MoE's 0.27), the weights are geometrically indistinguishable from the temporal
+model's, the kurtosis gap is there in both weights and activations, and the quantization curve
+lands on top of the coarse full MoE's (+0.0452 at 3 bits) with both temporal models below.
+Data: `mechinterp_structural_1e19.csv` (13 rows, label `moe_fine_g3_1e19`),
+`stability_weights.csv` (7,516 rows), `stability_activations.csv` and `stability_trunk.csv`
+(2,496 and 766 rows), `stability_fakequant.csv` (4 rows), figure
+`results/phase0/figures/fakequant_degradation_nocaption.png`; driver
+`scripts/residency/orchestration/tmoe_1e19_fine_tables.sh`.
+
+How the fake-quant numbers were validated. The quant eval was run on the fast sync-free expert
+path, whose packed weight layout the quantizer had never seen, so the coarse full MoE was
+re-scored at 16 and 4 bits on the same path as a check against July. The degradation reproduces
+exactly, +0.0076 CE on both paths, while the absolute level of this 4,096-sequence slice sits
+0.0064 higher than July's for identical weights (3.1363 against 3.1299 at 16 bits), and the new
+model shows the same offset against its own full-test CE. The corpus parts are discovered by
+directory listing and the local copy lives in a different directory, so the blended sample order
+of a short evaluation differs from July's; the full 20-iteration test evals agree to 0.001, and
+the paper's claim is about the deltas, which are unaffected.
+
+What went wrong on the way. The first version of the legacy-layout quantizer sliced the packed
+weight1 by columns, which mixes experts because the storage is expert-major (the forward views
+it as [E, H, fc1]); the tensor count matched July's and only the reproduction check caught it
+(3.1442 instead of 3.1375), after which slicing through the forward's own views gave the exact
+delta. The activation probe hooks a per-expert `linear_fc1` module that the fast path does not
+have, so its first capture had empty intermediate statistics; it now recomputes each expert's
+pre-activation output from the packed weights through the same views. The delex and activation
+captures were first started on the Transformer Engine path, which is host-bound at 1 percent GPU
+for this model and had not finished an iteration after 50 minutes; both were redone on the fast
+path. Two waiters used `pgrep -f` on a script name, matched the shell that launched them, and
+never fired. One flag for the paper: its 1e18 weight-kurtosis medians (0.42 against 0.14 coarse,
+0.62 against 0.24 fine, p99 2.79 to 0.77) do not equal a plain median over the routed rows of
+`stability_weights.csv` (0.52 against 0.15, 0.82 against 0.32, p99 1.46 to 0.45); the direction
+and the "every pair" claim hold under either aggregation, but the aggregation behind the printed
+numbers should be identified before the fine 1e19 pair is added to that sentence.

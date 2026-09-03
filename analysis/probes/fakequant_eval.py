@@ -52,10 +52,42 @@ def _quantize_model(model, verbose=True):
             if _is_routed_expert_weight(name):
                 rtn_quant_(p.data, BITS, GROUP)
                 n += 1
+            elif "experts" in name and "shared_experts" not in name and re.search(r"\.weight[12]$", name):
+                # Legacy GroupedMLP layout (--moe-use-legacy-grouped-gemm, the fast sync-free path):
+                # weight1 is [hidden, E * fc1_out] and weight2 is [E * fc2_in, hidden], i.e. each
+                # expert's matrix stored transposed relative to TE's per-expert [out, in] weightN.
+                # Quantize each expert's slice through its transpose so the groups run along the
+                # same input-feature axis and the result is bit-identical to the TE layout.
+                from megatron.training import get_args
+                E = get_args().num_experts
+                # The storage is expert-major: GroupedMLP.forward views weight1 as [E, H, fc1_out]
+                # and weight2 as [E, fc2_in, H]. Slice through the same views (a 2D column slice
+                # of weight1 would mix experts; that mistake was caught by the July 4-bit check).
+                H = p.data.shape[0] if name.endswith("weight1") else p.data.shape[1]
+                v = p.data.view(E, H, -1) if name.endswith("weight1") else p.data.view(E, -1, H)
+                for e in range(E):
+                    blk = v[e].t().contiguous()                                       # [out, in]
+                    rtn_quant_(blk, BITS, GROUP)
+                    v[e].copy_(blk.t())
+                n += E
     if verbose:
         if os.environ.get("QUANT_DEBUG"):
             print("[fakequant-debug] expert-param sample:\n  " + "\n  ".join(sample))
         print(f"[fakequant] QUANT_BITS={BITS} group={GROUP}: quantized {n} routed-expert weight tensors")
+
+
+def _lenient_load():
+    """The 2025-07 checkpoints predate the layernorm `_extra_state` entries Transformer Engine 2.16
+    registers (every weight is present; --dist-ckpt-strictness log_all lists exactly those keys),
+    so load the model non-strictly, as substitution_eval.py and sweep_eval.py do."""
+    import megatron.training.training as T
+    orig = T.load_checkpoint
+
+    def lenient(*a, **kw):
+        kw["strict"] = False
+        return orig(*a, **kw)
+
+    T.load_checkpoint = lenient
 
 
 def _wrap_provider():
@@ -87,6 +119,7 @@ if __name__ == "__main__":
     from megatron.training import pretrain
     from megatron.core.enums import ModelType
     import pretrain_gpt
+    _lenient_load()
     _wrap_provider()
     pretrain_gpt.train_valid_test_datasets_provider.is_distributed = True
     pretrain(

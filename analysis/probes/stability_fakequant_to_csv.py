@@ -17,7 +17,8 @@ DIV = 2.9780
 CELLS = [("g1_moe", "flame38m_g1_moe"), ("g1_temporal", "flame38m_g1_temporal"),
          ("g3_moe", "flame38m_g3_moe"), ("g3_temporal", "flame38m_g3_temporal"),
          ("moe_coarse_1e19", "moe_coarse_1e19"), ("temporal_coarse_1e19", "g1_tmoe_coarse_1e19"),
-         ("temporal_fine_1e19", "temporal_fine_g3_1e19")]
+         ("temporal_fine_1e19", "temporal_fine_g3_1e19"),
+         ("moe_fine_1e19", "moe_fine_g3_1e19")]   # fine full MoE trained 2026-09-03
 TEST = re.compile(r"on test set \| lm loss value:\s*([0-9.]+(?:[eE][+-]?\d+)?)")
 
 

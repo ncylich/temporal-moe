@@ -20,6 +20,7 @@ P19 = [
     ("MoE · coarse", MOE_C, [0.0000, 0.0076, 0.0452]),
     ("temporal · coarse", TMP_C, [0.0000, 0.0066, 0.0383]),
     ("temporal · fine", TMP_F, [0.0000, 0.0059, 0.0340]),
+    ("MoE · fine", MOE_F, [0.0000, 0.0072, 0.0421]),   # moe_fine_g3_1e19, 2026-09-03 (stability_fakequant.csv)
 ]
 P18 = [
     ("MoE · coarse", MOE_C, [0.0001, 0.0180, 0.1077]),
