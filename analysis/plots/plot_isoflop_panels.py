@@ -171,7 +171,8 @@ fig.legend([Line2D([0], [0], color=c, lw=2.6) for _, c, _ in STYLE], LEG,
 fig.tight_layout(rect=[0, 0, 1, 0.925])
 fig.subplots_adjust(wspace=0.16, hspace=0.42)
 out = f"{OUTD}/isoflop_panels_2x2_nocaption.png"
-fig.savefig(out, dpi=200); print("wrote", out); plt.close(fig)
+# tight bbox: the shared legend sits above the axes and was clipped at the right edge otherwise
+fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.02); print("wrote", out); plt.close(fig)
 
 # captioned 2x2 overview for the repo
 fig, axes = plt.subplots(2, 2, figsize=(9.4, 7.6))
