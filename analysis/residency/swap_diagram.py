@@ -6,10 +6,11 @@ carries a vector figure from a committed producer rather than a raster lifted fr
 the slides. Two changes against the slide version, both driven by the paper's page
 budget rather than taste:
 
-  * a key, since the slide relied on the speaker to explain that a light green fill
-    means resident, a dashed border means leaving, and a solid fill means arriving;
-  * no key. At half a column wide there is no room for one, and the caption can
-    carry what the colours mean in a clause.
+  * a key along the bottom, since the slide relied on the speaker to explain that a
+    light green fill means resident, a dashed border means leaving, a solid fill
+    means arriving, and grey means not resident (a reviewer read the colours as
+    "two experts active" without it);
+  * a fixed pool of five slots, small enough to read at half a column.
 
 Sized so its natural width is about half the text column, which means LaTeX places
 it without downscaling and the font sizes set below are the sizes that print.
@@ -73,7 +74,7 @@ def arrow(ax, a, b, dashed=False, lw=1.1):
 
 
 def draw():
-    W, H = 258.0, 96.0
+    W, H = 258.0, 110.0
     fig, ax = plt.subplots(figsize=(W / 95, H / 95))
     ax.set_xlim(0, W)
     ax.set_ylim(H, 0)                    # SVG-style: y grows downward
@@ -118,6 +119,17 @@ def draw():
     ax.text(170, slot_mid(ADMITTED) + 6, "admit", ha="center", va="center",
             fontsize=5.6, color=BLUE)
 
+
+    # key: one swatch per colour, spread along the bottom edge
+    ky, kw, kh = 101.0, 9.0, 5.6
+    for x, label, fill, edge, dashed in ((16, "resident", GREEN_FILL, GREEN, False),
+                                         (74, "evicted", GREEN_FILL, GREEN, True),
+                                         (134, "admitted", GREEN, GREEN, False),
+                                         (192, "not resident", GREY_FILL, GREY_EDGE, False)):
+        box(ax, x, ky, kw, kh, fill, edge, 0.9 if fill != GREY_FILL else 0.7, dashed=dashed,
+            r=1.2)
+        ax.text(x + kw + 3, ky + kh / 2, label, ha="left", va="center", fontsize=5.4,
+                color=INK)
 
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
     for ext in ("pdf", "png"):
