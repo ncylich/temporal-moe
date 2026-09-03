@@ -2065,9 +2065,12 @@ are real but small: experts in both regimes are nearly orthogonal functions, and
 orthogonal in both (the paper's Table already says so). Training pulls the selected set together
 in the full MoE far more than in the temporal model, which is the opposite of the "general
 experts" picture: the temporal router's k residents are a more diverse set. The gated-layer
-perturbation from a random swap is smaller for temporal at 1e18 (0.355 against 0.406 coarse,
-0.168 against 0.200 fine) and about equal at 1e17 and 1e19 coarse, which is a weaker version of
-the substitution pattern, but per layer it has no predictive power: Spearman 0.07 between the
+perturbation from a random swap is smaller for temporal by 10 to 15 percent at 1e18 and at 1e19
+fine (0.355 against 0.406 coarse, 0.168 against 0.200 fine), by 3 to 10 percent for dropping the
+expert outright, and equal at 1e17 coarse and 1e19 coarse. That is a modest local advantage in
+the direction of the substitution result, and it is at most part of it: at 1e17 the CE advantage
+is the largest of all budgets while the local perturbation is identical, and per layer it has
+no predictive power: Spearman 0.07 between the
 swap perturbation and the substitution cost across the 168 model-layers, and 0.09 between the
 regime gaps across the 84 pair-layers. The regime gap in similarity correlates the other way
 (0.41): where temporal experts are much less alike than the full MoE's, the temporal tolerance
@@ -2075,6 +2078,16 @@ advantage is smaller. The one local signature the substitution experiment did le
 entry-layer reversal, which is here too: at MoE layers 2 to 4 the temporal models' swap
 perturbation is larger than the full MoE's (coarse 0.45 to 0.47 against 0.38 to 0.42), and it
 is smaller from the middle of the stack on.
+
+Underneath the ratio the two regimes are built differently. The gate weight of the displaced
+expert averages 0.17 in the coarse temporal models and 0.056 in the fine ones, which is 1/6 and
+1/18: the masked softmax over the k residents is nearly flat, the router-flatness result of
+Table tab:structural seen from the gate side. The full MoE puts 0.06 to 0.08 (coarse) and 0.024
+to 0.027 (fine) on the same expert, concentrating its mass on fewer of the k, and its expert
+outputs are about three times larger in norm (21.7 against 7.2 at 1e17 coarse, 1.23 against
+0.38 at 1e18 coarse, 10.2 against 3.6 at 1e19 coarse). The constraint produces many small,
+evenly weighted contributions rather than a few large ones, and the relative damage from losing
+one is similar or slightly lower.
 
 What the paper can say. Experts under the constraint are measurably more substitutable at 1e17
 and 1e18, and this is not because they compute more similar functions, they compute less
