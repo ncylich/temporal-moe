@@ -1987,3 +1987,23 @@ a path string, which matched the tool shell that had launched it, so it never fi
 keys on the absence of GPU processes. The chain's first version wrote records relative to the
 evaluator's working directory again (the fix from the day before had not been applied to the
 file that was actually running), and the aggregator's empty result was what exposed it.
+
+### Downstream 0-shot for the 1e19 fine full MoE (2026-09-03 16:25)
+
+The new model scored on the six t19 tasks with the same harness, backend and native routing as
+the July cells, rows added to `t19_lmeval_stderr.csv` under `moe_fine_1e19`. Mean accuracy over
+the six tasks is 0.390, between the coarse full MoE (0.396) and the fine temporal model (0.388),
+with every per-task difference inside one to two standard errors (arc_challenge 0.195 against
+0.207 for fine temporal, arc_easy 0.496 against 0.499, hellaswag 0.302 against 0.303, openbookqa
+0.178 against 0.180, piqa 0.662 against 0.654, winogrande 0.509 against 0.486). The 0.005 BPB
+advantage of the full MoE over the fine temporal model does not show up downstream at this
+scale, which is the same picture the coarse pair gives.
+
+Getting the harness to run in the resurrected environment took three attempts, each of which is
+now handled in `analysis/probes/run_lmeval.py`: the system torchvision and torchaudio are built
+against another torch and are declared unavailable to transformers, the vendored task YAMLs
+name datasets by canonical names that huggingface_hub 1.x no longer resolves and are mapped to
+the namespaced repos the hub redirects to, and piqa's namespaced repo is still script-based, so
+it loads from the hub's parquet branch. A first conversion pass regenerated the CSV from local
+run directories and silently dropped the July models that are not on this pod (45 rows to 33);
+the file was restored from git and the converter now upserts only the models it is given.
