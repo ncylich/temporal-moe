@@ -2005,5 +2005,5 @@ against another torch and are declared unavailable to transformers, the vendored
 name datasets by canonical names that huggingface_hub 1.x no longer resolves and are mapped to
 the namespaced repos the hub redirects to, and piqa's namespaced repo is still script-based, so
 it loads from the hub's parquet branch. A first conversion pass regenerated the CSV from local
-run directories and silently dropped the July models that are not on this pod (45 rows to 33);
-the file was restored from git and the converter now upserts only the models it is given.
+run directories and silently dropped the July models that are not on this pod (45 rows to 33).
+The file was restored from git and the converter now upserts only the models it is given.
