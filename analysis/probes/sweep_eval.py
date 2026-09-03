@@ -69,6 +69,17 @@ def _install():
 
     orig_eval_print = T.evaluate_and_print_results
 
+    # The 2025-07 checkpoints predate the layernorm `_extra_state` entries Transformer Engine 2.16
+    # registers; every weight is present (run with --dist-ckpt-strictness log_all to see the
+    # exact key list), so load the model non-strictly. Same treatment as substitution_eval.py.
+    orig_load = T.load_checkpoint
+
+    def lenient_load(*a, **kw):
+        kw["strict"] = False
+        return orig_load(*a, **kw)
+
+    T.load_checkpoint = lenient_load
+
     def patched(prefix, forward_step_func, data_iterator, model, iteration,
                 process_non_loss_data_func, config, verbose=False, write_to_tensorboard=True,
                 **kw):

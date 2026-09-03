@@ -14,8 +14,9 @@ Values = end-of-training TEST evals (canonical; see results/ablations/FINDINGS.m
   on the h100 split with its local dense floor —
   flame192_leftflank_1e18.csv, flame38m_1e18_cells.csv, flame512_1e18_rightflank.csv.
   x = non-embed active params (6.88/12.19/48.50M from the run configs).
-- 1e19: BPB = CE/2.9780, t19_1e19_curves.csv (one shape; bars). No fine full-MoE cell was trained
-  at 1e19 (1e18 already showed fine-graining hurts the full MoE; temporal is the fine contender).
+- 1e19: BPB = CE/2.9780, t19_1e19_curves.csv (one shape; bars). The fine full-MoE cell was added
+  on 2026-09-03 (moe_fine_g3_1e19, 1.0604): it beats the fine temporal model by 0.005 BPB, a third
+  of the coarse pair's gap, so the 1e19 panel now shows both grains for both paradigms.
 
 Outputs results/phase0/figures/isoflop_panel_1e{16,17,18,19}_nocaption.png (paper tiles) and a
 captioned 2x2 overview isoflop_panels_all.png for the repo.
@@ -74,7 +75,8 @@ P18 = {
 # tmp_c {1.3128,1.3111,1.3128}  moe_c {1.3158,1.3197,1.3169}
 # tmp_f {1.3354,1.3339,1.3323}  moe_f {1.3461,1.3489,1.3483}
 P19 = [("dense", 1.1260, DENSE_C), ("temporal\ncoarse", 1.0680, TMP_COARSE),
-       ("temporal\nfine", 1.0655, TMP_FINE), ("full MoE\ncoarse", 1.0514, MOE_COARSE)]
+       ("temporal\nfine", 1.0655, TMP_FINE), ("full MoE\ncoarse", 1.0514, MOE_COARSE),
+       ("full MoE\nfine", 1.0604, MOE_FINE)]   # moe_fine_g3_1e19, trained 2026-09-03 (t19_1e19_curves.csv)
 
 STYLE = [("dense", DENSE_C, 1.4), ("moe_c", MOE_COARSE, 1.9), ("moe_f", MOE_FINE, 1.9),
          ("tmp_c", TMP_COARSE, 1.9), ("tmp_f", TMP_FINE, 1.9)]
@@ -120,7 +122,7 @@ def bar_panel(ax, title, ylabel=True):
     ax.grid(True, axis="y", ls=":", alpha=0.4)
     ax.set_title(title)
     if ylabel: ax.set_ylabel("test BPB")
-    ax.tick_params(axis="x", labelsize=8.5)
+    ax.tick_params(axis="x", labelsize=7.5)
 
 
 # paper tiles (one file per budget, no baked caption)
