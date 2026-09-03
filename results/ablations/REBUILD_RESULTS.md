@@ -2007,3 +2007,28 @@ the namespaced repos the hub redirects to, and piqa's namespaced repo is still s
 it loads from the hub's parquet branch. A first conversion pass regenerated the CSV from local
 run directories and silently dropped the July models that are not on this pod (45 rows to 33).
 The file was restored from git and the converter now upserts only the models it is given.
+
+## Unmask and impose at 1e19, now with a producer and the fine full MoE (2026-09-03 17:58)
+
+**Every July row of `unmask_eval_1e19.csv` re-derives to the third decimal from the manifest
+checkpoints with the in-process evaluator, and the new fine full MoE loses +0.59 BPB when
+rolling residency is imposed on it, more than the coarse full MoE's +0.43.** The README had listed
+this file as the one result without a committed producer. `tmoe_unmask_1e19.sh` scores each
+checkpoint on the full 20-iteration test split in its native regime and in the crossed one, with
+the replay self-test (the first arm re-scored at the end, exact match required), and
+`unmask_eval_csv.py` writes the table. Native values equal the end-of-training test evals in the
+training logs (fine full MoE 3.1578 in both).
+
+| cell | native | crossed | delta BPB |
+|---|---|---|---|
+| coarse full MoE, unconstrained -> residency R = 6 | 1.0511 | 1.4823 | +0.4312 |
+| coarse temporal, masked -> every expert resident | 1.0678 | 1.2742 | +0.2065 |
+| fine temporal, masked -> every expert resident | 1.0652 | 1.2658 | +0.2006 |
+| fine full MoE, unconstrained -> residency R = 18 (new) | 1.0604 | 1.6549 | +0.5945 |
+
+The contrast with the substitution result is the point worth a sentence. Swapping one active
+expert in eighteen costs the fine full MoE and the fine temporal model the same at 1e19
+(Appendix B parity), yet forcing the whole selection through a rolling resident set costs the
+full MoE three times what unmasking costs the temporal model. Single-expert substitutability and
+tolerance of the constraint are different properties, and the second is the one training under
+the constraint buys.
