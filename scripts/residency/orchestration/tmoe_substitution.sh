@@ -34,6 +34,9 @@ g3_tmoe_s2_1e17          temporal  s2     1e17 3 32 256  tok16k
 moe_coarse_1e19          full      s19opt 1e19 1 16 1024 pythia
 g1_tmoe_coarse_1e19      temporal  s19opt 1e19 1 16 1024 pythia
 temporal_fine_g3_1e19    temporal  s19opt 1e19 3 16 1024 pythia
+moe_fine_g3_1e19         full      s19opt 1e19 3 16 1024 pythia
+g1_moe_s2_1e17           full      s2     1e17 1 32 256  tok16k
+g1_tmoe_s2_1e17          temporal  s2     1e17 1 32 256  tok16k
 "
 echo "$CELLS" | grep -v '^\s*$' | while read -r run regime shape flops grain mb gb corpus; do
   [ -n "${ONLY:-}" ] && [ "$run" != "$ONLY" ] && continue

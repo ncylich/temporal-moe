@@ -1946,3 +1946,44 @@ the July logs, and a run started on the wrong schedule was killed. During traini
 spike occurred at iteration 860 (grad norm 0.35 to 3.3, loss up 0.25) and had fully recovered by
 iteration 1000; July's two 1e19 runs show no spike at that point, and there is no same-recipe
 reference for this cell.
+
+### Substitution tolerance, the last two pairs (2026-09-03 14:19)
+
+**The coarse 1e17 pair, retrained because July kept no checkpoint, behaves like every other
+pair (temporal minus full -0.0105 BPB). The fine 1e19 pair, completed by the new full MoE,
+is at the edge: -0.0016 [-0.0022, -0.0009] at three of eighteen, and +0.0004 [+0.0001, +0.0008]
+for a single expert, the first pair-level interval on the other side of zero.** The rule of
+thumb that the advantage shrinks with budget now has both grains behind it: about a quarter of
+the full-MoE cost at 1e17 (coarse 25 percent, fine 27), a fifth at 1e18 (19 and 20), and at
+1e19 a tenth for the coarse pair and 4 percent for the fine pair. The sentence the paper can
+carry is that experts are measurably more substitutable at 1e17 and 1e18, with the margin
+closing toward parity at 1e19, and it should not say more than that.
+
+| pair (all layers, matched fraction, random substitute at its own weight) | full MoE | temporal | temporal minus full [95% CI] |
+|---|---|---|---|
+| 1e17 coarse, 6 of 64 (rebuilt-corpus retrain) | +0.0417 | +0.0312 | -0.0105 [-0.0111, -0.0099] |
+| 1e19 fine, 18 of 192 | +0.0380 | +0.0364 | -0.0016 [-0.0022, -0.0009] |
+| 1e19 fine, one expert | +0.0105 | +0.0110 | +0.0004 [+0.0001, +0.0008] |
+
+The other substitutes keep their ordering at 1e17 coarse (next-best -0.0128, zeroed -0.0088,
+inherited weight -0.0202) and at 1e19 fine the next-best and zeroed conditions stay narrowly
+below zero (-0.0029 and -0.0012) while the inherited-weight condition remains large (-0.0259),
+which says the 1e19 fine full MoE is as tolerant of losing an expert as the temporal model but
+still far more sensitive to a wrong expert carrying a real gate weight. Per layer at 1e19 fine
+the pattern is the one the coarse pair showed: the temporal model is markedly more fragile in
+the first two MoE layers (layer 2: 0.0037 against 0.0016) and less fragile from layer 12 on.
+
+Provenance of the retrain. `g1_moe_s2_1e17` and `g1_tmoe_s2_1e17` use the fine 1e17 pair's
+recipe (shape s2, global batch 256, micro-batch 64, lr 3e-3, 5 percent warmup, cosine, eval at
+end, min-logit eviction, R = k) on the tok16k corpus rebuilt on 2026-08-31, 3,917 iterations
+each, 36 and 38 minutes on the H200. Test CE 3.4930 (1.2670 BPB) for the full MoE and 3.5486
+(1.2873) for the temporal model, against the published 1.269 and 1.2821 for the July runs on the
+pre-rebuild corpus, so the recipe reproduces to within 0.005 BPB and the two rows in
+`substitution_tolerance.csv` are labelled by run name. They are not pooled with the July 1e17
+points anywhere else.
+
+What went wrong. The waiter that was to start this chain after the 1e19 run used `pgrep -f` on
+a path string, which matched the tool shell that had launched it, so it never fired; it now
+keys on the absence of GPU processes. The chain's first version wrote records relative to the
+evaluator's working directory again (the fix from the day before had not been applied to the
+file that was actually running), and the aggregator's empty result was what exposed it.

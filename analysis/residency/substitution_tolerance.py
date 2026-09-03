@@ -42,7 +42,7 @@ def meta(run):
         s = re.search(r"_s(\d)$", run)
         return "1e18", g, (int(s.group(1)) if s else 1), "pythia"
     if run.endswith("_1e17"):
-        return "1e17", 3, 1, "tok16k"
+        return "1e17", (1 if run.startswith("g1_") else 3), 1, "tok16k"
     if run.endswith("_1e19"):
         return "1e19", (3 if "fine" in run or "g3" in run else 1), 1, "pythia"
     raise ValueError(run)
@@ -98,7 +98,8 @@ PAIRS = [  # temporal, full
     ("flame38m_g1_temporal_s3", "flame38m_g1_moe_s3"),
     ("flame38m_g3_temporal", "flame38m_g3_moe"), ("flame38m_g3_temporal_s2", "flame38m_g3_moe_s2"),
     ("flame38m_g3_temporal_s3", "flame38m_g3_moe_s3"),
-    ("g3_tmoe_s2_1e17", "g3_moe_s2_1e17"), ("g1_tmoe_coarse_1e19", "moe_coarse_1e19"),
+    ("g3_tmoe_s2_1e17", "g3_moe_s2_1e17"), ("g1_tmoe_s2_1e17", "g1_moe_s2_1e17"),
+    ("g1_tmoe_coarse_1e19", "moe_coarse_1e19"), ("temporal_fine_g3_1e19", "moe_fine_g3_1e19"),
 ]
 
 
