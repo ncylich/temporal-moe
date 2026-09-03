@@ -1944,7 +1944,7 @@ freezes the learning rate at zero so routing stays balanced. The launch chain al
 1e16 cosine recipe at lr 3e-3 instead of July's WSD 3e-4 until the schedule was checked against
 the July logs, and a run started on the wrong schedule was killed. During training one loss
 spike occurred at iteration 860 (grad norm 0.35 to 3.3, loss up 0.25) and had fully recovered by
-iteration 1000; July's two 1e19 runs show no spike at that point, and there is no same-recipe
+iteration 1000. July's two 1e19 runs show no spike at that point, and there is no same-recipe
 reference for this cell.
 
 ### Substitution tolerance, the last two pairs (2026-09-03 14:19)
@@ -1983,7 +1983,7 @@ pre-rebuild corpus, so the recipe reproduces to within 0.005 BPB and the two row
 points anywhere else.
 
 What went wrong. The waiter that was to start this chain after the 1e19 run used `pgrep -f` on
-a path string, which matched the tool shell that had launched it, so it never fired; it now
+a path string, which matched the tool shell that had launched it, so it never fired. It now
 keys on the absence of GPU processes. The chain's first version wrote records relative to the
 evaluator's working directory again (the fix from the day before had not been applied to the
 file that was actually running), and the aggregator's empty result was what exposed it.
