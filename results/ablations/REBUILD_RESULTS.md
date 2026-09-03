@@ -2032,3 +2032,60 @@ expert in eighteen costs the fine full MoE and the fine temporal model the same 
 full MoE three times what unmasking costs the temporal model. Single-expert substitutability and
 tolerance of the constraint are different properties, and the second is the one training under
 the constraint buys.
+
+## Expert output similarity: temporal experts are less alike, not more (2026-09-03 18:29)
+
+**The mechanism the substitution result invited, that temporal experts compute more similar
+functions and are therefore interchangeable, is false. On the same inputs, the experts a temporal
+router selects are about half as similar to each other as the experts a full-MoE router selects,
+at every budget and grain, and the per-layer size of a swap perturbation does not predict the
+per-layer substitution cost.** The substitution advantage is a property of the network downstream
+of the swap, not of the experts being redundant.
+
+What was measured. For each of the 20 substitution checkpoints and six random-init models of the
+same shapes, one cached test micro-batch, 2,048 sampled token positions, and every routed expert
+of every MoE layer evaluated on those inputs, ungated, shared expert excluded. Per layer: mean
+cosine between expert outputs over all pairs, over the k experts the router actually selected
+(native regime, so the temporal model's selection is the masked one it trained with), and
+between a selected expert and the three substitutes the substitution experiment draws; the
+relative change of the gated layer output when one selected expert's output is swapped for the
+substitute's at the same gate; the paper's weight cosine. Data `expert_similarity.csv`, figure
+`figures/expert_similarity_depth.png`.
+
+| layer mean, full MoE / temporal / random init | 1e17 coarse | 1e18 coarse (3 seeds) | 1e19 coarse | 1e17 fine | 1e18 fine (3 seeds) | 1e19 fine |
+|---|---|---|---|---|---|---|
+| cosine, all expert pairs | .011 / .015 / .000 | .041 / .028 / .000 | .021 / .015 / .000 | .006 / .008 / .000 | .035 / .024 / .000 | .020 / .010 / .000 |
+| cosine within the selected k | .081 / .045 / .000 | .114 / .062 / .000 | .080 / .032 / .000 | .040 / .018 / .000 | .061 / .034 / .000 | .046 / .014 / .000 |
+| cosine, selected vs next-best | .048 / .049 | .081 / .070 | .052 / .034 | .024 / .017 | .048 / .035 | .034 / .016 |
+| gated-layer change, random swap | .378 / .376 / .572 | .406 / .355 / .572 | .409 / .393 / .563 | .197 / .179 / .328 | .200 / .168 / .328 | .208 / .175 / .321 |
+| weight cosine | .010 / .012 / .000 | .003 / .001 / .000 | .002 / .004 / .000 | .006 / .011 / .000 | .008 / .001 / .000 | .003 / .003 / .000 |
+
+Reading. Random experts have output cosine 0.000 exactly, so the trained values of 0.01 to 0.11
+are real but small: experts in both regimes are nearly orthogonal functions, and the weights are
+orthogonal in both (the paper's Table already says so). Training pulls the selected set together
+in the full MoE far more than in the temporal model, which is the opposite of the "general
+experts" picture: the temporal router's k residents are a more diverse set. The gated-layer
+perturbation from a random swap is smaller for temporal at 1e18 (0.355 against 0.406 coarse,
+0.168 against 0.200 fine) and about equal at 1e17 and 1e19 coarse, which is a weaker version of
+the substitution pattern, but per layer it has no predictive power: Spearman 0.07 between the
+swap perturbation and the substitution cost across the 168 model-layers, and 0.09 between the
+regime gaps across the 84 pair-layers. The regime gap in similarity correlates the other way
+(0.41): where temporal experts are much less alike than the full MoE's, the temporal tolerance
+advantage is smaller. The one local signature the substitution experiment did leave is the 1e19
+entry-layer reversal, which is here too: at MoE layers 2 to 4 the temporal models' swap
+perturbation is larger than the full MoE's (coarse 0.45 to 0.47 against 0.38 to 0.42), and it
+is smaller from the middle of the stack on.
+
+What the paper can say. Experts under the constraint are measurably more substitutable at 1e17
+and 1e18, and this is not because they compute more similar functions, they compute less
+similar ones. Together with the impose-versus-unmask asymmetry, the tolerance lives in how the
+rest of the network reads a perturbed expert mixture, which is what training under the
+constraint shapes. Nothing here supports "experts become more general", and the appendix
+should not say it.
+
+What went wrong. The first version of the probe captured the router input with a forward hook,
+which fires after the router's forward returns, while the routing hook fires inside it, so no
+layer was recorded and the run produced an empty record without an error; a forward pre-hook
+fixed it, and the record now fails loudly if a layer is missing. The unmask chain that was
+running when `run.sh` gained the new branch read the edited file at a shifted offset after its
+own work was done and exited 2 with intact results, the in-place edit hazard again.

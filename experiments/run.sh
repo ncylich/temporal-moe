@@ -269,6 +269,19 @@ elif [ "${SUBSTEVAL:-0}" = "1" ]; then
     --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
     --eval-iters ${SUBST_EVAL_ITERS:-1} --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
     2>&1 | tee "$OUT/substeval.log"
+elif [ "${EXPERTSIM:-0}" = "1" ]; then
+  # Expert output similarity (Appendix C mechanism check for substitution tolerance): one
+  # micro-batch, every routed expert evaluated on the same sampled inputs, per-layer similarity
+  # metrics. Frozen weights, throwaway save. A run name without a checkpoint gives the
+  # random-init calibration cell.
+  export TEMPORAL=1 TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  echo "[expertsim] R=$TEMPORAL_RESIDENCY_R regime=${EXPSIM_REGIME:-?} N=${EXPSIM_N:-2048} out=${EXPSIM_OUT:-}"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/expert_similarity.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/expertsim.log"
 elif [ "${CAUSALPROBE:-0}" = "1" ]; then
   # C8 / N6: causal token-versus-context substitution. One invocation per arm (CAUSAL_ARM in
   # ref|token|context); the three are compared offline and the analysis refuses to compare arms whose
