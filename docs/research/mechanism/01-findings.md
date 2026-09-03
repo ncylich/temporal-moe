@@ -110,23 +110,12 @@ evidence. Full range across models, median over each model's layers.
 
 - **These ranges overlap**, unlike the locus result. A strong tendency, not a separator.
 - **Flattening is strongest early**: generalist fraction falls with depth in both regimes.
-- **The third row is a control.** One arm of the section 4 training sweep runs a temporal schedule
-  that constrains no layers. Built, trained and counted as temporal; only the constraint is missing.
-  It lands at the bottom of the temporal range, with the full MoE models, as it must if these
-  statistics measure the constraint rather than how temporal runs are configured. Nothing else here
-  would catch a bug that inflated every temporal model equally.
-
-**The inventory is not starved.** Union covers 85 to 100% of the pool on shipped configurations:
-
-| model | budget | regime | experts | union, mean | union, share of E | effective experts |
-|---|---|---|---|---|---|---|
-| `moe_coarse_1e19` | 1e19 | full MoE | 64 | 63.8 | 0.997 | 59.8 |
-| `g3_tmoe_s2_1e17` | 1e17 | temporal | 192 | 160.8 | 0.837 | 187.8 |
-| `flame38m_g1_temporal` | 1e18 | temporal | 64 | 62.0 | 0.969 | 63.1 |
-| `flame38m_g3_temporal` | 1e18 | temporal | 192 | 163.4 | 0.851 | 187.2 |
-| `g1_tmoe_coarse_1e19` | 1e19 | temporal | 64 | 63.9 | 0.999 | 62.5 |
-| `temporal_fine_g3_1e19` | 1e19 | temporal | 192 | 184.2 | 0.959 | 183.0 |
-
+- **The third row is not a control.** It is the temporal trainer run with R = E on every layer,
+  which the router makes the unconstrained top-k exactly (the identity the router tests check), so
+  it is the baseline trained a second time through the temporal code path. It lands with the full
+  MoE models because it is one. The paper does not cite it; do not reintroduce it as evidence that
+  the spread "tracks the constraint rather than the training configuration", since the two
+  regimes differ only by the constraint by construction.
 - **Union** is the mean count of distinct experts a sequence touches. **Effective experts** weights
   that count by how evenly usage is spread, penalising a long tail of barely-used ones. Higher is
   better on both if the goal is to use the pool you paid for.
