@@ -2154,7 +2154,12 @@ pre-activation output from the packed weights through the same views. The delex 
 captures were first started on the Transformer Engine path, which is host-bound at 1 percent GPU
 for this model and had not finished an iteration after 50 minutes; both were redone on the fast
 path. Two waiters used `pgrep -f` on a script name, matched the shell that launched them, and
-never fired. One flag for the paper: its 1e18 weight-kurtosis medians (0.42 against 0.14 coarse,
+never fired. The first regeneration of `stability_fakequant.csv` corrupted the three July 1e19
+16-bit rows, because the `quanteval_b16.log` files on the hub for those runs are not the 16-bit
+baselines: July's constraint-swap evaluations reused that log name and overwrote them before
+mirroring (they read 4.41 and 3.79, the imposed and unmasked values). The committed rows are the
+only record of those baselines, the file was restored from git, and the converter now upserts
+only the cells it is given. One flag for the paper: its 1e18 weight-kurtosis medians (0.42 against 0.14 coarse,
 0.62 against 0.24 fine, p99 2.79 to 0.77) do not equal a plain median over the routed rows of
 `stability_weights.csv` (0.52 against 0.15, 0.82 against 0.32, p99 1.46 to 0.45); the direction
 and the "every pair" claim hold under either aggregation, but the aggregation behind the printed
