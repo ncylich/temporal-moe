@@ -2079,15 +2079,19 @@ entry-layer reversal, which is here too: at MoE layers 2 to 4 the temporal model
 perturbation is larger than the full MoE's (coarse 0.45 to 0.47 against 0.38 to 0.42), and it
 is smaller from the middle of the stack on.
 
-Underneath the ratio the two regimes are built differently. The gate weight of the displaced
-expert averages 0.17 in the coarse temporal models and 0.056 in the fine ones, which is 1/6 and
-1/18: the masked softmax over the k residents is nearly flat, the router-flatness result of
-Table tab:structural seen from the gate side. The full MoE puts 0.06 to 0.08 (coarse) and 0.024
-to 0.027 (fine) on the same expert, concentrating its mass on fewer of the k, and its expert
-outputs are about three times larger in norm (21.7 against 7.2 at 1e17 coarse, 1.23 against
-0.38 at 1e18 coarse, 10.2 against 3.6 at 1e19 coarse). The constraint produces many small,
-evenly weighted contributions rather than a few large ones, and the relative damage from losing
-one is similar or slightly lower.
+Underneath the ratio the two regimes are built differently, and one reading of the gate
+numbers has to be ruled out first. The gate weight of a randomly displaced expert averages 0.17
+in the coarse temporal models and 0.056 in the fine ones, which is 1/6 and 1/18, but that is
+arithmetic, not flatness: the masked softmax over the k residents sums to one, so the mean gate
+of a random resident is 1/k whatever the distribution. What the comparison does show is total
+routed mass. The full MoE's softmax runs over all E experts, and its k selected gates average
+0.06 to 0.08 (coarse) and 0.024 to 0.027 (fine), a total of 0.37 to 0.50 on the routed experts
+with the rest of the mass on experts that never run. Its expert outputs are correspondingly
+about three times larger in norm (21.7 against 7.2 at 1e17 coarse, 1.23 against 0.38 at 1e18
+coarse, 10.2 against 3.6 at 1e19 coarse), so the routed sums of the two regimes have comparable
+size and the relative damage from losing one expert is similar or slightly lower under the
+constraint. Flatness within the selected set is the paper's router-entropy number, not
+something this probe measures.
 
 What the paper can say. Experts under the constraint are measurably more substitutable at 1e17
 and 1e18, and this is not because they compute more similar functions, they compute less
