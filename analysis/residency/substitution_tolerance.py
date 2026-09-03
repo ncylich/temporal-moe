@@ -151,7 +151,8 @@ def write_csv(rows):
     print(f"wrote {CSV} ({len(rows)} rows)")
 
 
-def figure(rows, paper):
+def figure(rows, paper, budgets=None):
+    """budgets: optional set of budget labels to draw; None draws every budget present."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -160,6 +161,8 @@ def figure(rows, paper):
                              "ytick.labelsize": 10.5, "legend.fontsize": 10})
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.6), sharey=False)
     marks = {"1e17": ("s", ":"), "1e18": ("o", "-"), "1e19": ("^", "--")}
+    if budgets:
+        marks = {b: m for b, m in marks.items() if b in budgets}
     for ax, grain, title in ((axes[0], 1, "coarse, 6 of 64"), (axes[1], 3, "fine, 18 of 192")):
         for regime, color in (("full", FULL), ("temporal", TEMPORAL)):
             for budget, (mk, ls) in marks.items():
@@ -185,7 +188,7 @@ def figure(rows, paper):
         ax.set_title(title)
         ax.set_xlabel("relative depth of the perturbed layer")
         ax.grid(alpha=0.25); ax.set_axisbelow(True)
-    axes[0].set_ylabel("BPB increase from one perturbed layer")
+    axes[0].set_ylabel("BPB increase, one perturbed layer")
     handles, labels = {}, []
     for ax in axes:
         for h, l in zip(*ax.get_legend_handles_labels()):
@@ -207,6 +210,12 @@ def figure(rows, paper):
 
 def main():
     paper = "--no-caption" in sys.argv
+    # --budgets 1e18[,1e19]: restrict the figure to these budgets (the paper draws 1e18 only,
+    # the budget with three seeds per model and both granularities paired)
+    budgets = None
+    for a in sys.argv:
+        if a.startswith("--budgets="):
+            budgets = set(a.split("=", 1)[1].split(","))
     files = sorted(glob.glob(os.path.join(SRC, "*.npz")))
     if not files:
         sys.exit(f"no records in {SRC}")
@@ -218,7 +227,7 @@ def main():
         rows += rows_for(d, run)
     rows += pair_rows(rows, data)
     write_csv(rows)
-    figure(rows, paper)
+    figure(rows, paper, budgets)
 
 
 if __name__ == "__main__":
