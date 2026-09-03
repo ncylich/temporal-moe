@@ -2047,9 +2047,9 @@ same shapes, one cached test micro-batch, 2,048 sampled token positions, and eve
 of every MoE layer evaluated on those inputs, ungated, shared expert excluded. Per layer: mean
 cosine between expert outputs over all pairs, over the k experts the router actually selected
 (native regime, so the temporal model's selection is the masked one it trained with), and
-between a selected expert and the three substitutes the substitution experiment draws; the
+between a selected expert and the three substitutes the substitution experiment draws, the
 relative change of the gated layer output when one selected expert's output is swapped for the
-substitute's at the same gate; the paper's weight cosine. Data `expert_similarity.csv`, figure
+substitute's at the same gate, and the paper's weight cosine. Data `expert_similarity.csv`, figure
 `figures/expert_similarity_depth.png`.
 
 | layer mean, full MoE / temporal / random init | 1e17 coarse | 1e18 coarse (3 seeds) | 1e19 coarse | 1e17 fine | 1e18 fine (3 seeds) | 1e19 fine |
@@ -2085,7 +2085,7 @@ should not say it.
 
 What went wrong. The first version of the probe captured the router input with a forward hook,
 which fires after the router's forward returns, while the routing hook fires inside it, so no
-layer was recorded and the run produced an empty record without an error; a forward pre-hook
-fixed it, and the record now fails loudly if a layer is missing. The unmask chain that was
+layer was recorded and the run produced an empty record without an error. A forward pre-hook
+fixed it. The unmask chain that was
 running when `run.sh` gained the new branch read the edited file at a shifted offset after its
 own work was done and exited 2 with intact results, the in-place edit hazard again.
