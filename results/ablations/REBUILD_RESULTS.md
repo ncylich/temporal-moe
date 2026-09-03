@@ -1901,3 +1901,48 @@ with its replacement.
 Reproduce: `bash scripts/residency/orchestration/tmoe_substitution.sh` (about 45 minutes on
 one H200 for the 17 checkpoints, pulled with `scripts/artifacts.py pull --repo ckpts --run
 ...`), then `$PY analysis/residency/substitution_tolerance.py [--no-caption]`.
+
+## The missing 1e19 corner: fine-grained full MoE trained (2026-09-03 12:13)
+
+**The 1e19 panel is now complete at both grains. The fine full MoE lands at test CE 3.1578, or
+1.0604 BPB, below the fine temporal model's 3.1732 (1.0655) by 0.005 BPB, a smaller gap than
+the coarse pair's 0.016 (1.0514 against 1.0675).** Run `moe_fine_g3_1e19`: shape s19opt, 192
+experts at top-18, expert width 184, 14 layers, global batch 1024, lr 3e-4 with the July WSD
+schedule (1 percent warmup, decay over the last 10 percent to 3e-5), seed 1234, the local pythia-50k
+DCLM copy, 4,278 iterations. Curve appended to `t19_1e19_curves.csv` with the same columns as the
+four July cells; the number fills the corner that `paper/main.tex` and
+`analysis/plots/plot_isoflop_panels.py` currently mark as absent by design.
+
+| 1e19 cell | test CE | test BPB |
+|---|---|---|
+| dense floor (July) | see `t19_1e19_curves.csv` | |
+| coarse full MoE, 6 of 64 (July) | 3.1310 | 1.0514 |
+| coarse temporal (July) | | 1.0675 |
+| fine temporal, 18 of 192 (July) | 3.1732 | 1.0655 |
+| fine full MoE, 18 of 192 (this run) | 3.1578 | 1.0604 |
+
+How it ran. 21.2 s per iteration on one H200 for 25.7 hours of training, paused once at
+checkpoint 2200 for the substitution-tolerance sweep and resumed from it with the loss continuing
+on the same curve. The route to that speed is its own record: the as-resurrected environment ran
+at 136 s per iteration with the GPU 15 percent busy, and a profiler pass with the CUDA runtime
+calls broken out showed the pip grouped_gemm library spending about 125 s of every iteration in
+host-side work across the 192 expert groups. The replacement, PyTorch's own grouped matmul with
+device-side offsets and a device-side padding of each expert's rows to a multiple of 16 (the torch
+2.8 backward hangs on an empty group, so every expert keeps at least 16 zero rows), is
+bit-identical to the grouped GEMM in forward and in all three gradients and took the iteration to
+28 s; dropping an identity chunk sort on the single rank and a cheaper padding path took it to
+22.5 s at 97 percent GPU utilisation. Every load-balancing loss printed by the benchmark
+reproduced the old code's value to all digits at each iteration. The patches live in
+`scripts/residency/orchestration/megatron_moe_syncfree.patch`; the benchmark and the schedule
+validation with the stop-and-resume check are `tmoe_bench_balanced.sh` and
+`tmoe_1e19_validate.sh` in the same directory.
+
+What went wrong on the way. The first speed smokes read 21.8 s per iteration and were an
+artefact: an 8-iteration schedule reached peak learning rate by iteration 2, routing collapsed
+onto a few experts, and the grouped GEMMs shrank to a few big groups. The honest benchmark
+freezes the learning rate at zero so routing stays balanced. The launch chain also carried the
+1e16 cosine recipe at lr 3e-3 instead of July's WSD 3e-4 until the schedule was checked against
+the July logs, and a run started on the wrong schedule was killed. During training one loss
+spike occurred at iteration 860 (grad norm 0.35 to 3.3, loss up 0.25) and had fully recovered by
+iteration 1000; July's two 1e19 runs show no spike at that point, and there is no same-recipe
+reference for this cell.

@@ -72,7 +72,7 @@ Consolidated result tables from the temporal-MoE ablation program, gathered from
 | `stability_gradnorms.csv` | Grad-norm series (every 10 iters) from surviving train.logs, 38M + 1e19 runs, spike census. | h100@efc43768 |
 | `stability_fakequant.csv` | Fake-quant (per-group-128 RTN, routed experts only) test CE/BPB at 16/8/4/3 bits, 1e18 + 1e19; divisor 2.9780. | h100@8f5064e6 (38M), h100@ec9007c8 (1e19) |
 | `t18_1e18_curves.csv` | 1e18 (38M) isoFLOP training curves — coarse full-MoE + coarse temporal cells. | h100@60b0e351/e53596d6 |
-| `t19_1e19_curves.csv` | 1e19 isoFLOP training curves for the 4 t19 cells (dense / moe_coarse / coarse_temporal / fine_temporal). | h100@03a8e488/6a69b7f7/d2b7cd7e/de80543f |
+| `t19_1e19_curves.csv` | 1e19 isoFLOP training curves for the 5 t19 cells (dense / moe_coarse / coarse_temporal / fine_temporal, plus the fine full MoE `moe_fine_g3_1e19` trained 2026-09-02/03 on the same recipe, final test CE 3.1578 = 1.0604 BPB). | h100@03a8e488/6a69b7f7/d2b7cd7e/de80543f; fine full MoE: h200, `scripts/residency/orchestration/tmoe_moe_fine_1e19.sh` |
 | `t19_lmeval_stderr.csv` | t19 lm-eval rerun with per-task stderr (pinned-venv harness; accs reproduce t19_lmeval within noise). | h100@9bec50ac |
 | `t19_lmeval.csv` | t19 downstream lm-eval accuracies (dense / moe_coarse / temporal_coarse). | h100@a42340f1 |
 | `t19_lmeval_finegrain.csv` | t19 fine-grained temporal downstream lm-eval accuracies. | h100@3b8d9da8 |
