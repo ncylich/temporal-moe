@@ -2505,3 +2505,9 @@ temporal weights carry something a full MoE could inherit, does not show up in u
 BPB at this scale. The grain-1 transfer of SHD0p01 (with its own C0) runs to close the
 question on the coarse grain; no promotion follows unless it wins there, which the rules
 do not expect.
+
+**MoE dispatch probe** (21:40). At the new configuration (TE cross-entropy, micro-batch 128,
+0.850 s per iteration), Megatron's native permute in place of the fused one runs at 1.098 s and
+the all-gather dispatcher in place of all-to-all at 1.021 s, both with the same loss. The fused
+all-to-all path in use is the fastest of the three; the profile's remaining time is the model's
+own GEMMs and attention, which are the compute, so 0.85 s is where this shape stops.
