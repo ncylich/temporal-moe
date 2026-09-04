@@ -35,7 +35,7 @@ if [ "$DENSE" = "1" ]; then FFN=1422; MODE=dense
 elif [ "$MOE_FULL" = "1" ]; then FFN=1368; MODE=moe
 else FFN=1368; MODE=temporal; fi
 RUN_NAME=${RUN_NAME:-flame38m_g${GRAIN}_${MODE}$([ "$MODE" = temporal ] && echo _${TEMPORAL_EVICT})}
-WSD_DECAY=$("$PY" -c "print(max(1,$TRAIN_ITERS//10))")
+WSD_DECAY=${WSD_DECAY_OVERRIDE:-$("$PY" -c "print(max(1,$TRAIN_ITERS//10))")}   # override: curriculum SWW arms decay over the free phase
 EVAL_INTERVAL=${EVAL_INTERVAL:-$TRAIN_ITERS}
 WARMUP_FRAC=0.01
 

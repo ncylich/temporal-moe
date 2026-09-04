@@ -579,6 +579,71 @@ def step_accel_mask(lt, resident):
 POST_ROUTING_HOOK = None
 
 
+
+# ---- curriculum knobs (default off; pure helpers unit-tested in temporal/tests/test_curriculum.py) ----
+def current_iteration() -> int:
+    """Megatron's training iteration (args.curr_iteration, set at the top of every train step);
+    0 when there are no Megatron args (eval-only processes, unit tests)."""
+    try:
+        from megatron.training import get_args
+        return int(getattr(get_args(), "curr_iteration", 0) or 0)
+    except Exception:
+        return 0
+
+
+def _parse_schedule(spec: str):
+    pts = []
+    for item in spec.split(","):
+        if item.strip():
+            start, _, val = item.partition(":")
+            pts.append((int(start), val.strip()))
+    if not pts:
+        raise ValueError(f"empty schedule {spec!r}")
+    return sorted(pts)
+
+
+def schedule_step(spec: str, it: int) -> str:
+    """'<iter>:<value>,...' -> the value of the last point whose start <= it (the first point's
+    value before its start). Values are returned as strings ('E' allowed)."""
+    pts = _parse_schedule(spec)
+    val = pts[0][1]
+    for start, v in pts:
+        if start <= it:
+            val = v
+    return val
+
+
+def schedule_interp(spec: str, it: int) -> float:
+    """'<iter>:<float>,...' -> piecewise-linear interpolation between points, constant outside."""
+    pts = [(s, float(v)) for s, v in _parse_schedule(spec)]
+    if it <= pts[0][0]:
+        return pts[0][1]
+    for (s0, v0), (s1, v1) in zip(pts, pts[1:]):
+        if s0 <= it <= s1:
+            return v0 if s1 == s0 else v0 + (v1 - v0) * (it - s0) / (s1 - s0)
+    return pts[-1][1]
+
+
+def free_rows(mask: torch.Tensor, frac: float, it: int, layer: int, seed: int = 1234) -> torch.Tensor:
+    """Heterogeneous batch: set round(frac * batch) sequences (rows of a [seq, batch, E] mask) to
+    all-True, i.e. unconstrained, chosen by a generator seeded on (seed, layer, iteration) so the
+    choice is deterministic and differs across layers and steps. frac <= 0 returns mask as is."""
+    if frac <= 0:
+        return mask
+    B = mask.shape[1]
+    n = int(round(frac * B))
+    if n >= B:
+        return torch.ones_like(mask)
+    if n == 0:
+        return mask
+    g = torch.Generator(device="cpu")
+    g.manual_seed(seed + 1009 * layer + 7919 * it)
+    idx = torch.randperm(B, generator=g)[:n].to(mask.device)
+    out = mask.clone()
+    out[:, idx, :] = True
+    return out
+
+
 def temporal_forward(self, input: torch.Tensor):
     """Drop-in replacement for TopKRouter.forward: restrict selection to the resident set.
 
@@ -657,6 +722,17 @@ def temporal_forward(self, input: torch.Tensor):
             if int(lay) == ln:
                 resid_R = E if val.strip().upper() == "E" else int(val)
                 break
+    # Curriculum (default off). TEMPORAL_ITER_SCHEDULE="<iter>:<R>,..." picks, from Megatron's
+    # training iteration, the R whose start is the largest start <= iteration (R may be 'E'). One
+    # run, one process: a switch or ramp happens inside the loop, so the lr schedule and the data
+    # order are exactly the baseline's. Overrides the global and per-layer R. Eval-only processes
+    # leave it unset (their iteration reads 0) and set TEMPORAL_RESIDENCY_R instead.
+    isched = os.environ.get("TEMPORAL_ITER_SCHEDULE", "").strip()
+    ffsched = os.environ.get("TEMPORAL_FREE_FRAC_SCHEDULE", "").strip()
+    _it = current_iteration() if (isched or ffsched) else 0
+    if isched:
+        _val = schedule_step(isched, _it)
+        resid_R = logits.shape[-1] if _val.upper() == "E" else int(_val)
     # N1 sham control. TEMPORAL_SHAM=random replaces the residency mask with a resident set drawn
     # uniformly at random per token: the same R experts are eligible, but the choice carries no
     # lexical information and no temporal dynamics. It answers whether the per-layer cost profile is
@@ -706,6 +782,10 @@ def temporal_forward(self, input: torch.Tensor):
             trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
             tau=float(os.environ.get("TEMPORAL_RHO", "0")),
             ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
+    # Heterogeneous batches (default off): TEMPORAL_FREE_FRAC_SCHEDULE="<iter>:<frac>,..." is the
+    # piecewise-linear fraction of sequences per micro-batch that train unconstrained.
+    if ffsched and self.training:
+        mask = free_rows(mask, schedule_interp(ffsched, _it), _it, int(getattr(self, "layer_number", 0)))
     lam = float(os.environ.get("TEMPORAL_COHERENCE_LAMBDA", "0"))
     if lam > 0 and self.training:
         from megatron.core.transformer.moe.moe_utils import (
@@ -758,6 +838,10 @@ def temporal_forward(self, input: torch.Tensor):
             tgt = ab.centered_demand_labels(tgt, float(os.environ.get("HEAD_GAMMA_C", "0.015625")))
         head_bce = ab.anticipatory_bce_loss(head_logits, tgt, valid)
     raw_logits = logits
+    if os.environ.get("TEMPORAL_SHADOW", "0") == "1":
+        # Soft constraint (default off): the resident set was computed and fed to the coherence
+        # loss above, but routing itself is free. A full MoE regularised toward coherent routing.
+        mask = torch.ones_like(mask)
     logits = logits.masked_fill(~mask, float("-inf"))       # only resident experts are selectable
     if auxfree:
         # Selection over the k unmasked residents is a no-op top-k, but sigmoid(-inf)=0 plus a
@@ -798,6 +882,11 @@ def banner_knobs() -> str:
     knobs = f", tau={tau}, ema_beta={beta}" if (float(tau) != 0.0 or float(beta) < 1.0) else ""
     if int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) > 0:
         knobs += f", residency_R={os.environ.get('TEMPORAL_RESIDENCY_R')}"
+    for name in ("TEMPORAL_ITER_SCHEDULE", "TEMPORAL_FREE_FRAC_SCHEDULE"):
+        if os.environ.get(name, "").strip():
+            knobs += f", {name.lower()[9:]}={os.environ[name].strip()}"
+    if os.environ.get("TEMPORAL_SHADOW", "0") == "1":
+        knobs += ", shadow=1"
     if os.environ.get("AUXFREE", "0") == "1":
         knobs += ", auxfree-trigger=sigmoid+bias"
     if float(os.environ.get("TEMPORAL_MOM_BETA", "0")) > 0:
