@@ -3038,3 +3038,6 @@ lfm25_instruct_mbpp_cap16k,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.722000,
 lfm25_instruct_mbpp_cap16k,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.614000,full,16384,165
 lfm25_instruct_mbpp_cap32k,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.728000,full,32768,317
 lfm25_instruct_mbpp_cap32k,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.630000,full,32768,328
+qwen35_ce_online_klT2_lr3e-5_rho0_mbpp,256,8,free,,mbpp_chat,"pass@1,channel-aware",0.792000,full,8192,149
+qwen35_ce_online_klT2_lr3e-5_rho0_mbpp,256,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.770000,full,8192,142
+qwen35_ce_online_klT2_lr3e-5_rho0_mbpp,256,8,R32,32,mbpp_chat,"pass@1,channel-aware",0.800000,full,8192,144

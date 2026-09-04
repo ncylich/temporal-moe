@@ -2305,3 +2305,32 @@ the two drivers (`tmoe_mbpp_full.sh`, `tmoe_mbpp_cap16k.sh`). gemma4 and the Qwe
 finals keep their recorded MBPP rows. For the paper: an MBPP column in the Section 6 table
 from these rows (LFM from the 32k pair with its cap residual, OLMoE at its 3,328 budget), the
 LFM thinking-always caveat, and for Section 7 the gemma base R8 number with the scaffold note.
+
+## MBPP as a standard surface, part 3: the Qwen final under the one producer (2026-09-04 04:20)
+
+**Why the Qwen rows were ever different.** gemma4 got its own MBPP producer in August because
+the stock lm_eval task reads its reasoning channel as the answer and scored it at 0.28 against
+0.84 true; the fix (strip the channel, take the last fenced block, execute it) was a gemma
+requirement and was left at that. Qwen in non-thinking mode pre-closes its think block, so the
+stock task extracted correctly and every Qwen code row was taken from it: three-shot, a primed
+` ```python ` fence, the first block, a 1,536-token budget. The two protocols were never the
+same. Making MBPP a standard surface meant picking one, and the gemma rule became the standard
+because it is the one the channel models need, so the Qwen column had to be re-measured under
+it. The base re-measurement agreed with the stock rows within noise (part 2); this part does the
+final, adapter-direct on the raw model directory the recorded surface used (the two Qwen
+directories are byte-identical on the shards checked, same index and configs).
+
+| Qwen3.5-35B-A3B, 500 problems, 8192 budget | free | R8 | R32 |
+|---|---|---|---|
+| base (`qwen35_instruct_mbpp`) | 0.800 | 0.752 | 0.790 |
+| final (`qwen35_ce_online_klT2_lr3e-5_rho0_mbpp`) | 0.792 | 0.770 | 0.800 |
+| paired delta, points | -0.8 | +1.8 | +1.0 |
+| discordant items (base fail / final fail) | 16 / 20 | 33 / 24 | 23 / 18 |
+| paired z | -0.67 | +1.19 | +0.78 |
+
+The stock-task rows had read the same story (R8 0.752 to 0.764, R32 0.764 to 0.776): the
+adapter closes a third of the R8 gap on MBPP and nothing here is outside noise, which is what
+part 1 of the Qwen adaptation record already said about code. No extraction rescue on any
+adapted arm. The Section 7 Qwen MBPP column is now one producer end to end; the baselines'
+MBPP rows (Skliar, ReMoE, the digit and pool ablations) remain stock-task rows and are not
+in this column.

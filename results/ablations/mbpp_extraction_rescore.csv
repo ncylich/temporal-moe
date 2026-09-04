@@ -16,3 +16,6 @@ lfm25_instruct_mbpp_cap16k_free,500,0.7220,0.7220,0.7220,0.7240,0,1
 lfm25_instruct_mbpp_cap16k_R4,500,0.6140,0.6140,0.6140,0.6280,0,8
 lfm25_instruct_mbpp_cap32k_free,500,0.7280,0.7280,0.7280,0.7300,0,1
 lfm25_instruct_mbpp_cap32k_R4,500,0.6300,0.6300,0.6300,0.6440,0,8
+qwen35_ce_online_klT2_lr3e-5_rho0_mbpp_free,500,0.7920,0.7920,0.7920,0.7920,0,0
+qwen35_ce_online_klT2_lr3e-5_rho0_mbpp_R8,500,0.7700,0.7700,0.7700,0.7680,0,0
+qwen35_ce_online_klT2_lr3e-5_rho0_mbpp_R32,500,0.8000,0.8000,0.8000,0.8000,0,0
