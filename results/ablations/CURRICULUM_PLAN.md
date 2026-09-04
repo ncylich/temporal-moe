@@ -8,24 +8,23 @@ constraint, reach a lower test BPB at the same FLOPs?
 
 ## Setting and baselines (no re-runs; seed variance is below the effects we chase)
 
-Shape s2 at 1e17, the recorded pipeline: 6 layers, H 256, global batch 256, cosine lr 3e-3 to
-3e-4, 3,861 iterations (grain 3, 192 experts, k 18) or 3,917 (grain 1, 64 experts, k 6), pythia
-tokenizer, DCLM. Every curriculum run keeps the batch, iteration count and lr schedule of the
-recorded baseline; residency changes no FLOPs, so every arm is compute-matched by construction.
-The 1e19 fine-run speed recipe is on (`MOE_TORCH_GMM=1 MOE_PERMUTE_FUSION=1 MOE_NO_LAYER_LOG=1
-CE_FUSION=1`, legacy grouped GEMM path, rope fusion off), bit-identical to the reference path.
-
-| cell | test CE | test BPB |
-|---|---|---|
-| g3 full MoE, `g3_moe_s2_1e17` (the number to beat) | 3.5074 | 1.1778 |
-| g3 temporal at R = k, `g3_tmoe_s2_1e17` | 3.5530 | 1.1931 |
-| g1 full MoE, `g1_moe_s2_1e17` | 3.4930 | 1.1729 |
-| g1 temporal at R = k, `g1_tmoe_s2_1e17` | 3.5486 | 1.1916 |
+Shape s2 at 1e17: 6 layers, H 256, global batch 256, cosine lr 3e-3 to 3e-4, 3,861 iterations
+(grain 3, 192 experts, k 18) or 3,917 (grain 1, 64 experts, k 6), the pythia-50k tokenizer and
+the DCLM corpus of the 1e18 and 1e19 runs. Correction (08:10): the recorded `g*_moe_s2_1e17` and
+`g*_tmoe_s2_1e17` cells were trained with the 16k tokenizer on its own corpus (test CE 3.5074 /
+3.5530 on grain 3, 3.4930 / 3.5486 on grain 1, BPB divisor 2.7568, so 1.272 / 1.289 BPB), which
+makes their cross-entropies incomparable with runs on the 50k corpus. The curriculum stays on the
+50k corpus, the one the promotion targets use, and the reference for every 1e17 comparison is
+the C0 control: the full MoE trained through the same router path (R = E) on the same corpus,
+one run per grain. Every arm keeps C0's batch, iteration count and lr schedule; residency changes
+no FLOPs, so every arm is compute-matched by construction. The 1e19 fine-run speed recipe is on
+(`MOE_TORCH_GMM=1 MOE_PERMUTE_FUSION=1 MOE_NO_LAYER_LOG=1 CE_FUSION=1`, legacy grouped GEMM path,
+rope fusion off), bit-identical to the reference path, 1.17 s per iteration at this shape.
 
 Noise bar. The 1e18 seed triplets (`flame38m_g3_moe`, `_s2`, `_s3`: 4.0087, 4.0170, 4.0152; the
 temporal triplet 3.9768, 3.9724, 3.9675) put the seed standard deviation near 0.005 CE. A recipe
-counts as a win at 0.010 CE (0.0034 BPB) below the baseline, as promising within 0.005 of it, and
-is dropped otherwise. Test CE is the final 20-iteration test-split eval in `train.log`, the same
+counts as a win at 0.010 CE (0.0034 BPB) below C0, as promising within 0.005 of it, and is
+dropped otherwise. Test CE is the final 20-iteration test-split eval in `train.log`, the same
 quantity the baseline row carries, and the final eval of every curriculum run is unconstrained.
 
 Cost. One 1e17 run is about 3,900 iterations at 1.5 s (1.6 h, less with the speed recipe). One
@@ -52,6 +51,7 @@ To add, default off so nothing recorded changes:
 
 | arm | recipe | what it tests |
 |---|---|---|
+| C0 | R = E throughout, through the router path | the reference: full MoE on this corpus, same code path |
 | C1 | R = k for the first half, then R = E | the user's proposal, early switch |
 | C2 | R = k for the first two thirds, then R = E | late switch: more temporal, less recovery |
 | C3 | R ramp k, 2k, 4k, 8k, E at 0, 20, 40, 60, 75% of training | annealed constraint, no shock |
@@ -70,6 +70,9 @@ switch are visible (`analysis/parse_run.py`). Decision rules after each result:
   helping nor hurting the final basin; run C5 and C6 (below) before concluding.
 - Everything loses by more than the temporal-at-R=k gap explains: the constrained phase costs
   optimisation progress that the free phase cannot recoup at this budget; report and stop at 1e17.
+
+Driver arm names: C1 = SW0p5, C2 = SW0p667, C3 = RAMP0p75, C4 = HET0p4-0p8, C5 = SHD0p01, C6 = SAND
+(`tmoe_curriculum_1e17.sh`); round 2 refinements are chosen by `curriculum_decide.py`.
 
 ## Round 2 candidates (chosen by round 1)
 
@@ -93,6 +96,6 @@ recorded baselines are never re-run.
 ## Records
 
 Runs land in `results/phase0/runs/<name>` with `run.meta` and `train.log`; the summary table
-`results/ablations/curriculum_1e17.csv` (arm, recipe, test CE, BPB, delta vs baseline, per-tenth
-test losses) is produced by `analysis/residency/curriculum_csv.py`. The log of what was run and
+`results/ablations/curriculum_1e17.csv` (arm, recipe, test CE, BPB, delta vs C0, per-tenth
+validation losses) is produced by `analysis/residency/curriculum_csv.py`. The log of what was run and
 why goes in `REBUILD_RESULTS.md` as it happens.

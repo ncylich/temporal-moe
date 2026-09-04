@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Decision rules of results/ablations/CURRICULUM_PLAN.md, applied to curriculum_1e17.csv so the
-supervisor can pick the next stage unattended. Reference = the C0 environment control when it exists
-(same code path, same numerics), else the recorded full-MoE baseline. Win bar 0.010 CE below the
-reference, promising within 0.005 above it.
+supervisor can pick the next stage unattended. Reference = the C0 control of the same grain (full MoE through the router path on the
+same pythia-50k corpus; the recorded 16k-tokenizer 1e17 cells are not comparable), so nothing is
+decided until C0 exists. Win bar 0.010 CE below the reference, promising within 0.005 above it.
 
     curriculum_decide.py round2   -> arms to run next on grain 3 (empty = stop)
     curriculum_decide.py best     -> the best grain-3 arm (by CE) and its verdict
-    curriculum_decide.py transfer -> the arm to run on grain 1 if the best is a win or promising
+    curriculum_decide.py transfer -> 'C0 <best>' to run on grain 1 if the best is a win or promising
     curriculum_decide.py promote  -> the arm to promote to 1e18 if it won on grain 3 and did not lose on grain 1
 """
 import csv
@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ABLATIONS  # noqa: E402
 
 CSV = os.path.join(ABLATIONS, "curriculum_1e17.csv")
-BASE = {"g3": 3.507410, "g1": 3.492985}
 WIN, PROMISING = -0.010, 0.005
 
 
@@ -26,12 +25,10 @@ def load():
     return {(r["grain"], r["arm"]): float(r["test_CE"]) for r in rows}
 
 
-def ref(ce, grain):
-    return ce.get((grain, "C0"), BASE[grain])
-
-
 def verdicts(ce, grain):
-    r = ref(ce, grain)
+    r = ce.get((grain, "C0"))
+    if r is None:
+        return {}
     return {a: v - r for (g, a), v in ce.items() if g == grain and a != "C0"}
 
 
@@ -74,11 +71,12 @@ def main():
             arms = []
         print(" ".join(a for a in arms if ("g3", a) not in ce)); return
     if stage == "transfer":
-        print(best if d[best] <= PROMISING else ""); return
+        # grain 1 needs its own C0 reference; the driver skips arms that already exist
+        print(f"C0 {best}" if d[best] <= PROMISING else ""); return
     if stage == "promote":
         if d[best] > WIN:
             print(""); return
-        g1 = verdicts(ce, "g1")
+        g1 = verdicts(ce, "g1")            # needs a grain-1 C0 as well
         ok = (best in g1 and g1[best] <= PROMISING)
         print(best if ok else ""); return
     raise SystemExit(f"unknown stage {stage}")
