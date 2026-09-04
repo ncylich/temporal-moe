@@ -58,8 +58,10 @@ conclusions and cites no results.
 - gemma4 finals keep their recorded `mbpp_gemma` rows (same prompt and rule). The Qwen base
   and its final (`qwen35_ce_online_klT2_lr3e-5_rho0_mbpp`, adapter-direct on the raw dir,
   free/R8/R32) are re-measured under `mbpp_chat`; their earlier `mbpp_instruct` rows came
-  from the stock lm_eval task (3-shot, primed fence, first block, 1536 budget), which is a
-  different protocol and must not be mixed into this column.
+  from the stock lm_eval task (3-shot, primed fence, first block, 1536 budget). Paired
+  per item the two protocols agree within noise on Qwen (85-91% item agreement, max
+  paired z 1.7 at R32, `mbpp_stock_pair.py`), so stock rows of the other Qwen records may
+  sit in the same table with their task named; they are not re-run.
 
 ## Fair-budget re-runs (`*_cap16k`, 2026-08-24)
 Records suffixed `_cap16k` are the SAME cell re-measured at 16384 because the
