@@ -2229,11 +2229,11 @@ so its budget is 3,328 and the CSV records it. Qwen3.5 was run twice with its re
 non-thinking recipe (temperature 0.7, top_p 0.8, presence penalty 1.5), once through the fast
 presence-penalty processor and once through vLLM's native one: identical pass/fail on all 120
 items and 118 of 120 token sequences bit-identical, the two divergences at tokens 59 and 5,987.
-At this batch size the native path was a little faster (38 to 59 s against 49 to 69 s per arm);
-the processor's 1.8x was measured at batch 256. The recorded Qwen MBPP rows came from the stock
+At this batch size the native path was a little faster (38 to 59 s against 49 to 69 s per arm),
+and the processor's 1.8x was measured at batch 256. The recorded Qwen MBPP rows came from the stock
 lm_eval task, whose dumps hold neither prompts nor per-item results, so they cannot be audited
-after the fact; the unified producer stores both, and Qwen is re-run under it for the standard
-column. gpt-oss reads its final channel; an item that ends in the analysis or commentary channel
+after the fact. The unified producer stores both, and Qwen is re-run under it for the standard
+column. gpt-oss reads its final channel, and an item that ends in the analysis or commentary channel
 (one of 40 at R4 on the 20B, a tool-call-style heredoc) counts as no answer.
 
 Sub-sample pass@1 (40 problems, 8192 budget unless noted): gemma4 0.875 / 0.825 / 0.875 (free /
