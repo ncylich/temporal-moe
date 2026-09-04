@@ -2334,3 +2334,16 @@ part 1 of the Qwen adaptation record already said about code. No extraction resc
 adapted arm. The Section 7 Qwen MBPP column is now one producer end to end; the baselines'
 MBPP rows (Skliar, ReMoE, the digit and pool ablations) remain stock-task rows and are not
 in this column.
+
+Why the unified numbers differ from the stock ones, item by item (`mbpp_stock_pair.py`). The stock
+dumps keep the raw generations, so re-scoring them with the stock rule reproduces the recorded
+aggregates exactly (0.794 / 0.752 / 0.764 base, 0.764 / 0.776 final) and gives a per-item pass
+to pair. Agreement is 85 to 91% per arm. The rest is resampling under a different prompt: the
+two protocols show the model different tokens (three worked examples and a primed fence against
+the bare task and a one-block instruction), so the same seed draws different programs, and the
+47 to 77 discordant items per arm split nearly evenly (25 against 22 at free, 37 against 37 at
+R8 for the base). Cap-outs explain only 2 to 5 items per arm at 1,536 and 0 to 1 at 8,192. The
+one arm where the split is not even is R32, where the unified protocol reads 2.6 points higher
+for the base (40 against 27, paired z +1.6) and 2.4 higher for the final (32 against 20, z +1.7),
+the same shift on both, so it is a protocol effect at that arm and not an adapter effect. The
+adapter's own deltas agree across protocols: R8 +1.2 stock and +1.8 unified, R32 +1.2 and +1.0.
