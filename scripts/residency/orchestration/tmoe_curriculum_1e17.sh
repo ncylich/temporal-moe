@@ -26,9 +26,9 @@ if [ "$GRAIN" = 3 ]; then ITERS=3861; K=18; E=192; else ITERS=3917; K=6; E=64; f
 pct() { python3 -c "print(round($ITERS*$1))"; }
 dec() { echo "${1/p/.}"; }
 arm_env() {
-  local a=$1 f
+  local a=${1%b} f          # a trailing b names a same-seed replicate of the arm (C0b, SHD0p01b)
   case $a in
-    C0|C0b) echo "TEMPORAL_RESIDENCY_R=$E" ;;                                              # C0b: same-seed replicate of C0 (run-to-run noise floor)
+    C0)    echo "TEMPORAL_RESIDENCY_R=$E" ;;                                              # C0b: same-seed replicate of C0 (run-to-run noise floor)
     SWW*)  f=$(dec ${a#SWW}); echo "TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E LR_DECAY_STYLE=WSD WSD_DECAY_ITERS=$((ITERS - $(pct $f)))" ;;
     SW*)   f=$(dec ${a#SW});  echo "TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E" ;;
     RAMP*) f=$(dec ${a#RAMP}); echo "TEMPORAL_ITER_SCHEDULE=0:$K,$(pct "$f/4"):$((2*K)),$(pct "$f/2"):$((4*K)),$(pct "3*$f/4"):$((8*K)),$(pct $f):E" ;;
