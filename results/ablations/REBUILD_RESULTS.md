@@ -2525,3 +2525,19 @@ such spikes on the coarse grain, which would be a stabilisation result rather th
 gain. A grain-1 control replicate (`cur_g1_1e17_C0b`, running) decides; a replicate of the
 shadow arm follows if the control spikes again. Grain 1 is also 0.032 behind grain 3 on this
 corpus (C0 3.7661 against 3.7342), the fine-grain advantage the paper reports.
+
+**Correction and the grain-1 mechanism** (23:55). The shadow arm did spike, and at the same
+iteration as the control: at 1740 both runs record a gradient norm near 24 (C0 25.0, shadow
+23.8) and a jump in the router's z-loss and load-balancing loss, so the trigger is the batch at
+that point of the shared data order, not either recipe. What differs is the aftermath. The
+control's router z-loss reaches 2.04 and its loss is still 6.96 sixty iterations later and 4.61
+at the fifth-tenth validation; the shadow arm's z-loss peaks at 0.96 and its validation at the
+same point reads 3.89, back on its curve. The control replicate C0b has its own episode at
+800 (gradient norm 5.1, z-loss 0.75, loss 4.28 to 4.85), recovers within a hundred iterations,
+and ends at 3.7421, 0.024 below the first control and 0.012 above the shadow arm. Coarse-grain
+free routing at this learning rate is prone to router blow-ups of varying size; the coherence
+loss toward a shadow resident set, which pulls the raw router logits toward a small consistent
+set, limits how far the router departs and how long it takes to come back. On grain 3 neither
+control spiked and the shadow arms sat at the control, consistent with this reading: the
+coherence loss buys stability where the router is fragile, not BPB where it is not. The shadow
+replicate on grain 1 (`cur_g1_1e17_SHD0p01b`, running) is the second point on that side.
