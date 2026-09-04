@@ -15,3 +15,4 @@ gptoss_20b_mbpp40,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.850000,40,8192,2
 gptoss_20b_mbpp40,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.875000,40,8192,41
 gptoss_120b_mbpp40,128,4,free,,mbpp_chat,"pass@1,channel-aware",0.925000,40,8192,54
 gptoss_120b_mbpp40,128,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.925000,40,8192,30
+gptoss_120b_mbpp40,128,4,R16,16,mbpp_chat,"pass@1,channel-aware",0.975000,40,8192,56

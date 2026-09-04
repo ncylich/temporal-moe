@@ -1,0 +1,16 @@
+# Section 6 MBPP dumps (task mbpp_chat, 500 problems) re-scored offline from stored raw generations (analysis/residency/mbpp_rescore.py). whole_block = the scored rule (last fenced block executed verbatim); def_block = the last fenced block that defines a function (rescues answers followed by a second block holding only the prompt's asserts); function_only = def_block with the model's if __name__ self-test scaffold and trailing asserts dropped; stored = recorded pass@1; rescued_* = fail-to-pass counts vs whole_block. Diagnostic, not a correction: the scored rule stays whole_block. 2026-09-04
+record_arm,n,whole_block,stored,def_block,function_only,rescued_def,rescued_fn
+olmoe_instruct_mbpp_free,500,0.2640,0.2640,0.2780,0.2820,7,9
+olmoe_instruct_mbpp_R8,500,0.1740,0.1740,0.1960,0.2140,11,20
+lfm25_instruct_mbpp_free,500,0.7040,0.7040,0.7040,0.7060,0,1
+lfm25_instruct_mbpp_R4,500,0.6040,0.6040,0.6040,0.6180,0,8
+qwen35_instruct_mbpp_free,500,0.8000,0.8000,0.8000,0.8000,0,0
+qwen35_instruct_mbpp_R8,500,0.7520,0.7520,0.7520,0.7560,0,2
+qwen35_instruct_mbpp_R32,500,0.7900,0.7900,0.7900,0.7920,0,1
+gptoss_20b_mbpp_free,500,0.9000,0.9000,0.9140,0.9160,7,8
+gptoss_20b_mbpp_R4,500,0.8860,0.8860,0.9000,0.9000,7,7
+gptoss_120b_mbpp_free,500,0.9140,0.9140,0.9400,0.9420,13,14
+gptoss_120b_mbpp_R4,500,0.8860,0.8860,0.9200,0.9280,17,21
+gptoss_120b_mbpp_R16,500,0.9140,0.9140,0.9400,0.9420,13,14
+lfm25_instruct_mbpp_cap16k_free,500,0.7220,0.7220,0.7220,0.7240,0,1
+lfm25_instruct_mbpp_cap16k_R4,500,0.6140,0.6140,0.6140,0.6280,0,8

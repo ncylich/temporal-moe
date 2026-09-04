@@ -33,6 +33,29 @@ conclusions and cites no results.
   `humaneval_gemma.py` (1536 off / 3072 on), `humaneval_gptoss.py` (2048 low-med /
   4096 high), `humaneval_think.py` (4096), `mmlu_gptoss.py` (relaxed extraction).
 
+## MBPP standard surface (`mbpp_chat`, 2026-09-04)
+- Task `mbpp_chat`, producer `analysis/residency/mbpp_chat.py`, records suffixed
+  `_mbpp` (`olmoe_instruct_mbpp`, `lfm25_instruct_mbpp`, `qwen35_instruct_mbpp`,
+  `gptoss_20b_mbpp`, `gptoss_120b_mbpp`). All 500 MBPP test problems (`limit` = full).
+- Prompt: task text plus the three asserts, one fenced Python block requested; the
+  LAST fenced block is executed whole (self-test scaffolds included, same rule as
+  the recorded gemma `mbpp_gemma` cells). Thinking stripped per family before the
+  fence search; an unclosed thinking span or a cap-out with no fence scores 0.
+- Sampling: shipped generation_config, seed 1234, budget 8192 (OLMoE 3328 in its
+  4096 window; the CSV `max_gen_toks` column records it). Qwen3.5 runs its card
+  non-thinking recipe (0.7 / top_p 0.8 / presence 1.5) through the fast
+  presence-penalty processor (`TEMPORAL_FAST_PP=1`, verified equal to native on
+  the sub-sample). LFM2.5 has no thinking toggle: it always thinks in-band.
+- Per-item dumps `genbench_samples/<record>_<arm>_mbpp_chat.json` hold prompt ids,
+  raw generation, executed code, pass, thinking tokens, cap and unfinished flags.
+  The `*_mbpp40_*` dumps and `mbpp_subsample.csv` are producer validation only.
+- Noise floor at n=500: binomial SE per arm 1.5 to 2.2 points.
+- `lfm25_instruct_mbpp_cap16k` free/R4 is the fair-budget twin of `lfm25_instruct_mbpp`
+  (11% / 13% at cap at 8192) and supersedes it for citation; 8.6% / 10.2% of its items
+  still end in an unclosed thinking span at 16384 (`tmoe_mbpp_cap16k.sh`).
+- gemma4 and Qwen3.5 adapted finals keep their recorded MBPP rows (`mbpp_gemma`,
+  `mbpp_instruct`); the Qwen base is re-measured under `mbpp_chat` for auditability.
+
 ## Fair-budget re-runs (`*_cap16k`, 2026-08-24)
 Records suffixed `_cap16k` are the SAME cell re-measured at 16384 because the
 original was budget-limited (≥5% of items finishing at the cap). They SUPERSEDE

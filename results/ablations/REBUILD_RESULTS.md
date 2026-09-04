@@ -2241,3 +2241,65 @@ R8 / R16, new producer, agreeing with the recorded run on pass/fail for every sh
 item), LFM2.5 0.775 / 0.650 (free / R4), OLMoE 0.275 / 0.150 (free / R8, 3,328 budget), Qwen3.5
 0.875 / 0.800 / 0.775 (free / R8 / R32), gpt-oss-20B 0.850 / 0.875 (free / R4). Records in
 `mbpp_subsample.csv`, dumps in `genbench_samples/*_mbpp40_*`.
+
+## MBPP as a standard surface, part 2: the 500-problem column and the reviewer verdicts (2026-09-04 03:40)
+
+**Every Section 6 base model now has an MBPP row at free and at its residency cells under the
+one producer, 500 problems each, with per-item dumps that hold the prompt ids, the raw
+generation and the executed code. Two reviewer passes read the sub-samples before the runs
+went out; nothing they found changed the scored rule, and each finding is quantified below.**
+
+pass@1 on the 500 MBPP test problems, budget 8192 unless noted (`instruct_genbench_vllm.csv`,
+task `mbpp_chat`; gemma4 from its recorded `mbpp_gemma` rows at the same budget):
+
+| model | free | R = k | R = 2k or 4k | at cap (free / constrained) |
+|---|---|---|---|---|
+| OLMoE-1B-7B (R8, budget 3,328) | 0.264 | 0.174 | | 0 / 0 |
+| LFM2.5-8B-A1B (R4) | 0.704 | 0.604 | | 55 / 66 |
+| LFM2.5-8B-A1B (R4), budget 16,384 | 0.722 | 0.614 | | 43 / 51 |
+| gemma4-26B (R8, R16, recorded) | 0.910 | 0.770 | 0.890 | |
+| Qwen3.5-35B-A3B (R8, R32) | 0.800 | 0.752 | 0.790 | 4 / 7, 4 |
+| gpt-oss-20B (R4) | 0.900 | 0.886 | | 20 / 18 |
+| gpt-oss-120B (R4, R16) | 0.914 | 0.886 | 0.914 | 5 / 7, 7 |
+
+Binomial SE per arm is 1.5 to 2.2 points at n=500. Qwen's new rows agree with its recorded
+stock lm_eval rows (0.794 / 0.752 / 0.764 at a 1,536 budget) within that, and its dumps are now
+auditable. The LFM pair at 16,384 is the fair-budget re-measurement the data contract requires
+once 5% of items finish at the cap (11% and 13% did at 8,192). Doubling the budget rescued 12
+and 15 items and moved the numbers by 1.8 and 1.0 points, but 8.6% and 10.2% of items still
+end inside an unclosed thinking span at 16,384: LFM2.5's in-band deliberation has a runaway
+tail that a budget does not close, so its MBPP is budget-limited by construction and the
+16k rows are the ones to cite, with that residual stated. R4 costs LFM 10 points and half of
+that gap is cap-outs (66 against 55, then 51 against 43), the rest wrong code.
+
+The reviewer verdicts (three Sonnet passes over the sub-sample renders, every item read).
+Coherent generations on every model and arm, no repetition loops, no thinking text in any
+executed block, templates well formed and single-turn, header counts matching the items.
+Three findings, all about extraction and all left as they are because the rule is the one
+the recorded gemma rows used and the user's call was to keep it. First, gpt-oss often answers
+correctly and then appends a second fenced block that holds only the prompt's asserts as a
+demonstration, and the last-block rule executes that block (2% of the sub-sample, 4 of 200).
+Second, OLMoE sometimes puts its function in the first block and an asserts- or prints-only
+block last. Third, a malformed self-test scaffold (the gemma failure mode) also appears in LFM
+at R4 and in OLMoE. `mbpp_extraction_rescore.csv` re-scores every 500-problem dump offline under
+the scored rule, a def-block rule (last block that defines a function) and function-only.
+The def-block rescue is 7 items on gpt-oss-20B per arm, 13 / 17 / 13 on gpt-oss-120B (free /
+R4 / R16), 7 / 11 on OLMoE (free / R8) and 0 on LFM and Qwen; function-only adds 8 on LFM at
+R4 and 9 more on OLMoE at R8, and at most 1 on every free arm of LFM and Qwen. No rule turns a
+passing item into a failing one except one LFM R4 item under function-only. So gpt-oss's numbers
+carry a 1.4 to 3.4 point tax from its own demonstration habit, uniform across its arms, and the
+residency gaps on OLMoE and LFM are partly scaffold breakage of the gemma kind (about 2 and 1
+points of the 9 and 10 point gaps at R = k under function-only).
+
+Two things the reviewers raised that are not defects. OLMoE's prompts open with a token that
+decodes as `|||IP_ADDRESS|||`: that is id 50279, which the shipped tokenizer config names both
+BOS and EOS, and the chat template prepends it. Qwen's `unfinished` flag did not fire on two
+runaway generations that closed before the cap; the flag marks unclosed thinking and cap-outs,
+and a model that stops on its own with no code is a wrong answer, which is how it scored.
+One Qwen R8 item emitted a stray `</think>` mid-generation in non-thinking mode; it failed.
+
+What went out as records. Fourteen new rows, dumps for each, `mbpp_extraction_rescore.csv`, and
+the two drivers (`tmoe_mbpp_full.sh`, `tmoe_mbpp_cap16k.sh`). gemma4 and the Qwen adapted
+finals keep their recorded MBPP rows. For the paper: an MBPP column in the Section 6 table
+from these rows (LFM from the 16k pair with its cap residual, OLMoE at its 3,328 budget), the
+LFM thinking-always caveat, and for Section 7 the gemma base R8 number with the scaffold note.

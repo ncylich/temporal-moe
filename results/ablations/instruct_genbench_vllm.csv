@@ -3022,3 +3022,17 @@ gemma4_skliar_C16_lam0p6_n1319,128,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexib
 qwen35_skliar_C32_lam0p6_n1319,256,8,R8,8,gsm8k_cot_zeroshot,sample_len,1319.000000,full,2048,472
 qwen35_skliar_C32_lam0p6_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,strict-match",0.001516,full,2048,472
 qwen35_skliar_C32_lam0p6_n1319,256,8,R8,8,gsm8k_cot_zeroshot,"exact_match,flexible-extract",0.756634,full,2048,472
+olmoe_instruct_mbpp,64,8,free,,mbpp_chat,"pass@1,channel-aware",0.264000,full,3328,20
+olmoe_instruct_mbpp,64,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.174000,full,3328,19
+lfm25_instruct_mbpp,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.704000,full,8192,84
+lfm25_instruct_mbpp,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.604000,full,8192,90
+qwen35_instruct_mbpp,256,8,free,,mbpp_chat,"pass@1,channel-aware",0.800000,full,8192,150
+qwen35_instruct_mbpp,256,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.752000,full,8192,147
+qwen35_instruct_mbpp,256,8,R32,32,mbpp_chat,"pass@1,channel-aware",0.790000,full,8192,145
+gptoss_20b_mbpp,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.900000,full,8192,83
+gptoss_20b_mbpp,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.886000,full,8192,89
+gptoss_120b_mbpp,128,4,free,,mbpp_chat,"pass@1,channel-aware",0.914000,full,8192,144
+gptoss_120b_mbpp,128,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.886000,full,8192,155
+gptoss_120b_mbpp,128,4,R16,16,mbpp_chat,"pass@1,channel-aware",0.914000,full,8192,156
+lfm25_instruct_mbpp_cap16k,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.722000,full,16384,155
+lfm25_instruct_mbpp_cap16k,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.614000,full,16384,165
