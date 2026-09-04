@@ -2460,3 +2460,14 @@ already runs. The single-pass online-softmax kernel that reads bf16 logits once 
 gradient in place is what the profile asks for; Transformer Engine 2.16 ships it, this Megatron
 wires it as `cross_entropy_fusion_impl = te` but had no parser flag, added as
 `--cross-entropy-fusion-impl te` (`megatron_ce_impl_arg.patch`). Its benchmark follows.
+
+**The fix that worked** (20:35). Transformer Engine's single-pass cross-entropy
+(`--cross-entropy-fusion-impl te`): 0.95 s per iteration at micro-batch 64 and 0.85 s at 128,
+against 1.15 s before, with peak memory 39 and 77 GB against 90, and the iteration-20 training
+loss identical to C0's at micro-batch 64 (1.002035E+01) and equal to 2e-6 at 128. Micro-batch 256
+does not fit, since the output layer's bf16 logits alone are 49 GB there. Every curriculum driver
+now runs TE cross-entropy at micro-batch 128 (1e18: micro-batch 64, to be confirmed on its first
+run). The remaining stages, the C0 replicate on grain 3 and the grain-1 transfer, run under this
+configuration; the replicate therefore also checks the new configuration end to end against C0.
+Two other candidates from the profile are untouched: the MoE permute index passes (12.5%) and
+the head GEMMs; the residency scan stays as it is at 2%.
