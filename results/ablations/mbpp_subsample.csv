@@ -1,0 +1,16 @@
+gemma4_instruct_mbpp40,128,8,free,,mbpp_chat,"pass@1,channel-aware",0.875000,40,8192,50
+gemma4_instruct_mbpp40,128,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.825000,40,8192,44
+gemma4_instruct_mbpp40,128,8,R16,16,mbpp_chat,"pass@1,channel-aware",0.875000,40,8192,35
+lfm25_instruct_mbpp40,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.775000,40,8192,42
+lfm25_instruct_mbpp40,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.650000,40,8192,45
+olmoe_instruct_mbpp40,64,8,free,,mbpp_chat,"pass@1,channel-aware",0.275000,40,3328,7
+olmoe_instruct_mbpp40,64,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.150000,40,3328,4
+qwen35_instruct_mbpp40_fastpp,256,8,free,,mbpp_chat,"pass@1,channel-aware",0.875000,40,8192,49
+qwen35_instruct_mbpp40_fastpp,256,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.800000,40,8192,64
+qwen35_instruct_mbpp40_fastpp,256,8,R32,32,mbpp_chat,"pass@1,channel-aware",0.775000,40,8192,69
+qwen35_instruct_mbpp40_nativepp,256,8,free,,mbpp_chat,"pass@1,channel-aware",0.875000,40,8192,38
+qwen35_instruct_mbpp40_nativepp,256,8,R8,8,mbpp_chat,"pass@1,channel-aware",0.800000,40,8192,53
+qwen35_instruct_mbpp40_nativepp,256,8,R32,32,mbpp_chat,"pass@1,channel-aware",0.775000,40,8192,59
+gptoss_20b_mbpp40,32,4,free,,mbpp_chat,"pass@1,channel-aware",0.850000,40,8192,24
+gptoss_20b_mbpp40,32,4,R4,4,mbpp_chat,"pass@1,channel-aware",0.875000,40,8192,41
+gptoss_120b_mbpp40,128,4,free,,mbpp_chat,"pass@1,channel-aware",0.925000,40,8192,54

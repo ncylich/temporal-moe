@@ -2198,3 +2198,46 @@ that depends most on free routing. Data `impose_dose_1e19.csv`, figure
 `figures/impose_dose_1e19.png`, driver `tmoe_impose_dose_1e19.sh`, producer
 `impose_dose_csv.py`. The producer had to learn to skip the self-test repeat rows in
 `sweep_eval.csv`, whose tag suffix broke the integer parse on the first run.
+
+## MBPP as a standard surface, part 1: the producer, the sub-samples, and a failure mode (2026-09-04 03:00)
+
+**One MBPP producer now serves every released model (`mbpp_chat.py`: the MBPP prompt with the
+asserts, the model's shipped sampling recipe, thinking stripped per family, the last fenced
+block executed against the asserts), validated on 40-problem sub-samples of all six Section 6
+models with a reviewer reading prompts, raw generations and executed code. Two findings
+changed what gets recorded, one did not change the rule.**
+
+The failure mode. On the recorded gemma4 runs the reviewer noticed that at R8 the base model
+often appends its own self-test (`if __name__ == "__main__": assert ...`) after a correct
+function and mistypes it (`"__main__'`, `if if __name__`, `____name__`), and since the whole
+block is executed the item fails. Re-scoring every recorded gemma dump offline from the stored
+raw text with the scaffold and trailing asserts dropped (`mbpp_gemma_rescore.csv`) rescues 29 of
+500 items for the base model at R8 (0.770 to 0.828), 0 at free and 2 at R16, and 8 to 29 items
+on every other unadapted or lightly adapted R8 record, but at most 4 on the adapted finals (the
+think-off final 0.822 to 0.820, the think-on final 0.862 to 0.864). The adapted models write
+well-formed scaffolds. The rule stays as recorded: a model that breaks its own boilerplate under
+the constraint is showing real damage, and the re-score is kept as the record of how much of
+the base model's R8 loss is of that kind. HumanEval is untouched, no gemma HumanEval generation
+carries a scaffold.
+
+The other findings. LFM2.5's chat template has no thinking switch, so the `--think off` every
+recorded LFM row passed was inert: LFM2.5 has always run with in-band thinking, a median of 719
+thinking tokens on this sample (1,029 at R4), and its capped items are deliberations that never
+closed rather than repetition loops (compressibility normal, text coherent). Its shipped
+repetition_penalty 1.05 was never applied by the harness either. OLMoE's window is 4,096 tokens,
+so its budget is 3,328 and the CSV records it. Qwen3.5 was run twice with its recorded
+non-thinking recipe (temperature 0.7, top_p 0.8, presence penalty 1.5), once through the fast
+presence-penalty processor and once through vLLM's native one: identical pass/fail on all 120
+items and 118 of 120 token sequences bit-identical, the two divergences at tokens 59 and 5,987.
+At this batch size the native path was a little faster (38 to 59 s against 49 to 69 s per arm);
+the processor's 1.8x was measured at batch 256. The recorded Qwen MBPP rows came from the stock
+lm_eval task, whose dumps hold neither prompts nor per-item results, so they cannot be audited
+after the fact; the unified producer stores both, and Qwen is re-run under it for the standard
+column. gpt-oss reads its final channel; an item that ends in the analysis or commentary channel
+(one of 40 at R4 on the 20B, a tool-call-style heredoc) counts as no answer.
+
+Sub-sample pass@1 (40 problems, 8192 budget unless noted): gemma4 0.875 / 0.825 / 0.875 (free /
+R8 / R16, new producer, agreeing with the recorded run on pass/fail for every shared free-arm
+item), LFM2.5 0.775 / 0.650 (free / R4), OLMoE 0.275 / 0.150 (free / R8, 3,328 budget), Qwen3.5
+0.875 / 0.800 / 0.775 (free / R8 / R32), gpt-oss-20B 0.850 / 0.875 (free / R4). Records in
+`mbpp_subsample.csv`, dumps in `genbench_samples/*_mbpp40_*`.
