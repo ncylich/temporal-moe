@@ -9,7 +9,7 @@ set -uo pipefail; cd "$(dirname "$0")/../../.."
 ARM=${ARM:?set ARM}; ITERS=4278; K=18; E=192
 export TOKENIZER_MODEL=EleutherAI/pythia-12b DATA_DIR=/root/data/dclm_tokenized
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CE_FUSION=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=${TMOE_PRIO:-5}
-export EXTRA_ARGS="--no-rope-fusion --moe-use-legacy-grouped-gemm --save-interval 200"
+export EXTRA_ARGS="--no-rope-fusion --moe-use-legacy-grouped-gemm --save-interval 200 --cross-entropy-fusion-impl te"
 export HF_TOKEN=$(cat /root/.cache/huggingface/token)
 pct() { python3 -c "print(round($ITERS*$1))"; }
 dec() { echo "${1/p/.}"; }

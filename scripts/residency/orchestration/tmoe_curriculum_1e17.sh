@@ -18,10 +18,10 @@ set -uo pipefail; cd "$(dirname "$0")/../../.."
 . scripts/env.sh
 export TOKENIZER_MODEL=EleutherAI/pythia-12b DATA_DIR=/root/data/dclm_tokenized
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CE_FUSION=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=${TMOE_PRIO:-5}
-export EXTRA_ARGS="--no-rope-fusion --moe-use-legacy-grouped-gemm"
+export EXTRA_ARGS="--no-rope-fusion --moe-use-legacy-grouped-gemm --cross-entropy-fusion-impl te"   # TE single-pass CE: 1.15 -> 0.85 s/it with mb 128, loss identical
 export HF_TOKEN=$(cat /root/.cache/huggingface/token)
 export MOE_TORCH_GMM=1 MOE_PERMUTE_FUSION=1 MOE_NO_LAYER_LOG=1 TEMPORAL_EVICT=min_logit   # the recorded temporal cells evict by min logit
-export GRAIN=${GRAIN:-3} SHAPE=s2 TARGET_FLOPS=1e17 GLOBAL_BATCH=256 MICRO_BATCH=64 SEED=1234 TEMPORAL=1
+export GRAIN=${GRAIN:-3} SHAPE=s2 TARGET_FLOPS=1e17 GLOBAL_BATCH=256 MICRO_BATCH=${MICRO_BATCH:-128} SEED=1234 TEMPORAL=1
 if [ "$GRAIN" = 3 ]; then ITERS=3861; K=18; E=192; else ITERS=3917; K=6; E=64; fi
 pct() { python3 -c "print(round($ITERS*$1))"; }
 dec() { echo "${1/p/.}"; }

@@ -8,7 +8,7 @@ set -uo pipefail; cd "$(dirname "$0")/../../.."
 . scripts/env.sh
 ARM=${ARM:?set ARM}; ITERS=2121; K=18; E=192
 export CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=${TMOE_PRIO:-5} HF_TOKEN=$(cat /root/.cache/huggingface/token)
-export MOE_TORCH_GMM=1 MOE_NO_LAYER_LOG=1 EXTRA_ARGS="--moe-permute-fusion --no-rope-fusion --moe-use-legacy-grouped-gemm"
+export MOE_TORCH_GMM=1 MOE_NO_LAYER_LOG=1 EXTRA_ARGS="--moe-permute-fusion --no-rope-fusion --moe-use-legacy-grouped-gemm --cross-entropy-loss-fusion --cross-entropy-fusion-impl te"
 pct() { python3 -c "print(round($ITERS*$1))"; }
 dec() { echo "${1/p/.}"; }
 case $ARM in
@@ -25,7 +25,7 @@ NAME=cur_flame38m_g3_$ARM
 FINAL=results/phase0/runs/$NAME/ckpt/iter_$(printf %07d $ITERS)
 [ -d "$FINAL" ] && { echo "[skip] $NAME done"; exit 0; }
 echo "### curriculum1e18 $NAME [$ENV] START $(date -u +%H:%M)"
-env $ENV GRAIN=3 MICRO_BATCH=32 TEMPORAL_EVICT=min_logit RUN_NAME=$NAME RDZV_PORT=29640 \
+env $ENV GRAIN=3 MICRO_BATCH=${MICRO_BATCH:-64} TEMPORAL_EVICT=min_logit RUN_NAME=$NAME RDZV_PORT=29640 \
   scripts/residency/gpu_lease.sh bash experiments/scale_1e18_1e19/flame38m_run.sh > /workspace/rerun-logs/cur_$NAME.out 2>&1
 echo "### curriculum1e18 $NAME rc=$? $(date -u +%H:%M)"
 grep "on test set" results/phase0/runs/$NAME/train.log 2>/dev/null | tail -1 | cut -c1-160
