@@ -2511,3 +2511,17 @@ do not expect.
 the all-gather dispatcher in place of all-to-all at 1.021 s, both with the same loss. The fused
 all-to-all path in use is the fastest of the three; the profile's remaining time is the model's
 own GEMMs and attention, which are the compute, so 0.85 s is where this shape stops.
+
+**Grain-1 transfer** (23:05). Control `cur_g1_1e17_C0` 3.7661, shadow arm `cur_g1_1e17_SHD0p01`
+3.7297: a 0.036 gap in the shadow arm's favour, where the same recipe was a null on grain 3. The
+control's trace explains most of it: at iterations 1740 to 1750 its train loss jumps from 3.92
+to 8.36 with no change in the recipe (free routing, lr near 1.9e-3 at that point of the cosine),
+its validation at the fifth tenth reads 4.61 against the shadow arm's 3.89, and it recovers but
+ends 0.036 behind. The shadow arm shows no spike; before the episode the two are within 0.014
+of each other (the shadow arm slightly ahead from the third tenth). So either the control
+suffered a one-off instability of free MoE training at this learning rate, in which case the
+shadow arm is again at the control, or the coherence loss damps the router enough to prevent
+such spikes on the coarse grain, which would be a stabilisation result rather than a BPB
+gain. A grain-1 control replicate (`cur_g1_1e17_C0b`, running) decides; a replicate of the
+shadow arm follows if the control spikes again. Grain 1 is also 0.032 behind grain 3 on this
+corpus (C0 3.7661 against 3.7342), the fine-grain advantage the paper reports.
