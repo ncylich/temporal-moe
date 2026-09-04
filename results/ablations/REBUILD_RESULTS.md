@@ -2395,3 +2395,13 @@ lose more, so it was dropped from round 1 after three minutes and replaced by a 
 (SW0p25), which minimises the constrained phase while keeping the question alive; the ramp,
 heterogeneous-batch and shadow-constraint arms follow as planned. Records in
 `curriculum_1e17.csv`.
+
+**SW0p25** (12:05 addendum) ends at 3.8036, 0.069 behind C0, worse than the half switch. The
+cause is on the train-loss trace: at the quarter switch (iteration 965, learning rate 1.76e-3)
+the loss blew up from 4.19 to 9.86 and took 300 iterations to return to its pre-switch level,
+whereas the half switch at a lower learning rate spiked only to 4.37. A hard unmask is therefore
+a learning-rate-gated instability, not a fixed-size shock, and the earlier the switch the worse it
+is. The ramp arm confirms the mechanism from the other side: its four doublings of R cost at most
+0.03 transiently with no spike, and it tracks C0 at a steady 0.02 CE through three quarters of
+training (3.819 against 3.799 at the seventh tenth), the constrained-phase deficit rather than any
+recovery cost.
