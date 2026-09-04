@@ -2347,3 +2347,33 @@ one arm where the split is not even is R32, where the unified protocol reads 2.6
 for the base (40 against 27, paired z +1.6) and 2.4 higher for the final (32 against 20, z +1.7),
 the same shift on both, so it is a protocol effect at that arm and not an adapter effect. The
 adapter's own deltas agree across protocols: R8 +1.2 stock and +1.8 unified, R32 +1.2 and +1.0.
+
+## MBPP as a standard surface, part 4: every Qwen record under the one producer (2026-09-04 08:10)
+
+**All fourteen Qwen records that had a stock-task MBPP row now have unified rows, and the pairing
+shows why that was necessary: the stock protocol reads a median 1.4 points low on non-thinking
+records and 6 points low with thinking on.** Records `*_mbpp` in `instruct_genbench_vllm.csv`,
+dumps per arm, adapters applied on the raw model directory (the digit and rebuild stock rows had
+been measured on merged text-class directories, the confound retired on 2026-08-29).
+
+The pairing (`mbpp_stock_vs_unified.csv`, 35 record-arms, stock dumps re-scored to their recorded
+aggregates and matched per item). Non-thinking records: item agreement 86 to 91%, median shift
++1.4 points, range -1.6 to +4.6, five of 29 arms beyond two standard errors and all of those
+upward (the merged-directory records and Skliar C128 at lambda 0.4 carry the largest shifts).
+The two protocols are therefore not interchangeable at the column level even though the base
+model's three arms agreed within noise: the offset is small per cell but one-signed. Thinking
+records: agreement 79 to 85%, shifts of +5.4 to +9.2 points on all six arms, z above 2.6
+everywhere, because the stock task's primed fence made the model answer without thinking. The
+unified rows are the ones to cite, for every record.
+
+The column itself (500 problems, 8192 budget, R8 unless stated; base 0.800 / 0.752 / 0.790 at
+free / R8 / R32): rebuild 0.802 / 0.778 / 0.792, digit10 0.808 / 0.776 / 0.804, digit3 0.806 /
+0.788 / 0.792, klT2 lr3e-5 0.792 / 0.770 / 0.800, klT2 mix R8 0.782 R32 0.804, mix39 0.784 /
+0.800, mix-continued 0.760 / 0.772, full-pool half 0.776 / 0.784, full-pool full 0.798 / 0.790 /
+0.808, ReMoE lr1e-4 free 0.804, Skliar C128 lambda 0 R8 0.810 and lambda 0.4 0.832, Skliar C8
+lambda 0.4 R8 0.760; thinking on, base 0.868 / 0.804 / 0.858 and the think adapter 0.872 / 0.824
+/ 0.838. On MBPP the adapters move the R8 arm by +1.8 to +3.6 points against the base's 0.752,
+inside two standard errors each, consistent with the stock-era reading that the code surface is
+where adaptation buys least. Extraction rescue is zero on every non-thinking arm and 4 to 14
+items on the thinking arms at R8 and R32 (the asserts-only trailing block again), recorded in
+`mbpp_extraction_rescore.csv`, scored rule unchanged.
