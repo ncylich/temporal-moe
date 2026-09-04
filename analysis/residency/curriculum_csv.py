@@ -49,6 +49,12 @@ def main():
         if not tests:
             print(f"[running] {run}: {len(vals)} evals so far"); continue
         ce = float(tests[-1])
+        # HET arms before the eval fix: their train.log evals are constrained; the unconstrained
+        # re-score of the final checkpoint lives in sweep_eval.csv (tag cross, R = E)
+        if run.split("_", 3)[3].startswith("HET"):
+            sw = [r for r in csv.DictReader(open(os.path.join(ABLATIONS, "sweep_eval.csv"))) if r["run"] == run and r["tag"] == "cross"]
+            if sw:
+                ce = float(sw[-1]["lm_loss"])
         ref = c0.get(grain)
         tenths = [vals[i] for i in sorted(vals)]
         rows.append([run, run.split("_", 3)[3], grain, f"cur_{grain}_1e17_C0" if ref else "", f"{ce:.6f}", f"{ce / DIV:.4f}",
