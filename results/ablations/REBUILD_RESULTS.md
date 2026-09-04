@@ -2171,3 +2171,30 @@ populations, with a larger gap under the one the sentence describes. For the fin
 routed-only figures are 0.22 against 0.14 (p99 0.89 against 0.66) and the all-rows figures 0.17
 against 0.10 (p99 0.82 against 0.59), so either convention can be carried through, but the
 sentence and the numbers should agree.
+
+## Imposition dose curve at 1e19: a full MoE needs seven to nine times the resident memory (2026-09-04 02:04)
+
+**Rolling residency imposed on a trained full MoE at R = k costs +0.43 BPB (coarse) and +0.59
+(fine), and the cost only falls below the temporal model's quality at R = k when the resident
+budget reaches about 7k for the coarse pair and 9k for the fine pair.** Appendix B had the R = k
+point; this is the curve behind it, and it turns the impose-versus-unmask asymmetry into a
+serving statement: to serve a full MoE at the quality the temporal model delivers with k resident
+experts per layer, keep seven to nine times as many experts resident.
+
+| resident experts R | coarse full MoE, 6 of 64 | fine full MoE, 18 of 192 |
+|---|---|---|
+| k | 1.4823 | 1.6549 |
+| 2k | 1.2545 | 1.3681 |
+| 4k | 1.1126 | 1.1471 |
+| 8k | 1.0564 | 1.0672 |
+| E (unconstrained) | 1.0511 | 1.0604 |
+| temporal model trained at R = k | 1.0678 | 1.0652 |
+
+Test BPB on the full 20-iteration test split, replay self-test exact for both models. The
+coarse full MoE first beats its temporal counterpart at R = 48 (crossing near R = 42 by linear
+interpolation in log R), the fine full MoE only at R = E = 192 (crossing near R = 157), so the
+fine-grained full MoE, the one that wins on unconstrained BPB at this budget, is also the one
+that depends most on free routing. Data `impose_dose_1e19.csv`, figure
+`figures/impose_dose_1e19.png`, driver `tmoe_impose_dose_1e19.sh`, producer
+`impose_dose_csv.py`. The producer had to learn to skip the self-test repeat rows in
+`sweep_eval.csv`, whose tag suffix broke the integer parse on the first run.
