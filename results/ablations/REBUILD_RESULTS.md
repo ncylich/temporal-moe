@@ -2434,3 +2434,29 @@ and started round 2 (SAND, SHD0p003, SHD0p03); the grain-1 transfer and the C0 r
 Round 1 verdict: every arm that constrains routing during training loses, in proportion to how
 long and how abruptly it constrains (ramp 0.015, half switch 0.035, heterogeneous 0.048, quarter
 switch 0.069); the soft constraint is free but has not shown a gain.
+
+## Where a 1e17 step goes: the profile (2026-09-04 20:30)
+
+The s2 grain-3 runs sit at 1.15 s per iteration, about 2% of the H100's bf16 peak, and a
+kernel profile of two iterations (torch profiler, `analysis/residency/profile_summary.py`) says
+why. GPU busy is 88%, so the CPU is not the limit. Of 2,134 ms of kernel time: the fused
+cross-entropy over the 50k vocabulary is 620 ms (29%), five torch.compile passes over the
+131k x 50k fp32 logits per micro-batch (row max, exp-sum, gather and one-hot subtraction,
+normalisation, gradient scaling), all memory-bound; GEMMs 605 ms (28%, the head's 50k x 256
+GEMMs among the largest); MoE dispatch 267 ms (12.5%, the permute index passes and unpermute);
+attention 230 ms (11%, cuDNN flash kernels, already fused, backward three times the forward);
+norms and elementwise 193 ms (9%); the residency scan itself 45 ms (2%). Peak memory, 90 GB,
+is the same head: fp32 logits are 26 GB per micro-batch before copies and gradients.
+
+What was tried against it. A chunked fused head-plus-loss (`temporal/chunked_ce.py`,
+MOE_CHUNKED_CE=1) matches the reference loss to 1e-5 through iteration 20 and cuts peak memory
+to 33 GB, but runs at 1.43 s: it recomputes the head in the backward and its per-chunk fp32
+passes are the same memory-bound work. A forward-gradient variant (MOE_CHUNKED_CE=2, Liger's
+trick, exact for a uniform loss mask) is 1.30 s. Larger micro-batches, which the chunked loss
+makes possible (128 and 256 fit at 58 and 107 GB; the plain loss fails to allocate 49 GB at
+128), change nothing: 1.33 and 1.26 s. The step is per-token work, not per-step overhead.
+Forcing the attention backend crashes at start and would not help, since cuDNN flash is what
+already runs. The single-pass online-softmax kernel that reads bf16 logits once and writes the
+gradient in place is what the profile asks for; Transformer Engine 2.16 ships it, this Megatron
+wires it as `cross_entropy_fusion_impl = te` but had no parser flag, added as
+`--cross-entropy-fusion-impl te` (`megatron_ce_impl_arg.patch`). Its benchmark follows.
