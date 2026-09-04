@@ -2159,8 +2159,15 @@ never fired. The first regeneration of `stability_fakequant.csv` corrupted the t
 baselines: July's constraint-swap evaluations reused that log name and overwrote them before
 mirroring (they read 4.41 and 3.79, the imposed and unmasked values). The committed rows are the
 only record of those baselines, the file was restored from git, and the converter now upserts
-only the cells it is given. One flag for the paper: its 1e18 weight-kurtosis medians (0.42 against 0.14 coarse,
-0.62 against 0.24 fine, p99 2.79 to 0.77) do not equal a plain median over the routed rows of
-`stability_weights.csv` (0.52 against 0.15, 0.82 against 0.32, p99 1.46 to 0.45). The direction
-and the "every pair" claim hold under either aggregation, but the aggregation behind the printed
-numbers should be identified before the fine 1e19 pair is added to that sentence.
+only the cells it is given. One correction for the paper, resolved the next morning: its 1e18 weight-kurtosis
+figures (medians 0.42 against 0.14 coarse, 0.62 against 0.24 fine, fine p99 2.79 to 0.77) are
+medians and percentiles over every row of `stability_weights.csv` for the run, which includes
+the shared expert, the dense FFN and the 512 or 1,536 per-expert router rows, not over "the
+routed-expert weight matrices" as the sentence says (the table in
+`docs/research/mechanism/01-findings.md` line 146 carries the same numbers). Restricted to the
+routed matrices the figures are 0.52 against 0.15 and 0.82 against 0.32 at the median and 3.15
+against 0.80 at the fine p99. The direction and the "every pair" claim hold under both
+populations, with a larger gap under the one the sentence describes. For the fine 1e19 pair the
+routed-only figures are 0.22 against 0.14 (p99 0.89 against 0.66) and the all-rows figures 0.17
+against 0.10 (p99 0.82 against 0.59), so either convention can be carried through, but the
+sentence and the numbers should agree.
