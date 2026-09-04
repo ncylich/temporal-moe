@@ -1,5 +1,5 @@
 diff --git a/megatron/core/models/gpt/gpt_model.py b/megatron/core/models/gpt/gpt_model.py
-index ad08d20c..298129ee 100644
+index ad08d20c..d72d7a84 100644
 --- a/megatron/core/models/gpt/gpt_model.py
 +++ b/megatron/core/models/gpt/gpt_model.py
 @@ -8,6 +8,7 @@ import torch
@@ -16,7 +16,7 @@ index ad08d20c..298129ee 100644
              output_weight = self.shared_embedding_or_output_weight()
 +        if (
 +            labels is not None
-+            and os.environ.get("MOE_CHUNKED_CE") == "1"
++            and os.environ.get("MOE_CHUNKED_CE") in ("1", "2")
 +            and parallel_state.get_tensor_model_parallel_world_size() == 1
 +        ):
 +            # Chunked fused head + cross-entropy (temporal/chunked_ce.py): never materialises the

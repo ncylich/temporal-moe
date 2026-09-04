@@ -48,6 +48,32 @@ def test_bf16_gpu_matches_reference_to_bf16_rounding():
     assert torch.allclose(gw.float(), gw_ref.float(), atol=2e-2, rtol=5e-2)
 
 
+def test_forward_grad_variant_uniform_and_masked(monkeypatch=None):
+    os.environ["MOE_CHUNKED_CE"] = "2"
+    try:
+        # uniform upstream gradient (all-ones mask / N): stored gradients, exact to rounding
+        g = torch.Generator().manual_seed(3)
+        s, b, h, v = 6, 2, 16, 29
+        hidden = (torch.randn(s, b, h, generator=g)).requires_grad_(True); weight = (torch.randn(v, h, generator=g) * 0.1).requires_grad_(True)
+        target = torch.randint(0, v, (s, b), generator=g)
+        h2 = hidden.detach().clone().requires_grad_(True); w2 = weight.detach().clone().requires_grad_(True)
+        ref = F.cross_entropy(torch.matmul(h2.reshape(-1, h), w2.t()), target.reshape(-1), reduction="none").view(s, b)
+        (ref.sum() / (s * b)).backward()
+        out = chunked_linear_cross_entropy(hidden, weight, target, chunk=5)
+        (out.sum() / (s * b)).backward()
+        assert torch.allclose(out, ref, atol=1e-5) and torch.allclose(hidden.grad, h2.grad, atol=1e-5) and torch.allclose(weight.grad, w2.grad, atol=1e-5)
+        # masked (non-uniform) upstream gradient: the recompute fallback, still exact
+        hidden.grad = None; weight.grad = None; h2.grad = None; w2.grad = None
+        mask = (torch.rand(s, b, generator=g) > 0.3).float()
+        ref = F.cross_entropy(torch.matmul(h2.reshape(-1, h), w2.t()), target.reshape(-1), reduction="none").view(s, b)
+        (ref * mask).sum().backward()
+        out = chunked_linear_cross_entropy(hidden, weight, target, chunk=5)
+        (out * mask).sum().backward()
+        assert torch.allclose(hidden.grad, h2.grad, atol=1e-5) and torch.allclose(weight.grad, w2.grad, atol=1e-5)
+    finally:
+        os.environ.pop("MOE_CHUNKED_CE", None)
+
+
 def test_negative_targets_are_clamped_not_crashed():
     hidden = torch.randn(3, 2, 8, requires_grad=True); weight = torch.randn(11, 8, requires_grad=True)
     target = torch.tensor([[0, -1], [5, 3], [-1, 10]])
