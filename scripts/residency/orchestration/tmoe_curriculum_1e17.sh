@@ -38,7 +38,7 @@ arm_env() {
     *) echo "unknown arm $a" >&2; return 1 ;;
   esac
 }
-for A in ${ARMS:-SW0p5 C0 SW0p667 RAMP0p75 HET0p4-0p8 SHD0p01}; do
+for A in ${ARMS:-SW0p5 C0 SW0p25 RAMP0p75 HET0p4-0p8 SHD0p01}; do   # SW0p667 dropped after SW0p5 lost 0.035 to C0: a later switch can only lose more
   NAME=cur_g${GRAIN}_1e17_$A; ENV=$(arm_env $A) || continue
   FINAL=results/phase0/runs/$NAME/ckpt/iter_$(printf %07d $ITERS)
   [ -d "$FINAL" ] && { echo "[skip] $NAME done"; continue; }

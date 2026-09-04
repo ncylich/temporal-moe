@@ -2377,3 +2377,21 @@ inside two standard errors each, consistent with the stock-era reading that the 
 where adaptation buys least. Extraction rescue is zero on every non-thinking arm and 4 to 14
 items on the thinking arms at R8 and R32 (the asserts-only trailing block again), recorded in
 `mbpp_extraction_rescore.csv`, scored rule unchanged.
+
+## Curriculum, round 1 in progress: the half switch loses to the control (2026-09-04 10:40)
+
+**Reference fixed first.** The recorded 1e17 cells turned out to be 16k-tokenizer runs on their
+own corpus, so the curriculum's reference is `cur_g3_1e17_C0`: the same shape trained through the
+residency router with R = E on the pythia-50k corpus of the 1e18 and 1e19 runs, 1.17 s per
+iteration with the speed recipe. C0 ends at test CE 3.7342 (1.2539 BPB).
+
+**SW0p5** (R = k for 1,930 iterations, then free) ends at 3.7693, 0.035 CE (0.012 BPB) behind C0.
+The per-tenth validation curve says where the loss comes from: at the switch the constrained arm
+is 0.046 behind C0 (3.939 against 3.893), the unmask shock is brief (train loss 3.95 to 4.37 and
+back to 3.94 within 170 iterations), and the free half recoups only 0.011 of the deficit
+(3.7649 against 3.7303 at the last tenth). The constrained phase costs optimisation progress
+that the free phase does not recover at this budget. Given that, the two-thirds switch can only
+lose more, so it was dropped from round 1 after three minutes and replaced by a quarter switch
+(SW0p25), which minimises the constrained phase while keeping the question alive; the ramp,
+heterogeneous-batch and shadow-constraint arms follow as planned. Records in
+`curriculum_1e17.csv`.
