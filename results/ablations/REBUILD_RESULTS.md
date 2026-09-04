@@ -2177,7 +2177,7 @@ sentence and the numbers should agree.
 **Rolling residency imposed on a trained full MoE at R = k costs +0.43 BPB (coarse) and +0.59
 (fine), and the cost only falls below the temporal model's quality at R = k when the resident
 budget reaches about 7k for the coarse pair and 9k for the fine pair.** Appendix B had the R = k
-point; this is the curve behind it, and it turns the impose-versus-unmask asymmetry into a
+point. This is the curve behind it, and it turns the impose-versus-unmask asymmetry into a
 serving statement: to serve a full MoE at the quality the temporal model delivers with k resident
 experts per layer, keep seven to nine times as many experts resident.
 
