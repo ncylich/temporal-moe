@@ -2471,3 +2471,37 @@ run). The remaining stages, the C0 replicate on grain 3 and the grain-1 transfer
 configuration; the replicate therefore also checks the new configuration end to end against C0.
 Two other candidates from the profile are untouched: the MoE permute index passes (12.5%) and
 the head GEMMs; the residency scan stays as it is at 2%.
+
+## Curriculum: the noise floor and the verdict (2026-09-04 21:40)
+
+**C0b**, the same-seed replicate of the control under the new speed configuration (TE
+cross-entropy, micro-batch 128), ends at 3.7321 against C0's 3.7342: 0.002 CE apart. The
+run-to-run spread that reached 0.06 at the first tenth (the pipeline is not bit-deterministic
+past iteration 20) closes to 0.002 by the end of the cosine schedule, so the final-loss noise
+floor is what the 1e18 seed triplets suggested and the 0.010 win bar is conservative. The
+replicate also certifies the speed change: same loss, 60 minutes instead of 75 for the run.
+
+Grain 3, unconstrained final test CE against C0 (3.7342), 500-problem noise floor 0.002:
+
+| arm | recipe | test CE | vs C0 |
+|---|---|---|---|
+| C0b | control replicate, new configuration | 3.7321 | -0.002 |
+| SHD0p01 | free routing, coherence loss to a shadow resident set, lambda 0.01 | 3.7373 | +0.003 |
+| SHD0p03 | same, lambda 0.03 | 3.7390 | +0.005 |
+| SHD0p003 | same, lambda 0.003 | 3.7398 | +0.006 |
+| RAMP0p75 | R doubles k, 2k, 4k, 8k; free from 75% | 3.7490 | +0.015 |
+| SW0p5 | R = k for half, then free | 3.7693 | +0.035 |
+| SAND | free, R = k over the third quarter, free | 3.7782 | +0.044 |
+| HET0p4-0p8 | constrained fraction of sequences 1 to 0 over 40 to 80% (free re-score) | 3.7824 | +0.048 |
+| SW0p25 | R = k for a quarter, then free | 3.8036 | +0.069 |
+
+Verdict at 1e17. No curriculum beats the control. Every arm that constrains routing during
+training loses, in proportion to how long and how abruptly it constrains: the constrained phase
+falls behind at a steady rate (0.046 by mid-run under the full constraint), a hard unmask is a
+learning-rate-gated instability on top (a spike to 9.9 at lr 1.8e-3, to 4.4 at a lower lr), and
+the free phase recovers only a fraction of the deficit. The soft constraint that never masks
+routing costs nothing and gains nothing at three strengths spanning a decade. The premise, that
+temporal weights carry something a full MoE could inherit, does not show up in unconstrained
+BPB at this scale. The grain-1 transfer of SHD0p01 (with its own C0) runs to close the
+question on the coarse grain; no promotion follows unless it wins there, which the rules
+do not expect.
