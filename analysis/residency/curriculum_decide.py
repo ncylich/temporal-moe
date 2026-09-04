@@ -68,7 +68,9 @@ def main():
         elif v <= PROMISING:
             arms = ["SAND"] + family(best)[:2]
         else:
-            arms = []
+            # every arm lost: two diagnostics before concluding, a switch late in the cosine tail
+            # (the hard-switch damage was learning-rate gated) and one refinement of the best family
+            arms = ["SW0p8"] + family(best)[:1]
         print(" ".join(a for a in arms if ("g3", a) not in ce)); return
     if stage == "transfer":
         # grain 1 needs its own C0 reference; the driver skips arms that already exist
