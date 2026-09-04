@@ -16,7 +16,7 @@ case $ARM in
   SWW*)  f=$(dec ${ARM#SWW}); ENV="TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E WSD_DECAY_OVERRIDE=$((ITERS - $(pct $f)))" ;;
   SW*)   f=$(dec ${ARM#SW});  ENV="TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E" ;;
   RAMP*) f=$(dec ${ARM#RAMP}); ENV="TEMPORAL_ITER_SCHEDULE=0:$K,$(pct "$f/4"):$((2*K)),$(pct "$f/2"):$((4*K)),$(pct "3*$f/4"):$((8*K)),$(pct $f):E" ;;
-  HET*)  f=${ARM#HET}; ENV="TEMPORAL_FREE_FRAC_SCHEDULE=0:0,$(pct $(dec ${f%-*})):0,$(pct $(dec ${f#*-})):1" ;;
+  HET*)  f=${ARM#HET}; ENV="TEMPORAL_FREE_FRAC_SCHEDULE=0:0,$(pct $(dec ${f%-*})):0,$(pct $(dec ${f#*-})):1 TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $(dec ${f#*-})):E" ;;
   SHD*)  f=$(dec ${ARM#SHD}); ENV="TEMPORAL_SHADOW=1 TEMPORAL_COHERENCE_LAMBDA=$f" ;;
   SAND)  ENV="TEMPORAL_ITER_SCHEDULE=0:E,$(pct 0.5):$K,$(pct 0.75):E" ;;
   *) echo "unknown arm $ARM"; exit 1 ;;

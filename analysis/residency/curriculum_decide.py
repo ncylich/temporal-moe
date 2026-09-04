@@ -70,7 +70,7 @@ def main():
         else:
             # every arm lost: two diagnostics before concluding, a switch late in the cosine tail
             # (the hard-switch damage was learning-rate gated) and one refinement of the best family
-            arms = ["SW0p8"] + family(best)[:1]
+            arms = ["SW0p8"] + family(best)[:1] + ["C0b"]   # C0b: same-seed replicate, the run-to-run noise floor
         print(" ".join(a for a in arms if ("g3", a) not in ce)); return
     if stage == "transfer":
         # grain 1 needs its own C0 reference; the driver skips arms that already exist

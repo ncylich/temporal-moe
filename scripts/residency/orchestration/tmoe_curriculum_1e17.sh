@@ -28,11 +28,11 @@ dec() { echo "${1/p/.}"; }
 arm_env() {
   local a=$1 f
   case $a in
-    C0)    echo "TEMPORAL_RESIDENCY_R=$E" ;;
+    C0|C0b) echo "TEMPORAL_RESIDENCY_R=$E" ;;                                              # C0b: same-seed replicate of C0 (run-to-run noise floor)
     SWW*)  f=$(dec ${a#SWW}); echo "TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E LR_DECAY_STYLE=WSD WSD_DECAY_ITERS=$((ITERS - $(pct $f)))" ;;
     SW*)   f=$(dec ${a#SW});  echo "TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E" ;;
     RAMP*) f=$(dec ${a#RAMP}); echo "TEMPORAL_ITER_SCHEDULE=0:$K,$(pct "$f/4"):$((2*K)),$(pct "$f/2"):$((4*K)),$(pct "3*$f/4"):$((8*K)),$(pct $f):E" ;;
-    HET*)  f=${a#HET}; echo "TEMPORAL_FREE_FRAC_SCHEDULE=0:0,$(pct $(dec ${f%-*})):0,$(pct $(dec ${f#*-})):1" ;;
+    HET*)  f=${a#HET}; echo "TEMPORAL_FREE_FRAC_SCHEDULE=0:0,$(pct $(dec ${f%-*})):0,$(pct $(dec ${f#*-})):1 TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $(dec ${f#*-})):E" ;;   # the free fraction acts in training only; the iteration schedule makes evals free from the anneal's end
     SHD*)  f=$(dec ${a#SHD}); echo "TEMPORAL_SHADOW=1 TEMPORAL_COHERENCE_LAMBDA=$f" ;;
     SAND)  echo "TEMPORAL_ITER_SCHEDULE=0:E,$(pct 0.5):$K,$(pct 0.75):E" ;;
     *) echo "unknown arm $a" >&2; return 1 ;;

@@ -2405,3 +2405,21 @@ is. The ramp arm confirms the mechanism from the other side: its four doublings 
 0.03 transiently with no spike, and it tracks C0 at a steady 0.02 CE through three quarters of
 training (3.819 against 3.799 at the seventh tenth), the constrained-phase deficit rather than any
 recovery cost.
+
+**HET0p4-0p8 and a defect in its evaluation** (14:50 addendum). The heterogeneous-batch arm reads
+3.9858 at the end, but that number is a constrained evaluation: the free-row override acts only
+in training mode, so every validation and the final test eval of this arm ran at R = k, and they
+drift upward through the anneal (3.90 at the seventh tenth, 3.98 at the end) as the model
+trains increasingly free and de-adapts from the constraint, while its train loss falls normally
+(3.89 to 3.78). The finished checkpoint is re-scored unconstrained in place (sweep eval, tag
+`cross` at R = 192 in `sweep_eval.csv`) and the HET arms now carry an iteration schedule that
+frees evaluation from the anneal's end. The other arms are unaffected: the iteration schedule
+and the shadow override apply in evaluation too.
+
+**Run-to-run noise.** The four arms share the constrained recipe through at least iteration
+724, and their train losses are bit-identical through iteration 20 and then diverge: by
+iteration 400 they span 0.06 (4.770, 4.829, 4.807, 4.771) and the constrained validation at
+386 spans 0.062. The pipeline is not deterministic at this shape, and the size of the spread
+at the final loss is unknown (the 1e18 seed triplets say 0.005 for different seeds). A
+same-seed replicate of the control, C0b, is appended to the fallback round to measure it; it
+is the one re-run in this program and every 0.015-sized verdict depends on it.
