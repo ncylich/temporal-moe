@@ -50,9 +50,11 @@ conclusions and cites no results.
   raw generation, executed code, pass, thinking tokens, cap and unfinished flags.
   The `*_mbpp40_*` dumps and `mbpp_subsample.csv` are producer validation only.
 - Noise floor at n=500: binomial SE per arm 1.5 to 2.2 points.
-- `lfm25_instruct_mbpp_cap16k` free/R4 is the fair-budget twin of `lfm25_instruct_mbpp`
-  (11% / 13% at cap at 8192) and supersedes it for citation; 8.6% / 10.2% of its items
-  still end in an unclosed thinking span at 16384 (`tmoe_mbpp_cap16k.sh`).
+- `lfm25_instruct_mbpp_cap16k` and `_cap32k` free/R4 are fair-budget twins of
+  `lfm25_instruct_mbpp` (11% / 13% at cap at 8192; 8.6% / 10.2% at 16384). The 32k pair
+  supersedes both for citation and is the last doubling: its 6.8% / 7.4% of items still
+  inside an unclosed thinking span at 32768 are the model's own length explosion, not a
+  budget limit (`tmoe_mbpp_cap16k.sh`, `BUDGET=32768`).
 - gemma4 and Qwen3.5 adapted finals keep their recorded MBPP rows (`mbpp_gemma`,
   `mbpp_instruct`); the Qwen base is re-measured under `mbpp_chat` for auditability.
 

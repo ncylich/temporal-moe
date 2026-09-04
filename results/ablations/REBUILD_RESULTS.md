@@ -2257,6 +2257,7 @@ task `mbpp_chat`; gemma4 from its recorded `mbpp_gemma` rows at the same budget)
 | OLMoE-1B-7B (R8, budget 3,328) | 0.264 | 0.174 | | 0 / 0 |
 | LFM2.5-8B-A1B (R4) | 0.704 | 0.604 | | 55 / 66 |
 | LFM2.5-8B-A1B (R4), budget 16,384 | 0.722 | 0.614 | | 43 / 51 |
+| LFM2.5-8B-A1B (R4), budget 32,768 | 0.728 | 0.630 | | 34 / 37 |
 | gemma4-26B (R8, R16, recorded) | 0.910 | 0.770 | 0.890 | |
 | Qwen3.5-35B-A3B (R8, R32) | 0.800 | 0.752 | 0.790 | 4 / 7, 4 |
 | gpt-oss-20B (R4) | 0.900 | 0.886 | | 20 / 18 |
@@ -2265,12 +2266,13 @@ task `mbpp_chat`; gemma4 from its recorded `mbpp_gemma` rows at the same budget)
 Binomial SE per arm is 1.5 to 2.2 points at n=500. Qwen's new rows agree with its recorded
 stock lm_eval rows (0.794 / 0.752 / 0.764 at a 1,536 budget) within that, and its dumps are now
 auditable. The LFM pair at 16,384 is the fair-budget re-measurement the data contract requires
-once 5% of items finish at the cap (11% and 13% did at 8,192). Doubling the budget rescued 12
-and 15 items and moved the numbers by 1.8 and 1.0 points, but 8.6% and 10.2% of items still
-end inside an unclosed thinking span at 16,384: LFM2.5's in-band deliberation has a runaway
-tail that a budget does not close, so its MBPP is budget-limited by construction and the
-16k rows are the ones to cite, with that residual stated. R4 costs LFM 10 points and half of
-that gap is cap-outs (66 against 55, then 51 against 43), the rest wrong code.
+once 5% of items finish at the cap (11% and 13% did at 8,192). Doubling the budget twice
+rescued 21 and 29 cap-outs and moved the numbers by 2.4 and 2.6 points, but 6.8% and 7.4% of
+items still end inside an unclosed thinking span at 32,768. Thirty-two thousand is the last
+doubling: what remains at that budget is LFM2.5's own length explosion, deliberation that
+never closes, and it is recorded as such rather than chased further. The 32k rows are the
+ones to cite, with that residual stated. R4 costs LFM 10 points at every budget and a third
+of that gap is cap-outs (66 against 55 at 8k, 37 against 34 at 32k), the rest wrong code.
 
 The reviewer verdicts (three Sonnet passes over the sub-sample renders, every item read).
 Coherent generations on every model and arm, no repetition loops, no thinking text in any
@@ -2301,5 +2303,5 @@ One Qwen R8 item emitted a stray `</think>` mid-generation in non-thinking mode;
 What went out as records. Fourteen new rows, dumps for each, `mbpp_extraction_rescore.csv`, and
 the two drivers (`tmoe_mbpp_full.sh`, `tmoe_mbpp_cap16k.sh`). gemma4 and the Qwen adapted
 finals keep their recorded MBPP rows. For the paper: an MBPP column in the Section 6 table
-from these rows (LFM from the 16k pair with its cap residual, OLMoE at its 3,328 budget), the
+from these rows (LFM from the 32k pair with its cap residual, OLMoE at its 3,328 budget), the
 LFM thinking-always caveat, and for Section 7 the gemma base R8 number with the scaffold note.
