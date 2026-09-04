@@ -2423,3 +2423,14 @@ iteration 400 they span 0.06 (4.770, 4.829, 4.807, 4.771) and the constrained va
 at the final loss is unknown (the 1e18 seed triplets say 0.005 for different seeds). A
 same-seed replicate of the control, C0b, is appended to the fallback round to measure it; it
 is the one re-run in this program and every 0.015-sized verdict depends on it.
+
+**Round 1 closed** (16:10). The unconstrained re-score of the HET checkpoint reads 3.7824 (the
+constrained sweep reproduces the logged 3.9858 to the sixth digit, so the two evals are the same
+quantity), a loss of 0.048 to C0: mixing constrained and free sequences costs more than a clean
+ramp. The shadow arm SHD0p01 (free routing throughout, coherence loss toward a resident set
+computed at R = k but never applied) ends at 3.7373, within 0.003 of C0: the only arm that never
+pays the constraint and the only one at the control. The supervisor's rules read it as promising
+and started round 2 (SAND, SHD0p003, SHD0p03); the grain-1 transfer and the C0 replicate follow.
+Round 1 verdict: every arm that constrains routing during training loses, in proportion to how
+long and how abruptly it constrains (ramp 0.015, half switch 0.035, heterogeneous 0.048, quarter
+switch 0.069); the soft constraint is free but has not shown a gain.
