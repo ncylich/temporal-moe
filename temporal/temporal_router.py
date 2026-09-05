@@ -733,6 +733,13 @@ def temporal_forward(self, input: torch.Tensor):
     if isched:
         _val = schedule_step(isched, _it)
         resid_R = logits.shape[-1] if _val.upper() == "E" else int(_val)
+    # Weak constraint (default 1 = shipped): TEMPORAL_SWAPS is the swap budget per token, the number
+    # of residents that may change between consecutive tokens (k/2 keeps half the previous set).
+    # TEMPORAL_SWAPS_SCHEDULE="<iter>:<swaps>,..." anneals it; swaps >= k is unconstrained.
+    _swaps = int(os.environ.get("TEMPORAL_SWAPS", "1"))
+    _ssched = os.environ.get("TEMPORAL_SWAPS_SCHEDULE", "").strip()
+    if _ssched:
+        _swaps = int(schedule_step(_ssched, current_iteration()))
     # N1 sham control. TEMPORAL_SHAM=random replaces the residency mask with a resident set drawn
     # uniformly at random per token: the same R experts are eligible, but the choice carries no
     # lexical information and no temporal dynamics. It answers whether the per-layer cost profile is
@@ -781,7 +788,7 @@ def temporal_forward(self, input: torch.Tensor):
         mask = compute_resident_mask_accel(
             trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
             tau=float(os.environ.get("TEMPORAL_RHO", "0")),
-            ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
+            ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")), swaps=_swaps)
     # Heterogeneous batches (default off): TEMPORAL_FREE_FRAC_SCHEDULE="<iter>:<frac>,..." is the
     # piecewise-linear fraction of sequences per micro-batch that train unconstrained.
     if ffsched and self.training:
@@ -882,7 +889,9 @@ def banner_knobs() -> str:
     knobs = f", tau={tau}, ema_beta={beta}" if (float(tau) != 0.0 or float(beta) < 1.0) else ""
     if int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) > 0:
         knobs += f", residency_R={os.environ.get('TEMPORAL_RESIDENCY_R')}"
-    for name in ("TEMPORAL_ITER_SCHEDULE", "TEMPORAL_FREE_FRAC_SCHEDULE"):
+    if os.environ.get("TEMPORAL_SWAPS", "1") != "1":
+        knobs += f", swaps={os.environ['TEMPORAL_SWAPS']}"
+    for name in ("TEMPORAL_ITER_SCHEDULE", "TEMPORAL_FREE_FRAC_SCHEDULE", "TEMPORAL_SWAPS_SCHEDULE"):
         if os.environ.get(name, "").strip():
             knobs += f", {name.lower()[9:]}={os.environ[name].strip()}"
     if os.environ.get("TEMPORAL_SHADOW", "0") == "1":

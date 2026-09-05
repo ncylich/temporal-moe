@@ -65,6 +65,34 @@ def test_current_iteration_is_zero_without_megatron_args():
     assert current_iteration() == 0
 
 
+def test_banner_names_swaps_knob(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_SWAPS", "3")
+    monkeypatch.setenv("TEMPORAL_SWAPS_SCHEDULE", "0:3,1958:6")
+    b = banner_knobs()
+    assert "swaps=3" in b and "swaps_schedule=0:3,1958:6" in b
+
+
+def test_swaps_budget_changes_the_mask_only_when_above_one():
+    from temporal.temporal_router import compute_resident_mask
+    lg = _ar1()
+    m1 = compute_resident_mask(lg, 6, "min_logit", swaps=1)
+    m3 = compute_resident_mask(lg, 6, "min_logit", swaps=3)
+    m6 = compute_resident_mask(lg, 6, "min_logit", swaps=6)
+    top = torch.zeros_like(m6); top.scatter_(-1, lg.topk(6, dim=-1).indices, True)
+    assert m1.sum(-1).eq(6).all() and m3.sum(-1).eq(6).all()
+    assert torch.equal(m6, top)                           # swaps >= k: unconstrained top-k
+    ch1 = (m1[1:] != m1[:-1]).sum(-1).max().item(); ch3 = (m3[1:] != m3[:-1]).sum(-1).max().item()
+    assert ch1 <= 2 and ch3 <= 6 and ch3 > ch1              # at most 1 vs 3 residents change per token
+
+
+def _ar1(S=64, B=2, E=32, seed=5):
+    g = torch.Generator().manual_seed(seed)
+    base = torch.randn(B, E, generator=g); lg = torch.empty(S, B, E); lg[0] = base
+    for t in range(1, S):
+        base = 0.9 * base + 0.5 * torch.randn(B, E, generator=g); lg[t] = base
+    return lg
+
+
 def test_banner_names_curriculum_knobs(monkeypatch):
     monkeypatch.setenv("TEMPORAL_ITER_SCHEDULE", "0:18,1931:E")
     monkeypatch.setenv("TEMPORAL_SHADOW", "1")

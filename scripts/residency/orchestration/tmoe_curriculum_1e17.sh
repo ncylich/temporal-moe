@@ -13,6 +13,9 @@
 #   HET<a>-<b>  free fraction of sequences 0 until a, linear to 1 at b  (plan C4 = HET0p4-0p8)
 #   SHD<l>      free routing, shadow resident set, coherence lambda l   (plan C5 = SHD0p01)
 #   SAND        free, R = k over the third quarter, free                (plan C6)
+#   WK<s>       weak constraint: s swaps per token at R = k, whole run; free re-score after (WK3 = k/2 on grain 1)
+#   WK<s>SW<f>  weak constraint until fraction f, then free
+#   WKA<s>-<f>  swaps annealed from s to k (free) at fraction f
 #   tmoe_curriculum_1e17.sh [ARMS="SW0p5 C0 ..."] [GRAIN=3|1]
 set -uo pipefail; cd "$(dirname "$0")/../../.."
 . scripts/env.sh
@@ -35,6 +38,9 @@ arm_env() {
     HET*)  f=${a#HET}; echo "TEMPORAL_FREE_FRAC_SCHEDULE=0:0,$(pct $(dec ${f%-*})):0,$(pct $(dec ${f#*-})):1 TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $(dec ${f#*-})):E" ;;   # the free fraction acts in training only; the iteration schedule makes evals free from the anneal's end
     SHD*)  f=$(dec ${a#SHD}); echo "TEMPORAL_SHADOW=1 TEMPORAL_COHERENCE_LAMBDA=$f" ;;
     SAND)  echo "TEMPORAL_ITER_SCHEDULE=0:E,$(pct 0.5):$K,$(pct 0.75):E" ;;
+    WK*SW*) f=$(dec ${a#*SW}); local sw=${a#WK}; sw=${sw%%SW*}; echo "TEMPORAL_SWAPS=$sw TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $f):E" ;;   # weak constraint (s swaps/token), free from f
+    WKA*)  f=${a#WKA}; echo "TEMPORAL_SWAPS_SCHEDULE=0:${f%-*},$(pct $(dec ${f#*-})):$K" ;;                                     # weak constraint annealed to free (swaps = k) at fraction
+    WK*)   echo "TEMPORAL_SWAPS=${a#WK}" ;;                                                                                    # weak constraint whole run, R = k; free re-score after
     *) echo "unknown arm $a" >&2; return 1 ;;
   esac
 }
@@ -46,5 +52,12 @@ for A in ${ARMS:-SW0p5 C0 SW0p25 RAMP0p75 HET0p4-0p8 SHD0p01}; do   # SW0p667 dr
   env $ENV RUN_NAME=$NAME scripts/residency/gpu_lease.sh bash experiments/run.sh > /workspace/rerun-logs/cur_$NAME.out 2>&1
   echo "### curriculum $NAME rc=$? $(date -u +%H:%M)"
   "$PY" analysis/parse_run.py results/phase0/runs/$NAME 2>/dev/null | grep '^SUMMARY' | cut -c1-200
+  case $A in WK[0-9]*|WK[0-9]*b)   # whole-run constrained: the logged final eval is constrained; re-score free (R = E) and native in place
+    [ -d "$FINAL" ] && ! grep -q "^$NAME,cross," results/ablations/sweep_eval.csv 2>/dev/null && {
+      cp results/phase0/runs/$NAME/run.meta results/phase0/runs/$NAME/run.meta.pre
+      env $ENV SWEEPEVAL=1 RUN_NAME=$NAME TEMPORAL_RESIDENCY_R=$K SWEEP="native:$K cross:$E" scripts/residency/gpu_lease.sh timeout -k 60 1800 bash experiments/run.sh > /workspace/rerun-logs/cur_${NAME}_free.out 2>&1
+      mv -f results/phase0/runs/$NAME/run.meta.pre results/phase0/runs/$NAME/run.meta
+      grep -E "^\[sweep\]" /workspace/rerun-logs/cur_${NAME}_free.out | tail -2; } ;;
+  esac
 done
 echo "### curriculum ALL DONE $(date -u +%H:%M)"

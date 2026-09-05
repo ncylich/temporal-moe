@@ -49,9 +49,9 @@ def main():
         if not tests:
             print(f"[running] {run}: {len(vals)} evals so far"); continue
         ce = float(tests[-1])
-        # HET arms before the eval fix: their train.log evals are constrained; the unconstrained
-        # re-score of the final checkpoint lives in sweep_eval.csv (tag cross, R = E)
-        if run.split("_", 3)[3].startswith("HET"):
+        # arms whose logged final eval is constrained (HET before the eval fix, WK whole-run weak
+        # constraint): the unconstrained re-score of the final checkpoint lives in sweep_eval.csv (tag cross)
+        if run.split("_", 3)[3].startswith(("HET", "WK")) and not "SW" in run.split("_", 3)[3]:
             sw = [r for r in csv.DictReader(open(os.path.join(ABLATIONS, "sweep_eval.csv"))) if r["run"] == run and r["tag"] == "cross"]
             if sw:
                 ce = float(sw[-1]["lm_loss"])

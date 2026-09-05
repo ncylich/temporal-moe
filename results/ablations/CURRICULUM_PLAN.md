@@ -99,3 +99,24 @@ Runs land in `results/phase0/runs/<name>` with `run.meta` and `train.log`; the s
 `results/ablations/curriculum_1e17.csv` (arm, recipe, test CE, BPB, delta vs C0, per-tenth
 validation losses) is produced by `analysis/residency/curriculum_csv.py`. The log of what was run and
 why goes in `REBUILD_RESULTS.md` as it happens.
+
+## Round W: the weak constraint (2026-09-05, user's proposal)
+
+The shipped constraint keeps k - 1 of the previous token's residents (one swap per token). A
+weaker policy keeps only k/2 (k/2 swaps per token): the same inductive bias, less of it, and
+less to give up when the constraint lifts. The scan already implements a swap budget
+(`swaps`, bit-exact Triton kernel checked against the reference at startup); it is now exposed
+as `TEMPORAL_SWAPS` with `TEMPORAL_SWAPS_SCHEDULE` for annealing. Grain 1 (k = 6), 1e17, the
+50k corpus; controls C0 3.7661 and C0b 3.7421 (both with router blow-ups), shadow arms
+3.7297 and 3.7337. Whole-run constrained arms are re-scored unconstrained in place after
+training (sweep eval, tag `cross`), and their own constrained quality is the `native` row.
+
+| arm | recipe | question |
+|---|---|---|
+| WK3 | 3 swaps per token (k/2), whole run | does the weak bias help the free model? what does it cost under its own constraint? |
+| WK1 | 1 swap per token, whole run (the shipped temporal model on this corpus) | the anchor: strong bias, both evals |
+| WK2 | 2 swaps per token | the dose in between |
+| WK3SW0p5 | 3 swaps until half, then free | the curriculum with the weak bias |
+
+Then, by the results: `WKA3-<f>` anneals the budget from 3 to k (free) at fraction f; the
+best is replicated once on grain 3 if it wins on grain 1.
