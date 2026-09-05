@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrow, FancyArrowPatch, FancyBboxPatch, Rectangle
+from matplotlib.transforms import ScaledTranslation
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(REPO, "paper", "odi", "figures")
@@ -167,8 +168,8 @@ def bandwidth_timeline():
 
 # --------------------------------------------------------------- isoFLOP panels
 DENSE_C = "#7f7f7f"
-MOE_COARSE, MOE_FINE = "#5aa0dd", "#0d3b66"
-TMP_COARSE, TMP_FINE = "#5cc85c", "#145a14"
+MOE_COARSE, MOE_FINE = "#f4756b", "#9e0f14"
+TMP_COARSE, TMP_FINE = "#7ecb7e", "#0b5c1c"
 P16 = {
     "dense": {0.770: 1.534, 1.361: 1.519, 3.812: 1.591},
     "moe_c": {0.770: 1.4766, 1.361: 1.447, 3.812: 1.540},
@@ -193,9 +194,12 @@ P18 = {
 P19 = [("dense", 1.1260, DENSE_C), ("temporal\ncoarse", 1.0680, TMP_COARSE),
        ("temporal\nfine", 1.0655, TMP_FINE), ("full MoE\ncoarse", 1.0514, MOE_COARSE),
        ("full MoE\nfine", 1.0604, MOE_FINE)]
-STYLE = [("dense", DENSE_C, 1.4), ("moe_c", MOE_COARSE, 1.9), ("moe_f", MOE_FINE, 1.9),
-         ("tmp_c", TMP_COARSE, 1.9), ("tmp_f", TMP_FINE, 1.9)]
-LEG = ["dense", "MoE · coarse", "MoE · fine", "temporal · coarse", "temporal · fine"]
+STYLE = [("dense", DENSE_C, 1.4), ("moe_c", MOE_COARSE, 1.8), ("moe_f", MOE_FINE, 1.8),
+         ("tmp_c", TMP_COARSE, 1.8), ("tmp_f", TMP_FINE, 2.9)]
+LEG = ["dense", "MoE · coarse", "MoE · fine", "temporal · coarse", "temporal · fine (ours)"]
+# sub-point vertical dodge so coincident series render side by side rather than
+# stacked; a pure drawing offset (max 0.9pt), the plotted values are untouched
+DODGE_PT = {"dense": 0.0, "moe_c": -0.9, "moe_f": -0.3, "tmp_c": 0.3, "tmp_f": 0.9}
 TICKS = {"1e16": ([0.77, 1.4, 3.85], ["0.8", "1.4", "3.9"]),
          "1e17": ([3.85, 8.17, 14.9], ["3.9", "8.1", "15"]),
          "1e18": ([6.88, 12.19, 48.50], ["6.9", "12", "49"])}
@@ -206,11 +210,15 @@ def isoflop_panels():
                          "xtick.labelsize": 10, "ytick.labelsize": 10})
 
     def curve_panel(ax, data, title, ticks=None, xlabel=True, ylabel=True):
-        for key, color, lw in STYLE:
+        for z, (key, color, lw) in enumerate(STYLE):
             d = data[key]
             xs = sorted(d)
-            ax.plot(xs, [d[x] for x in xs], "-o", color=color, mfc=color, mec=color,
-                    ms=5, lw=lw, alpha=0.9)
+            ax.plot(xs, [d[x] for x in xs], alpha=0)     # register data limits
+            tr = ax.transData + ScaledTranslation(0, DODGE_PT[key] / 72,
+                                                  ax.figure.dpi_scale_trans)
+            ax.plot(xs, [d[x] for x in xs], "-o", color=color, mfc=color,
+                    mec="white", mew=0.9, ms=6 if key == "tmp_f" else 5, lw=lw,
+                    zorder=2 + z, transform=tr)
         ax.set_xscale("log")
         if ticks:
             ax.set_xticks(ticks[0])
@@ -230,7 +238,7 @@ def isoflop_panels():
         vals = [p[1] for p in P19]
         cols = [p[2] for p in P19]
         bars = ax.bar(labels, vals, color=cols, width=0.66, edgecolor="k",
-                      linewidth=0.6)
+                      linewidth=[1.6 if l == "temporal\nfine" else 0.6 for l in labels])
         for b, v in zip(bars, vals):
             ax.text(b.get_x() + b.get_width() / 2, v + 0.004, f"{v:.3f}",
                     ha="center", fontsize=9, fontweight="bold")
@@ -251,9 +259,12 @@ def isoflop_panels():
                 ticks=TICKS["1e17"], xlabel=False, ylabel=False)
     curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"])
     bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab", ylabel=False)
-    fig.legend([Line2D([0], [0], color=c, lw=2.6) for _, c, _ in STYLE], LEG,
-               ncol=5, loc="upper center", fontsize=9.5, frameon=False,
-               bbox_to_anchor=(0.5, 1.002), columnspacing=1.0, handlelength=1.3)
+    handles = [Line2D([0], [0], color=c, lw=3.2 if k == "tmp_f" else 2.2)
+               for k, c, _ in STYLE]
+    leg = fig.legend(handles, LEG, ncol=5, loc="upper center", fontsize=9.3,
+                     frameon=False, bbox_to_anchor=(0.5, 1.002),
+                     columnspacing=0.8, handlelength=1.3)
+    leg.get_texts()[-1].set_fontweight("bold")
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     fig.subplots_adjust(wspace=0.18, hspace=0.52)
     p = f"{OUT}/isoflop_panels_odi.png"
