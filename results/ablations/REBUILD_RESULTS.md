@@ -2583,3 +2583,14 @@ where both free controls had router blow-ups. Per the agreed rule (lowest CE, no
 the 1/6 policy went to 1e18 (`cur_flame38m_g1_WK5`, the paper's grain-1 config, 50k tokenizer)
 at 03:52, against the recorded triplets free MoE 3.9184 / 3.9302 / 3.9218 and temporal
 3.9094 / 3.9043 / 3.9094; 0.010 below the temporal mean 3.9077 launches the 1e19 run.
+
+**1e18, reuse 1/6** (06:00). `cur_flame38m_g1_WK5`, the paper's grain-1 1e18 configuration
+(50k tokenizer, 2,121 iterations, WSD) with the speed recipe (3.5 s per iteration against the
+recorded 12.7), keeping 1 of 6 experts per token: final test CE **3.8720**, no training spike.
+Recorded references, same configuration: temporal 3.9094 / 3.9043 / 3.9094 (mean 3.9077), free
+MoE 3.9184 / 3.9302 / 3.9218 (mean 3.9235). The 1/6 policy is 0.036 below the temporal mean
+and 0.051 below the free MoE mean, seven and ten times the seed standard deviation, and it
+clears the 0.010 bar by a wide margin. Caveat as at 1e17: the references are July runs (rope
+fusion on, the old grouped GEMM, the old cross-entropy) and no same-environment 1e18 control
+exists; at 1e17 the same-environment replicate agreed with its control to 0.002. Reuse 2/6 runs
+at 1e18 next (`cur_flame38m_g1_WK4`, done about 08:05); the better of the two goes to 1e19.
