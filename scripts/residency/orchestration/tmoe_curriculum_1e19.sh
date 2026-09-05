@@ -32,7 +32,7 @@ echo "### curriculum1e19 $NAME [$ENV] START $(date -u +%H:%M)"
 for attempt in 1 2 3 4 5 6; do
   [ -d "$FINAL" ] && break
   echo "### curriculum1e19 $NAME attempt $attempt $(date -u +%H:%M)"
-  env $ENV MOE_TORCH_GMM=1 MOE_PERMUTE_FUSION=1 MOE_NO_LAYER_LOG=1 TEMPORAL_EVICT=min_logit GRAIN=$GRAIN TEMPORAL=1 SHAPE=s19opt TARGET_FLOPS=1e19 PEAK_LR=3e-4 WARMUP_FRAC=0.01 LR_DECAY_STYLE=WSD GLOBAL_BATCH=1024 MICRO_BATCH=16 SEED=1234 \
+  env $ENV MOE_TORCH_GMM=1 MOE_PERMUTE_FUSION=1 MOE_NO_LAYER_LOG=1 TEMPORAL_EVICT=min_logit GRAIN=$GRAIN TEMPORAL=1 SHAPE=s19opt TARGET_FLOPS=1e19 PEAK_LR=3e-4 WARMUP_FRAC=0.01 LR_DECAY_STYLE=WSD GLOBAL_BATCH=1024 MICRO_BATCH=${MICRO_BATCH:-16} SEED=1234 \
     RUN_NAME=$NAME scripts/residency/gpu_lease.sh bash experiments/run.sh > /workspace/rerun-logs/cur_$NAME.attempt$attempt.out 2>&1
   echo "### curriculum1e19 $NAME attempt $attempt rc=$? $(date -u +%H:%M)"
   [ -d "$FINAL" ] || sleep 120
