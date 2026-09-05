@@ -18,7 +18,7 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(REPO, "results", "phase0", "figures",
                    "bandwidth_timeline_nocaption.png" if PAPER else "bandwidth_timeline.png")
 
-FS = 18 if PAPER else 11.5
+FS = 15 if PAPER else 11.5
 LIGHT, EDGE, DARK, GREY = "#cfe3f5", "#4a7fb5", "#0d3b66", "#666666"
 
 fig, ax = plt.subplots(figsize=(9.0, 2.2) if PAPER else (10.0, 3.4))
