@@ -19,7 +19,8 @@
 #   tmoe_curriculum_1e17.sh [ARMS="SW0p5 C0 ..."] [GRAIN=3|1]
 set -uo pipefail; cd "$(dirname "$0")/../../.."
 . scripts/env.sh
-export TOKENIZER_MODEL=EleutherAI/pythia-12b DATA_DIR=/root/data/dclm_tokenized
+export TOKENIZER_MODEL=${TOKENIZER_MODEL:-EleutherAI/pythia-12b} DATA_DIR=${DATA_DIR:-/root/data/dclm_tokenized}   # SETUP=16k: the recorded 1e17 cells' tokenizer and corpus
+[ "${SETUP:-}" = 16k ] && export TOKENIZER_MODEL=$PWD/data/tok16k DATA_DIR=$PWD/data/tok16k_full
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CE_FUSION=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=${TMOE_PRIO:-5}
 export EXTRA_ARGS="--no-rope-fusion --moe-use-legacy-grouped-gemm --cross-entropy-fusion-impl te"   # TE single-pass CE: 1.15 -> 0.85 s/it with mb 128, loss identical
 export HF_TOKEN=$(cat /root/.cache/huggingface/token)
@@ -45,14 +46,14 @@ arm_env() {
   esac
 }
 for A in ${ARMS:-SW0p5 C0 SW0p25 RAMP0p75 HET0p4-0p8 SHD0p01}; do   # SW0p667 dropped after SW0p5 lost 0.035 to C0: a later switch can only lose more
-  NAME=cur_g${GRAIN}_1e17_$A; ENV=$(arm_env $A) || continue
+  NAME=cur_g${GRAIN}_1e17_$A${SETUP:+_$SETUP}; ENV=$(arm_env $A) || continue
   FINAL=results/phase0/runs/$NAME/ckpt/iter_$(printf %07d $ITERS)
   [ -d "$FINAL" ] && { echo "[skip] $NAME done"; continue; }
   echo "### curriculum $NAME [$ENV] START $(date -u +%H:%M)"
   env $ENV RUN_NAME=$NAME scripts/residency/gpu_lease.sh bash experiments/run.sh > /workspace/rerun-logs/cur_$NAME.out 2>&1
   echo "### curriculum $NAME rc=$? $(date -u +%H:%M)"
   "$PY" analysis/parse_run.py results/phase0/runs/$NAME 2>/dev/null | grep '^SUMMARY' | cut -c1-200
-  case $A in WK[0-9]*|WK[0-9]*b)   # whole-run constrained: the logged final eval is constrained; re-score free (R = E) and native in place
+  case $A in WK[0-9]|WK[0-9]b)   # whole-run constrained: the logged final eval is constrained; re-score free (R = E) and native in place
     [ -d "$FINAL" ] && ! grep -q "^$NAME,cross," results/ablations/sweep_eval.csv 2>/dev/null && {
       cp results/phase0/runs/$NAME/run.meta results/phase0/runs/$NAME/run.meta.pre
       env $ENV SWEEPEVAL=1 RUN_NAME=$NAME TEMPORAL_RESIDENCY_R=$K SWEEP="native:$K cross:$E" scripts/residency/gpu_lease.sh timeout -k 60 1800 bash experiments/run.sh > /workspace/rerun-logs/cur_${NAME}_free.out 2>&1
