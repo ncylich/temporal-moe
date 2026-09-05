@@ -2594,3 +2594,10 @@ clears the 0.010 bar by a wide margin. Caveat as at 1e17: the references are Jul
 fusion on, the old grouped GEMM, the old cross-entropy) and no same-environment 1e18 control
 exists; at 1e17 the same-environment replicate agreed with its control to 0.002. Reuse 2/6 runs
 at 1e18 next (`cur_flame38m_g1_WK4`, done about 08:05); the better of the two goes to 1e19.
+
+**1e18, reuse 2/6 and the pick** (08:05). `cur_flame38m_g1_WK4` (keep 2 of 6): 3.8764, against
+3.8720 for 1/6, both far below the recorded temporal (mean 3.9077) and free MoE (mean 3.9235)
+triplets. The two lightest policies agree to 0.004 at this scale, as 3/6 and 1/6 nearly did at
+1e17; the 2/6 outlier at 1e17 (3.5055) does not recur. Pick by the rule: 1/6, and its 1e19 run
+started at 08:03 (`cur_g1_1e19_WK5`, the paper's coarse configuration, 4,318 iterations, WSD,
+against the recorded free MoE 3.1301 and temporal 3.1798).
