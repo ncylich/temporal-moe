@@ -104,11 +104,11 @@ def draw():
     ax.plot([LEFT_X + SLOT_W + 4, RIGHT_X], [y, y], color="#8fbf9f", lw=0.7,
             dashes=(2.0, 2.4), zorder=1)
 
-    rx, ry, rw, rh = 104.0, 36.0, 80.0, 24.0
+    rx, ry, rw, rh = 104.0, 40.0, 80.0, 24.0
     box(ax, rx, ry, rw, rh, "#ffffff", BLUE, 1.3, r=3)
     ax.text(rx + rw / 2, ry + rh / 2, "ROUTER", ha="center", va="center",
             fontsize=7.0, fontweight="bold", color=BLUE)
-    arrow(ax, (rx + rw / 2, ry - 7.0), (rx + rw / 2, ry - 0.8), lw=0.9)
+    arrow(ax, (rx + rw / 2, ry - 13.5), (rx + rw / 2, ry - 0.8), lw=0.9)
 
     arrow(ax, (LEFT_X + SLOT_W + 5, slot_mid(EVICTED)), (rx - 1.5, ry + rh - 6),
           dashed=True)

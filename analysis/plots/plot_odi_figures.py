@@ -82,11 +82,11 @@ def swap_diagram():
     ax.plot([LX + SLOT_W + 4, RX], [y, y], color="#8fbf9f", lw=0.7,
             dashes=(2.0, 2.4), zorder=1)
 
-    rx, ry, rw, rh = 104.0, 36.0, 80.0, 24.0
+    rx, ry, rw, rh = 104.0, 40.0, 80.0, 24.0
     box(rx, ry, rw, rh, "#ffffff", BLUE, 1.3, r=3)
     ax.text(rx + rw / 2, ry + rh / 2, "ROUTER", ha="center", va="center",
             fontsize=10, fontweight="bold", color=BLUE)
-    arrow((rx + rw / 2, ry - 7.0), (rx + rw / 2, ry - 0.8), lw=0.9)
+    arrow((rx + rw / 2, ry - 13.5), (rx + rw / 2, ry - 0.8), lw=0.9)
 
     arrow((LX + SLOT_W + 5, smid(EVICTED)), (rx - 1.5, ry + rh - 6), dashed=True)
     ax.text(82, smid(EVICTED) + 9, "evict", ha="center", va="center",
