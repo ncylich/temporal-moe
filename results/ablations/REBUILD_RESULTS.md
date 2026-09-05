@@ -2601,3 +2601,11 @@ triplets. The two lightest policies agree to 0.004 at this scale, as 3/6 and 1/6
 1e17; the 2/6 outlier at 1e17 (3.5055) does not recur. Pick by the rule: 1/6, and its 1e19 run
 started at 08:03 (`cur_g1_1e19_WK5`, the paper's coarse configuration, 4,318 iterations, WSD,
 against the recorded free MoE 3.1301 and temporal 3.1798).
+
+**1e19 launch** (08:20). The first launch at micro-batch 16 (25 s per iteration at startup, 52 GB)
+was stopped after ten minutes for a micro-batch check on this shape: 32 runs at 20.7 s per
+iteration (82 GB), 64 does not fit. `cur_g1_1e19_WK5` relaunched at micro-batch 32 with the
+speed recipe (TE cross-entropy, sync-free grouped GEMM, fused permute): 4,318 iterations, about
+25 hours, expected to finish around 09:30 on 2026-09-06, against the recorded coarse cells
+free MoE 3.1301 and temporal 3.1798 (36 s per iteration in July). Checkpoints every tenth,
+auto-resume on a crash, a pruner keeps the two newest.
