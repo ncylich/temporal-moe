@@ -1,0 +1,547 @@
+run,regime,budget,layer,feature,window,null,preserves,median_AUC,excess_over_chance,n_experts,label_autocorr_lag1
+flame192_g3_moe,full,1e18,2,token,0,real,nothing destroyed (the measurement),0.9581,0.4581,192,0.0024
+flame192_g3_moe,full,1e18,2,token,0,flat-roll,partial document + position,0.5,0.0,192,0.0024
+flame192_g3_moe,full,1e18,2,token,0,seq-roll,document + near-position,0.5213,0.0213,192,0.0024
+flame192_g3_moe,full,1e18,2,token,0,perm-b,position only,0.4996,-0.0004,192,0.0024
+flame192_g3_moe,full,1e18,2,token,0,perm-t,document only,0.5045,0.0045,192,0.0024
+flame192_g3_moe,full,1e18,2,token,0,iid,nothing,0.4995,-0.0005,192,0.0024
+flame192_g3_moe,full,1e18,2,token,0,synth,autocorrelation only,0.4999,-0.0001,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,real,nothing destroyed (the measurement),0.6288,0.1288,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,flat-roll,partial document + position,0.5027,0.0027,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,seq-roll,document + near-position,0.6569,0.1569,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,perm-b,position only,0.4984,-0.0016,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,perm-t,document only,0.5152,0.0152,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,iid,nothing,0.4994,-0.0006,192,0.0024
+flame192_g3_moe,full,1e18,2,context,18,synth,autocorrelation only,0.5007,0.0007,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,real,nothing destroyed (the measurement),0.6098,0.1098,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,flat-roll,partial document + position,0.5029,0.0029,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,seq-roll,document + near-position,0.6385,0.1385,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,perm-b,position only,0.4968,-0.0032,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,perm-t,document only,0.515,0.015,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,iid,nothing,0.5006,0.0006,192,0.0024
+flame192_g3_moe,full,1e18,2,context,32,synth,autocorrelation only,0.5005,0.0005,192,0.0024
+flame192_g3_temporal,temporal,1e18,2,token,0,real,nothing destroyed (the measurement),0.5873,0.0873,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,token,0,flat-roll,partial document + position,0.4989,-0.0011,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,token,0,seq-roll,document + near-position,0.5288,0.0288,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,token,0,perm-b,position only,0.4997,-0.0003,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,token,0,perm-t,document only,0.5058,0.0058,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,token,0,iid,nothing,0.4993,-0.0007,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,token,0,synth,autocorrelation only,0.5004,0.0004,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,real,nothing destroyed (the measurement),0.7143,0.2143,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,flat-roll,partial document + position,0.4981,-0.0019,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,seq-roll,document + near-position,0.6181,0.1181,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,perm-b,position only,0.4993,-0.0007,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,perm-t,document only,0.5262,0.0262,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,iid,nothing,0.4999,-0.0001,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,18,synth,autocorrelation only,0.5003,0.0003,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,real,nothing destroyed (the measurement),0.7055,0.2055,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,flat-roll,partial document + position,0.4988,-0.0012,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,seq-roll,document + near-position,0.6723,0.1723,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,perm-b,position only,0.4991,-0.0009,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,perm-t,document only,0.5276,0.0276,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,iid,nothing,0.4997,-0.0003,192,0.0032
+flame192_g3_temporal,temporal,1e18,2,context,32,synth,autocorrelation only,0.4999,-0.0001,192,0.0032
+flame38m_g1_moe,full,1e18,2,token,0,real,nothing destroyed (the measurement),0.9417,0.4417,64,-0.0
+flame38m_g1_moe,full,1e18,2,token,0,flat-roll,partial document + position,0.5009,0.0009,64,-0.0
+flame38m_g1_moe,full,1e18,2,token,0,seq-roll,document + near-position,0.5183,0.0183,64,-0.0
+flame38m_g1_moe,full,1e18,2,token,0,perm-b,position only,0.5009,0.0009,64,-0.0
+flame38m_g1_moe,full,1e18,2,token,0,perm-t,document only,0.5034,0.0034,64,-0.0
+flame38m_g1_moe,full,1e18,2,token,0,iid,nothing,0.4994,-0.0006,64,-0.0
+flame38m_g1_moe,full,1e18,2,token,0,synth,autocorrelation only,0.5,-0.0,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,real,nothing destroyed (the measurement),0.6608,0.1608,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,flat-roll,partial document + position,0.5,-0.0,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,seq-roll,document + near-position,0.558,0.058,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,perm-b,position only,0.4983,-0.0017,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,perm-t,document only,0.5118,0.0118,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,iid,nothing,0.5006,0.0006,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,6,synth,autocorrelation only,0.5003,0.0003,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,real,nothing destroyed (the measurement),0.6183,0.1183,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,flat-roll,partial document + position,0.4993,-0.0007,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,seq-roll,document + near-position,0.6421,0.1421,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,perm-b,position only,0.4954,-0.0046,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,perm-t,document only,0.5132,0.0132,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,iid,nothing,0.4998,-0.0002,64,-0.0
+flame38m_g1_moe,full,1e18,2,context,32,synth,autocorrelation only,0.4986,-0.0014,64,-0.0
+flame38m_g1_temporal,temporal,1e18,2,token,0,real,nothing destroyed (the measurement),0.6451,0.1451,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,token,0,flat-roll,partial document + position,0.5002,0.0002,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,token,0,seq-roll,document + near-position,0.5152,0.0152,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,token,0,perm-b,position only,0.5008,0.0008,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,token,0,perm-t,document only,0.5035,0.0035,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,token,0,iid,nothing,0.5015,0.0015,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,token,0,synth,autocorrelation only,0.5,0.0,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,real,nothing destroyed (the measurement),0.7159,0.2159,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,flat-roll,partial document + position,0.4998,-0.0002,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,seq-roll,document + near-position,0.5352,0.0352,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,perm-b,position only,0.4984,-0.0016,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,perm-t,document only,0.5093,0.0093,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,iid,nothing,0.5001,0.0001,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,6,synth,autocorrelation only,0.4994,-0.0006,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,real,nothing destroyed (the measurement),0.6515,0.1515,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,flat-roll,partial document + position,0.4957,-0.0043,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,seq-roll,document + near-position,0.6678,0.1678,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,perm-b,position only,0.4965,-0.0035,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,perm-t,document only,0.5169,0.0169,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,iid,nothing,0.4995,-0.0005,64,0.0005
+flame38m_g1_temporal,temporal,1e18,2,context,32,synth,autocorrelation only,0.4987,-0.0013,64,0.0005
+flame38m_g3_moe,full,1e18,2,token,0,real,nothing destroyed (the measurement),0.9367,0.4367,192,0.0001
+flame38m_g3_moe,full,1e18,2,token,0,flat-roll,partial document + position,0.5004,0.0004,192,0.0001
+flame38m_g3_moe,full,1e18,2,token,0,seq-roll,document + near-position,0.5182,0.0182,192,0.0001
+flame38m_g3_moe,full,1e18,2,token,0,perm-b,position only,0.5007,0.0007,192,0.0001
+flame38m_g3_moe,full,1e18,2,token,0,perm-t,document only,0.5047,0.0047,192,0.0001
+flame38m_g3_moe,full,1e18,2,token,0,iid,nothing,0.5003,0.0003,192,0.0001
+flame38m_g3_moe,full,1e18,2,token,0,synth,autocorrelation only,0.5002,0.0002,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,real,nothing destroyed (the measurement),0.6352,0.1352,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,flat-roll,partial document + position,0.5044,0.0044,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,seq-roll,document + near-position,0.6571,0.1571,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,perm-b,position only,0.5023,0.0023,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,perm-t,document only,0.519,0.019,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,iid,nothing,0.5008,0.0008,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,18,synth,autocorrelation only,0.5006,0.0006,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,real,nothing destroyed (the measurement),0.6165,0.1165,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,flat-roll,partial document + position,0.5048,0.0048,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,seq-roll,document + near-position,0.642,0.142,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,perm-b,position only,0.5017,0.0017,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,perm-t,document only,0.5187,0.0187,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,iid,nothing,0.5005,0.0005,192,0.0001
+flame38m_g3_moe,full,1e18,2,context,32,synth,autocorrelation only,0.5001,0.0001,192,0.0001
+flame38m_g3_temporal,temporal,1e18,2,token,0,real,nothing destroyed (the measurement),0.5756,0.0756,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,token,0,flat-roll,partial document + position,0.5001,0.0001,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,token,0,seq-roll,document + near-position,0.5279,0.0279,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,token,0,perm-b,position only,0.4993,-0.0007,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,token,0,perm-t,document only,0.5078,0.0078,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,token,0,iid,nothing,0.5005,0.0005,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,token,0,synth,autocorrelation only,0.4997,-0.0003,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,real,nothing destroyed (the measurement),0.7,0.2,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,flat-roll,partial document + position,0.4993,-0.0007,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,seq-roll,document + near-position,0.6008,0.1008,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,perm-b,position only,0.4978,-0.0022,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,perm-t,document only,0.5304,0.0304,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,iid,nothing,0.5003,0.0003,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,18,synth,autocorrelation only,0.4998,-0.0002,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,real,nothing destroyed (the measurement),0.6963,0.1963,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,flat-roll,partial document + position,0.5019,0.0019,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,seq-roll,document + near-position,0.6608,0.1608,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,perm-b,position only,0.494,-0.006,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,perm-t,document only,0.5316,0.0316,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,iid,nothing,0.4996,-0.0004,192,-0.0005
+flame38m_g3_temporal,temporal,1e18,2,context,32,synth,autocorrelation only,0.4999,-0.0001,192,-0.0005
+flame38m_g5_moe,full,1e18,2,token,0,real,nothing destroyed (the measurement),0.9341,0.4341,256,0.0025
+flame38m_g5_moe,full,1e18,2,token,0,flat-roll,partial document + position,0.5008,0.0008,256,0.0025
+flame38m_g5_moe,full,1e18,2,token,0,seq-roll,document + near-position,0.5201,0.0201,256,0.0025
+flame38m_g5_moe,full,1e18,2,token,0,perm-b,position only,0.5001,0.0001,256,0.0025
+flame38m_g5_moe,full,1e18,2,token,0,perm-t,document only,0.5043,0.0043,256,0.0025
+flame38m_g5_moe,full,1e18,2,token,0,iid,nothing,0.5004,0.0004,256,0.0025
+flame38m_g5_moe,full,1e18,2,token,0,synth,autocorrelation only,0.4996,-0.0004,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,real,nothing destroyed (the measurement),0.6291,0.1291,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,flat-roll,partial document + position,0.5004,0.0004,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,seq-roll,document + near-position,0.6504,0.1504,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,perm-b,position only,0.4983,-0.0017,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,perm-t,document only,0.5172,0.0172,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,iid,nothing,0.4995,-0.0005,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,30,synth,autocorrelation only,0.5003,0.0003,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,real,nothing destroyed (the measurement),0.6277,0.1277,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,flat-roll,partial document + position,0.5005,0.0005,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,seq-roll,document + near-position,0.6495,0.1495,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,perm-b,position only,0.4984,-0.0016,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,perm-t,document only,0.5175,0.0175,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,iid,nothing,0.4993,-0.0007,256,0.0025
+flame38m_g5_moe,full,1e18,2,context,32,synth,autocorrelation only,0.5006,0.0006,256,0.0025
+flame38m_g5_temporal,temporal,1e18,2,token,0,real,nothing destroyed (the measurement),0.5588,0.0588,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,token,0,flat-roll,partial document + position,0.4995,-0.0005,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,token,0,seq-roll,document + near-position,0.5262,0.0262,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,token,0,perm-b,position only,0.4983,-0.0017,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,token,0,perm-t,document only,0.5084,0.0084,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,token,0,iid,nothing,0.4997,-0.0003,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,token,0,synth,autocorrelation only,0.4992,-0.0008,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,real,nothing destroyed (the measurement),0.6744,0.1744,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,flat-roll,partial document + position,0.5007,0.0007,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,seq-roll,document + near-position,0.6328,0.1328,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,perm-b,position only,0.4953,-0.0047,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,perm-t,document only,0.5318,0.0318,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,iid,nothing,0.4995,-0.0005,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,30,synth,autocorrelation only,0.5001,0.0001,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,real,nothing destroyed (the measurement),0.6764,0.1764,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,flat-roll,partial document + position,0.5005,0.0005,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,seq-roll,document + near-position,0.6352,0.1352,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,perm-b,position only,0.495,-0.005,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,perm-t,document only,0.5316,0.0316,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,iid,nothing,0.4993,-0.0007,256,-0.0009
+flame38m_g5_temporal,temporal,1e18,2,context,32,synth,autocorrelation only,0.4995,-0.0005,256,-0.0009
+flame512_g1_moe,full,1e18,2,token,0,real,nothing destroyed (the measurement),0.871,0.371,64,0.0018
+flame512_g1_moe,full,1e18,2,token,0,flat-roll,partial document + position,0.4999,-0.0001,64,0.0018
+flame512_g1_moe,full,1e18,2,token,0,seq-roll,document + near-position,0.5076,0.0076,64,0.0018
+flame512_g1_moe,full,1e18,2,token,0,perm-b,position only,0.5003,0.0003,64,0.0018
+flame512_g1_moe,full,1e18,2,token,0,perm-t,document only,0.5014,0.0014,64,0.0018
+flame512_g1_moe,full,1e18,2,token,0,iid,nothing,0.4998,-0.0002,64,0.0018
+flame512_g1_moe,full,1e18,2,token,0,synth,autocorrelation only,0.5003,0.0003,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,real,nothing destroyed (the measurement),0.5945,0.0945,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,flat-roll,partial document + position,0.4988,-0.0012,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,seq-roll,document + near-position,0.5347,0.0347,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,perm-b,position only,0.4991,-0.0009,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,perm-t,document only,0.5081,0.0081,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,iid,nothing,0.5002,0.0002,64,0.0018
+flame512_g1_moe,full,1e18,2,context,6,synth,autocorrelation only,0.5012,0.0012,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,real,nothing destroyed (the measurement),0.5728,0.0728,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,flat-roll,partial document + position,0.4991,-0.0009,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,seq-roll,document + near-position,0.59,0.09,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,perm-b,position only,0.5003,0.0003,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,perm-t,document only,0.5089,0.0089,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,iid,nothing,0.4987,-0.0013,64,0.0018
+flame512_g1_moe,full,1e18,2,context,32,synth,autocorrelation only,0.4992,-0.0008,64,0.0018
+flame512_g1_temporal,temporal,1e18,2,token,0,real,nothing destroyed (the measurement),0.6118,0.1118,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,token,0,flat-roll,partial document + position,0.4996,-0.0004,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,token,0,seq-roll,document + near-position,0.5064,0.0064,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,token,0,perm-b,position only,0.5,0.0,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,token,0,perm-t,document only,0.5011,0.0011,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,token,0,iid,nothing,0.4999,-0.0001,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,token,0,synth,autocorrelation only,0.4997,-0.0003,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,real,nothing destroyed (the measurement),0.634,0.134,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,flat-roll,partial document + position,0.4998,-0.0002,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,seq-roll,document + near-position,0.5141,0.0141,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,perm-b,position only,0.4994,-0.0006,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,perm-t,document only,0.5068,0.0068,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,iid,nothing,0.5004,0.0004,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,6,synth,autocorrelation only,0.5003,0.0003,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,real,nothing destroyed (the measurement),0.5804,0.0804,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,flat-roll,partial document + position,0.5011,0.0011,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,seq-roll,document + near-position,0.5937,0.0937,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,perm-b,position only,0.5004,0.0004,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,perm-t,document only,0.5086,0.0086,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,iid,nothing,0.4991,-0.0009,64,-0.0015
+flame512_g1_temporal,temporal,1e18,2,context,32,synth,autocorrelation only,0.4993,-0.0007,64,-0.0015
+flame512_g3_moe,full,1e18,2,token,0,real,nothing destroyed (the measurement),0.8822,0.3822,192,0.002
+flame512_g3_moe,full,1e18,2,token,0,flat-roll,partial document + position,0.4999,-0.0001,192,0.002
+flame512_g3_moe,full,1e18,2,token,0,seq-roll,document + near-position,0.5116,0.0116,192,0.002
+flame512_g3_moe,full,1e18,2,token,0,perm-b,position only,0.5003,0.0003,192,0.002
+flame512_g3_moe,full,1e18,2,token,0,perm-t,document only,0.5031,0.0031,192,0.002
+flame512_g3_moe,full,1e18,2,token,0,iid,nothing,0.5003,0.0003,192,0.002
+flame512_g3_moe,full,1e18,2,token,0,synth,autocorrelation only,0.5,-0.0,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,real,nothing destroyed (the measurement),0.597,0.097,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,flat-roll,partial document + position,0.4994,-0.0006,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,seq-roll,document + near-position,0.6223,0.1223,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,perm-b,position only,0.5014,0.0014,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,perm-t,document only,0.5129,0.0129,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,iid,nothing,0.5005,0.0005,192,0.002
+flame512_g3_moe,full,1e18,2,context,18,synth,autocorrelation only,0.5001,0.0001,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,real,nothing destroyed (the measurement),0.5852,0.0852,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,flat-roll,partial document + position,0.4993,-0.0007,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,seq-roll,document + near-position,0.6095,0.1095,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,perm-b,position only,0.5012,0.0012,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,perm-t,document only,0.5136,0.0136,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,iid,nothing,0.4998,-0.0002,192,0.002
+flame512_g3_moe,full,1e18,2,context,32,synth,autocorrelation only,0.4991,-0.0009,192,0.002
+flame512_g3_temporal,temporal,1e18,2,token,0,real,nothing destroyed (the measurement),0.551,0.051,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,token,0,flat-roll,partial document + position,0.5003,0.0003,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,token,0,seq-roll,document + near-position,0.5098,0.0098,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,token,0,perm-b,position only,0.4995,-0.0005,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,token,0,perm-t,document only,0.5032,0.0032,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,token,0,iid,nothing,0.4998,-0.0002,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,token,0,synth,autocorrelation only,0.4997,-0.0003,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,real,nothing destroyed (the measurement),0.6055,0.1055,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,flat-roll,partial document + position,0.5012,0.0012,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,seq-roll,document + near-position,0.5416,0.0416,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,perm-b,position only,0.5,-0.0,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,perm-t,document only,0.5145,0.0145,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,iid,nothing,0.5008,0.0008,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,18,synth,autocorrelation only,0.5004,0.0004,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,real,nothing destroyed (the measurement),0.5933,0.0933,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,flat-roll,partial document + position,0.4994,-0.0006,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,seq-roll,document + near-position,0.5706,0.0706,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,perm-b,position only,0.4991,-0.0009,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,perm-t,document only,0.5139,0.0139,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,iid,nothing,0.5001,0.0001,192,0.0008
+flame512_g3_temporal,temporal,1e18,2,context,32,synth,autocorrelation only,0.5,-0.0,192,0.0008
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,real,nothing destroyed (the measurement),0.6139,0.1139,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,flat-roll,partial document + position,0.5001,0.0001,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,seq-roll,document + near-position,0.5041,0.0041,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,perm-b,position only,0.4996,-0.0004,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,perm-t,document only,0.5011,0.0011,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,iid,nothing,0.5019,0.0019,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,token,0,synth,autocorrelation only,0.4988,-0.0012,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,real,nothing destroyed (the measurement),0.6323,0.1323,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,flat-roll,partial document + position,0.4987,-0.0013,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,seq-roll,document + near-position,0.5091,0.0091,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,perm-b,position only,0.4986,-0.0014,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,perm-t,document only,0.5026,0.0026,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,iid,nothing,0.5009,0.0009,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,6,synth,autocorrelation only,0.4987,-0.0013,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,real,nothing destroyed (the measurement),0.5658,0.0658,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,flat-roll,partial document + position,0.4986,-0.0014,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,seq-roll,document + near-position,0.5788,0.0788,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,perm-b,position only,0.4987,-0.0013,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,perm-t,document only,0.5052,0.0052,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,iid,nothing,0.5006,0.0006,64,0.0007
+g1_tmoe_coarse_1e19,temporal,1e19,2,context,32,synth,autocorrelation only,0.5007,0.0007,64,0.0007
+g3_moe_s0_1e16,full,1e16,2,token,0,real,nothing destroyed (the measurement),0.9381,0.4381,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,token,0,flat-roll,partial document + position,0.5003,0.0003,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,token,0,seq-roll,document + near-position,0.5234,0.0234,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,token,0,perm-b,position only,0.4996,-0.0004,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,token,0,perm-t,document only,0.5049,0.0049,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,token,0,iid,nothing,0.499,-0.001,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,token,0,synth,autocorrelation only,0.4996,-0.0004,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,real,nothing destroyed (the measurement),0.6247,0.1247,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,flat-roll,partial document + position,0.4969,-0.0031,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,seq-roll,document + near-position,0.6471,0.1471,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,perm-b,position only,0.4993,-0.0007,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,perm-t,document only,0.5137,0.0137,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,iid,nothing,0.4995,-0.0005,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,18,synth,autocorrelation only,0.501,0.001,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,real,nothing destroyed (the measurement),0.6093,0.1093,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,flat-roll,partial document + position,0.496,-0.004,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,seq-roll,document + near-position,0.6262,0.1262,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,perm-b,position only,0.499,-0.001,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,perm-t,document only,0.5136,0.0136,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,iid,nothing,0.5003,0.0003,192,-0.0008
+g3_moe_s0_1e16,full,1e16,2,context,32,synth,autocorrelation only,0.5011,0.0011,192,-0.0008
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,real,nothing destroyed (the measurement),0.9359,0.4359,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,flat-roll,partial document + position,0.4997,-0.0003,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,seq-roll,document + near-position,0.5248,0.0248,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,perm-b,position only,0.4997,-0.0003,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,perm-t,document only,0.504,0.004,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,iid,nothing,0.4988,-0.0012,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,token,0,synth,autocorrelation only,0.5005,0.0005,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,real,nothing destroyed (the measurement),0.6379,0.1379,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,flat-roll,partial document + position,0.4985,-0.0015,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,seq-roll,document + near-position,0.6578,0.1578,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,perm-b,position only,0.4956,-0.0044,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,perm-t,document only,0.5169,0.0169,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,iid,nothing,0.4991,-0.0009,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,18,synth,autocorrelation only,0.5007,0.0007,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,real,nothing destroyed (the measurement),0.6221,0.1221,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,flat-roll,partial document + position,0.496,-0.004,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,seq-roll,document + near-position,0.6381,0.1381,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,perm-b,position only,0.4952,-0.0048,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,perm-t,document only,0.5182,0.0182,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,iid,nothing,0.4996,-0.0004,192,-0.0013
+g3_moe_s0_1e16_sigmoid_seed2,full,1e16,2,context,32,synth,autocorrelation only,0.5008,0.0008,192,-0.0013
+g3_moe_s1_1e16,full,1e16,2,token,0,real,nothing destroyed (the measurement),0.8933,0.3933,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,token,0,flat-roll,partial document + position,0.5003,0.0003,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,token,0,seq-roll,document + near-position,0.5156,0.0156,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,token,0,perm-b,position only,0.4996,-0.0004,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,token,0,perm-t,document only,0.501,0.001,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,token,0,iid,nothing,0.498,-0.002,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,token,0,synth,autocorrelation only,0.4999,-0.0001,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,real,nothing destroyed (the measurement),0.6108,0.1108,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,flat-roll,partial document + position,0.4998,-0.0002,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,seq-roll,document + near-position,0.6303,0.1303,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,perm-b,position only,0.498,-0.002,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,perm-t,document only,0.5123,0.0123,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,iid,nothing,0.4997,-0.0003,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,18,synth,autocorrelation only,0.5003,0.0003,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,real,nothing destroyed (the measurement),0.5997,0.0997,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,flat-roll,partial document + position,0.499,-0.001,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,seq-roll,document + near-position,0.616,0.116,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,perm-b,position only,0.4967,-0.0033,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,perm-t,document only,0.5124,0.0124,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,iid,nothing,0.4991,-0.0009,192,-0.0002
+g3_moe_s1_1e16,full,1e16,2,context,32,synth,autocorrelation only,0.5,0.0,192,-0.0002
+g3_moe_s1_1e17,full,1e17,2,token,0,real,nothing destroyed (the measurement),0.9407,0.4407,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,token,0,flat-roll,partial document + position,0.5005,0.0005,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,token,0,seq-roll,document + near-position,0.5203,0.0203,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,token,0,perm-b,position only,0.4994,-0.0006,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,token,0,perm-t,document only,0.5034,0.0034,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,token,0,iid,nothing,0.5007,0.0007,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,token,0,synth,autocorrelation only,0.5007,0.0007,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,real,nothing destroyed (the measurement),0.6261,0.1261,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,flat-roll,partial document + position,0.4977,-0.0023,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,seq-roll,document + near-position,0.652,0.152,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,perm-b,position only,0.5001,0.0001,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,perm-t,document only,0.5128,0.0128,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,iid,nothing,0.5015,0.0015,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,18,synth,autocorrelation only,0.5005,0.0005,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,real,nothing destroyed (the measurement),0.6131,0.1131,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,flat-roll,partial document + position,0.4965,-0.0035,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,seq-roll,document + near-position,0.6327,0.1327,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,perm-b,position only,0.4989,-0.0011,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,perm-t,document only,0.5154,0.0154,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,iid,nothing,0.5012,0.0012,192,-0.0007
+g3_moe_s1_1e17,full,1e17,2,context,32,synth,autocorrelation only,0.4999,-0.0001,192,-0.0007
+g3_moe_s2_1e17,full,1e17,2,token,0,real,nothing destroyed (the measurement),0.8938,0.3938,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,token,0,flat-roll,partial document + position,0.5002,0.0002,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,token,0,seq-roll,document + near-position,0.5163,0.0163,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,token,0,perm-b,position only,0.4994,-0.0006,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,token,0,perm-t,document only,0.5018,0.0018,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,token,0,iid,nothing,0.5007,0.0007,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,token,0,synth,autocorrelation only,0.5003,0.0003,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,real,nothing destroyed (the measurement),0.6258,0.1258,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,flat-roll,partial document + position,0.4992,-0.0008,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,seq-roll,document + near-position,0.6393,0.1393,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,perm-b,position only,0.5002,0.0002,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,perm-t,document only,0.5123,0.0123,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,iid,nothing,0.5,0.0,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,18,synth,autocorrelation only,0.5,-0.0,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,real,nothing destroyed (the measurement),0.6093,0.1093,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,flat-roll,partial document + position,0.5001,0.0001,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,seq-roll,document + near-position,0.6231,0.1231,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,perm-b,position only,0.5013,0.0013,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,perm-t,document only,0.5123,0.0123,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,iid,nothing,0.5008,0.0008,192,-0.0011
+g3_moe_s2_1e17,full,1e17,2,context,32,synth,autocorrelation only,0.5,0.0,192,-0.0011
+g3_moe_s3_1e17,full,1e17,2,token,0,real,nothing destroyed (the measurement),0.8935,0.3935,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,token,0,flat-roll,partial document + position,0.5003,0.0003,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,token,0,seq-roll,document + near-position,0.5134,0.0134,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,token,0,perm-b,position only,0.4999,-0.0001,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,token,0,perm-t,document only,0.5011,0.0011,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,token,0,iid,nothing,0.5002,0.0002,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,token,0,synth,autocorrelation only,0.4999,-0.0001,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,real,nothing destroyed (the measurement),0.6108,0.1108,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,flat-roll,partial document + position,0.4997,-0.0003,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,seq-roll,document + near-position,0.6303,0.1303,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,perm-b,position only,0.5008,0.0008,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,perm-t,document only,0.5109,0.0109,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,iid,nothing,0.4999,-0.0001,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,18,synth,autocorrelation only,0.4999,-0.0001,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,real,nothing destroyed (the measurement),0.5957,0.0957,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,flat-roll,partial document + position,0.4989,-0.0011,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,seq-roll,document + near-position,0.6126,0.1126,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,perm-b,position only,0.4996,-0.0004,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,perm-t,document only,0.5109,0.0109,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,iid,nothing,0.5004,0.0004,192,-0.0006
+g3_moe_s3_1e17,full,1e17,2,context,32,synth,autocorrelation only,0.5007,0.0007,192,-0.0006
+g3_moe_sm1_1e16,full,1e16,2,token,0,real,nothing destroyed (the measurement),0.9507,0.4507,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,token,0,flat-roll,partial document + position,0.4996,-0.0004,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,token,0,seq-roll,document + near-position,0.5294,0.0294,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,token,0,perm-b,position only,0.5001,0.0001,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,token,0,perm-t,document only,0.5046,0.0046,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,token,0,iid,nothing,0.5004,0.0004,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,token,0,synth,autocorrelation only,0.5007,0.0007,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,real,nothing destroyed (the measurement),0.6382,0.1382,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,flat-roll,partial document + position,0.4994,-0.0006,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,seq-roll,document + near-position,0.6569,0.1569,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,perm-b,position only,0.4986,-0.0014,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,perm-t,document only,0.5203,0.0203,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,iid,nothing,0.5004,0.0004,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,18,synth,autocorrelation only,0.4997,-0.0003,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,real,nothing destroyed (the measurement),0.625,0.125,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,flat-roll,partial document + position,0.499,-0.001,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,seq-roll,document + near-position,0.6436,0.1436,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,perm-b,position only,0.497,-0.003,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,perm-t,document only,0.5225,0.0225,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,iid,nothing,0.5016,0.0016,192,-0.0014
+g3_moe_sm1_1e16,full,1e16,2,context,32,synth,autocorrelation only,0.4999,-0.0001,192,-0.0014
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,real,nothing destroyed (the measurement),0.6079,0.1079,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,flat-roll,partial document + position,0.4999,-0.0001,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,seq-roll,document + near-position,0.5419,0.0419,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,perm-b,position only,0.5006,0.0006,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,perm-t,document only,0.5134,0.0134,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,iid,nothing,0.5007,0.0007,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,token,0,synth,autocorrelation only,0.4999,-0.0001,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,real,nothing destroyed (the measurement),0.7409,0.2409,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,flat-roll,partial document + position,0.4999,-0.0001,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,seq-roll,document + near-position,0.6494,0.1494,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,perm-b,position only,0.4981,-0.0019,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,perm-t,document only,0.5449,0.0449,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,iid,nothing,0.5,0.0,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,18,synth,autocorrelation only,0.4993,-0.0007,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,real,nothing destroyed (the measurement),0.7312,0.2312,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,flat-roll,partial document + position,0.4982,-0.0018,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,seq-roll,document + near-position,0.7041,0.2041,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,perm-b,position only,0.4979,-0.0021,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,perm-t,document only,0.5493,0.0493,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,iid,nothing,0.5004,0.0004,165,-0.0025
+g3_tmoe_s0_1e16_mom,temporal,1e16,2,context,32,synth,autocorrelation only,0.5002,0.0002,165,-0.0025
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,real,nothing destroyed (the measurement),0.58,0.08,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,flat-roll,partial document + position,0.5011,0.0011,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,seq-roll,document + near-position,0.5212,0.0212,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,perm-b,position only,0.4995,-0.0005,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,perm-t,document only,0.506,0.006,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,iid,nothing,0.5012,0.0012,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,token,0,synth,autocorrelation only,0.4987,-0.0013,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,real,nothing destroyed (the measurement),0.6979,0.1979,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,flat-roll,partial document + position,0.4999,-0.0001,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,seq-roll,document + near-position,0.5962,0.0962,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,perm-b,position only,0.5007,0.0007,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,perm-t,document only,0.5205,0.0205,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,iid,nothing,0.4996,-0.0004,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,18,synth,autocorrelation only,0.5008,0.0008,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,real,nothing destroyed (the measurement),0.6766,0.1766,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,flat-roll,partial document + position,0.4981,-0.0019,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,seq-roll,document + near-position,0.6539,0.1539,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,perm-b,position only,0.5007,0.0007,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,perm-t,document only,0.5232,0.0232,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,iid,nothing,0.4997,-0.0003,175,0.0006
+g3_tmoe_s2_1e17,temporal,1e17,2,context,32,synth,autocorrelation only,0.5002,0.0002,175,0.0006
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,real,nothing destroyed (the measurement),0.5635,0.0635,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,flat-roll,partial document + position,0.5005,0.0005,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,seq-roll,document + near-position,0.5214,0.0214,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,perm-b,position only,0.5017,0.0017,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,perm-t,document only,0.5068,0.0068,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,iid,nothing,0.5006,0.0006,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,token,0,synth,autocorrelation only,0.5006,0.0006,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,real,nothing destroyed (the measurement),0.645,0.145,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,flat-roll,partial document + position,0.5004,0.0004,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,seq-roll,document + near-position,0.5728,0.0728,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,perm-b,position only,0.5012,0.0012,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,perm-t,document only,0.5245,0.0245,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,iid,nothing,0.4995,-0.0005,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,18,synth,autocorrelation only,0.4998,-0.0002,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,real,nothing destroyed (the measurement),0.6429,0.1429,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,flat-roll,partial document + position,0.5006,0.0006,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,seq-roll,document + near-position,0.6118,0.1118,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,perm-b,position only,0.5011,0.0011,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,perm-t,document only,0.5259,0.0259,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,iid,nothing,0.4999,-0.0001,182,0.0
+g3_tmoe_s3_1e17,temporal,1e17,2,context,32,synth,autocorrelation only,0.4996,-0.0004,182,0.0
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,real,nothing destroyed (the measurement),0.6002,0.1002,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,flat-roll,partial document + position,0.5003,0.0003,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,seq-roll,document + near-position,0.5453,0.0453,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,perm-b,position only,0.499,-0.001,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,perm-t,document only,0.5135,0.0135,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,iid,nothing,0.5001,0.0001,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,token,0,synth,autocorrelation only,0.4999,-0.0001,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,real,nothing destroyed (the measurement),0.7334,0.2334,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,flat-roll,partial document + position,0.5017,0.0017,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,seq-roll,document + near-position,0.6587,0.1587,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,perm-b,position only,0.4986,-0.0014,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,perm-t,document only,0.5467,0.0467,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,iid,nothing,0.5009,0.0009,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,18,synth,autocorrelation only,0.5002,0.0002,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,real,nothing destroyed (the measurement),0.7222,0.2222,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,flat-roll,partial document + position,0.5015,0.0015,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,seq-roll,document + near-position,0.7042,0.2042,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,perm-b,position only,0.4977,-0.0023,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,perm-t,document only,0.5493,0.0493,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,iid,nothing,0.5005,0.0005,192,-0.0009
+g3_tmoe_sm1_1e16,temporal,1e16,2,context,32,synth,autocorrelation only,0.5001,0.0001,192,-0.0009
+moe_coarse_1e19,full,1e19,2,token,0,real,nothing destroyed (the measurement),0.8476,0.3476,64,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,flat-roll,partial document + position,0.5001,0.0001,64,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,seq-roll,document + near-position,0.5008,0.0008,64,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,perm-b,position only,0.501,0.001,64,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,perm-t,document only,0.4987,-0.0013,64,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,iid,nothing,0.4988,-0.0012,64,0.0023
+moe_coarse_1e19,full,1e19,2,token,0,synth,autocorrelation only,0.4989,-0.0011,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,real,nothing destroyed (the measurement),0.5483,0.0483,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,flat-roll,partial document + position,0.4985,-0.0015,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,seq-roll,document + near-position,0.5073,0.0073,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,perm-b,position only,0.5002,0.0002,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,perm-t,document only,0.5013,0.0013,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,iid,nothing,0.5005,0.0005,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,6,synth,autocorrelation only,0.5002,0.0002,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,real,nothing destroyed (the measurement),0.5217,0.0217,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,flat-roll,partial document + position,0.5009,0.0009,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,seq-roll,document + near-position,0.5429,0.0429,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,perm-b,position only,0.5003,0.0003,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,perm-t,document only,0.5022,0.0022,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,iid,nothing,0.4996,-0.0004,64,0.0023
+moe_coarse_1e19,full,1e19,2,context,32,synth,autocorrelation only,0.5008,0.0008,64,0.0023
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,real,nothing destroyed (the measurement),0.5467,0.0467,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,flat-roll,partial document + position,0.5,-0.0,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,seq-roll,document + near-position,0.5066,0.0066,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,perm-b,position only,0.5002,0.0002,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,perm-t,document only,0.5011,0.0011,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,iid,nothing,0.4997,-0.0003,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,token,0,synth,autocorrelation only,0.5,0.0,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,real,nothing destroyed (the measurement),0.6048,0.1048,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,flat-roll,partial document + position,0.5014,0.0014,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,seq-roll,document + near-position,0.5299,0.0299,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,perm-b,position only,0.4996,-0.0004,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,perm-t,document only,0.5066,0.0066,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,iid,nothing,0.5005,0.0005,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,18,synth,autocorrelation only,0.5002,0.0002,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,real,nothing destroyed (the measurement),0.5899,0.0899,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,flat-roll,partial document + position,0.5006,0.0006,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,seq-roll,document + near-position,0.5678,0.0678,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,perm-b,position only,0.4983,-0.0017,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,perm-t,document only,0.5091,0.0091,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,iid,nothing,0.5003,0.0003,192,-0.0011
+temporal_fine_g3_1e19,temporal,1e19,2,context,32,synth,autocorrelation only,0.5006,0.0006,192,-0.0011

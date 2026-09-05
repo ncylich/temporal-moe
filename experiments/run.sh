@@ -30,6 +30,22 @@ case $SHAPE in
   s5) H=448; L=9;  FFN=2394; MOE_FFN=308;;
   s6) H=512; L=10; FFN=2736; MOE_FFN=352;;
   s19opt) H=800; L=14; FFN=4272; MOE_FFN=550;;  # 1e19 compute-optimal (t19 panel), N_active ~184.1M
+  # The 1e18 panel. These three were trained by their own launchers in experiments/scale_1e18_1e19/
+  # with the geometry hardcoded, so run.sh could not address them at all and the probe branches were
+  # unreachable for the whole 1e18 fleet. Each entry reproduces its launcher's geometry exactly under
+  # run.sh's own derivation rules -- verified against every field of the runs' committed run.meta:
+  #   s38m  flame38m_*   H=256 ffn=1368 moe_ffn=176 -> g1: 64E/top-6/shared 352
+  #                                                     g3: 192E/top-18/moe_ffn 58/shared 352
+  #   s192f flame192_*   H=192 ffn=1026 moe_ffn=132 -> g3: moe_ffn 44, shared 264
+  #   s512f flame512_*   H=512 ffn=2736 moe_ffn=352 -> g3: moe_ffn 118, shared 704
+  # All three are L=9. The panel varies hidden size at FIXED depth, which is what makes it an isoFLOP
+  # panel; flame_scale_run.sh takes --num-layers ${N_LAYERS:-9} and none of the three overrides it.
+  # Depth was briefly inferred from the 1e16/1e17 shape sharing each ffn (s1 is L=5, s6 is L=10) and
+  # that is wrong -- it built a 10-layer model against a 9-layer checkpoint and died on a missing
+  # decoder.layers.9. Verified against the checkpoints: transformer layers 0..8, MoE modules 1..8.
+  s38m)  H=256; L=9; FFN=1368; MOE_FFN=176;;
+  s192f) H=192; L=9; FFN=1026; MOE_FFN=132;;
+  s512f) H=512; L=9; FFN=2736; MOE_FFN=352;;
   *) echo "bad SHAPE $SHAPE"; exit 1;;
 esac
 MOE_LAYER_FREQ="[0]+[1]*$((L-1))"
@@ -164,7 +180,7 @@ LOG_ARGS=(
   --tensorboard-dir "$OUT/tb"     # sets a writer so track_moe_metrics logs each aux loss
 )                                 # (load_balancing_loss, z_loss, coherence_loss) individually in
                                   # the train log + tensorboard, separate from (not summed into) 'lm loss'.
-[ "${DENSE:-0}" != "1" ] && LOG_ARGS+=(--moe-per-layer-logging)
+[ "${DENSE:-0}" != "1" ] && [ -z "${MOE_NO_LAYER_LOG:-}" ] && LOG_ARGS+=(--moe-per-layer-logging)
 
 cd Megatron-LM
 if [ "${PROBE:-0}" = "1" ]; then
@@ -189,6 +205,99 @@ elif [ "${ACTPROBE:-0}" = "1" ]; then
     --finetune --train-iters 6 --lr-warmup-iters 1 --save-interval 100000 --eval-iters 1 \
     --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
     2>&1 | tee "$OUT/actprobe.log"
+elif [ "${DELEXPROBE:-0}" = "1" ]; then
+  # De-lexicalization capture: one pass over a fixed batch, recording token input embeddings, every
+  # MoE layer's router logits and resident mask, and per-expert output sums. This is the input to the
+  # whole locus/lens/structural family (analysis/probes/delex_*.py).
+  #
+  # The three captures in MANIFEST.csv were produced ad hoc and this branch was never committed, so
+  # the family had no reproducible driver. Modelled on PROBE=1 above; --nproc_per_node=1 is correct
+  # for a single-GPU pod.
+  #
+  # N_MB is the number of micro-batches accumulated. Every published locus/lens number is on the same
+  # fixed batch of 64 sequences x 2048 tokens = 131k tokens, and micro-batch differs by shape (8 at
+  # s19opt, 64 at s0), so N_MB defaults to whatever reaches 64 sequences rather than to a constant.
+  # Override it only to deliberately change the batch, and note that doing so makes the capture
+  # non-comparable with every other cell.
+  export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  export DELEX_OUT=$OUT/delex_capture.pt
+  export N_MB=${N_MB:-$(( (64 + MICRO_BATCH - 1) / MICRO_BATCH ))}
+  # Weights frozen (--lr 0 --min-lr 0): with --finetune the iteration counter resets, so the warmup
+  # iters would otherwise run at ~PEAK LR and perturb the model before it is captured. delex_probe.py
+  # records the first N_MB micro-batches, which all fall inside the first iteration whenever
+  # N_MB <= GLOBAL_BATCH/MICRO_BATCH, but freezing makes that independent of the arithmetic.
+  # Throwaway --save, so the real checkpoint is never written to.
+  echo "[delexprobe] N_MB=$N_MB x mb=$MICRO_BATCH = $((N_MB * MICRO_BATCH)) sequences, TEMPORAL=$TEMPORAL"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/delex_probe.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/delexprobe.log"
+elif [ "${EODPROBE:-0}" = "1" ]; then
+  # 1f: produce the end-of-document mask e8 needs. Same pipeline and batch as PROBE=1, so the mask
+  # lines up with the router logs e8 replays; frozen weights because only the input ids matter.
+  export N_MB=${N_MB:-$(( (64 + MICRO_BATCH - 1) / MICRO_BATCH ))}
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/eod_capture.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/eodprobe.log"
+elif [ "${SWEEPEVAL:-0}" = "1" ]; then
+  # In-process sweep: load the model once and evaluate it under every residency setting in $SWEEP,
+  # replacing one process per arm. Startup dominates a single arm (~4 of 7 minutes), so this is where
+  # nearly all of a sweep's wall-clock goes. --train-iters 0 because nothing here trains; the frozen
+  # iterations the other branches inherit are pure overhead when no capture depends on them.
+  export TEMPORAL=${TEMPORAL:-1} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  echo "[sweepeval] SWEEP='$SWEEP'"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/sweep_eval.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --save /tmp/probe_junk_ckpt $EXTRA_ARGS ${SWEEP_EXTRA:-} \
+    2>&1 | tee "$OUT/sweepeval.log"
+elif [ "${SUBSTEVAL:-0}" = "1" ]; then
+  # Substitution tolerance (Appendix B): one process per checkpoint, every perturbation arm scored
+  # in-process on the same cached test micro-batches. Same frozen-weight, throwaway-save discipline
+  # as SWEEPEVAL. The temporal router is always installed; a full MoE runs with R = num_experts.
+  export TEMPORAL=1 TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  echo "[substeval] R=$TEMPORAL_RESIDENCY_R regime=${SUBST_REGIME:-?} nseq=${SUBST_NSEQ:-512} out=${SUBST_OUT:-}"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/substitution_eval.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters ${SUBST_EVAL_ITERS:-1} --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/substeval.log"
+elif [ "${EXPERTSIM:-0}" = "1" ]; then
+  # Expert output similarity (Appendix C mechanism check for substitution tolerance): one
+  # micro-batch, every routed expert evaluated on the same sampled inputs, per-layer similarity
+  # metrics. Frozen weights, throwaway save. A run name without a checkpoint gives the
+  # random-init calibration cell.
+  export TEMPORAL=1 TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  echo "[expertsim] R=$TEMPORAL_RESIDENCY_R regime=${EXPSIM_REGIME:-?} N=${EXPSIM_N:-2048} out=${EXPSIM_OUT:-}"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/expert_similarity.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 1 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/expertsim.log"
+elif [ "${CAUSALPROBE:-0}" = "1" ]; then
+  # C8 / N6: causal token-versus-context substitution. One invocation per arm (CAUSAL_ARM in
+  # ref|token|context); the three are compared offline and the analysis refuses to compare arms whose
+  # input-id hashes differ, which is what makes separate invocations sound. Same frozen-weight,
+  # throwaway-save discipline as DELEXPROBE.
+  export TEMPORAL=${TEMPORAL:-0} TEMPORAL_EVICT=${TEMPORAL_EVICT:-min_logit}
+  export CAUSAL_ARM=${CAUSAL_ARM:-ref}
+  export CAUSAL_OUT=${CAUSAL_OUT:-$OUT/causal_${CAUSAL_ARM}.pt}
+  export N_MB=${N_MB:-$(( (64 + MICRO_BATCH - 1) / MICRO_BATCH ))}
+  echo "[causalprobe] arm=$CAUSAL_ARM N_MB=$N_MB x mb=$MICRO_BATCH, TEMPORAL=$TEMPORAL"
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
+    $ROOT/analysis/probes/delex_causal.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-warmup-iters 1 --save-interval 100000 \
+    --eval-iters 1 --save /tmp/probe_junk_ckpt $EXTRA_ARGS \
+    2>&1 | tee "$OUT/causalprobe_${CAUSAL_ARM}.log"
 elif [ "${QUANTEVAL:-0}" = "1" ]; then
   # Stability Part E: RTN fake-quant routed-expert weights (QUANT_BITS, group QUANT_GROUP) then
   # test-set eval. --finetune resets consumed_samples to 0 (end-of-training checkpoints have
@@ -218,6 +327,11 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   # LR (not min-LR as an earlier comment claimed) — 10 such iters measurably corrupt a checkpoint
   # before eval (smoke: BPB 1.93 vs 1.4753 baseline). The temporal eval path therefore freezes
   # weights outright (--lr 0 --min-lr 0): routers/banners still fire, eval is of the true ckpt.
+  # EVAL_TRAIN_ITERS: the temporal eval path freezes weights (--lr 0 --min-lr 0), so every training
+  # iteration before the eval is forward+backward that changes nothing -- measured at 9.1 s each, 91 s
+  # per arm of the ~7 min total. 10 was needed by the expert_load path, whose router hook has to see
+  # real forward passes; the frozen temporal path needs only enough to reach the eval. Lowering it
+  # cannot change a result: identical weights in, identical eval out.
   EVAL_ENTRY=$ROOT/analysis/probes/expert_load.py; EVAL_LOG=expert_load.log; EVAL_FREEZE=""
   if [ "${TEMPORAL:-0}" = "1" ]; then
     EVAL_ENTRY=$ROOT/temporal/pretrain_temporal.py; EVAL_LOG=eval_temporal.log
@@ -226,7 +340,7 @@ elif [ "${EVAL_ONLY:-0}" = "1" ]; then
   "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} \
     $EVAL_ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" \
-    --finetune --train-iters 10 --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
+    --finetune --train-iters ${EVAL_TRAIN_ITERS:-10} --lr-warmup-iters 1 --save-interval 100000 --eval-iters ${EVAL_ITERS:-1} $EVAL_FREEZE $EXTRA_ARGS \
     2>&1 | tee "$OUT/$EVAL_LOG"
 else
   # TEMPORAL=1: rolling-residency MoE -> run via pretrain_temporal.py (installs the router patch,

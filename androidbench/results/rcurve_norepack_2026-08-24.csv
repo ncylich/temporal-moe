@@ -1,0 +1,4 @@
+ts,model,R,ctx,decode_tps,stddev_tps,ceiling_tps,fetches,evictions,fetched_mib,avg_fetch_us,experts_per_layer_tok,peak_swap_mb,mean_clk0,mean_clk4,mean_clk7,throttled,void,note
+10:46:34,e80_ceiling,80,0,28.587189,1.263303,,0,0,0.0,0.0,0.0,0,1950000.0,2600000.0,3105000.0,False,False,norepack ceilplain
+10:48:18,fine,18,0,12.044433,0.313786,,83566,81034,17627.2,1064.9,1.612,0,1950000.0,2600000.0,3105000.0,False,False,replication target
+10:49:52,fine,36,0,17.294087,0.5741,,31494,26602,6643.3,1234.2,0.608,0,1950000.0,2600000.0,3105000.0,False,False,replication target

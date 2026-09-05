@@ -1,0 +1,25 @@
+"# OLMoE-1B-7B residency re-measured with gate mass preserved. The published numbers used gate_mass=renorm, which on a norm_topk_prob=False model raises the top-k gate mass from ~0.40 to 1.0 and scales every MoE block output by ~2.5x over 16 layers. 'renorm' rows reproduce the published intervention; 'preserve' rows select from the masked distribution but weight from the unmasked one. free_baseline 0.670290. Producer: analysis/residency/olmoe_remeasure.py"
+cell,R,gate_mass,bpb,n_seq,secs,damage_vs_free
+free_baseline,8,preserve,0.670290,16,2.1,+0.000000
+constrained_R8,8,renorm,2.671729,16,2.8,+2.001439
+constrained_R8,8,preserve,0.839290,16,1.8,+0.169000
+all_constrained_R8,8,preserve,0.839290,16,1.8,+0.169000
+all_constrained_R16,16,preserve,0.768393,16,2.0,+0.098103
+all_constrained_R32,32,preserve,0.713203,16,1.8,+0.042913
+all_constrained_R64,64,preserve,0.670290,16,1.8,+0.000000
+solo_L00,8,preserve,0.676727,16,1.5,+0.006437
+solo_L01,8,preserve,0.676235,16,1.5,+0.005945
+solo_L02,8,preserve,0.675052,16,1.5,+0.004762
+solo_L03,8,preserve,0.674824,16,1.5,+0.004534
+solo_L04,8,preserve,0.674798,16,1.5,+0.004508
+solo_L05,8,preserve,0.674055,16,1.5,+0.003765
+solo_L06,8,preserve,0.675373,16,1.5,+0.005083
+solo_L07,8,preserve,0.675561,16,1.5,+0.005271
+solo_L08,8,preserve,0.675793,16,1.5,+0.005503
+solo_L09,8,preserve,0.678337,16,1.5,+0.008047
+solo_L10,8,preserve,0.679894,16,1.5,+0.009604
+solo_L11,8,preserve,0.678137,16,1.5,+0.007847
+solo_L12,8,preserve,0.679629,16,1.5,+0.009339
+solo_L13,8,preserve,0.678476,16,1.5,+0.008186
+solo_L14,8,preserve,0.681640,16,1.5,+0.011350
+solo_L15,8,preserve,0.692622,16,1.5,+0.022332

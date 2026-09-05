@@ -39,7 +39,7 @@ def panel(ax, tps_A, tps_C, title):
     ax.set_ylim(0, max(tps_A)*1.12); ax.set_title(title); ax.grid(True, ls=":", alpha=0.35)
     return axr
 
-fig, (axp, axd) = plt.subplots(1, 2, figsize=(7.4, 3.1))
+fig, (axp, axd) = plt.subplots(1, 2, figsize=(7.4, 2.8))
 panel(axp, A_pp, C_pp, "Prefill")
 panel(axd, A_tg, C_tg, "Decode (100-token gen)")
 # legend: method = color, metric = linestyle (kept separate so the dotted 8 GB line reads as VRAM)

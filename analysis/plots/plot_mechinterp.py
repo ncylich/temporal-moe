@@ -96,7 +96,9 @@ R, bpb = [], []
 with open(os.path.join(DATA, "rsweep.csv")) as f:
     for r in csv.DictReader(f):
         R.append(int(r["R"])); bpb.append(float(r["test_bpb"]))
-fig, ax = plt.subplots(figsize=(4.5, 4.15) if PAPER else (6.6, 5.2))
+# Wider than tall: five monotone points do not need a square, and the figure now stands
+# in its own half-width column beside the locus panel.
+fig, ax = plt.subplots(figsize=(4.9, 3.05) if PAPER else (6.6, 5.2))
 ax.plot(R, bpb, "-", color="#145a14", lw=2.0, zorder=2)
 ax.scatter(R[:-1], bpb[:-1], s=64, color="#145a14", zorder=3, label="temporal, cache $R$")
 ax.scatter(R[-1:], bpb[-1:], s=74, color="#0d3b66", marker="s", zorder=3, label="full MoE ($R{=}E$)")
@@ -105,6 +107,7 @@ ax.annotate("$R{=}k$", (R[0], bpb[0]), textcoords="offset points", xytext=(9, -5
 ax.grid(True, ls=":", alpha=0.4)
 ax.set_xticks(R)
 ax.set_xlim(4, 206)
+ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(0.005))   # 0.023 BPB total range
 ax.set_xlabel("resident experts $R$ (of 192)")
 ax.set_ylabel("held-out BPB")
 ax.set_title("Residency dose")

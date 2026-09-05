@@ -37,7 +37,12 @@ except Exception:                                           # triton missing -> 
 
 
 def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
-                          tau: float = 0.0, ema_beta: float = 1.0) -> torch.Tensor:
+                          tau: float = 0.0, ema_beta: float = 1.0,
+                          swaps: int = 1,
+                          init_resident: torch.Tensor = None,
+                          init_refresh: torch.Tensor = None,
+                          t0: int = 0,
+                          return_state: dict = None) -> torch.Tensor:
     """Rolling-residency expert selection.
 
     Args:
@@ -71,7 +76,12 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
     Refresh times (for "lru"): cold-fill experts rank by ascending logit (lowest = oldest); each
     nomination is the newest. All resident refresh times stay distinct, so eviction is deterministic.
     """
+    # swaps: budget of resident-set changes per token (the swap-axis knob; 1 == shipped).
+    # Each sub-swap repeats the same trigger: best non-resident vs worst resident. The greedy
+    # exchange converges to top-k(logits[t]) in <= k sub-swaps, so swaps >= k reproduces the
+    # unconstrained per-token top-k exactly -- the analytic anchor the tests check.
     assert evict in ("lru", "min_logit"), f"unknown evict policy {evict!r}"
+    assert swaps >= 1
     use_lru = evict == "lru"
     S, B, E = logits.shape
     dev = logits.device
@@ -87,6 +97,42 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
     refresh = torch.full((B, E), NEG, device=dev)           # last-refresh time per expert ("lru" only)
     out = torch.zeros(S, B, E, dtype=torch.bool, device=dev)
 
+    # --- RESUME: continue a walk already in progress -------------------------
+    # With init_resident given, this call is the tail of a longer sequence, so
+    # there is no cold fill: token 0 of this chunk is an ordinary swap step
+    # against the incoming set. The resident set is path-dependent, so resuming
+    # from anything other than the true S_t is a different run wearing the same
+    # prefix -- that is why the state is passed in rather than re-derived.
+    # test_resume_residency.py holds splice == continuous run to BIT equality.
+    if return_state is not None and not isinstance(return_state, dict):
+        raise TypeError("return_state must be a dict to receive the final state")
+    if init_resident is not None:
+        resident = init_resident.clone()
+        refresh = (init_refresh.clone() if init_refresh is not None
+                   else torch.full((B, E), NEG, device=dev))
+        assert resident.shape == (B, E), \
+            f"init_resident {tuple(resident.shape)} != (B,E) {(B, E)}"
+        assert bool((resident.sum(-1) == k).all()), \
+            "init_resident must hold exactly k experts per row"
+        for t in range(S):                                  # every token is a swap step
+            lt = trig[t]
+            for _sw in range(swaps):
+                nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
+                worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
+                do_swap = (nom_val > worst_val + tau).unsqueeze(-1)
+                evict_key = refresh if use_lru else lt
+                evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)
+                evicted = F.one_hot(evict_i, E).bool() & do_swap
+                nominee = F.one_hot(nom_i, E).bool() & do_swap
+                resident = (resident & ~evicted) | nominee
+                # absolute position: LRU compares refresh times across the whole
+                # walk, so a resumed chunk must keep counting from t0, not restart
+                refresh = refresh.masked_fill(nominee, float(k + t0 + t))
+            out[t] = resident
+        if return_state is not None:
+            return_state["resident"], return_state["refresh"] = resident, refresh
+        return out
+
     # --- t=0 cold fill: R_0 = top-k(trig[0]) (== top-k(logits[0]): EMA is identity at t=0) ---
     resident = torch.zeros(B, E, dtype=torch.bool, device=dev)
     _, top_i = trig[0].topk(k, dim=-1)                      # [B,k], descending by logit
@@ -98,17 +144,20 @@ def compute_resident_mask(logits: torch.Tensor, k: int, evict: str = "lru",
 
     for t in range(1, S):
         lt = trig[t]                                        # token t pulls in one expert and uses it
-        nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)      # best non-resident [B]
-        worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)       # worst resident   [B]
-        do_swap = (nom_val > worst_val + tau).unsqueeze(-1)             # [B,1]; tau=0 == shipped
-        evict_key = refresh if use_lru else lt
-        evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove [B]
-        evicted = F.one_hot(evict_i, E).bool() & do_swap               # [B,E]
-        nominee = F.one_hot(nom_i, E).bool() & do_swap                 # [B,E]
-        resident = (resident & ~evicted) | nominee
-        refresh = refresh.masked_fill(nominee, float(k + t))           # newest (read only when "lru")
+        for _sw in range(swaps):
+            nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)  # best non-resident [B]
+            worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)   # worst resident   [B]
+            do_swap = (nom_val > worst_val + tau).unsqueeze(-1)         # [B,1]; tau=0 == shipped
+            evict_key = refresh if use_lru else lt
+            evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)  # resident to remove
+            evicted = F.one_hot(evict_i, E).bool() & do_swap            # [B,E]
+            nominee = F.one_hot(nom_i, E).bool() & do_swap              # [B,E]
+            resident = (resident & ~evicted) | nominee
+            refresh = refresh.masked_fill(nominee, float(k + t))        # newest ("lru" only)
         out[t] = resident
 
+    if return_state is not None:      # hand-off point for a resumed continuation
+        return_state["resident"], return_state["refresh"] = resident, refresh
     return out
 
 
@@ -130,7 +179,7 @@ def _step(lt, resident, refresh, tval, use_lru):
     NEG, POS = float("-inf"), float("inf")
     nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
     worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
-    do_swap = (nom_val > worst_val).unsqueeze(-1)
+    do_swap = (nom_val > worst_val + _RHO).unsqueeze(-1)   # _RHO=0 -> published rule
     evict_key = refresh if use_lru else lt
     evict_i = evict_key.masked_fill(~resident, POS).argmin(dim=-1)
     evicted = F.one_hot(evict_i, E).bool() & do_swap
@@ -195,15 +244,23 @@ def _graph_scan(logits, k, use_lru):
 #
 # The t=0 cold fill (torch.topk) is done in torch so its tie-breaking matches the
 # reference exactly; the kernel reproduces torch's first-index argmax/argmin tie
-# semantics via "max value, then min index achieving it". All comparisons are in
-# fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
+# semantics either via "max value, then min index achieving it" or via Triton's
+# tie_break_left fused reduction (same result; see the kernel). All comparisons are
+# in fp32: upcasting the logits is exact and order-preserving, so the boolean mask is
 # bit-identical to the reference for any input dtype. Verified == reference once at
 # runtime by compute_resident_mask_accel, which raises hard on any mismatch.
+#
+# The loop is latency-bound, not throughput-bound: one program per batch element and a
+# strictly sequential recurrence over S, so per-token cost is a dependent chain of a
+# global load plus warp-shuffle reductions. It is tuned on that basis -- prefetch to hide
+# the load, and a reduction shape/num_warps picked per BLOCK. temporal/bench_scan.py is
+# the benchmark those choices come from; re-run it before changing any of them.
 # ---------------------------------------------------------------------------
 if _HAS_TRITON:
     @triton.jit
     def _scan_kernel(logits_ptr, res0_ptr, ref0_ptr, out_ptr,
-                     S, B, k, E, use_lru: tl.constexpr, BLOCK: tl.constexpr):
+                     S, B, k, E, use_lru: tl.constexpr, BLOCK: tl.constexpr,
+                     NSWAPS: tl.constexpr):
         b = tl.program_id(0)
         e = tl.arange(0, BLOCK)
         valid = e < E                                        # BLOCK = next pow2 >= E; mask pad lanes
@@ -211,52 +268,115 @@ if _HAS_TRITON:
         resident = tl.load(res0_ptr + b * E + e, mask=valid, other=0) != 0
         refresh = tl.load(ref0_ptr + b * E + e, mask=valid, other=0.0)
         tl.store(out_ptr + b * E + e, resident.to(tl.int8), mask=valid)   # out[0] = cold fill
+        row = b * E + e
+        # 2-deep software pipeline. Only the DECISION is sequential: logits[t] is known before the
+        # loop starts and its address never depends on the resident state, so the loads for t+1/t+2
+        # are issued two iterations early and their global-memory latency is hidden behind the
+        # reductions. Worth up to 1.75x on its own (see temporal/bench_scan.py).
+        p1 = tl.load(logits_ptr + (1 * B * E + row), mask=valid & (1 < S), other=0.0).to(tl.float32)
+        p2 = tl.load(logits_ptr + (2 * B * E + row), mask=valid & (2 < S), other=0.0).to(tl.float32)
         for t in range(1, S):
-            base = t * B * E + b * E + e
-            lt = tl.load(logits_ptr + base, mask=valid, other=0.0).to(tl.float32)
-            # nominee = argmax over NON-resident logits (first index on ties)
-            masked_nom = tl.where(valid & (resident == 0), lt, NEG)
-            nom_val = tl.max(masked_nom, 0)
-            nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
-            # worst resident logit (the swap trigger)
-            worst_val = tl.min(tl.where(resident, lt, POS), 0)
-            do_swap = nom_val > worst_val
-            # evict: lru -> oldest refresh; min_logit -> lowest current logit (first index on ties)
-            if use_lru:
-                evict_key = refresh
-            else:
-                evict_key = lt
-            masked_ev = tl.where(resident, evict_key, POS)
-            ev_val = tl.min(masked_ev, 0)
-            evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
-            is_evict = (e == evict_i) & do_swap
-            is_nom = (e == nom_i) & do_swap
-            resident = (resident & (is_evict == 0)) | is_nom
-            refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)   # newest (read only when lru)
-            tl.store(out_ptr + base, resident.to(tl.int8), mask=valid)
+            lt = p1
+            p1 = p2
+            p2 = tl.load(logits_ptr + ((t + 2) * B * E + row), mask=valid & (t + 2 < S),
+                         other=0.0).to(tl.float32)
+            # Two formulations of the same three selections. Which one wins is a measured property
+            # of the reduction width, not a preference: at BLOCK >= 256 one fused value+index
+            # reduction beats two dependent ones (~1.25x), and at BLOCK <= 128 it loses (~4%),
+            # because the fused combiner shuffles twice per level. Both give torch's first-index
+            # tie-breaking, so the mask is identical either way.
+            # NSWAPS sub-swaps per token (swap-axis budget; 1 == shipped). static_range unrolls,
+            # so NSWAPS=1 compiles to exactly the previous kernel body.
+            for _sw in tl.static_range(NSWAPS):
+                if BLOCK >= 256:
+                    nom_val, nom_i = tl.max(tl.where(valid & (resident == 0), lt, NEG), 0,
+                                            return_indices=True)
+                    if use_lru:
+                        worst_val = tl.min(tl.where(resident, lt, POS), 0)
+                        _, evict_i = tl.min(tl.where(resident, refresh, POS), 0,
+                                            return_indices=True)
+                    else:                   # min_logit: the evict key IS lt, so one reduction does
+                        worst_val, evict_i = tl.min(tl.where(resident, lt, POS), 0,  # both
+                                                    return_indices=True)
+                else:
+                    # nominee = argmax over NON-resident logits (first index on ties)
+                    masked_nom = tl.where(valid & (resident == 0), lt, NEG)
+                    nom_val = tl.max(masked_nom, 0)
+                    nom_i = tl.min(tl.where(masked_nom == nom_val, e, BLOCK), 0)
+                    # worst resident logit (the swap trigger)
+                    worst_val = tl.min(tl.where(resident, lt, POS), 0)
+                    # evict: lru -> oldest refresh; min_logit -> lowest logit (first index ties)
+                    if use_lru:
+                        evict_key = refresh
+                    else:
+                        evict_key = lt
+                    masked_ev = tl.where(resident, evict_key, POS)
+                    ev_val = tl.min(masked_ev, 0)
+                    evict_i = tl.min(tl.where(masked_ev == ev_val, e, BLOCK), 0)
+                do_swap = nom_val > worst_val
+                is_evict = (e == evict_i) & do_swap
+                is_nom = (e == nom_i) & do_swap
+                resident = (resident & (is_evict == 0)) | is_nom
+                refresh = tl.where(is_nom, (k + t).to(tl.float32), refresh)  # newest (lru only)
+            tl.store(out_ptr + (t * B * E + row), resident.to(tl.int8), mask=valid)
 
 
-def _triton_scan(logits, k, use_lru):
+def _scan_num_warps(BLOCK, use_lru):
+    """num_warps for the scan, chosen by measurement (temporal/bench_scan.py, H100).
+
+    One program per batch element, so this is the only parallelism knob; B is irrelevant to the
+    per-token cost (measured identical at B=1/2/8). More warps shorten the per-thread serial part
+    of each reduction but add a shared-memory cross-warp step, and the crossover sits at BLOCK=256.
+    Going wide below that is severe (num_warps=4 at BLOCK=64 is 0.46x).
+    """
+    if BLOCK <= 128:
+        return 1
+    return 2 if use_lru else 4
+
+
+def _triton_scan(logits, k, use_lru, swaps=1):
     """Single-launch Triton fast path: cold fill in torch, full t>=1 scan in one kernel."""
     if not _HAS_TRITON:
         raise RuntimeError("triton unavailable")
     S, B, E = logits.shape
     dev = logits.device
     logits = logits.contiguous()
-    resident0 = torch.zeros(B, E, dtype=torch.bool, device=dev)
+    resident0 = torch.zeros(B, E, dtype=torch.int8, device=dev)   # int8: what the kernel loads
     refresh0 = torch.full((B, E), float("-inf"), device=dev, dtype=torch.float32)
     _, top_i = logits[0].topk(k, dim=-1)
-    resident0.scatter_(1, top_i, True)
+    resident0.scatter_(1, top_i, 1)
     rank = torch.arange(k - 1, -1, -1, device=dev, dtype=torch.float32).expand(B, k)
     refresh0.scatter_(1, top_i, rank)
     out = torch.empty(S, B, E, dtype=torch.int8, device=dev)
     BLOCK = 1 << (E - 1).bit_length()
-    _scan_kernel[(B,)](logits, resident0.to(torch.int8), refresh0, out,
-                       S, B, k, E, use_lru, BLOCK, num_warps=1)
-    return out.to(torch.bool)
+    _scan_kernel[(B,)](logits, resident0, refresh0, out, S, B, k, E, use_lru, BLOCK, swaps,
+                       num_warps=_scan_num_warps(BLOCK, use_lru))
+    # every element is written by exactly one program with a 0/1 int8, so this reinterprets the
+    # buffer as bool for free -- .to(torch.bool) would cost an extra alloc + launch + full copy.
+    return out.view(torch.bool)
 
 
-def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
+def compute_resident_mask_padded(logits, k, starts, evict="lru", swaps=1):
+    """Pad-aware scan for LEFT-padded batches: column b's real content begins at starts[b].
+
+    Pure wrapper: each column is rolled so its first real token sits at t=0, the existing
+    (verified) scan runs unchanged - so the cold-fill lands on the first REAL token exactly
+    as in an unbatched call - and the mask is rolled back. Positions before starts[b] are
+    padding; their returned mask rows are whatever the roll wraps around (their router
+    outputs are never attended to or scored). Bit-equivalent to scanning each column's
+    content alone.
+    """
+    S, B, E = logits.shape
+    starts = starts.to(logits.device).long()                       # [B]
+    ar = torch.arange(S, device=logits.device)
+    fwd_idx = (ar[:, None] + starts[None, :]) % S                  # [S, B]
+    shifted = logits.gather(0, fwd_idx[:, :, None].expand(S, B, E))
+    mask = compute_resident_mask_accel(shifted, k, evict=evict, swaps=swaps)
+    back_idx = (ar[:, None] - starts[None, :]) % S                 # [S, B]
+    return mask.gather(0, back_idx[:, :, None].expand(S, B, E))
+
+
+def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0, swaps=1):
     """Resident mask via a GPU fast path; identical result to compute_resident_mask.
 
     On CUDA, runs the Triton single-launch scan (TEMPORAL_SCAN default "triton"; "graph" selects the
@@ -274,19 +394,21 @@ def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
             _scan_path = "eager-shaped"
             print(f"[temporal] scan path: eager (shaped trigger: tau={tau}, ema_beta={ema_beta})")
         with torch.no_grad():
-            return compute_resident_mask(logits, k, evict, tau=tau, ema_beta=ema_beta)
+            return compute_resident_mask(logits, k, evict, tau=tau, ema_beta=ema_beta, swaps=swaps)
     if not logits.is_cuda or mode == "eager":               # CPU (tests) or explicit opt-out
         if _scan_path is None:
             _scan_path = "eager"
             print("[temporal] scan path: eager")
         with torch.no_grad():
-            return compute_resident_mask(logits, k, evict)
+            return compute_resident_mask(logits, k, evict, swaps=swaps)
+    if swaps != 1 and mode == "graph":
+        raise RuntimeError("swaps>1 is implemented for the triton scan only; unset TEMPORAL_SCAN")
     # GPU fast path — correct or crash; no fallback.
     with torch.no_grad():
         out, pathname = ((_graph_scan(logits, k, evict == "lru"), "cuda-graph") if mode == "graph"
-                         else (_triton_scan(logits, k, evict == "lru"), "triton"))
+                         else (_triton_scan(logits, k, evict == "lru", swaps), "triton"))
         if _scan_path is None:                              # one-time bit-exactness gate (hard)
-            ref = compute_resident_mask(logits, k, evict)
+            ref = compute_resident_mask(logits, k, evict, swaps=swaps)
             if not torch.equal(out, ref):
                 bad = (out != ref).any(dim=-1).sum().item()
                 raise RuntimeError(
@@ -294,6 +416,231 @@ def compute_resident_mask_accel(logits, k, evict="lru", tau=0.0, ema_beta=1.0):
                     f"aborting (kernel bug; do not trust results). Set TEMPORAL_SCAN=eager to bypass.")
             _scan_path = pathname
             print(f"[temporal] scan path: {pathname} (verified == reference)")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Decode-time single-step fast path (serving, S == 1).
+#
+# The scan fast paths above all take a whole sequence [S,B,E]. Generation through
+# a KV cache sees ONE token per forward, so decode_state.step calls the eager
+# `_step` once per MoE layer per token: ~16 tiny kernels on a [B,E] tensor,
+# ~700 launches per decode step on a 36-layer model, which measured 5.5 ms of
+# pure launch overhead per step and costs constrained arms 3-6x throughput
+# against free ones (worst on the SMALLEST model -- the signature of a fixed
+# per-step cost). This captures the same `_step` into a CUDA graph keyed by
+# (B,E,dtype,policy) and replays it: 1 graph launch + 2 state copies per layer.
+#
+# Identical by construction, not by reimplementation: the graph records the very
+# ops the reference issues, in order. `step_accel` still gates on a bit-exactness
+# check against eager the first time each shape is used, and RAISES HARD on any
+# mismatch (house rule: a correctness bug crashes loudly rather than degrading).
+# ---------------------------------------------------------------------------
+_step_graph_cache = {}
+_step_path = None
+
+
+# Cache-conditional experts (Skliar et al., arXiv:2412.00099), serving side.
+# Their method adds a fixed bonus to experts already in memory so close calls break
+# toward what is already loaded. In this scoring rule that is exactly a swap deadband:
+# evict only when the best non-resident logit beats the worst resident one by more than
+# RHO. 0.0 is our published min_logit rule, bit-identical -- the comparison is unchanged
+# when the bonus is zero, so every prior row stands. Read once at import so the captured
+# CUDA graph and the eager reference always agree (the bit-exactness gate in step_accel
+# checks this). The same env name is used by the training-side router for the same
+# concept; the two paths never run in one process.
+_RHO = float(os.environ.get("TEMPORAL_RHO", "0"))
+
+# Opt-in swap accounting. The RHO sweep's x-axis was a SIMULATED swap rate (a synthetic
+# correlated routing signal), while its y-axis was measured on real generations -- an
+# estimate divided into a measurement. With this on, the serving path counts the swaps it
+# actually performs, so the bandwidth claim rests on the same workload as the quality
+# claim. Off by default: this adds a device-to-host sync per step and would slow every
+# other run. Read with swap_stats().
+_COUNT = os.environ.get("TEMPORAL_COUNT_SWAPS", "") == "1"
+_SWAPS = [0, 0]          # [swaps performed, token-rows stepped]
+
+
+def swap_stats():
+    """(swaps, token_rows, swaps_per_token) since import; zeros unless
+    TEMPORAL_COUNT_SWAPS=1."""
+    sw, tk = _SWAPS
+    return sw, tk, (sw / tk if tk else 0.0)
+
+
+def _minlogit_step(lt, resident):
+    """`_step` specialized to min_logit eviction (use_lru=False), refresh dropped.
+
+    For min_logit the evict key IS the logit tensor, and refresh is only ever read
+    by the LRU branch. decode carries tval=0 and refresh starts at zeros, so
+    `torch.where(nominee, 0, refresh)` is the identity on a zero tensor: refresh
+    is provably dead state. Dropping it removes two per-call device copies and one
+    kernel from the captured body. Equality with `_step` is asserted in step_accel."""
+    E = lt.shape[-1]
+    NEG, POS = float("-inf"), float("inf")
+    nom_val, nom_i = lt.masked_fill(resident, NEG).max(dim=-1)
+    worst_val, _ = lt.masked_fill(~resident, POS).min(dim=-1)
+    do_swap = (nom_val > worst_val + _RHO).unsqueeze(-1)   # _RHO=0 -> published rule
+    evict_i = lt.masked_fill(~resident, POS).argmin(dim=-1)
+    evicted = F.one_hot(evict_i, E).bool() & do_swap
+    nominee = F.one_hot(nom_i, E).bool() & do_swap
+    if _COUNT:
+        _SWAPS[0] += int(do_swap.sum())
+        _SWAPS[1] += do_swap.shape[0]
+    return (resident & ~evicted) | nominee
+
+
+def _graph_step(lt, resident):
+    """One min_logit `_step` via a replayed CUDA graph. Returns the new resident
+    mask (a view of the graph's static output buffer -- callers must consume or
+    clone it before the next replay of the same shape)."""
+    B, E = lt.shape
+    key = (B, E, lt.dtype)
+    g = _step_graph_cache.get(key)
+    if g is None:
+        lt_s = torch.zeros(B, E, device=lt.device, dtype=lt.dtype)
+        res_s = torch.zeros(B, E, dtype=torch.bool, device=lt.device)
+        torch.cuda.synchronize()
+        warm = torch.cuda.Stream()
+        warm.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(warm):
+            for _ in range(3):
+                res_s.copy_(_minlogit_step(lt_s, res_s))
+        torch.cuda.current_stream().wait_stream(warm)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            res_s.copy_(_minlogit_step(lt_s, res_s))
+        g = (lt_s, res_s, graph)
+        _step_graph_cache[key] = g
+    lt_s, res_s, graph = g
+    lt_s.copy_(lt); res_s.copy_(resident)
+    graph.replay()
+    return res_s
+
+
+def step_accel(lt, resident, refresh, use_lru=False):
+    """Decode-time `_step` with the CUDA-graph fast path (TEMPORAL_DECODE=graph,
+    the default on CUDA; "eager" forces the reference). tval is zeros: min_logit
+    eviction ignores refresh, and the LRU variant is not served from here."""
+    global _step_path
+    # DEFAULT GRAPH as of 2026-08-24: validated bit-exact and a real end-to-end
+    # win on three architecturally distinct models (OLMoE, qwen3.5-35B,
+    # gpt-oss-20b/MXFP4) -- baseline run twice for the noise floor, fast path
+    # once, generations 100% textually identical in every case, wall-clock
+    # -13% to -18%. TODO.md section 6 has the full protocol and numbers. Every
+    # row in the grid before this date was produced on the eager path; opt back
+    # into that with TEMPORAL_DECODE=eager if a future comparison needs it.
+    mode = os.environ.get("TEMPORAL_DECODE", "graph")
+    tval = torch.zeros((), device=lt.device, dtype=lt.dtype)
+    if not lt.is_cuda or mode == "eager" or use_lru:
+        if _step_path is None:
+            _step_path = "eager"
+            print("[temporal] decode step path: eager")
+        return _step(lt, resident, refresh, tval, use_lru)
+    if _step_path is None:                       # one-time bit-exactness gate (hard)
+        probe = _graph_step(lt, resident).clone()
+        ref, _ = _step(lt, resident, refresh, tval, use_lru)
+        if not torch.equal(probe, ref):
+            bad = (probe != ref).any(dim=-1).sum().item()
+            raise RuntimeError(
+                "[temporal] DECODE FAST PATH DISAGREES WITH REFERENCE on "
+                f"{bad} rows — aborting (do not trust results). "
+                "Set TEMPORAL_DECODE=eager to bypass.")
+        _step_path = "cuda-graph"
+        print("[temporal] decode step path: cuda-graph (verified == reference)")
+    # refresh is dead state under min_logit (see _minlogit_step): passed through
+    return _graph_step(lt, resident).clone(), refresh
+
+
+def step_accel_mask(lt, resident):
+    """min_logit `_step` returning the resident mask alone (no refresh), for the
+    slotted serving walker. Same env switch and same one-time hard equality gate
+    as `step_accel`; returns a fresh tensor (safe to index_copy_ into a bank)."""
+    global _step_path
+    if not lt.is_cuda or os.environ.get("TEMPORAL_DECODE", "graph") == "eager" or _COUNT:
+        if _step_path is None:
+            _step_path = "eager"
+            print("[temporal] decode step path: eager")
+        return _minlogit_step(lt, resident)
+    if _step_path is None:                       # one-time bit-exactness gate (hard)
+        probe = _graph_step(lt, resident).clone()
+        ref = _minlogit_step(lt, resident)
+        if not torch.equal(probe, ref):
+            raise RuntimeError(
+                "[temporal] DECODE FAST PATH DISAGREES WITH REFERENCE on "
+                f"{(probe != ref).any(dim=-1).sum().item()} rows — aborting.")
+        _step_path = "cuda-graph"
+        print("[temporal] decode step path: cuda-graph (verified == reference)")
+    return _graph_step(lt, resident).clone()
+
+
+# Optional callable(self, raw_logits, mask, probs, routing_map) -> (probs, routing_map), applied
+# after routing. None during training and normal evaluation; set only by eval-time probes.
+POST_ROUTING_HOOK = None
+
+
+
+# ---- curriculum knobs (default off; pure helpers unit-tested in temporal/tests/test_curriculum.py) ----
+def current_iteration() -> int:
+    """Megatron's training iteration (args.curr_iteration, set at the top of every train step);
+    0 when there are no Megatron args (eval-only processes, unit tests)."""
+    try:
+        from megatron.training import get_args
+        return int(getattr(get_args(), "curr_iteration", 0) or 0)
+    except Exception:
+        return 0
+
+
+def _parse_schedule(spec: str):
+    pts = []
+    for item in spec.split(","):
+        if item.strip():
+            start, _, val = item.partition(":")
+            pts.append((int(start), val.strip()))
+    if not pts:
+        raise ValueError(f"empty schedule {spec!r}")
+    return sorted(pts)
+
+
+def schedule_step(spec: str, it: int) -> str:
+    """'<iter>:<value>,...' -> the value of the last point whose start <= it (the first point's
+    value before its start). Values are returned as strings ('E' allowed)."""
+    pts = _parse_schedule(spec)
+    val = pts[0][1]
+    for start, v in pts:
+        if start <= it:
+            val = v
+    return val
+
+
+def schedule_interp(spec: str, it: int) -> float:
+    """'<iter>:<float>,...' -> piecewise-linear interpolation between points, constant outside."""
+    pts = [(s, float(v)) for s, v in _parse_schedule(spec)]
+    if it <= pts[0][0]:
+        return pts[0][1]
+    for (s0, v0), (s1, v1) in zip(pts, pts[1:]):
+        if s0 <= it <= s1:
+            return v0 if s1 == s0 else v0 + (v1 - v0) * (it - s0) / (s1 - s0)
+    return pts[-1][1]
+
+
+def free_rows(mask: torch.Tensor, frac: float, it: int, layer: int, seed: int = 1234) -> torch.Tensor:
+    """Heterogeneous batch: set round(frac * batch) sequences (rows of a [seq, batch, E] mask) to
+    all-True, i.e. unconstrained, chosen by a generator seeded on (seed, layer, iteration) so the
+    choice is deterministic and differs across layers and steps. frac <= 0 returns mask as is."""
+    if frac <= 0:
+        return mask
+    B = mask.shape[1]
+    n = int(round(frac * B))
+    if n >= B:
+        return torch.ones_like(mask)
+    if n == 0:
+        return mask
+    g = torch.Generator(device="cpu")
+    g.manual_seed(seed + 1009 * layer + 7919 * it)
+    idx = torch.randperm(B, generator=g)[:n].to(mask.device)
+    out = mask.clone()
+    out[:, idx, :] = True
     return out
 
 
@@ -357,10 +704,95 @@ def temporal_forward(self, input: torch.Tensor):
     # router selects top-k AMONG residents. R=k (default) == shipped maximal constraint; R=E ==
     # unconstrained full MoE (mask all-True, masked_fill a no-op). Zero FLOP change at any R.
     resid_R = int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) or k
-    mask = compute_resident_mask_accel(
-        trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
-        tau=float(os.environ.get("TEMPORAL_RHO", "0")),
-        ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")))
+    # Per-layer schedule, for the cross-regime swap sweep (X2 / test C3) and any prefix schedule.
+    # TEMPORAL_R_SCHEDULE is a comma-separated list of <layer>:<R> overriding the global R at those
+    # layers only; R may be the literal 'E' for unconstrained. Layers are Megatron's layer_number,
+    # matching the `layer` column of every mechinterp CSV. Examples:
+    #   TEMPORAL_R_SCHEDULE=4:E                  free layer 4, constrain the rest  (unmask one layer)
+    #   TEMPORAL_RESIDENCY_R=0 with R=E default and 4:6   constrain layer 4 only   (impose one layer)
+    # FLOPs are unchanged at any R, at any layer, so every arm stays compute-matched.
+    sched = os.environ.get("TEMPORAL_R_SCHEDULE", "").strip()
+    if sched:
+        E = logits.shape[-1]
+        ln = int(getattr(self, "layer_number", -1))
+        for item in sched.split(","):
+            if not item.strip():
+                continue
+            lay, _, val = item.partition(":")
+            if int(lay) == ln:
+                resid_R = E if val.strip().upper() == "E" else int(val)
+                break
+    # Curriculum (default off). TEMPORAL_ITER_SCHEDULE="<iter>:<R>,..." picks, from Megatron's
+    # training iteration, the R whose start is the largest start <= iteration (R may be 'E'). One
+    # run, one process: a switch or ramp happens inside the loop, so the lr schedule and the data
+    # order are exactly the baseline's. Overrides the global and per-layer R. Eval-only processes
+    # leave it unset (their iteration reads 0) and set TEMPORAL_RESIDENCY_R instead.
+    isched = os.environ.get("TEMPORAL_ITER_SCHEDULE", "").strip()
+    ffsched = os.environ.get("TEMPORAL_FREE_FRAC_SCHEDULE", "").strip()
+    _it = current_iteration() if (isched or ffsched) else 0
+    if isched:
+        _val = schedule_step(isched, _it)
+        resid_R = logits.shape[-1] if _val.upper() == "E" else int(_val)
+    # Weak constraint (default 1 = shipped): TEMPORAL_SWAPS is the swap budget per token, the number
+    # of residents that may change between consecutive tokens (k/2 keeps half the previous set).
+    # TEMPORAL_SWAPS_SCHEDULE="<iter>:<swaps>,..." anneals it; swaps >= k is unconstrained.
+    _swaps = int(os.environ.get("TEMPORAL_SWAPS", "1"))
+    _ssched = os.environ.get("TEMPORAL_SWAPS_SCHEDULE", "").strip()
+    if _ssched:
+        _swaps = int(schedule_step(_ssched, current_iteration()))
+    # N1 sham control. TEMPORAL_SHAM=random replaces the residency mask with a resident set drawn
+    # uniformly at random per token: the same R experts are eligible, but the choice carries no
+    # lexical information and no temporal dynamics. It answers whether the per-layer cost profile is
+    # about routing at all, or is positional sensitivity that any perturbation of that layer would
+    # show. Deliberately bypasses compute_resident_mask_accel rather than adding a policy to it: the
+    # fast path asserts bit-exactness against the reference scan, and a sham has no reference.
+    #
+    # Seeded from the layer number and a fixed base so repeated evaluations are identical -- C3's
+    # whole value is that it carries no seed noise, and a sham arm has to inherit that.
+    sham = os.environ.get("TEMPORAL_SHAM", "")
+    if sham:
+        E = logits.shape[-1]
+        if resid_R >= E:
+            mask = torch.ones_like(logits, dtype=torch.bool)
+        elif sham == "noise":
+            # Magnitude-matched sham (N1, round 2). The random-resident sham above has no size knob:
+            # its damage is fixed by R and lands 2.11x the real constraint's, so comparing endpoint
+            # ratios between them assumes the profile scales linearly in perturbation size. This adds
+            # Gaussian noise to the router logits instead and imposes no residency at all, giving a
+            # continuous sigma that can be calibrated until the mean CE penalty matches the real
+            # constraint's. It carries no lexical information and no temporal dynamics, which is what
+            # a sham has to establish.
+            sigma = float(os.environ.get("TEMPORAL_SHAM_SIGMA", "0"))
+            # TEMPORAL_SHAM_LAYER restricts the noise to one layer, mirroring impose_one so the two
+            # profiles are comparable arm for arm. Empty means every MoE layer.
+            _only = os.environ.get("TEMPORAL_SHAM_LAYER", "")
+            if _only and int(_only) != int(getattr(self, "layer_number", 0)):
+                sigma = 0.0
+            g = torch.Generator(device=logits.device)
+            g.manual_seed(int(os.environ.get("TEMPORAL_SHAM_SEED", "1234"))
+                          + 1009 * int(getattr(self, "layer_number", 0)))
+            noise = torch.randn(logits.shape, generator=g, device=logits.device,
+                                dtype=torch.float32).to(logits.dtype)
+            logits = logits + sigma * noise
+            mask = torch.ones_like(logits, dtype=torch.bool)
+        elif sham == "random":
+            g = torch.Generator(device=logits.device)
+            g.manual_seed(int(os.environ.get("TEMPORAL_SHAM_SEED", "1234"))
+                          + 1009 * int(getattr(self, "layer_number", 0)))
+            r = torch.rand(logits.shape, generator=g, device=logits.device, dtype=torch.float32)
+            mask = torch.zeros_like(logits, dtype=torch.bool)
+            mask.scatter_(-1, r.topk(resid_R, dim=-1).indices, True)
+        else:
+            raise ValueError(f"unknown TEMPORAL_SHAM={sham!r} (expected 'random' or 'noise')")
+    else:
+        mask = compute_resident_mask_accel(
+            trig, resid_R, evict=os.environ.get("TEMPORAL_EVICT", "lru"),
+            tau=float(os.environ.get("TEMPORAL_RHO", "0")),
+            ema_beta=float(os.environ.get("TEMPORAL_EMA_BETA", "1.0")), swaps=_swaps)
+    # Heterogeneous batches (default off): TEMPORAL_FREE_FRAC_SCHEDULE="<iter>:<frac>,..." is the
+    # piecewise-linear fraction of sequences per micro-batch that train unconstrained.
+    if ffsched and self.training:
+        mask = free_rows(mask, schedule_interp(ffsched, _it), _it, int(getattr(self, "layer_number", 0)))
     lam = float(os.environ.get("TEMPORAL_COHERENCE_LAMBDA", "0"))
     if lam > 0 and self.training:
         from megatron.core.transformer.moe.moe_utils import (
@@ -376,6 +808,22 @@ def temporal_forward(self, input: torch.Tensor):
         bw = ab.bursty_window_loss(logits, int(os.environ.get("BURSTY_WINDOW", "32")))
         logits = MoEAuxLossAutoScaler.apply(logits, bw_lam * bw)
         save_to_aux_losses_tracker("bursty_loss", bw.detach(),
+                                   self.layer_number, self.config.num_layers)
+    # CoSMoEs (Huber et al., arXiv:2503.00245) -- BASELINE_METHODS_COMPARISON baseline #1.
+    # BlES (Eq. 4-7): hard replacement count times soft L1 of consecutive routing-weight
+    # deltas, sequence-level. Nothing is forbidden,
+    # switching is only made expensive, so unlike rolling residency it never BOUNDS the
+    # resident set -- which is the whole comparison: their locality buys a smaller R, ours
+    # buys R = k. Appendix E currently rebuts CoSMoEs by quoting their table rather than
+    # running it, which that document calls the most attackable move in the paper.
+    # Injected exactly like its siblings above so it composes with the same sweep tooling.
+    cos_lam = float(os.environ.get("COSMOES_LAMBDA", "0"))
+    if cos_lam > 0 and self.training:
+        from megatron.core.transformer.moe.moe_utils import (
+            MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
+        cos = ab.cosmoes_bles_loss(logits, k, float(os.environ.get("COSMOES_TAU", "1.0")))
+        logits = MoEAuxLossAutoScaler.apply(logits, cos_lam * cos)
+        save_to_aux_losses_tracker("cosmoes_loss", cos.detach(),
                                    self.layer_number, self.config.num_layers)
     ant_lam = float(os.environ.get("ANTICIPATORY_LAMBDA", "0"))
     if ant_lam > 0 and self.training:
@@ -396,6 +844,11 @@ def temporal_forward(self, input: torch.Tensor):
             # H3: labels centered on each expert's own baseline — popularity unlearnable.
             tgt = ab.centered_demand_labels(tgt, float(os.environ.get("HEAD_GAMMA_C", "0.015625")))
         head_bce = ab.anticipatory_bce_loss(head_logits, tgt, valid)
+    raw_logits = logits
+    if os.environ.get("TEMPORAL_SHADOW", "0") == "1":
+        # Soft constraint (default off): the resident set was computed and fed to the coherence
+        # loss above, but routing itself is free. A full MoE regularised toward coherent routing.
+        mask = torch.ones_like(mask)
     logits = logits.masked_fill(~mask, float("-inf"))       # only resident experts are selectable
     if auxfree:
         # Selection over the k unmasked residents is a no-op top-k, but sigmoid(-inf)=0 plus a
@@ -411,6 +864,11 @@ def temporal_forward(self, input: torch.Tensor):
             self.expert_bias = saved_bias
     else:
         probs, routing_map = self.routing(logits)
+    if POST_ROUTING_HOOK is not None:
+        # Eval-time perturbation of the selected set AFTER the residency mask and top-k have run
+        # exactly as trained (analysis/probes/substitution_eval.py). `raw_logits` is pre-mask,
+        # `mask` is the resident set, so a hook can score substitutes as the router would have.
+        probs, routing_map = POST_ROUTING_HOOK(self, raw_logits, mask, probs, routing_map)
     if head_bce is not None:
         # Attach the head loss to the model loss via the aux-loss autoscaler hooked on the
         # routing OUTPUT (gate probs) — deliberately NOT on the router logits (the Track-B
@@ -431,6 +889,13 @@ def banner_knobs() -> str:
     knobs = f", tau={tau}, ema_beta={beta}" if (float(tau) != 0.0 or float(beta) < 1.0) else ""
     if int(os.environ.get("TEMPORAL_RESIDENCY_R", "0")) > 0:
         knobs += f", residency_R={os.environ.get('TEMPORAL_RESIDENCY_R')}"
+    if os.environ.get("TEMPORAL_SWAPS", "1") != "1":
+        knobs += f", swaps={os.environ['TEMPORAL_SWAPS']}"
+    for name in ("TEMPORAL_ITER_SCHEDULE", "TEMPORAL_FREE_FRAC_SCHEDULE", "TEMPORAL_SWAPS_SCHEDULE"):
+        if os.environ.get(name, "").strip():
+            knobs += f", {name.lower()[9:]}={os.environ[name].strip()}"
+    if os.environ.get("TEMPORAL_SHADOW", "0") == "1":
+        knobs += ", shadow=1"
     if os.environ.get("AUXFREE", "0") == "1":
         knobs += ", auxfree-trigger=sigmoid+bias"
     if float(os.environ.get("TEMPORAL_MOM_BETA", "0")) > 0:
