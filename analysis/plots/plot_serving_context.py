@@ -20,8 +20,8 @@ A_vram = [8.174, 8.840, 8.936, 9.128, 9.512]; C_vram = [2.172, 2.918, 3.014, 3.2
 
 CEIL, DEPL, VRC = "#5aa0dd", "#2ca02c", "0.45"
 PAPER = True
-plt.rcParams.update({"font.size": 9.5, "axes.titlesize": 11, "axes.labelsize": 9.5,
-                     "xtick.labelsize": 8.5, "ytick.labelsize": 8.5, "legend.fontsize": 7.5})
+plt.rcParams.update({"font.size": 12, "axes.titlesize": 13.5, "axes.labelsize": 12,
+                     "xtick.labelsize": 10.5, "ytick.labelsize": 10.5, "legend.fontsize": 9.5})
 
 def panel(ax, tps_A, tps_C, title):
     axr = ax.twinx()

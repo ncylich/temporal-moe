@@ -106,7 +106,7 @@ def curve_panel(ax, data, title, legend=False, ticks=None, xlabel=True, ylabel=T
     if ylabel: ax.set_ylabel("test BPB")
     if legend:
         ax.legend([Line2D([0], [0], color=c, lw=2.2) for _, c, _ in STYLE], LEG,
-                  fontsize=7.5, framealpha=0.9)
+                  fontsize=9.5, framealpha=0.9)
 
 
 def bar_panel(ax, title, ylabel=True):
@@ -117,16 +117,16 @@ def bar_panel(ax, title, ylabel=True):
         if faded:
             b.set_alpha(0.2)
         ax.text(b.get_x()+b.get_width()/2, v + 0.002, f"{v:.3f}", ha="center",
-                fontsize=9, fontweight="bold", alpha=0.25 if faded else 1.0)
+                fontsize=11, fontweight="bold", alpha=0.25 if faded else 1.0)
     ax.set_ylim(1.0, 1.16)
     ax.grid(True, axis="y", ls=":", alpha=0.4)
     ax.set_title(title)
     if ylabel: ax.set_ylabel("test BPB")
-    ax.tick_params(axis="x", labelsize=7.5)
+    ax.tick_params(axis="x", labelsize=9.5)
 
 
 # paper tiles (one file per budget, no baked caption)
-plt.rcParams.update({"font.size": 9.5, "axes.titlesize": 11, "axes.labelsize": 10})
+plt.rcParams.update({"font.size": 12, "axes.titlesize": 13.5, "axes.labelsize": 12.5})
 TICKS = {"1e16": ([0.77, 1.4, 3.85], ["0.8", "1.4", "3.9"]),
          "1e17": ([3.85, 8.17, 14.9], ["3.9", "8.1", "15"]),
          "1e18": ([6.88, 12.19, 48.50], ["6.9", "12", "49"])}
@@ -166,7 +166,7 @@ curve_panel(axes[0][1], P17, "$10^{17}$ FLOPs · 16k vocab", ticks=TICKS["1e17"]
 curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"])
 bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab", ylabel=False)
 fig.legend([Line2D([0], [0], color=c, lw=2.6) for _, c, _ in STYLE], LEG,
-           ncol=5, loc="upper center", fontsize=10.5, frameon=False,
+           ncol=5, loc="upper center", fontsize=12.5, frameon=False,
            bbox_to_anchor=(0.5, 1.008), columnspacing=1.5, handlelength=1.7)
 fig.tight_layout(rect=[0, 0, 1, 0.925])
 fig.subplots_adjust(wspace=0.16, hspace=0.42)

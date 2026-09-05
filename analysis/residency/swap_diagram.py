@@ -83,7 +83,7 @@ def draw():
     for x, label in ((LEFT_X, "TOKEN $t$"), (RIGHT_X, "TOKEN $t{+}1$")):
         box(ax, x, 17, SLOT_W + 4, BOTTOM - 17 + 5, POOL_FILL, POOL_EDGE, 0.7, r=3)
         ax.text(x + (SLOT_W + 4) / 2, 10, label, ha="center", va="center",
-                fontsize=6.0, fontweight="bold", color=BLUE)
+                fontsize=7.0, fontweight="bold", color=BLUE)
 
     for i in range(N_SLOTS):
         for x, side in ((LEFT_X + 2, "L"), (RIGHT_X + 2, "R")):
@@ -107,17 +107,17 @@ def draw():
     rx, ry, rw, rh = 104.0, 36.0, 80.0, 24.0
     box(ax, rx, ry, rw, rh, "#ffffff", BLUE, 1.3, r=3)
     ax.text(rx + rw / 2, ry + rh / 2, "ROUTER", ha="center", va="center",
-            fontsize=7.0, fontweight="bold", color=BLUE)
+            fontsize=8.2, fontweight="bold", color=BLUE)
     arrow(ax, (rx + rw / 2, ry - 7.0), (rx + rw / 2, ry - 0.8), lw=0.9)
 
     arrow(ax, (LEFT_X + SLOT_W + 5, slot_mid(EVICTED)), (rx - 1.5, ry + rh - 6),
           dashed=True)
     ax.text(82, slot_mid(EVICTED) + 8, "evict", ha="center", va="center",
-            fontsize=5.6, color=BLUE)
+            fontsize=6.6, color=BLUE)
 
     arrow(ax, (rx + rw + 1.5, ry + rh - 4), (RIGHT_X + 1, slot_mid(ADMITTED)))
     ax.text(170, slot_mid(ADMITTED) + 6, "admit", ha="center", va="center",
-            fontsize=5.6, color=BLUE)
+            fontsize=6.6, color=BLUE)
 
 
     # key: one swatch per colour, spread along the bottom edge
@@ -128,7 +128,7 @@ def draw():
                                          (192, "not resident", GREY_FILL, GREY_EDGE, False)):
         box(ax, x, ky, kw, kh, fill, edge, 0.9 if fill != GREY_FILL else 0.7, dashed=dashed,
             r=1.2)
-        ax.text(x + kw + 3, ky + kh / 2, label, ha="left", va="center", fontsize=5.4,
+        ax.text(x + kw + 3, ky + kh / 2, label, ha="left", va="center", fontsize=6.4,
                 color=INK)
 
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
