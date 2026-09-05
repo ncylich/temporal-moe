@@ -100,23 +100,24 @@ Runs land in `results/phase0/runs/<name>` with `run.meta` and `train.log`; the s
 validation losses) is produced by `analysis/residency/curriculum_csv.py`. The log of what was run and
 why goes in `REBUILD_RESULTS.md` as it happens.
 
-## Round W: the weak constraint (2026-09-05, user's proposal)
+## Reuse-fraction program (2026-09-05 01:40, approved plan; supersedes round W above)
 
-The shipped constraint keeps k - 1 of the previous token's residents (one swap per token). A
-weaker policy keeps only k/2 (k/2 swaps per token): the same inductive bias, less of it, and
-less to give up when the constraint lifts. The scan already implements a swap budget
-(`swaps`, bit-exact Triton kernel checked against the reference at startup); it is now exposed
-as `TEMPORAL_SWAPS` with `TEMPORAL_SWAPS_SCHEDULE` for annealing. Grain 1 (k = 6), 1e17, the
-50k corpus; controls C0 3.7661 and C0b 3.7421 (both with router blow-ups), shadow arms
-3.7297 and 3.7337. Whole-run constrained arms are re-scored unconstrained in place after
-training (sweep eval, tag `cross`), and their own constrained quality is the `native` row.
+Goal: find the reuse fraction, the share of the previous token's k active experts that must be
+kept, that trains the best model under its own policy, then prove it at 1e18 and 1e19. Temporal
+keeps (k - 1)/k, the half policy k/2, a free MoE nothing. Score: final test cross-entropy under
+the model's own policy, lower is better; the free re-score is recorded but not a criterion.
+Grain 1 throughout (k = 6). Nothing goes into the paper from this program.
 
-| arm | recipe | question |
-|---|---|---|
-| WK3 | 3 swaps per token (k/2), whole run | does the weak bias help the free model? what does it cost under its own constraint? |
-| WK1 | 1 swap per token, whole run (the shipped temporal model on this corpus) | the anchor: strong bias, both evals |
-| WK2 | 2 swaps per token | the dose in between |
-| WK3SW0p5 | 3 swaps until half, then free | the curriculum with the weak bias |
+Step 1, the sweep at 1e17 on the recorded cells' setup (16k tokenizer, `SETUP=16k`), 45 min
+each, against the recorded free MoE 3.4930 and temporal 3.5486: reuse 4/6 (`WK2`), 3/6 (`WK3`),
+2/6 (`WK4`), 1/6 (`WK5`). Pick the lowest CE; ties within 0.005 go to the higher reuse fraction
+(cheaper to serve). `tmoe_reuse_pick_1e18.sh` applies the rule and launches step 2.
 
-Then, by the results: `WKA3-<f>` anneals the budget from 3 to k (free) at fraction f; the
-best is replicated once on grain 3 if it wins on grain 1.
+Step 2, 1e18: the winner in the paper's grain-1 flame38m configuration (50k tokenizer, speed
+recipe, about 3 h), against the recorded triplets: free MoE 3.9184 / 3.9302 / 3.9218, temporal
+3.9094 / 3.9043 / 3.9094. Win: 0.010 below the temporal mean 3.9077.
+
+Step 3, 1e19 (only on the user's go, about 5 days): the winner in the paper's coarse 1e19
+configuration, against free MoE 3.1301 and temporal 3.1798.
+
+Cancelled: the half-then-free schedule arm and every grain-3 replicate.
