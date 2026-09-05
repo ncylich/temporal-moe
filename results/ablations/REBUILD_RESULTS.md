@@ -2609,3 +2609,18 @@ speed recipe (TE cross-entropy, sync-free grouped GEMM, fused permute): 4,318 it
 25 hours, expected to finish around 09:30 on 2026-09-06, against the recorded coarse cells
 free MoE 3.1301 and temporal 3.1798 (36 s per iteration in July). Checkpoints every tenth,
 auto-resume on a crash, a pruner keeps the two newest.
+
+**1e19 speed, second pass** (11:10). The kernel profile at this shape (two iterations, 97% GPU
+busy) put 30% of the step in `cutlass_80 ... align2` GEMMs, Ampere-generation kernels with
+2-element alignment. Cause: the sync-free expert path (`_torch_grouped_mm_experts`) refuses any
+expert width that is not a multiple of 8 and falls back silently to the host-bound legacy
+grouped GEMM; the coarse shape's width is 550 (grain 3 at s2 is 58), so every grain-1 run and
+the 1e19 run had been on the fallback. Fix: pad each half of fc1's output and fc2's input to 552
+at compute time (`_pad_expert_width`), exact by construction (padded columns give act(0) x 0 = 0
+and meet zero rows), verified on the GPU against an fp32 ground truth in forward and all three
+gradients at bf16 rounding (0.4 to 0.8%, the same as the legacy kernel), empty experts included;
+checkpoints unchanged. Paused at checkpoint 400, benchmarked 20 iterations: 16.2 s per
+iteration against 20.7, loss at iteration 10 equal to 1e-5 and at 20 to 2.5e-4 against the old
+path. Adopted and resumed from checkpoint 400 at 11:08; the remaining 3,918 iterations take
+about 17.6 h, finishing around 04:45 UTC on 2026-09-06 (21:45 Pacific on the 5th).
+`megatron_moe_syncfree.patch` carries the change.

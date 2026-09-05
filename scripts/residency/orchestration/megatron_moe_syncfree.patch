@@ -1,5 +1,5 @@
 diff --git a/megatron/core/transformer/moe/experts.py b/megatron/core/transformer/moe/experts.py
-index fc0cf3e6..1b181d46 100644
+index fc0cf3e6..4fb8ce68 100644
 --- a/megatron/core/transformer/moe/experts.py
 +++ b/megatron/core/transformer/moe/experts.py
 @@ -1,3 +1,4 @@
@@ -7,7 +7,7 @@ index fc0cf3e6..1b181d46 100644
  # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
  
  import copy
-@@ -88,6 +89,71 @@ def expert_dist_ckpt_decorator(func):
+@@ -88,6 +89,94 @@ def expert_dist_ckpt_decorator(func):
      return wrapper
  
  
@@ -41,7 +41,29 @@ index fc0cf3e6..1b181d46 100644
 +        return grad.index_select(0, src), None, None
 +
 +
-+def _torch_grouped_mm_experts(x, w1, w2, tokens_per_expert, activation_func, align=16):
++def _pad_expert_width(w1, w2, gated):
++    """Zero-pad the expert width F to a multiple of 8 so torch._grouped_mm's 16-byte row-stride
++    requirement holds (F = 550 at the coarse 1e19 shape, 58 at s2 grain 3; both fell back to the
++    host-bound grouped_gemm before). Exact: for a gated MLP each half of fc1's output is padded
++    separately, so the activation sees [gate | 0 | up | 0], the padded columns give act(0) * 0 = 0
++    and meet zero rows in fc2; for a plain MLP the padding sits at the end. Padded weight slices
++    receive no gradient, so the real weights' gradients are unchanged."""
++    import torch.nn.functional as Fn
++    F2 = w1.shape[-1]
++    F = F2 // 2 if gated else F2
++    Fp = (F + 7) // 8 * 8
++    if Fp == F:
++        return w1, w2, F, Fp
++    pad = (0, Fp - F)
++    if gated:
++        w1 = torch.cat([Fn.pad(w1[..., :F], pad), Fn.pad(w1[..., F:], pad)], dim=-1)
++    else:
++        w1 = Fn.pad(w1, pad)
++    w2 = Fn.pad(w2, (0, 0, 0, Fp - F))
++    return w1, w2, F, Fp
++
++
++def _torch_grouped_mm_experts(x, w1, w2, tokens_per_expert, activation_func, align=16, gated=True):
 +    """Sync-free replacement for the two legacy grouped_gemm calls (MOE_TORCH_GMM=1).
 +
 +    grouped_gemm's CUTLASS wrapper does host-side work on every call, which serialises the CPU
@@ -52,8 +74,9 @@ index fc0cf3e6..1b181d46 100644
 +    Padded rows are zero and dropped afterwards, so real rows and all gradients are bit-identical
 +    to the grouped GEMM (checked fwd + dx/dw1/dw2, including empty experts).
 +    """
-+    if x.shape[-1] % 8 or w1.shape[-1] % 8 or w2.shape[-1] % 8:
++    if x.shape[-1] % 8 or w2.shape[-1] % 8:
 +        return None  # _grouped_mm needs 16-byte (8 x bf16) row strides; caller uses grouped_gemm
++    w1, w2, _, _ = _pad_expert_width(w1, w2, gated)   # expert width padded to a multiple of 8 (exact)
 +    n = x.shape[0]
 +    E = w1.shape[0]
 +    counts = tokens_per_expert.to(device=x.device, dtype=torch.int64, non_blocking=True)
@@ -79,7 +102,7 @@ index fc0cf3e6..1b181d46 100644
  class GroupedMLP(MegatronModule):
      """An efficient implementation of the Experts layer using GroupedGEMM.
  
-@@ -218,13 +284,23 @@ class GroupedMLP(MegatronModule):
+@@ -218,13 +307,24 @@ class GroupedMLP(MegatronModule):
              w1 = self.weight1.view(self.num_local_experts, self.config.hidden_size, -1)
              w2 = self.weight2.view(self.num_local_experts, -1, self.config.hidden_size)
  
@@ -89,7 +112,8 @@ index fc0cf3e6..1b181d46 100644
 +            fc2_output = None
 +            if os.environ.get("MOE_TORCH_GMM") == "1":
 +                fc2_output = _torch_grouped_mm_experts(
-+                    permuted_local_hidden_states, w1, w2, tokens_per_expert, self.activation_func
++                    permuted_local_hidden_states, w1, w2, tokens_per_expert, self.activation_func,
++                    gated=bool(getattr(self.config, "gated_linear_unit", False)),
 +                )
 +            if fc2_output is None:
 +                if tokens_per_expert.is_cuda:  # sync-free dispatcher left the counts on device
@@ -108,74 +132,3 @@ index fc0cf3e6..1b181d46 100644
          else:
              # No token is allocated for local experts.
              assert torch.count_nonzero(tokens_per_expert) == 0
-diff --git a/megatron/core/transformer/moe/token_dispatcher.py b/megatron/core/transformer/moe/token_dispatcher.py
-index 54a89eec..6dc83dcc 100644
---- a/megatron/core/transformer/moe/token_dispatcher.py
-+++ b/megatron/core/transformer/moe/token_dispatcher.py
-@@ -1,3 +1,4 @@
-+import os
- # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
- 
- from abc import ABC, abstractmethod
-@@ -396,7 +397,16 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
-         else:
-             # Dropless
-             self.num_out_tokens = routing_map.size(0) * self.config.moe_router_topk
--            if self.ep_size > 1 or self.num_local_experts > 1:
-+            if (
-+                os.environ.get("MOE_TORCH_GMM") == "1"
-+                and self.ep_size == 1
-+                and self.tp_size == 1
-+                and self.config.moe_permute_fusion
-+            ):
-+                # Sync-free expert path (see experts._torch_grouped_mm_experts): counts stay on
-+                # the device, nothing downstream needs a host value.
-+                self.cuda_sync_point = "no_sync"
-+            elif self.ep_size > 1 or self.num_local_experts > 1:
-                 # Token dropless and enable ep. A synchronization is needed before expert parallel
-                 # AlltoAll communication to get the `input_splits` and `output_splits` CPU values.
-                 self.cuda_sync_point = "before_ep_alltoall"
-@@ -458,9 +468,12 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
-             num_global_tokens_per_local_expert = num_local_tokens_per_expert.reshape(
-                 self.num_experts
-             )
--            num_tokens_per_local_expert = num_local_tokens_per_expert.to(
--                torch.device("cpu"), non_blocking=True
--            )
-+            if self.cuda_sync_point == "no_sync":
-+                num_tokens_per_local_expert = num_local_tokens_per_expert
-+            else:
-+                num_tokens_per_local_expert = num_local_tokens_per_expert.to(
-+                    torch.device("cpu"), non_blocking=True
-+                )
- 
-         if self.num_local_experts > 1:
-             # [tp_size * ep_size, num_local_experts]. Represents the number of tokens sent
-@@ -541,7 +554,12 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
-             )
- 
-         # Permutation 2: Sort tokens by local expert.
--        if self.num_local_experts > 1:
-+        # With a single EP x TP rank the chunk sort is the identity permutation (chunks are
-+        # already in local-expert order), so the sync-free path skips it in both directions.
-+        skip_chunk_sort = (
-+            os.environ.get("MOE_TORCH_GMM") == "1" and self.tp_size * self.ep_size == 1
-+        )
-+        if self.num_local_experts > 1 and not skip_chunk_sort:
-             if self.drop_and_pad:
-                 global_input_tokens = (
-                     global_input_tokens.view(
-@@ -589,8 +607,11 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
-         """
-         assert bias is None, "Bias is not supported in MoEAlltoAllTokenDispatcher"
- 
--        # Unpermutation 2: Unsort tokens by local expert.
--        if self.num_local_experts > 1:
-+        # Unpermutation 2: Unsort tokens by local expert (identity on a single EP x TP rank).
-+        skip_chunk_sort = (
-+            os.environ.get("MOE_TORCH_GMM") == "1" and self.tp_size * self.ep_size == 1
-+        )
-+        if self.num_local_experts > 1 and not skip_chunk_sort:
-             if self.drop_and_pad:
-                 hidden_states = (
-                     hidden_states.view(
