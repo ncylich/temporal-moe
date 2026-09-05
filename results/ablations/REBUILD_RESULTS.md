@@ -2541,3 +2541,15 @@ set, limits how far the router departs and how long it takes to come back. On gr
 control spiked and the shadow arms sat at the control, consistent with this reading: the
 coherence loss buys stability where the router is fragile, not BPB where it is not. The shadow
 replicate on grain 1 (`cur_g1_1e17_SHD0p01b`, running) is the second point on that side.
+
+**Grain 1 closed** (00:30). Second shadow run `cur_g1_1e17_SHD0p01b`: 3.7337, no spike. The
+four grain-1 runs: controls 3.7661 and 3.7421 (both with router blow-ups, z-loss peaks 2.04
+and 0.75), shadow arms 3.7297 and 3.7337 (largest z-loss 0.96 in the first, which spiked with
+the control on the shared bad batch and recovered in 100 iterations; none in the second).
+Shadow mean 3.7317 against control mean 3.7541: 0.022 CE, and 0.008 against the better
+control. On the coarse grain the coherence loss toward a shadow resident set is a router
+stabiliser: the two shadow runs sit within 0.004 of each other while the two controls differ by
+0.024, and the shadow arm is never above either control. On the fine grain, where no control
+spiked, the same loss is a null. Neither is the effect the program set out to find (temporal
+weights improving a full MoE's BPB); the mechanism that shows up is damping of router
+excursions, and its size on grain 1 is set by how badly the control happens to spike.
