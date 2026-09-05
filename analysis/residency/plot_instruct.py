@@ -8,8 +8,9 @@ instruct_genbench_vllm.csv, screening_genbench.csv, think_ablation_summary.csv a
 writingbench/cell_stats.csv.
 Writes results/ablations/figures/{instruct_selfce_damage,instruct_bench_damage,
 instruct_model_damage}.png; --no-caption writes the paper variants (short labels, no titles).
-Model order everywhere: total parameters ascending. Bar means use the four accuracy
-benchmarks (uniform basis across modes and models); WritingBench appears as dots only.
+Model order everywhere: total parameters ascending. Bar means use the five accuracy
+benchmarks; MBPP ran one thinking mode per model (off, LFM native, plus on for gemma and
+Qwen), so the gpt-oss high-effort bars average the other four. WritingBench is dots only.
 """
 import csv
 import os
@@ -101,7 +102,8 @@ def load_damage():
             continue
         rec, arm, task, met = r[0], r[3], r[5], r[6]
         ok = met in METRIC.get(task, ()) or \
-            (task.startswith("humaneval") and met.startswith("pass@1"))
+            (task.startswith("humaneval") and met.startswith("pass@1")) or \
+            (task in ("mbpp_chat", "mbpp_gemma") and met.startswith("pass@1"))
         if ok:
             vals[(rec, arm, task)] = float(r[7])
     # thinking-ablation damage cells, already in points (5 models, both modes where a
@@ -135,7 +137,21 @@ def load_damage():
                           ("high", "on", ("think", "gpt-oss-120b"))],
          ("R4", "R16"), ("oss120_free", "oss120_R4", "oss120_R16"), "off"),
     ]
-    TASKS = ["GSM8K", "IFEval", "HumanEval", "MMLU"]
+    TASKS = ["GSM8K", "IFEval", "HumanEval", "MMLU", "MBPP"]
+
+    # MBPP under the unified producer (DATA_CONTRACT "MBPP standard surface"): one
+    # record per (model, mode label); LFM from its citable 32k pair, gemma from its
+    # recorded rows (same rule); gpt-oss measured at low effort only
+    MBPP_SRC = {
+        ("OLMoE-Instruct 7B", "none"): ("olmoe_instruct_mbpp", "mbpp_chat"),
+        ("LFM2.5-8B-A1B", "on"): ("lfm25_instruct_mbpp_cap32k", "mbpp_chat"),
+        ("gpt-oss-20b", "low"): ("gptoss_20b_mbpp", "mbpp_chat"),
+        ("gemma4-26B-IT", "off"): ("gemma4_instruct_m8192", "mbpp_gemma"),
+        ("gemma4-26B-IT", "on"): ("gemma4_think_on_fulln_m8192", "mbpp_gemma"),
+        ("Qwen3.5-35B", "off"): ("qwen35_instruct_mbpp", "mbpp_chat"),
+        ("Qwen3.5-35B", "on"): ("qwen35_think_on_fulln_mbpp", "mbpp_chat"),
+        ("gpt-oss-120b", "low"): ("gptoss_120b_mbpp", "mbpp_chat"),
+    }
 
     def delta(spec, mode, arm_idx, bench):
         name, modes, arms, wbcells, wbrole = spec
@@ -146,6 +162,13 @@ def load_damage():
             fr, cn = wb.get(wbcells[0]), wb.get(wbcells[1 + arm_idx])
             return None if fr is None or cn is None else 10 * (cn - fr)
         arm = arms[arm_idx]
+        if bench == "MBPP":
+            hit = MBPP_SRC.get((name, label))
+            if hit is None:
+                return None
+            rec, task = hit
+            fr, cn = vals.get((rec, "free", task)), vals.get((rec, arm, task))
+            return None if fr is None or cn is None else 100 * (cn - fr)
         if src[0] == "think":
             return tcells.get((src[1], label, arm, bench))
         rec, he, mm = src[1], src[2], src[3]
@@ -159,7 +182,7 @@ def load_damage():
 
 def bench():
     SPEC, TASKS, delta = load_damage()
-    DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.75, 5))))
+    DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.9, 6))))
     cols = plt.cm.tab10(np.linspace(0, 1, 10))
 
     # ---- per-benchmark figure: color = model, hue overlay = mode via hatch, alpha = arm ----
@@ -280,7 +303,7 @@ def combined_row():
     All legends live in a strip above the axes; per-item dots fan horizontally inside
     each bar instead of stacking on its centerline."""
     SPEC, TASKS, delta = load_damage()
-    DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.75, 5))))
+    DCOL = dict(zip(TASKS + ["WB"], plt.cm.Set2(np.linspace(0, 0.9, 6))))
     MCOL = plt.cm.tab10(np.linspace(0, 1, 10))
     SHORT = ["OLMoE", "LFM2.5", "GPT-OSS 20B", "gemma4", "Qwen3.5", "GPT-OSS 120B"]
     plt.rcParams.update({"font.size": 20, "axes.labelsize": 18,
