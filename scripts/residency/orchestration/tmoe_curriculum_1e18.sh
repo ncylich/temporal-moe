@@ -6,7 +6,7 @@
 #   ARM=SW0p5 tmoe_curriculum_1e18.sh
 set -uo pipefail; cd "$(dirname "$0")/../../.."
 . scripts/env.sh
-ARM=${ARM:?set ARM}; ITERS=2121; K=18; E=192
+ARM=${ARM:?set ARM}; ITERS=2121; GRAIN=${GRAIN:-3}; if [ "$GRAIN" = 3 ]; then K=18; E=192; else K=6; E=64; fi
 export CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=${TMOE_PRIO:-5} HF_TOKEN=$(cat /root/.cache/huggingface/token)
 export MOE_TORCH_GMM=1 MOE_NO_LAYER_LOG=1 EXTRA_ARGS="--moe-permute-fusion --no-rope-fusion --moe-use-legacy-grouped-gemm --cross-entropy-loss-fusion --cross-entropy-fusion-impl te"
 pct() { python3 -c "print(round($ITERS*$1))"; }
@@ -19,13 +19,14 @@ case $ARM in
   HET*)  f=${ARM#HET}; ENV="TEMPORAL_FREE_FRAC_SCHEDULE=0:0,$(pct $(dec ${f%-*})):0,$(pct $(dec ${f#*-})):1 TEMPORAL_ITER_SCHEDULE=0:$K,$(pct $(dec ${f#*-})):E" ;;
   SHD*)  f=$(dec ${ARM#SHD}); ENV="TEMPORAL_SHADOW=1 TEMPORAL_COHERENCE_LAMBDA=$f" ;;
   SAND)  ENV="TEMPORAL_ITER_SCHEDULE=0:E,$(pct 0.5):$K,$(pct 0.75):E" ;;
+  WK*)   ENV="TEMPORAL_SWAPS=${ARM#WK}" ;;          # reuse-fraction arm: (k - swaps)/k of the previous token's experts kept
   *) echo "unknown arm $ARM"; exit 1 ;;
 esac
-NAME=cur_flame38m_g3_$ARM
+NAME=cur_flame38m_g${GRAIN}_$ARM
 FINAL=results/phase0/runs/$NAME/ckpt/iter_$(printf %07d $ITERS)
 [ -d "$FINAL" ] && { echo "[skip] $NAME done"; exit 0; }
 echo "### curriculum1e18 $NAME [$ENV] START $(date -u +%H:%M)"
-env $ENV GRAIN=3 MICRO_BATCH=${MICRO_BATCH:-64} TEMPORAL_EVICT=min_logit RUN_NAME=$NAME RDZV_PORT=29640 \
+env $ENV GRAIN=$GRAIN MICRO_BATCH=${MICRO_BATCH:-64} TEMPORAL_EVICT=min_logit RUN_NAME=$NAME RDZV_PORT=29640 \
   scripts/residency/gpu_lease.sh bash experiments/scale_1e18_1e19/flame38m_run.sh > /workspace/rerun-logs/cur_$NAME.out 2>&1
 echo "### curriculum1e18 $NAME rc=$? $(date -u +%H:%M)"
 grep "on test set" results/phase0/runs/$NAME/train.log 2>/dev/null | tail -1 | cut -c1-160

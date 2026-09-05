@@ -49,26 +49,28 @@ def main():
         if not tests:
             print(f"[running] {run}: {len(vals)} evals so far"); continue
         ce = float(tests[-1])
-        # arms whose logged final eval is constrained (HET before the eval fix, WK whole-run weak
-        # constraint): the unconstrained re-score of the final checkpoint lives in sweep_eval.csv (tag cross)
-        if run.split("_", 3)[3].startswith(("HET", "WK")) and not "SW" in run.split("_", 3)[3]:
-            sw = [r for r in csv.DictReader(open(os.path.join(ABLATIONS, "sweep_eval.csv"))) if r["run"] == run and r["tag"] == "cross"]
-            if sw:
-                ce = float(sw[-1]["lm_loss"])
+        arm = run.split("_", 3)[3]
+        free_ce = ""
+        sw = [r for r in csv.DictReader(open(os.path.join(ABLATIONS, "sweep_eval.csv"))) if r["run"] == run and r["tag"] == "cross"]
+        if sw:
+            free_ce = f"{float(sw[-1]['lm_loss']):.6f}"
+        if arm.startswith("HET") and sw:
+            ce = float(sw[-1]["lm_loss"])      # HET before the eval fix: the logged final eval was constrained; the free re-score is the score
+        # WK arms (reuse-fraction sweep): the score is the logged final eval under the model's own policy; free_CE is informational
         ref = c0.get(grain)
         tenths = [vals[i] for i in sorted(vals)]
-        rows.append([run, run.split("_", 3)[3], grain, f"cur_{grain}_1e17_C0" if ref else "", f"{ce:.6f}", f"{ce / DIV:.4f}",
-                     f"{ce - ref:+.4f}" if ref else "", f"{(ce - ref) / DIV:+.4f}" if ref else "", recipe(run)]
+        rows.append([run, arm, grain, f"cur_{grain}_1e17_C0" if ref else "", f"{ce:.6f}", f"{ce / DIV:.4f}",
+                     f"{ce - ref:+.4f}" if ref else "", f"{(ce - ref) / DIV:+.4f}" if ref else "", free_ce, recipe(run)]
                     + [f"{v:.4f}" for v in tenths])
     with open(OUT, "w", newline="") as fh:
         fh.write("# temporal-to-free curriculum at 1e17 (CURRICULUM_PLAN.md), pythia-50k tokenizer and the 1e18/1e19 DCLM "
                  "corpus: final unconstrained test CE per run and delta vs the C0 control of the same grain (full MoE through "
                  "the router path, same corpus); the recorded g*_moe_s2_1e17 cells used the 16k tokenizer and are not comparable; "
                  "v<i> = validation loss at the i-th tenth of training; BPB = CE/2.9780; seed sd at 1e18 is ~0.005 CE, "
-                 "win bar 0.010. Producer analysis/residency/curriculum_csv.py\n")
+                 "win bar 0.010; _16k runs are on the recorded cells' tokenizer (BPB divisor 2.7568 there, not applied) and compare to g1_moe_s2_1e17 3.4930 / g1_tmoe_s2_1e17 3.5486; test_CE is under the model's own policy, free_CE the re-score with every expert allowed. Producer analysis/residency/curriculum_csv.py\n")
         w = csv.writer(fh)
         w.writerow(["run", "arm", "grain", "reference", "test_CE", "test_BPB", "delta_CE_vs_C0", "delta_BPB_vs_C0",
-                    "recipe"] + [f"v{i}" for i in range(1, 11)])
+                    "free_CE", "recipe"] + [f"v{i}" for i in range(1, 11)])
         w.writerows(rows)
     print(f"wrote {OUT} ({len(rows)} rows)")
     for r in rows:
