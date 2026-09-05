@@ -131,8 +131,8 @@ def bandwidth_timeline():
         x = x0 + i * (w + gap)
         ax.add_patch(Rectangle((x, y), w, h, facecolor=LIGHT, edgecolor=EDGE,
                                lw=1.2, joinstyle="round"))
-        ax.text(x + w / 2, y + h / 2, r"$\frac{b}{\mathrm{BW}_{\mathrm{fast}}}$",
-                ha="center", va="center", fontsize=FS - 3, color=DARK)
+        ax.text(x + w / 2, y + h / 2, r"$t_{\mathrm{fast}}$",
+                ha="center", va="center", fontsize=FS - 2, color=DARK)
     top_end = x0 + n * (w + gap) - gap
     ax.text(x0, y + h + 0.16, r"$k-1$ resident experts read from fast memory",
             fontsize=FS - 1, color=DARK, weight="bold", va="bottom")
@@ -140,18 +140,21 @@ def bandwidth_timeline():
     ax.add_patch(FancyArrow(x0, 1.62, top_end - x0 + 0.55, 0, width=0.012,
                             head_width=0.17, head_length=0.18, color=DARK))
     ax.text(top_end + 0.72, 1.62, "time", fontsize=FS - 3, color=GREY, va="center")
+    ax.text(9.9, 2.35, r"$t_{\mathrm{fast}} = b/\mathrm{BW}_{\mathrm{fast}}$",
+            fontsize=FS - 4, color=DARK, ha="right", va="center")
+    ax.text(9.9, 0.94, r"$t_{\mathrm{slow}} = b/\mathrm{BW}_{\mathrm{slow}}$",
+            fontsize=FS - 4, color=DARK, ha="right", va="center")
 
     sw = top_end - x0 - 0.55
     ax.add_patch(Rectangle((x0, 0.60), sw, h, facecolor=DARK, edgecolor=DARK))
     ax.text(x0 + sw / 2, 0.60 + h / 2,
-            r"incoming expert streams $b/\mathrm{BW}_{\mathrm{slow}}$",
+            r"incoming expert streams for $t_{\mathrm{slow}}$",
             ha="center", va="center", fontsize=FS - 2.5, color="white")
     ax.text(x0 + sw + 0.14, 0.60 + h / 2, "hidden", fontsize=FS - 4, color=GREY,
             va="center", style="italic")
 
     ax.text(x0, 0.06,
-            r"free when $(k-1)\,b/\mathrm{BW}_{\mathrm{fast}}"
-            r" \geq b/\mathrm{BW}_{\mathrm{slow}}$,  i.e. "
+            r"free when $(k-1)\,t_{\mathrm{fast}} \geq t_{\mathrm{slow}}$,  i.e. "
             r"$k-1 \geq \mathrm{BW}_{\mathrm{fast}}/\mathrm{BW}_{\mathrm{slow}}$",
             fontsize=FS - 3, color=DARK, ha="left", va="bottom")
 
