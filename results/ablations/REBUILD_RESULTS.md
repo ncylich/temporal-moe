@@ -2553,3 +2553,33 @@ stabiliser: the two shadow runs sit within 0.004 of each other while the two con
 spiked, the same loss is a null. Neither is the effect the program set out to find (temporal
 weights improving a full MoE's BPB); the mechanism that shows up is damping of router
 excursions, and its size on grain 1 is set by how badly the control happens to spike.
+
+## Reuse-fraction sweep at 1e17 (2026-09-05 04:00; not for the paper)
+
+The knob is the share of the previous token's k = 6 active experts that must be kept (the
+scan's swap budget, `TEMPORAL_SWAPS`): temporal keeps 5/6, a free MoE nothing. Grain 1, the
+recorded cells' setup (16k tokenizer, `data/tok16k_full`, 3,917 iterations), scored by the final
+test CE under the model's own policy; the free re-score of each checkpoint is in
+`sweep_eval.csv` (tag `cross`) and is 0.5 to 0.7 worse in every case, so none of these models
+can be served free. Runs are `cur_g1_1e17_WK<swaps>_16k`; 0.485 s per iteration with the speed
+recipe (32 minutes each).
+
+| reuse | swaps per token | test CE | vs free MoE 3.4930 |
+|---|---|---|---|
+| 5/6 (temporal, recorded g1_tmoe_s2_1e17) | 1 | 3.5486 | +0.056 |
+| 4/6 | 2 | 3.5261 | +0.033 |
+| 3/6 | 3 | 3.4951 | +0.002 |
+| 2/6 | 4 | 3.5055 | +0.013 |
+| 1/6 | 5 | 3.4881 | -0.005 |
+| 0 (free, recorded g1_moe_s2_1e17) | 6 | 3.4930 | |
+
+Reading. Any reuse at or below half costs nothing against the free MoE at this scale, where the
+paper's 5/6 policy costs 0.056; 1/6 reads 0.005 below the free MoE, two and a half times the
+0.002 same-environment floor, with the caveat that the recorded free cell is a July run (rope
+fusion on, the old grouped GEMM path). The 2/6 point is out of line with both neighbours by
+0.010 and would need a replicate before being interpreted. On the 50k corpus the half policy had
+already read 3.7262 against free controls of 3.7421 and 3.7661, with no training instability
+where both free controls had router blow-ups. Per the agreed rule (lowest CE, no tie-break)
+the 1/6 policy went to 1e18 (`cur_flame38m_g1_WK5`, the paper's grain-1 config, 50k tokenizer)
+at 03:52, against the recorded triplets free MoE 3.9184 / 3.9302 / 3.9218 and temporal
+3.9094 / 3.9043 / 3.9094; 0.010 below the temporal mean 3.9077 launches the 1e19 run.
