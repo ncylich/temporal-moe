@@ -6,7 +6,7 @@
 # Expected ~5.3 days (~21 s/it) on one H100.   ARM=SW0p5 tmoe_curriculum_1e19.sh
 set -uo pipefail; cd "$(dirname "$0")/../../.."
 . scripts/env.sh
-ARM=${ARM:?set ARM}; ITERS=4278; GRAIN=${GRAIN:-3}; if [ "$GRAIN" = 3 ]; then K=18; E=192; else K=6; E=64; fi
+ARM=${ARM:?set ARM}; GRAIN=${GRAIN:-3}; if [ "$GRAIN" = 3 ]; then ITERS=4278; K=18; E=192; else ITERS=4318; K=6; E=64; fi   # recorded: moe_fine_g3_1e19 4278 iters, moe_coarse_1e19 4318 (gb 1024, lr 3e-4, WSD)
 export TOKENIZER_MODEL=EleutherAI/pythia-12b DATA_DIR=/root/data/dclm_tokenized
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True CE_FUSION=1 CUDA_VISIBLE_DEVICES=0 GPU=0 TMOE_PRIO=${TMOE_PRIO:-5}
 export EXTRA_ARGS="--no-rope-fusion --moe-use-legacy-grouped-gemm --save-interval 200 --cross-entropy-fusion-impl te"
