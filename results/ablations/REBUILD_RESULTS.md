@@ -2624,3 +2624,30 @@ iteration against 20.7, loss at iteration 10 equal to 1e-5 and at 20 to 2.5e-4 a
 path. Adopted and resumed from checkpoint 400 at 11:08; the remaining 3,918 iterations take
 about 17.6 h, finishing around 04:45 UTC on 2026-09-06 (21:45 Pacific on the 5th).
 `megatron_moe_syncfree.patch` carries the change.
+
+## Reuse-fraction program, 1e19 result and close (2026-09-06 05:15)
+
+`cur_g1_1e19_WK5` (keep 1 of 6 experts per token, the paper's coarse 1e19 configuration, 50k
+tokenizer, 4,318 iterations) ends at test CE **3.1576** under its own policy: 0.022 below the
+recorded temporal run (3.1798) and 0.028 above the recorded free MoE (3.1301). The trace explains
+the split. Through iteration 1000 the run tracked the free MoE on the shared data order to
+0.002 (3.669 against 3.667 train loss) and led temporal by 0.09; at iterations 1170 to 1180
+the router blew up (train loss 3.61 to 8.19, z-loss thirty times, load-balancing loss four
+times), the same coarse-grain fragility seen on grain 1 at 1e17, and recovered by iteration
+1400; the gap to the free MoE it opened (0.06 at 1500) closed to 0.032 by 3400 and 0.028 at the
+end. Neither reference run's history shows whether it had such an episode (both logged only
+their final evaluation). Free re-score of the checkpoint not run (not a criterion).
+
+Program summary (`reuse_fraction.csv`). At 1e17 on the recorded setup, reuse at or below half
+costs nothing against the free MoE where the paper's 5/6 costs 0.056, and 1/6 reads 0.005 below
+it. At 1e18, 1/6 and 2/6 read 0.036 and 0.031 below the temporal triplet mean and 0.051 and
+0.047 below the free MoE mean, with no spike. At 1e19, 1/6 beats temporal by 0.022 and trails
+the free MoE by 0.028 after one router blow-up. Two things a follow-up would need: a
+same-environment free MoE at 1e18 and 1e19 (the references are July runs; at 1e17 the
+same-environment replicate agreed to 0.002), and something against the coarse-grain router
+blow-ups, which the shadow coherence loss damped at 1e17 and which a nearly free policy
+inherits. Speed work along the way, all committed: TE single-pass cross-entropy (1e17 s2 1.15 to
+0.85 s per iteration), and the expert-GEMM padding that puts widths not divisible by 8 on the
+sync-free path (coarse 1e19 20.7 to 16.2 s per iteration). The 1e19 run finished at 05:10 UTC,
+about 17 hours before the user's deadline. Nothing here goes into the paper by the user's
+instruction. GPU idle; no launches queued.
