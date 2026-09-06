@@ -2651,3 +2651,11 @@ inherits. Speed work along the way, all committed: TE single-pass cross-entropy 
 sync-free path (coarse 1e19 20.7 to 16.2 s per iteration). The 1e19 run finished at 05:10 UTC,
 about 17 hours before the user's deadline. Nothing here goes into the paper by the user's
 instruction. GPU idle; no launches queued.
+
+**Overnight 1e18 package, first arm** (10:20). Reuse 1/6 with the coherence loss (lambda 0.01)
+on its own resident set: 3.9194, against 3.8720 for plain 1/6 and the free MoE mean 3.9235. No
+spike in either run; the coherence arm trails by 0.05 from the first half onward, a straight
+cost of the regulariser where there is no instability to damp. The stabiliser seen at 1e17 is
+not free, so it is not a default; it would be a fix to reach for only where blow-ups occur
+(the 1e19 run), and its cost there would have to be weighed against the 0.028 the blow-up
+cost. Next in the package: same-environment free MoE, half policy, 1/6 replicate.
