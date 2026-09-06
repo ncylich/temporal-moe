@@ -10,3 +10,4 @@ scale,reuse,swaps_per_token,run,test_CE,reference_free_moe,reference_temporal,no
 1e18,2/6,4,cur_flame38m_g1_WK4,3.8764,3.9235 (triplet mean),3.9077 (triplet mean),
 1e19,1/6,5,cur_g1_1e19_WK5,3.1576,3.1301,3.1798,router blow-up at iteration 1170 (loss 3.61 to 8.19; recovered by 1400); 16.2 s/it after the expert-GEMM fix
 1e18,1/6 + coherence 0.01,5,cur_flame38m_g1_WK5C0p01,3.9194,3.9235 (triplet mean),3.9077 (triplet mean),coherence loss on the applied resident set costs 0.047 vs plain 1/6; no spike in either
+1e18,0 (free MoE; same environment),6,cur_flame38m_g1_C0,3.9147,3.9235 (triplet mean),3.9077 (triplet mean),same-environment control; inside the July triplet's range

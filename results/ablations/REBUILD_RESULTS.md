@@ -2659,3 +2659,9 @@ cost of the regulariser where there is no instability to damp. The stabiliser se
 not free, so it is not a default; it would be a fix to reach for only where blow-ups occur
 (the 1e19 run), and its cost there would have to be weighed against the 0.028 the blow-up
 cost. Next in the package: same-environment free MoE, half policy, 1/6 replicate.
+
+**Same-environment free MoE at 1e18** (12:20). `cur_flame38m_g1_C0`: 3.9147, inside the July
+triplet's range (3.9184 / 3.9302 / 3.9218), so the speed recipe (TE cross-entropy, padded
+sync-free expert GEMMs, micro-batch 64) does not move the reference. Plain reuse 1/6 (3.8720)
+is 0.043 below this control on identical code, which removes the environment caveat from the
+1e18 claim. Half policy and the 1/6 replicate follow.
