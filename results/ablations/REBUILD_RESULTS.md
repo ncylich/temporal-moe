@@ -2665,3 +2665,10 @@ triplet's range (3.9184 / 3.9302 / 3.9218), so the speed recipe (TE cross-entrop
 sync-free expert GEMMs, micro-batch 64) does not move the reference. Plain reuse 1/6 (3.8720)
 is 0.043 below this control on identical code, which removes the environment caveat from the
 1e18 claim. Half policy and the 1/6 replicate follow.
+
+**Half policy at 1e18** (14:20). `cur_flame38m_g1_WK3`: 3.8746, no spike. With 1/6 at 3.8720
+and 2/6 at 3.8764 the three light policies lie within 0.005 of one another, about 0.04 below the
+same-environment free MoE (3.9147) and 0.03 below the July temporal mean (3.9077). At 1e18 the
+gain does not depend on how light the policy is, only on keeping some of the previous token's
+experts; at 1e17 the same three spanned 0.017 with 2/6 the odd one out. The 1/6 replicate closes
+the package.
