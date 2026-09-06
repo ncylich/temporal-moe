@@ -12,3 +12,4 @@ scale,reuse,swaps_per_token,run,test_CE,reference_free_moe,reference_temporal,no
 1e18,1/6 + coherence 0.01,5,cur_flame38m_g1_WK5C0p01,3.9194,3.9235 (triplet mean),3.9077 (triplet mean),coherence loss on the applied resident set costs 0.047 vs plain 1/6; no spike in either
 1e18,0 (free MoE; same environment),6,cur_flame38m_g1_C0,3.9147,3.9235 (triplet mean),3.9077 (triplet mean),same-environment control; inside the July triplet's range
 1e18,3/6,3,cur_flame38m_g1_WK3,3.8746,3.9147 (same-env control),3.9077 (triplet mean),no spike
+1e18,1/6 (replicate),5,cur_flame38m_g1_WK5b,3.8707,3.9147 (same-env control),3.9077 (triplet mean),same-seed replicate of 3.8720: run-to-run 0.001

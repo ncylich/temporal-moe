@@ -2672,3 +2672,11 @@ same-environment free MoE (3.9147) and 0.03 below the July temporal mean (3.9077
 gain does not depend on how light the policy is, only on keeping some of the previous token's
 experts; at 1e17 the same three spanned 0.017 with 2/6 the odd one out. The 1/6 replicate closes
 the package.
+
+**Overnight package closed** (16:25). The 1/6 replicate `cur_flame38m_g1_WK5b`: 3.8707 against
+3.8720, a run-to-run spread of 0.001 at 1e18 in this environment. The 1e18 table now stands on
+its own: same-environment free MoE 3.9147, July temporal mean 3.9077, reuse 1/6 3.8720 and
+3.8707, 3/6 3.8746, 2/6 3.8764, 1/6 with the coherence loss 3.9194. Every light reuse policy
+beats the free MoE by about 0.04 and temporal by about 0.03, forty times the replicate spread;
+the coherence regulariser costs 0.05 where nothing needs damping. Checkpoints mirrored to the HF
+checkpoint repo. GPU idle; nothing queued.
