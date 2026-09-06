@@ -2680,3 +2680,25 @@ its own: same-environment free MoE 3.9147, July temporal mean 3.9077, reuse 1/6 
 beats the free MoE by about 0.04 and temporal by about 0.03, forty times the replicate spread;
 the coherence regulariser costs 0.05 where nothing needs damping. Checkpoints mirrored to the HF
 checkpoint repo. GPU idle; nothing queued.
+
+## KL direction in the on-policy adaptation, gemma4 (2026-09-06 23:45)
+
+Same cell as the gemma winner (`sweep_online.py` klT2: from scratch, lr 1e-4, no anchor, KL
+temperature 2 with T^2 scaling, 3.4M sampled tokens, refresh every 16 steps x 256 rows, budget
+on sampled tokens) with `--aux-loss fwdkl` (teacher-weighted forward KL over the teacher's top
+50 at the student's own states) in place of `revkl_full` (analytic reverse KL). Record
+`gemma4_ce_online_scratch_e16_klT2_fwdkl_n1319`, adapter
+`gemma_ce_online_scratch_e16_klT2_fwdkl_adapter.pt`; the winner's files untouched. Training
+56 minutes, forward KL 0.302 nats per token at step 50 to 0.239 at the end.
+
+GSM8K n=1319, paired by item:
+
+| arm | base | reverse KL (winner) | forward KL | fwd vs rev (fixed/broken, z) | fwd vs base |
+|---|---|---|---|---|---|
+| free | 87.8 | 88.2 | 87.0 | 16/31, -2.2 | 18/28, -1.5 |
+| R8 | 78.8 | 84.2 | 81.0 | 61/103, -3.3 | 116/86, +2.1 |
+
+Forward KL recovers less than half of what reverse KL recovers at R8 (+2.3 against +5.5
+over the base) and costs the free arm a point, paired-significant on both. Reverse KL stays
+the recipe. The full surface at R8 and R16 (`gemma4_ce_online_scratch_e16_klT2_fwdkl_rho0`)
+follows for completeness.
