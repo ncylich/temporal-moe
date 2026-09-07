@@ -2702,3 +2702,33 @@ Forward KL recovers less than half of what reverse KL recovers at R8 (+2.3 again
 over the base) and costs the free arm a point, paired-significant on both. Reverse KL stays
 the recipe. The full surface at R8 and R16 (`gemma4_ce_online_scratch_e16_klT2_fwdkl_rho0`)
 follows for completeness.
+
+**Forward KL, full surface** (00:10, 2026-09-07). Same instruments as the winner's rows
+(`..._fwdkl_rho0*` records), R8 and R16:
+
+| R8 | base | reverse KL (winner) | forward KL |
+|---|---|---|---|
+| GSM8K | 78.8 | 84.2 | 81.0 |
+| IFEval | 86.9 | 86.7 | 84.5 |
+| MMLU | 92.5 | 94.3 | 92.1 |
+| HumanEval | 94.5 | 96.3 | 96.3 |
+| MBPP | 77.0 | 82.2 | 64.0 |
+| mean | 85.9 | 88.7 | 83.6 |
+
+| R16 | base | reverse KL (winner) | forward KL |
+|---|---|---|---|
+| GSM8K | 86.6 | 87.2 | 86.1 |
+| IFEval | 87.8 | 88.0 | 86.3 |
+| MMLU | 92.5 | 93.9 | 92.5 |
+| HumanEval | 96.3 | 98.2 | 98.2 |
+| MBPP | 89.0 | 88.4 | 85.8 |
+| mean | 90.4 | 91.1 | 89.8 |
+
+Forward KL loses to reverse KL on every surface but HumanEval at both settings, and at R8 it
+ends below the unadapted base on the five-benchmark mean (83.6 against 85.9) because MBPP
+collapses to 64.0; the offline re-score under the function-only rule says how much of that
+is the self-test scaffold (line above this paragraph in the log). The teacher-weighted
+forward objective spends its capacity matching the teacher's whole top-50 on the student's
+own samples, where the reverse objective concentrates on the modes the student actually
+emits; on this recipe that difference is worth 5 points of mean at R8. Reverse KL stays,
+and the KL-direction line belongs in the adaptation appendix as one sentence.
