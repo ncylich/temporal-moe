@@ -233,6 +233,83 @@ def tag_qwen35(model):
     return n
 
 
+def patch_olmoe():
+    """OLMoE mirror of patch_qwen35 on the HF router: top-k among residents, gate weights the FULL
+    softmax masses at the selected experts (norm_topk_prob=False; the served vLLM path preserves the
+    same mass, see vllm_glue.olmoe_moe_forward)."""
+    from transformers.models.olmoe import modeling_olmoe as m
+    import torch.nn.functional as F
+
+    def fwd(self, hidden_states):
+        hidden_states = hidden_states.reshape(-1, self.hidden_dim)
+        router_logits = F.linear(hidden_states, self.weight)          # [T, E]
+        router_probs = F.softmax(router_logits, dtype=torch.float, dim=-1)
+        li = getattr(self, "_layer_idx", None)
+        fs = CFG.get("free_set")
+        freed = not CFG["on"] or (fs is not None and li in fs)
+        probs_for_topk = router_probs
+        if not freed:
+            R = CFG["R"]
+            rm = CFG.get("R_map")
+            if rm is not None and li is not None:
+                R = rm.get(li, R)
+            Bn = CFG.get("batch", 1)
+            T_, E_ = router_logits.shape
+            if Bn > 1:
+                assert not CFG.get("decode_mode") and not CFG.get("cold_start"), \
+                    "batched constraint supports the warm training path only"
+                lg = router_logits.view(Bn, T_ // Bn, E_).transpose(0, 1).float()
+            else:
+                lg = router_logits.unsqueeze(1).float()
+            if CFG.get("decode_mode"):
+                import decode_state as _DS
+                mask = _DS.route(getattr(self, "_layer_idx", id(self)), lg)
+                if mask is None:
+                    mask = torch.ones_like(lg, dtype=torch.bool)
+            else:
+                with torch.no_grad():
+                    mask = compute_resident_mask_accel(lg, R, evict="min_logit", swaps=1)
+            ef = CFG.get("enforce_from", 0)
+            efs = list(ef) if hasattr(ef, "__len__") else [ef] * Bn
+            if Bn > 1:
+                for b_, e_ in enumerate(efs):
+                    if e_:
+                        mask[:e_, b_] = True
+                probs_for_topk = router_probs.masked_fill(~mask.transpose(0, 1).reshape(T_, E_), 0.0)
+            else:
+                if efs[0]:
+                    mask[:efs[0]] = True
+                probs_for_topk = router_probs.masked_fill(~mask.squeeze(1), 0.0)
+        _, router_indices = torch.topk(probs_for_topk, self.top_k, dim=-1)
+        router_top_value = router_probs.gather(-1, router_indices)     # full masses at the selection
+        if self.norm_topk_prob:
+            router_top_value = router_top_value / router_top_value.sum(dim=-1, keepdim=True)
+        router_top_value = router_top_value.to(router_logits.dtype)
+        return router_logits, router_top_value, router_indices
+
+    m.OlmoeTopKRouter.forward = fwd
+
+
+def tag_olmoe(model):
+    from transformers.models.olmoe import modeling_olmoe as m
+    n = 0
+    for mod in model.modules():
+        if isinstance(mod, m.OlmoeTopKRouter):
+            mod._layer_idx = n
+            n += 1
+    return n
+
+
+def tag_lfm(model):
+    from transformers.models.lfm2_moe import modeling_lfm2_moe as m
+    n = 0
+    for mod in model.modules():
+        if isinstance(mod, m.Lfm2MoeSparseMoeBlock):
+            mod._layer_idx = n
+            n += 1
+    return n
+
+
 R_LAYER = [8, 12, 16, 24]
 
 

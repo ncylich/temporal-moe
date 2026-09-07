@@ -242,7 +242,7 @@ def main():
                          "interpolated base*(1-s)+ckpt*s. 1.0 = full adapter")
     ap.add_argument("--merge-out", default=None,
                     help="after loading the adapter, save the merged model to this dir and exit")
-    ap.add_argument("--family", default="gemma4", choices=("gemma4", "qwen35"),
+    ap.add_argument("--family", default="gemma4", choices=("gemma4", "qwen35", "olmoe", "lfm"),
                     help="router-patch family; everything else is layout-generic")
     ap.add_argument("--opt", default="adamw", choices=("adamw", "adamw8bit", "paged8bit"),
                     help="paged8bit: bnb paged 8-bit moments (crossmodel qwen precedent)")
@@ -319,7 +319,7 @@ def main():
         import torch.nn as _nn
         _names = [n for n, m in model.named_modules()
                   if isinstance(m, _nn.Linear)
-                  and n.rsplit(".", 1)[-1] in ("q_proj", "k_proj", "v_proj", "o_proj")
+                  and n.rsplit(".", 1)[-1] in ("q_proj", "k_proj", "v_proj", "o_proj", "out_proj")
                   and "vision_tower" not in n and "visual" not in n]
         assert _names, "found no text-side attention projections to attach LoRA to"
         model = get_peft_model(model, LoraConfig(
@@ -334,6 +334,12 @@ def main():
     if A.family == "qwen35":
         GL.patch_qwen35()
         n_routers = GL.tag_qwen35(model)
+    elif A.family == "olmoe":
+        GL.patch_olmoe()
+        n_routers = GL.tag_olmoe(model)
+    elif A.family == "lfm":
+        GL.patch_lfm()
+        n_routers = GL.tag_lfm(model)
     else:
         GL.patch_gemma4()
         n_routers = GL.tag_gemma4(model)
@@ -580,7 +586,7 @@ def main():
     extra = []
     for n, p in model.named_parameters():
         if ("router" in n.lower() and "proj" in n) or n.endswith("norm.weight") \
-                or n.endswith(".mlp.gate.weight"):  # qwen35 router (not shared_expert_gate)
+                or n.endswith(".mlp.gate.weight") or n.endswith(".feed_forward.gate.weight"):  # qwen35/olmoe router, lfm router
             p.requires_grad_(True)
             extra.append(p)
     if A.router_only:

@@ -33,21 +33,46 @@ import torch                                                         # noqa: E40
 _TAIL = re.compile(r"((?:layers\.\d+\.).*$)")
 
 
-def _hf_name(param_or_module_name, suffix=""):
-    """Trainer (peft-wrapped) name -> HF checkpoint name for gemma4's language model."""
+def _hf_name(param_or_module_name, suffix="", arch="gemma4"):
+    """Trainer (peft-wrapped) name -> HF checkpoint name. gemma4 and the raw qwen3.5 checkpoint
+    nest the text stack under model.language_model; OLMoE and LFM2.5 are plain model.layers."""
+    root = "model." if arch in ("olmoe", "lfm") else "model.language_model."
     m = _TAIL.search(param_or_module_name)
     if m:
-        return f"model.language_model.{m.group(1)}{suffix}"
+        return f"{root}{m.group(1)}{suffix}"
     if param_or_module_name.endswith("norm.weight") or param_or_module_name.endswith("norm"):
-        return "model.language_model.norm.weight" if suffix == "" or suffix == ".weight" else None
+        if suffix not in ("", ".weight"):
+            return None
+        if arch == "lfm":
+            return "model.embedding_norm.weight" if "embedding_norm" in param_or_module_name else None
+        return f"{root}norm.weight"
     return None
+
+
+# per-expert checkpoint naming for families whose experts are stored one module per expert
+# (HF 5 fuses them on load; vLLM's FusedMoE loader wants the on-disk names back)
+EXPERT_NAMES = {"olmoe": ("gate_proj.weight", "up_proj.weight", "down_proj.weight"),
+                "lfm": ("w1.weight", "w3.weight", "w2.weight")}
+
+
+def expert_slices(arch, base, gu, dp):
+    """(hf_name, tensor) per expert from merged grouped weights gu (E,H,2I) and dp (E,I,H):
+    gate (I,H), up (I,H), down (H,I) as nn.Linear weights, under the family's on-disk names."""
+    g_n, u_n, d_n = EXPERT_NAMES[arch]
+    E, H, twoI = gu.shape
+    I = twoI // 2
+    for e in range(E):
+        w = gu[e].t()                                   # (2I, H)
+        yield f"{base}.{e}.{g_n}", w[:I].contiguous()
+        yield f"{base}.{e}.{u_n}", w[I:].contiguous()
+        yield f"{base}.{e}.{d_n}", dp[e].t().contiguous()   # (H, I)
 
 
 class OnlineSampler:
     def __init__(self, model, base_path, R, swaps, prompts_path, quota, max_new=1024,
                  gpu_mem=0.5, max_model_len=2560, seed=0, arch="gemma4", temperature=0.7, top_p=0.8,
                  offload_layers=0, presence_penalty=0.0, think=False):
-        assert arch in ("gemma4", "qwen35"), arch
+        assert arch in ("gemma4", "qwen35", "olmoe", "lfm"), arch
         self.arch = arch
         # qwen35: trainer (70 GB) + engine weights (66 GB) exceed the 140 GB GPU. While the engine is
         # awake, the frozen expert base weights of the first `offload_layers` layers live on the host
@@ -154,7 +179,7 @@ class OnlineSampler:
 
     # ------------------------------------------------------------------ weights
     def _name(self, n, suffix=""):
-        return _hf_name(n, suffix)              # raw-base engine: model.language_model.* for both families
+        return _hf_name(n, suffix, self.arch)   # raw-base engine names for the family
 
     def _pairs(self):
         """(hf_name, merged tensor) for every trainable surface, one layer at a time."""
@@ -167,8 +192,11 @@ class OnlineSampler:
                     dev = mod.elora_gu_A.device
                     gu = mod.gate_up_proj.data.to(dev) + s * torch.bmm(mod.elora_gu_A.data, mod.elora_gu_B.data)   # (E,H,2I)
                     dp = mod.down_proj.data.to(dev) + s * torch.bmm(mod.elora_dp_A.data, mod.elora_dp_B.data)      # (E,I,H)
-                    yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
-                    yield base + ".down_proj", dp.transpose(1, 2).contiguous()
+                    if self.arch in EXPERT_NAMES:                    # per-expert checkpoints (OLMoE, LFM2.5)
+                        yield from expert_slices(self.arch, base, gu, dp)
+                    else:
+                        yield base + ".gate_up_proj", gu.transpose(1, 2).contiguous()
+                        yield base + ".down_proj", dp.transpose(1, 2).contiguous()
                     del gu, dp
                 elif hasattr(mod, "lora_A") and hasattr(mod, "base_layer") and "default" in getattr(mod, "lora_A", {}):
                     base = self._name(mod_names[id(mod)])

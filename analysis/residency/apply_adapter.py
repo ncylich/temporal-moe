@@ -51,7 +51,17 @@ class _Base:
     """Named tensors of the base checkpoint, read on demand straight to the GPU."""
     def __init__(self, base_path):
         self.d = base_path
-        self.map = json.load(open(f"{base_path}/model.safetensors.index.json"))["weight_map"]
+        idx = f"{base_path}/model.safetensors.index.json"
+        if os.path.exists(idx):
+            self.map = json.load(open(idx))["weight_map"]
+        else:                                   # single-file checkpoints (LFM2.5): index every tensor ourselves
+            import glob
+            from safetensors import safe_open
+            self.map = {}
+            for f in sorted(glob.glob(f"{base_path}/*.safetensors")):
+                with safe_open(f, "pt") as h:
+                    for k in h.keys():
+                        self.map[k] = os.path.basename(f)
         self._h = {}
 
     def get(self, name):
@@ -105,9 +115,53 @@ def adapter_pairs_qwen35(ck_tensors, base, meta=None):
             yield "model.language_model.norm.weight", t["model.norm.weight"].cuda()
 
 
+def adapter_pairs_per_expert(ck_tensors, base, meta):
+    """OLMoE / LFM2.5: plain model.layers.N names, experts stored one module per expert on disk
+    (gate/up/down for OLMoE, w1/w3/w2 for LFM). Merged per expert from the grouped LoRA."""
+    fam = meta["family"]
+    ex = {"olmoe": ("mlp.experts", "gate_proj.weight", "up_proj.weight", "down_proj.weight"),
+          "lfm": ("feed_forward.experts", "w1.weight", "w3.weight", "w2.weight")}[fam]
+    escale = 2.0; lscale = 64 / 32
+    t = {n[len(PREFIX):] if n.startswith(PREFIX) else n: v for n, v in ck_tensors.items()}
+    layers = sorted({int(m.group(1)) for n in t for m in [re.search(r"\.layers\.(\d+)\.", n)] if m})
+    with torch.no_grad():
+        for L in layers:
+            p = f"model.layers.{L}."
+            a = t.get(p + ex[0] + ".elora_gu_A")
+            if a is not None:
+                A = a.cuda(); B = t[p + ex[0] + ".elora_gu_B"].cuda()
+                D = escale * torch.bmm(A, B)                             # (E,H,2I)
+                E, H, twoI = D.shape; I = twoI // 2
+                Ad = t[p + ex[0] + ".elora_dp_A"].cuda(); Bd = t[p + ex[0] + ".elora_dp_B"].cuda()
+                Dd = escale * torch.bmm(Ad, Bd)                          # (E,I,H)
+                for e in range(E):
+                    g = base.get(f"{p}{ex[0]}.{e}.{ex[1]}").clone(); g += D[e][:, :I].t(); yield f"{p}{ex[0]}.{e}.{ex[1]}", g
+                    u = base.get(f"{p}{ex[0]}.{e}.{ex[2]}").clone(); u += D[e][:, I:].t(); yield f"{p}{ex[0]}.{e}.{ex[2]}", u
+                    d = base.get(f"{p}{ex[0]}.{e}.{ex[3]}").clone(); d += Dd[e].t();      yield f"{p}{ex[0]}.{e}.{ex[3]}", d
+                del A, B, D, Ad, Bd, Dd
+            for proj in ("q_proj", "k_proj", "v_proj", "o_proj", "out_proj"):
+                a = t.get(p + f"self_attn.{proj}.lora_A.default.weight")
+                if a is None:
+                    continue
+                A = a.cuda(); B = t[p + f"self_attn.{proj}.lora_B.default.weight"].cuda()
+                W = base.get(p + f"self_attn.{proj}.weight").clone()
+                W += (B @ A) * lscale
+                yield p + f"self_attn.{proj}.weight", W
+                del W, A, B
+            for n, v in t.items():
+                if n.startswith(p) and "lora_" not in n and "elora_" not in n:
+                    yield n, v.cuda()
+        for n, v in t.items():
+            if "layers." not in n and "lora_" not in n and "elora_" not in n and n.endswith("norm.weight"):
+                yield n, v.cuda()
+
+
 def adapter_pairs(ck_tensors, base, meta=None):
     if (meta or {}).get("family") == "qwen35":
         yield from adapter_pairs_qwen35(ck_tensors, base, meta)
+        return
+    if (meta or {}).get("family") in ("olmoe", "lfm"):
+        yield from adapter_pairs_per_expert(ck_tensors, base, meta)
         return
     """Yield (hf_name, merged tensor) for every trained language-model surface."""
     r = int((meta or {}).get("expert_lora_r", 32))
@@ -150,7 +204,7 @@ def adapter_pairs(ck_tensors, base, meta=None):
 def apply_adapter(llm, adapter_path, base_path):
     t0 = time.time()
     ck = torch.load(adapter_path, map_location="cpu", weights_only=False)
-    assert ck.get("family", "gemma4") in ("gemma4", "qwen35") and ck.get("stack", "hf+peft") == "hf+peft", ck.get("family")
+    assert ck.get("family", "gemma4") in ("gemma4", "qwen35", "olmoe", "lfm") and ck.get("stack", "hf+peft") == "hf+peft", ck.get("family")
     vm = find_engine_model(llm)
     base = _Base(base_path)
     loaded = vm.load_weights(adapter_pairs(ck["tensors"], base, ck))
