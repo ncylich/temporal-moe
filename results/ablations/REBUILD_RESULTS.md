@@ -2732,3 +2732,79 @@ forward objective spends its capacity matching the teacher's whole top-50 on the
 own samples, where the reverse objective concentrates on the modes the student actually
 emits; on this recipe that difference is worth 5 points of mean at R8. Reverse KL stays,
 and the KL-direction line belongs in the adaptation appendix as one sentence.
+
+## On-policy adaptation of the two small released models (2026-09-07 09:10)
+
+The paper's adaptation section covers gemma4 and qwen35 only; OLMoE-1B-7B-Instruct (R=k=8)
+and LFM2.5-8B-A1B (R=k=4) were left unadapted, and gpt-oss has no damage to adapt. Both got
+the gemma/qwen winner recipe unchanged (from scratch, reverse KL at T=2, lr 1e-4, refresh
+every 16 steps of 256 rows, 3.4M sampled tokens, budget on sampled tokens), with the family
+plumbing added for it: an HF router patch for OLMoE (`granularity_ladder.patch_olmoe`; LFM
+reuses its audited patch), per-expert weight slicing in the sampler's bit-exact sync
+(`online_sampler.expert_slices`) and in the adapter-direct loader
+(`apply_adapter.adapter_pairs_per_expert`), and a launcher
+(`scripts/residency/orchestration/tmoe_small_online.sh`). Training wall-clock, the user's
+hard constraint (no longer than gemma/qwen's hour): OLMoE 21 min, LFM 16 min at the shared
+budget, 33 to 35 min at the doubled budget below. Base rows were re-run at full size where
+the recorded ones were n=200 (GSM8K 1319, IFEval 541); MMLU is the 228-item relaxed metric,
+MBPP the 500-problem unified producer. GSM8K deltas are paired by question (McNemar);
+`analysis/residency/small_adapt_table.py` regenerates every table from the CSV.
+
+**OLMoE** (`olmoe_ce_online_scratch_e16`, adapter mirrored to HF):
+
+| task | free base | free adapted | R8 base | R8 adapted | R8 delta |
+|---|---|---|---|---|---|
+| GSM8K (1319) | 68.3 | 69.5 | 45.0 | 52.1 | +7.0 +/- 1.5, z=+4.7 |
+| IFEval (541) | 62.7 | 57.7 | 55.6 | 56.2 | +0.6 |
+| MMLU (228) | 55.3 | 55.7 | 45.6 | 46.9 | +1.3 |
+| HumanEval | 36.6 | 35.4 | 27.4 | 27.4 | 0.0 |
+| MBPP (500) | 26.4 | 23.8 | 17.4 | 18.8 | +1.4 |
+| mean | 49.9 | 48.4 | 38.2 | 40.3 | +2.1 |
+
+The recipe transfers to OLMoE: the constrained arm gains on every surface, GSM8K
+significantly (KL 0.94 to 0.74 nats/tok over 300 steps). The free arm pays, unlike on gemma
+and qwen: IFEval loses 5.0 and MBPP 2.6 with the adapter applied unconstrained. The paper's
+claim is about the constrained arm, but the OLMoE row would need that caveat.
+
+**LFM2.5** (three one-change variants, all mirrored). The shared recipe
+(`lfm25_ce_online_scratch_e16`) came out at or below base on the constrained arm, so it got
+a written diagnosis before being called the recipe's limit. The train and eval residency
+paths agree (the vLLM glue replicates the audited HF patch; the KL-only loop feeds the
+student one row at a time with a scalar constraint start, so the list-valued start that
+would crash the LFM patch never reaches it). What differs from gemma and qwen is the data:
+LFM thinks before answering, so its rollouts are twice as long (mean 1,650 tokens under
+the 2,048 cap, half of them truncated) and the fixed token budget bought it 130 optimizer
+steps against 250 to 300 for the others, with the KL barely moved (0.44 to 0.39). The first
+fix was the same number of steps (8M tokens, `_s300`); the second was qwen's learning rate
+(3e-5, `_s300_lr3e-5`), since qwen also started from a small KL (0.37) and still gained
+6.5 points. The first relaunch had to be killed and redone: the launcher's default rollout
+cap is 1,024 and the first LFM run had used 2,048 through the environment, so the re-run
+was silently a two-change experiment (84% of rollouts truncated); killing the lease
+wrapper's pid also left the python trainer alive on the GPU, re-parented to init, until it
+was killed by its own pid.
+
+| R4 | base | shared recipe | 300 steps | 300 steps, lr 3e-5 |
+|---|---|---|---|---|
+| GSM8K (1319) | 80.9 | 79.2 (-1.7 +/- 1.1) | 82.0 (+1.1 +/- 1.1) | 81.5 (+0.6 +/- 1.0) |
+| IFEval (541) | 85.0 | 87.6 | 86.5 | 87.8 |
+| MMLU (228) | 55.7 | 54.8 | 57.5 | 52.2 |
+| MBPP (500) | 60.4 | 63.8 | 62.8 | 63.4 |
+| mean | 70.5 | 71.4 | 72.2 | 71.2 |
+| final KL | 0.44 | 0.39 | 0.36 | 0.38 |
+
+| free | base | shared recipe | 300 steps | 300 steps, lr 3e-5 |
+|---|---|---|---|---|
+| GSM8K (1319) | 85.1 | 84.7 | 84.0 | 84.5 |
+| IFEval (541) | 89.3 | 90.8 | 89.3 | 90.8 |
+| MMLU (228) | 59.6 | 65.8 | 61.0 | 57.5 |
+| MBPP (500) | 70.4 | 66.0 | 66.4 | 68.0 |
+
+No LFM variant resolves a GSM8K gain at R4 (all within +/-1.7, none past z=1.6), and the
+surface moves are within the sizes of their instruments (IFEval +1.5 to +2.8, MBPP +2.4 to
++3.4, MMLU anywhere from -3.5 to +1.8 on 228 items). LFM's residency damage is small to
+begin with (4.2 points on GSM8K, 0.44 nats of KL) and this recipe recovers at most a point
+of it within the time budget; the limit is the recipe on this model, not a plumbing fault.
+HumanEval was not evaluated for the LFM adapters because its paper cell comes from the
+thinking-aware producer, which has no adapter path (the primed-fence task is invalid for a
+thinking model under the data contract). Nothing here goes into the paper unless asked;
+the OLMoE row is the one worth adding, with its free-arm caveat.
