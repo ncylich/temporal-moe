@@ -367,3 +367,73 @@ a 32% inflation of every GEMV **with the median unmoved** — a tail, i.e. TLB s
 not call overhead. That immediately killed the planned "batch the madvise calls" work
 before a line of it was written. Mean-up/median-flat is a shootdown or contention
 signature; mean-and-median-both-up is genuine per-call cost. (S3-38.)
+
+### 25. `evictions=0` or `hook_calls=0` on a streamed arm means the arm did not stream
+The single most expensive mistake of the 2026-08-24 session, and a recurrence of #8.
+With `LLAMA_TEMPORAL_REPACK=1` and no `TWOPASS`, `LLAMA_TEMPORAL_R` silently degrades to
+"lazy-load each expert on first touch and **never evict**": the pool grows unbounded until
+most of the model is resident, and the arm measures a nearly-fully-resident model at a
+fraction of the ceiling it should be showing. It reported plausible, quiet, publishable
+numbers (95-99% of ceiling) for an entire overnight run.
+
+The tells were all present and all ignored for hours:
+- `evictions=0` on every streamed arm;
+- `hook_calls=0` on every streamed arm (the residency hook was never once called);
+- **byte-identical** `fetches` and `fetched_mib` across R=18/36/48 — a 18-expert cache and
+  a 48-expert cache cannot do identical I/O;
+- pool residency 6.3x over its nominal cap (3232 MiB resident against a 513 MiB R=18 cap).
+
+Proof, same R and swap_prob, only the repack flag differing:
+
+| config | fetches | evictions | hook_calls | decode |
+|---|---|---|---|---|
+| `REPACK=1` | 8,235 | **0** | **0** | 16.58 tok/s |
+| `NO_REPACK=1` | 67,358 | 64,644 | 17,415 | **6.47 tok/s** |
+
+**Rule: a streamed arm with `evictions == 0` is void by construction, regardless of how
+clean its clocks, swap and variance look.** `run_ctx_designpoint.py` enforces this in code
+(`no_turnover`), and does not retry it, because it is a config fault and not thermal noise.
+
+### 26. Under `TWOPASS`, `LLAMA_TEMPORAL_R` is inert for every R >= top_k
+`ggml_temporal_window_fill` sizes the resident window from `dst->ne[0]`, and the graph
+builds that tensor as `n_expert_used` — the router's top_k, **not** R
+(`llama-graph.cpp:1930`). So two-pass mode holds exactly top_k experts resident whatever R
+says. Verified: R=18 -> 20.70 tok/s, R=36 -> 20.51, byte-identical fetch and eviction
+counts. Two-pass therefore yields **one operating point (R=k), never an R-curve**.
+An R-curve needs the FIFO trim in `ggml_tm_ensure` (`ggml-cpu.c:2930`), which lives inside
+`mul_mat_id` and so requires `LLAMA_NO_REPACK=1` (see #8, #25).
+
+### 27. A ceiling is only a denominator at the SAME context depth
+A fully-resident model's decode rate falls with context depth too, because attention cost
+grows with the KV cache regardless of expert residency. The fine-shape ceiling measures
+32.42 / 25.44 / 20.22 / 14.58 tok/s at depth 0 / 1024 / 2048 / 4096 — a **2.2x** spread.
+Dividing a depth-4096 arm by a depth-0 ceiling inflates the result by roughly 2x and
+manufactures a "context makes streaming free" conclusion out of nothing. Measure the
+ceiling at every depth you report.
+
+### 28. A ceiling model sized at depth 0 may not fit at depth > 0
+The KV cache competes with resident experts for the same RAM. `e112` (the largest fitting
+E at ctx=0) swapped 510 MB at ctx=1024 and had to be voided; `e80`/`e100n` were rebuilt to
+hold at the worst depth tested. Because fully-resident decode is E-independent on this
+device (decode reads only the k active experts), shrinking E costs the baseline nothing and
+buys the headroom — so size the ceiling model for the **deepest** context in the sweep.
+Also `am kill-all` + settle before any near-full-residency arm: background apps creep back
+between sessions, and that alone is worth hundreds of MB.
+
+### 29. Cool-gating once before an arm does not catch throttling during it
+A single pre-run clock sample passes while the device is mid-drift, and `Thermal Status`
+still reads 0 while cores sit at ~86% of rated (#L1 again). An e112 ceiling read 20.0 tok/s
+against a 27.5-36 historical range purely from this. Gate on a **sustained** reading (N
+consecutive samples at >=98% of rated), and separately compute the residency-weighted mean
+clock across the arm's actual runtime from `cpufreq/stats/time_in_state` deltas; void the
+arm if it fell below 97%. Long-context arms throttle far more readily — every ctx=4096 arm
+in this session needed at least one retry.
+
+### 30. `-d` defaults to 0, and the two protocol eras disagree about it
+`llama-bench -d/--n-depth` defaults to **0**. `bench.py`-era scripts (`run_sweep.py`,
+`run_regimes.py`, `run_final.py`) hardcode `CTX=1024` and pass it; the ad-hoc scripts that
+produced the S3-19..S3-38 Pixel curve pass no `-d` at all and therefore ran at depth 0.
+The two are not comparable and the difference is large (fine R=18 at the design point:
+63.9% of ceiling at depth 0, 83.4% at depth 4096). State the depth with every phone number
+you quote, and never assume an undated script's default matches the curve you are
+replicating.

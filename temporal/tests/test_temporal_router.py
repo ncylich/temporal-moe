@@ -163,6 +163,56 @@ def test_accel_matches_reference_on_gpu():
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU fast path needs a GPU")
+def test_accel_matches_reference_across_BLOCK_boundary():
+    """Bit-exactness at the expert counts where the kernel changes shape.
+
+    The scan pads E up to BLOCK = next pow2 and picks BOTH its reduction formulation and its
+    num_warps from BLOCK (see _scan_kernel / _scan_num_warps): BLOCK <= 128 takes the
+    "max value then min index achieving it" reductions at 1 warp, BLOCK >= 256 takes Triton's
+    fused tie_break_left reductions at 2 warps (lru) or 4 (min_logit). Those are different code
+    paths, so E=128 and E=256 must both be covered, plus a non-pow2 E (pad lanes must stay masked
+    out of every reduction) and E just over the boundary.
+    """
+    tr._scan_path = None; tr._graph_cache.clear()
+    torch.manual_seed(17)
+    for evict in ("lru", "min_logit"):
+        for S, B, E, k in [(512, 2, 128, 8),      # Qwen3-30B width: BLOCK=128, unfused, 1 warp
+                           (512, 1, 256, 8),      # Qwen3.5 width:   BLOCK=256, fused
+                           (512, 3, 192, 18),     # FLAME-MoE width: BLOCK=256 with 64 pad lanes
+                           (512, 2, 129, 4)]:     # just over the boundary: 127 pad lanes
+            logits = torch.randn(S, B, E, device="cuda")
+            assert torch.equal(tr.compute_resident_mask_accel(logits, k, evict),
+                               compute_resident_mask(logits, k, evict)), \
+                f"accel != ref evict={evict} shape={(S, B, E)} k={k}"
+            # integer logits with heavy ties -> every reduction hits the tie-break path
+            tied = torch.randint(0, 4, (S, B, E), device="cuda").float()
+            assert torch.equal(tr.compute_resident_mask_accel(tied, k, evict),
+                               compute_resident_mask(tied, k, evict)), \
+                f"accel != ref (ties) evict={evict} shape={(S, B, E)} k={k}"
+            # R = E: every expert resident, so the nominee reduction sees an all -inf input
+            assert tr.compute_resident_mask_accel(logits, E, evict).all()
+    assert tr._scan_path == "triton", f"triton path did not engage (path={tr._scan_path})"
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU fast path needs a GPU")
+def test_accel_matches_reference_on_short_sequences():
+    """S <= 3 exercises the prefetch prologue, which loads tokens 1 and 2 before the loop runs.
+
+    Those loads are masked off past the end of the sequence; if the masking were wrong this is
+    where it would show (S=1 runs zero loop iterations, S=2 runs one, S=3 fills the pipeline).
+    """
+    tr._scan_path = None; tr._graph_cache.clear()
+    torch.manual_seed(19)
+    for evict in ("lru", "min_logit"):
+        for E in (64, 128, 256):
+            for S in (1, 2, 3, 4, 5):
+                logits = torch.randn(S, 2, E, device="cuda")
+                assert torch.equal(tr.compute_resident_mask_accel(logits, 8, evict),
+                                   compute_resident_mask(logits, 8, evict)), \
+                    f"accel != ref evict={evict} S={S} E={E}"
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU fast path needs a GPU")
 def test_graph_path_matches_reference_on_gpu():
     # The alternate CUDA-graph fast path (TEMPORAL_SCAN=graph) must also stay bit-exact.
     tr._scan_path = None; tr._graph_cache.clear()
@@ -270,3 +320,39 @@ def test_residency_R_banner():
         assert "residency_R=36" in banner_knobs()
     finally:
         os.environ.pop("TEMPORAL_RESIDENCY_R", None)
+
+
+def test_multiswap_anchor_and_budget():
+    """swaps >= k reproduces per-token top-k exactly (greedy exchange converges in <= k
+    sub-swaps); intermediate budgets change at most `swaps` experts per token."""
+    torch.manual_seed(3)
+    lg = torch.randn(96, 2, 32)
+    m = compute_resident_mask(lg, k=4, evict="min_logit", swaps=4)
+    tk = torch.zeros_like(m)
+    tk.scatter_(-1, lg.topk(4, -1).indices, True)
+    assert torch.equal(m, tk)
+    for s in (1, 2, 3):
+        ms = compute_resident_mask(lg, k=4, evict="min_logit", swaps=s)
+        changes = (ms[1:] ^ ms[:-1]).sum(-1)                 # 2 per swap (one in, one out)
+        assert int(changes.max()) <= 2 * s
+    # s=1 is byte-identical to the pre-swaps behaviour (default arg path)
+    assert torch.equal(compute_resident_mask(lg, k=4, evict="min_logit", swaps=1),
+                       compute_resident_mask(lg, k=4, evict="min_logit"))
+
+
+def test_padded_scan_matches_unpadded_columns():
+    """compute_resident_mask_padded on a left-padded batch must reproduce, at every content
+    position, exactly what an unpadded single-column scan produces."""
+    import torch
+    from temporal.temporal_router import compute_resident_mask, compute_resident_mask_padded
+    torch.manual_seed(0)
+    S, E, k = 48, 16, 4
+    seqs = [torch.randn(S - s0, E) for s0 in (0, 7, 23)]
+    starts = torch.tensor([0, 7, 23])
+    logits = torch.full((S, 3, E), -9.0)
+    for b, (s0, seq) in enumerate(zip(starts.tolist(), seqs)):
+        logits[s0:, b] = seq
+    got = compute_resident_mask_padded(logits.cuda(), k, starts, evict="min_logit")
+    for b, (s0, seq) in enumerate(zip(starts.tolist(), starts.tolist() and seqs)):
+        ref = compute_resident_mask(seq.unsqueeze(1).cuda(), k, evict="min_logit")
+        assert torch.equal(got[s0:, b], ref[:, 0]), f"column {b} diverges"

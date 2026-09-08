@@ -1,6 +1,23 @@
-model,num_experts,union_mean,union_std,union_frac_of_E,effective_experts,mean_experts_over_0.8_resident_per_layer,max_residency_frac
-"1.4M active, coarse (6 of 64 experts)",64,62.77,2.10,0.9808,58.90,0.00,0.2054
-"8.1M active, coarse (6 of 64 experts)",64,62.20,2.73,0.9719,61.18,0.00,0.2015
-"14.8M active, coarse (6 of 64 experts)",64,62.81,1.87,0.9814,61.60,0.00,0.2048
-"3.9M active, fine-grained (18 of 192 experts)",192,158.77,14.94,0.8269,176.60,0.00,0.2527
-"38.0M active, coarse (6 of 64 experts)",64,62.33,1.65,0.9739,53.68,0.00,0.3906
+run,budget,regime,grain,num_experts,counterfactual_replay,union_mean,union_std,union_frac_of_E,effective_experts,mean_experts_over_0.8_resident_per_layer,max_residency_frac
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,64,no,61.99,6.67,0.9686,63.14,0.00,0.1521
+flame38m_g3_temporal,1e18,temporal,fine 18/192,192,no,163.39,24.26,0.8510,187.22,0.00,0.1791
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,64,no,63.91,0.34,0.9986,62.48,0.00,0.1995
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,192,no,49.64,6.60,0.2585,49.57,0.00,0.4614
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,192,no,50.60,5.23,0.2636,50.56,0.00,0.4375
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,192,no,24.33,2.62,0.1267,24.33,7.33,0.8460
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,192,no,42.29,6.64,0.2203,33.16,5.00,1.0000
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,192,no,102.28,17.79,0.5327,102.56,0.00,0.4138
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,192,no,127.20,7.38,0.6625,134.76,0.00,0.2821
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,192,no,157.23,9.92,0.8189,162.47,0.00,0.3139
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,192,no,123.20,11.29,0.6417,125.22,0.00,0.4930
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,192,no,162.80,9.39,0.8479,181.82,0.00,0.1633
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,192,no,156.85,9.75,0.8169,183.76,0.00,0.1845
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,192,no,165.65,9.71,0.8627,181.34,0.00,0.2009
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,192,no,164.65,9.45,0.8575,182.19,0.00,0.2016
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,192,no,168.51,10.20,0.8776,179.04,0.00,0.2157
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,192,no,170.81,9.11,0.8896,172.70,0.00,0.3410
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,192,no,160.75,13.61,0.8373,187.83,0.00,0.1517
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,192,no,150.92,14.87,0.7861,128.23,0.20,0.8155
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,192,no,152.51,16.81,0.7943,127.87,0.20,0.8528
+moe_coarse_1e19,1e19,full,coarse 6/64,64,yes,63.83,0.67,0.9973,59.81,0.00,0.3951
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,192,no,184.17,8.00,0.9592,183.00,0.00,0.2545

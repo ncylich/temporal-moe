@@ -1,0 +1,12 @@
+{
+ "seqs": 1024,
+ "tokens": 4194304,
+ "tokens_seen": 44842,
+ "lambda_star": 3.8024333274881568,
+ "within": 53.834464615636996,
+ "between": 14.157898371672283,
+ "delta": "MoE_free - MoE_residency on the C surface at /workspace/olmoe-adapt/data/csurf_seq_ple_512_at50M.pt",
+ "reference": "/workspace/olmoe-adapt/data/csurf_seq_ple_512_at50M.pt",
+ "shrunk_before_svd": true,
+ "rel_recon_err_r512": 0.45059099793434143
+}

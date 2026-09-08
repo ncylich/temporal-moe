@@ -7,9 +7,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from paths import ROOT   # canonical resolver: $TMOE_ROOT, then git, then file location
 RUNS=os.path.join(ROOT,"results/phase0/runs")
 OUT=os.path.join(ROOT,"results/ablations/t19_lmeval_stderr.csv")
-MODELS=["dense_1e19","moe_coarse_1e19","g1_tmoe_coarse_1e19","temporal_fine_g3_1e19"]
+MODELS=["dense_1e19","moe_coarse_1e19","g1_tmoe_coarse_1e19","temporal_fine_g3_1e19","moe_fine_g3_1e19"]
 LABEL={"dense_1e19":"dense_1e19","moe_coarse_1e19":"moe_coarse_1e19",
-       "g1_tmoe_coarse_1e19":"temporal_coarse_1e19","temporal_fine_g3_1e19":"temporal_fine_1e19"}
+       "g1_tmoe_coarse_1e19":"temporal_coarse_1e19","temporal_fine_g3_1e19":"temporal_fine_1e19",
+       "moe_fine_g3_1e19":"moe_fine_1e19"}   # fine full MoE trained 2026-09-03 (no July reference)
 
 def latest_json(d):
     js=glob.glob(os.path.join(d,"**","*.json"),recursive=True)
@@ -17,8 +18,14 @@ def latest_json(d):
     return max(js,key=os.path.getmtime) if js else None
 
 def main():
+    # Only the models named on the command line are (re)written; every other model's rows are
+    # kept from the existing CSV. The local July run directories hold partial lm-eval outputs
+    # (only the task subsets that were re-mirrored), so regenerating them from disk is wrong.
+    todo=[m for m in sys.argv[1:] if m in MODELS] or []
+    if not todo:
+        print("usage: lmeval_to_csv.py <run_name> [...]  (models:", ", ".join(MODELS), ")"); return
     rows=[]
-    for run in MODELS:
+    for run in todo:
         res={}
         for shot in (0,10):
             d=os.path.join(RUNS,run,f"lmeval_{shot}shot")
@@ -36,9 +43,18 @@ def main():
                 rows.append([LABEL[run],task,base,round(float(metrics[vk]),6),
                              (round(float(sv),6) if isinstance(sv,(int,float)) else "")])
     os.makedirs(os.path.dirname(OUT),exist_ok=True)
+    # Upsert: keep every existing row whose model has no local lm-eval results (the July run
+    # directories are not all on this pod), replace the rows of models that do. A regeneration
+    # that silently dropped models once shrank this file from 45 to 33 rows.
+    have={r[0] for r in rows}
+    old=[]
+    if os.path.exists(OUT):
+        with open(OUT,newline="") as f:
+            old=[r for r in list(csv.reader(f))[1:] if r and r[0] not in have]
+    rows=old+rows
     with open(OUT,"w",newline="") as f:
         w=csv.writer(f); w.writerow(["model","task","metric","value","stderr"]); w.writerows(rows)
-    print(f"[write] {OUT}: {len(rows)} rows")
+    print(f"[write] {OUT}: {len(rows)} rows ({len(old)} kept from models without local results)")
     # verify vs t19_lmeval.csv (dense/moe_coarse/temporal_coarse) + t19_lmeval_finegrain.csv (temporal_fine)
     ref={}
     norm={"temporal_fine_g3_1e19":"temporal_fine_1e19"}   # finegrain csv -> our label

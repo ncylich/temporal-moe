@@ -1,6 +1,8 @@
-model,active_params_M,temporal_overlap_pct,full_moe_overlap_pct,random_pct
-"1.4M active, coarse (6 of 64 experts)",1.36,33.22,19.36,9.38
-"8.1M active, coarse (6 of 64 experts)",8.12,38.19,21.32,9.38
-"14.8M active, coarse (6 of 64 experts)",14.77,33.51,20.24,9.38
-"38.0M active, coarse (6 of 64 experts)",38,30.42,,9.38
-"3.9M active, fine-grained (18 of 192 experts)",3.91,34.72,,9.38
+run,budget,regime,grain,active_params_M,temporal_overlap_pct,full_moe_overlap_pct,full_moe_run,random_pct
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,1.42,28.37,,,9.38
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,8.23,32.93,,,9.38
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,12.20,31.24,,,9.38
+flame38m_g3_temporal,1e18,temporal,fine 18/192,12.38,27.22,,,9.38
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,184.06,28.32,19.20,moe_coarse_1e19,9.38
+moe_coarse_1e19,1e19,full,coarse 6/64,184.06,19.20,,moe_coarse_1e19,9.38
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,185.77,23.54,,,9.38

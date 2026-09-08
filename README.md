@@ -20,9 +20,9 @@ Trained from scratch on isoFLOP sweeps from 10^16 to 10^19 FLOPs, at 6-of-64 and
 
 * Retains 72-82% of the MoE-over-dense quality gain at compute-optimal sizes.
 * Holds 18 of 192 experts resident, cutting whole-model weight memory 5.7x.
-* Serves an 11B-scale model in llama.cpp using 5.1x less memory, with a 17% decode
-  slowdown on an RTX A6000 and 30% on a Pixel 10a (Tensor G4), compared to the baseline
-  where all experts are in memory.
+* Serves an 11B-scale model in llama.cpp using 5.1x less memory, at 0.83x the all-resident
+  decode speed on an RTX A6000 and 0.70-0.83x a measured ceiling over 1k-4k of context on
+  a Pixel 10a (Tensor G4), which cannot hold the model at all.
 
 ## Train a temporal MoE
 
@@ -90,7 +90,7 @@ scripts/setup.sh analysis                    # creates .venv: numpy, pandas, mat
 for f in analysis/plots/*.py; do $PY "$f"; done
 ```
 
-All 11 scripts run and write 42 PNGs to `results/phase0/figures/` — 31 distinct figures (isoFLOP
+All 12 scripts run and write 44 PNGs to `results/phase0/figures/` — 32 distinct figures (isoFLOP
 panels, loss curves, residency and swap-rate analyses, the de-lexicalization locus scatter, serving
 sweeps) plus caption-free variants for the paper, which `--no-caption` produces on their own. The
 CSVs behind them are committed, so nothing downloads.

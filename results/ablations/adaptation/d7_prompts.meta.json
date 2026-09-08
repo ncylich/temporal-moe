@@ -1,0 +1,55 @@
+{
+  "path": "/workspace/olmoe-adapt/data/d7_prompts.jsonl",
+  "sha256": "e6e334de9b40bf9ea786a537db76d2e20ac5ae087e067d70e899c43f911ce06d",
+  "n": 8482,
+  "spec": {
+    "domain8k": 4958,
+    "mathlane_v2": 2341,
+    "d5_fewshot": 1183
+  },
+  "counts": {
+    "domain8k": 4958,
+    "mathlane_v2": 2341,
+    "d5_fewshot": 1183
+  },
+  "code_rows": 431,
+  "ngram_screen": {
+    "n": 8,
+    "test_sets": [
+      "gsm8k",
+      "mmlu",
+      "humaneval",
+      "ifeval"
+    ],
+    "screened_out": {
+      "domain8k": 0,
+      "mathlane_v2": 8,
+      "d5_fewshot": 17,
+      "code": 0,
+      "domain": 5
+    }
+  },
+  "prompt_length_gate": {
+    "max_prompt_tok": 1024,
+    "tokenizers": [
+      "/dev/shm/gemma4-26b-it",
+      "/dev/shm/qwen35-35b-a3b"
+    ],
+    "rejected": {
+      "domain": 2,
+      "code": 3,
+      "mathlane_v2": 4,
+      "d5_fewshot": 3
+    }
+  },
+  "dropped_lane": {
+    "mcq_writer": 691,
+    "reason": "never isolated in screening; no builder ever committed; unfillable from real corpora (184 strict matches in all of WildChat-1M). Removal stated rather than backfilled with templated rows."
+  },
+  "sources": [
+    "allenai/WildChat-1M (ODC-BY)",
+    "OpenAssistant/oasst2 (Apache-2.0)"
+  ],
+  "builder": "analysis/residency/build_d7_prompts.py",
+  "note": "REBUILD of a lost pool, not a reproduction; see RECOVER_DATA_PLAN 1.1/1.5"
+}

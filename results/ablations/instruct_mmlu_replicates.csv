@@ -1,0 +1,4 @@
+qwen35_instruct_s7,256,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.864035,4,4096,920
+qwen35_instruct_s7,256,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.807018,4,4096,920
+qwen35_instruct_s11,256,8,free,,mmlu_gptoss_relaxed,"acc,relaxed-extract",0.868421,4,4096,1065
+qwen35_instruct_s11,256,8,free,,mmlu_gptoss_relaxed,"acc,strict-flan",0.820175,4,4096,1065

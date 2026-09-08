@@ -1,0 +1,2 @@
+[run] g1_bles10_1e16 N=1361408 iters=2335 warmup=117 min_lr=0.00030000000000000003 eval@234
+[run] shape=s0 H=128 L=4 ffn=684 moe_ffn=88 grain=1 num_experts=64 shared_int=176 dense=0 temporal=1 shared_mult=2 topk=6 heads=8 gb=256 mb=32 lr=3e-3 flops=1e16

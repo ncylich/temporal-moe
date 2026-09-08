@@ -1,0 +1,134 @@
+diff --git a/megatron/core/transformer/moe/experts.py b/megatron/core/transformer/moe/experts.py
+index fc0cf3e6..4fb8ce68 100644
+--- a/megatron/core/transformer/moe/experts.py
++++ b/megatron/core/transformer/moe/experts.py
+@@ -1,3 +1,4 @@
++import os
+ # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+ 
+ import copy
+@@ -88,6 +89,94 @@ def expert_dist_ckpt_decorator(func):
+     return wrapper
+ 
+ 
++class _PadRows(torch.autograd.Function):
++    """out[p] = x[src[p]] * valid[p]; padded rows are exactly zero. Backward is a plain gather."""
++
++    @staticmethod
++    def forward(ctx, x, src, valid, pos):
++        ctx.save_for_backward(pos)
++        return x.index_select(0, src).mul_(valid)
++
++    @staticmethod
++    def backward(ctx, grad):
++        (pos,) = ctx.saved_tensors
++        return grad.index_select(0, pos), None, None, None
++
++
++class _UnpadRows(torch.autograd.Function):
++    """out[i] = y[pos[i]]. Backward: grad_y[p] = grad[src[p]] with NO mask: padded input rows
++    are exactly zero, so fc1 = 0 there, the GLU and its derivative are 0 there, and every padded
++    contribution to dw1, dw2 and dx vanishes regardless of grad_y on padded rows."""
++
++    @staticmethod
++    def forward(ctx, y, pos, src):
++        ctx.save_for_backward(src)
++        return y.index_select(0, pos)
++
++    @staticmethod
++    def backward(ctx, grad):
++        (src,) = ctx.saved_tensors
++        return grad.index_select(0, src), None, None
++
++
++def _pad_expert_width(w1, w2, gated):
++    """Zero-pad the expert width F to a multiple of 8 so torch._grouped_mm's 16-byte row-stride
++    requirement holds (F = 550 at the coarse 1e19 shape, 58 at s2 grain 3; both fell back to the
++    host-bound grouped_gemm before). Exact: for a gated MLP each half of fc1's output is padded
++    separately, so the activation sees [gate | 0 | up | 0], the padded columns give act(0) * 0 = 0
++    and meet zero rows in fc2; for a plain MLP the padding sits at the end. Padded weight slices
++    receive no gradient, so the real weights' gradients are unchanged."""
++    import torch.nn.functional as Fn
++    F2 = w1.shape[-1]
++    F = F2 // 2 if gated else F2
++    Fp = (F + 7) // 8 * 8
++    if Fp == F:
++        return w1, w2, F, Fp
++    pad = (0, Fp - F)
++    if gated:
++        w1 = torch.cat([Fn.pad(w1[..., :F], pad), Fn.pad(w1[..., F:], pad)], dim=-1)
++    else:
++        w1 = Fn.pad(w1, pad)
++    w2 = Fn.pad(w2, (0, 0, 0, Fp - F))
++    return w1, w2, F, Fp
++
++
++def _torch_grouped_mm_experts(x, w1, w2, tokens_per_expert, activation_func, align=16, gated=True):
++    """Sync-free replacement for the two legacy grouped_gemm calls (MOE_TORCH_GMM=1).
++
++    grouped_gemm's CUTLASS wrapper does host-side work on every call, which serialises the CPU
++    against the GPU (measured 2026-09-02: 124 s of a 136 s iteration on the host, GPU 15% busy).
++    torch._grouped_mm takes device-side offsets, so nothing here touches the host. Each expert's
++    rows are padded (device-side, into a fixed n + align*E buffer) to a multiple of `align` with
++    at least `align` rows, because the torch 2.8 _grouped_mm backward hangs on an empty group.
++    Padded rows are zero and dropped afterwards, so real rows and all gradients are bit-identical
++    to the grouped GEMM (checked fwd + dx/dw1/dw2, including empty experts).
++    """
++    if x.shape[-1] % 8 or w2.shape[-1] % 8:
++        return None  # _grouped_mm needs 16-byte (8 x bf16) row strides; caller uses grouped_gemm
++    w1, w2, _, _ = _pad_expert_width(w1, w2, gated)   # expert width padded to a multiple of 8 (exact)
++    n = x.shape[0]
++    E = w1.shape[0]
++    counts = tokens_per_expert.to(device=x.device, dtype=torch.int64, non_blocking=True)
++    pc = ((counts + align - 1) // align * align).clamp_(min=align)
++    poffs = torch.cumsum(pc, 0)
++    coffs = torch.cumsum(counts, 0)
++    rows = torch.arange(n, device=x.device)
++    g = torch.searchsorted(coffs, rows, right=True).clamp_(max=E - 1)
++    pos = (poffs - pc)[g] + rows - (coffs - counts)[g]  # padded position of each real row
++    ppos = torch.arange(n + align * E, device=x.device)
++    pg = torch.searchsorted(poffs, ppos, right=True).clamp_(max=E - 1)
++    within = ppos - (poffs - pc)[pg]
++    valid = (within < counts[pg]).to(x.dtype).unsqueeze_(1)
++    src = ((coffs - counts)[pg] + within).clamp_(max=n - 1)  # source row of each padded row
++    xp = _PadRows.apply(x, src, valid, pos)
++    offs = poffs.to(torch.int32)
++    h = torch._grouped_mm(xp, w1, offs=offs)
++    h = activation_func(h)
++    y = torch._grouped_mm(h, w2, offs=offs)
++    return _UnpadRows.apply(y, pos, src)
++
++
+ class GroupedMLP(MegatronModule):
+     """An efficient implementation of the Experts layer using GroupedGEMM.
+ 
+@@ -218,13 +307,24 @@ class GroupedMLP(MegatronModule):
+             w1 = self.weight1.view(self.num_local_experts, self.config.hidden_size, -1)
+             w2 = self.weight2.view(self.num_local_experts, -1, self.config.hidden_size)
+ 
+-            fc1_output = gg.ops.gmm(
+-                permuted_local_hidden_states, w1, tokens_per_expert, trans_b=False
+-            )
++            fc2_output = None
++            if os.environ.get("MOE_TORCH_GMM") == "1":
++                fc2_output = _torch_grouped_mm_experts(
++                    permuted_local_hidden_states, w1, w2, tokens_per_expert, self.activation_func,
++                    gated=bool(getattr(self.config, "gated_linear_unit", False)),
++                )
++            if fc2_output is None:
++                if tokens_per_expert.is_cuda:  # sync-free dispatcher left the counts on device
++                    tokens_per_expert = tokens_per_expert.cpu()
++                fc1_output = gg.ops.gmm(
++                    permuted_local_hidden_states, w1, tokens_per_expert, trans_b=False
++                )
+ 
+-            intermediate_parallel = self.activation_func(fc1_output)
++                intermediate_parallel = self.activation_func(fc1_output)
+ 
+-            fc2_output = gg.ops.gmm(intermediate_parallel, w2, tokens_per_expert, trans_b=False)
++                fc2_output = gg.ops.gmm(
++                    intermediate_parallel, w2, tokens_per_expert, trans_b=False
++                )
+         else:
+             # No token is allocated for local experts.
+             assert torch.count_nonzero(tokens_per_expert) == 0

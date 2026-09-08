@@ -1,0 +1,49 @@
+{
+ "tag": "ladder_full",
+ "rank": "full",
+ "lr": 0.0003,
+ "table_wd": 0.0,
+ "adam8bit": true,
+ "mb": 4,
+ "seed": 1234,
+ "train_tokens": 50003968,
+ "steps": 763,
+ "ple_params": 1648361488,
+ "final_bpb": 0.8588671282089995,
+ "final_swap": 0.999727778731685,
+ "final_entropy": 0.9984315037727356,
+ "divisor": 3.1089070924799973,
+ "divisor_source": "bpb_slice_meta.json (ln2 * bytes_per_token)",
+ "curve": [
+  {
+   "tok": 10027008,
+   "bpb": 0.9140160339925274,
+   "swap_rate": 0.9996438348977411,
+   "usage_entropy": 0.9975987672805786
+  },
+  {
+   "tok": 20054016,
+   "bpb": 0.8847463019454417,
+   "swap_rate": 0.9996710212530525,
+   "usage_entropy": 0.998170793056488
+  },
+  {
+   "tok": 30015488,
+   "bpb": 0.8723265879501925,
+   "swap_rate": 0.9996933784531441,
+   "usage_entropy": 0.9981133341789246
+  },
+  {
+   "tok": 40042496,
+   "bpb": 0.8653097018314756,
+   "swap_rate": 0.9997188954708486,
+   "usage_entropy": 0.9983428120613098
+  },
+  {
+   "tok": 50003968,
+   "bpb": 0.8588671282089995,
+   "swap_rate": 0.999727778731685,
+   "usage_entropy": 0.9984315037727356
+  }
+ ]
+}

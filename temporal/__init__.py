@@ -26,4 +26,5 @@ from .ablation_mechanisms import (
     bursty_window_loss,
     auxfree_trigger_scores,
     coherence_bce_loss,
+    cosmoes_bles_loss,
 )

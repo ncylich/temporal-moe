@@ -1,0 +1,68 @@
+diff --git a/megatron/core/dist_checkpointing/exchange_utils.py b/megatron/core/dist_checkpointing/exchange_utils.py
+index ea2cf6cc..beb6eb1d 100644
+--- a/megatron/core/dist_checkpointing/exchange_utils.py
++++ b/megatron/core/dist_checkpointing/exchange_utils.py
+@@ -62,7 +62,7 @@ class ShardDistribution(NamedTuple):
+ def _shard_size(sh_ten: ShardedTensor):
+     """Returns size in bytes of a given sharded tensor."""
+     if sh_ten.flattened_range is None:
+-        numel = np.product(sh_ten.local_shape)
++        numel = np.prod(sh_ten.local_shape)
+     else:
+         numel = sh_ten.flattened_range.stop - sh_ten.flattened_range.start
+     return numel * torch._utils._element_size(sh_ten.dtype)
+diff --git a/megatron/core/dist_checkpointing/mapping.py b/megatron/core/dist_checkpointing/mapping.py
+index 156702b2..6028b6b4 100644
+--- a/megatron/core/dist_checkpointing/mapping.py
++++ b/megatron/core/dist_checkpointing/mapping.py
+@@ -204,7 +204,7 @@ class ShardedTensor(ShardedBase):
+             )
+ 
+         # TODO: np.unravel_index?
+-        mask = np.zeros(np.product(self.local_shape), dtype=bool)
++        mask = np.zeros(np.prod(self.local_shape), dtype=bool)
+         mask[self.flattened_range] = True
+         return np.nonzero(mask.reshape(self.local_shape))
+ 
+diff --git a/megatron/core/dist_checkpointing/strategies/filesystem_async.py b/megatron/core/dist_checkpointing/strategies/filesystem_async.py
+index a613963e..40940659 100644
+--- a/megatron/core/dist_checkpointing/strategies/filesystem_async.py
++++ b/megatron/core/dist_checkpointing/strategies/filesystem_async.py
+@@ -17,7 +17,7 @@ import psutil
+ import torch
+ from torch import multiprocessing as mp
+ from torch.distributed.checkpoint import FileSystemWriter
+-from torch.distributed.checkpoint.filesystem import DEFAULT_SUFFIX, _StoragePrefix, _write_item
++from torch.distributed.checkpoint.filesystem import DEFAULT_SUFFIX, _StoragePrefix, _write_item, SerializationFormat
+ from torch.distributed.checkpoint.planner import SavePlan, SavePlanner, WriteItem, WriteItemType
+ from torch.distributed.checkpoint.storage import WriteResult
+ from torch.futures import Future
+@@ -316,13 +316,13 @@ class FileSystemWriterAsync(FileSystemWriter):
+             with open(file_name, "wb") as stream:
+                 for write_item, data in bytes_data:
+                     local_results.append(
+-                        _write_item(*transform_list, stream, data, write_item, storage_key)
++                        _write_item(*transform_list, stream, data, write_item, storage_key, SerializationFormat.TORCH_SAVE)
+                     )
+ 
+                 for write_item, tensor in tensor_data:
+                     assert tensor.is_cpu
+                     local_results.append(
+-                        _write_item(*transform_list, stream, tensor, write_item, storage_key)
++                        _write_item(*transform_list, stream, tensor, write_item, storage_key, SerializationFormat.TORCH_SAVE)
+                     )
+ 
+                 if use_fsync:
+diff --git a/megatron/core/dist_checkpointing/validation.py b/megatron/core/dist_checkpointing/validation.py
+index 546ec354..f4572f11 100644
+--- a/megatron/core/dist_checkpointing/validation.py
++++ b/megatron/core/dist_checkpointing/validation.py
+@@ -494,7 +494,7 @@ def _validate_sharding_for_key_flattened(tensors_by_shard):
+         all_slices.append((sharding.flattened_range.start, sharding.flattened_range.stop))
+ 
+     starts, stops = map(np.asarray, zip(*sorted(all_slices)))
+-    expected_size = np.product(local_shape)
++    expected_size = np.prod(local_shape)
+     if starts[0] != 0 or stops[-1] != expected_size or not np.all(starts[1:] == stops[:-1]):
+         raise CheckpointingException(
+             f'Flattened ranges dont cover the whole shard {tensors_by_shard[0]} of size {expected_size}. Ranges: {(starts, stops)}'
