@@ -34,7 +34,7 @@ PAPER = "--no-caption" in sys.argv
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(REPO, "results", "phase0", "figures")
 
-MOE, TMP = "#0d3b66", "#145a14"
+MOE, TMP = "#f4756b", "#7ecb7e"        # the paper palette: coarse shades of standard and Temporal MoE
 RANDOM_FLOOR = 6 / 64          # == 18/192; identical at both granularities
 
 # The one budget/granularity cell where both regimes have a preserved router log.
@@ -56,7 +56,7 @@ ax.axhline(RANDOM_FLOOR, color="#b03030", lw=1.2, ls="--", zorder=1)
 ax.text(2.15, RANDOM_FLOOR + 0.008, "random resident set (k/E = 0.094)",
         color="#b03030", fontsize=9, va="bottom")
 
-for run in CONTEXT:
+for run in ([] if PAPER else CONTEXT):     # paper: the matched pair alone
     if run not in rows:
         print(f"[warn] no rows for {run}", file=sys.stderr)
         continue
@@ -68,11 +68,11 @@ for run, (lab, col) in PAIR.items():
     ls = sorted(rows[run])
     ax.plot(ls, [rows[run][l] for l in ls], color=col, lw=2.6, marker="o", ms=7,
             markeredgecolor="white", markeredgewidth=0.9, zorder=4,
-            label=(f"{lab}, 6 of 64 at $10^{{19}}$ (matched pair)" if PAPER
+            label=(f"{lab}, 6 of 64 at $10^{{19}}$" if PAPER
                    else f"{lab} — 1e19, 6 of 64 (matched pair)"))
-ax.plot([], [], color=TMP, alpha=0.32, lw=1.4, marker="o", ms=3.5,
-        label=("other Temporal MoE models, $10^{17}$ to $10^{19}$" if PAPER
-               else "other temporal arms (1e17, 1e18, 1e19)"))
+if not PAPER:
+    ax.plot([], [], color=TMP, alpha=0.32, lw=1.4, marker="o", ms=3.5,
+            label="other temporal arms (1e17, 1e18, 1e19)")
 
 ax.set_xlabel("MoE layer" if PAPER else "MoE layer  (layer 1 is a dense FFN in every config)")
 ax.set_ylabel("cache hit rate" if PAPER else
