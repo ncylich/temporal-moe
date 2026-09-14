@@ -247,3 +247,53 @@ One driver bug found by the dry run itself: `pack --dry-run` wrote a header-only
 `s1` probe is re-run once exclusions read correctly; T1 and everything after wait for the model.
 
 **Retracted:** nothing.
+
+### L1-1b -- Preliminary T0 (tag s0pre, `--force`): WSL2 QD1 latency is 1.70x native; provisional until the Defender re-run
+
+`python lapbench.py probe --env all --tag s0pre --force` (forced only because the Defender exclusion
+state is unverifiable; nothing else failed check). Both probe files pre-written, 8 GiB, random data,
+non-sparse (Windows: `fsutil sparse queryflag` "NOT set as sparse"; WSL: `blocks512=16777224` for
+8589934592 bytes, 6 extents). fio 3.42 `windowsaio --thread` native, fio 3.36 `libaio` in WSL2,
+`--direct=1 --norandommap --randrepeat=0`, 20 s per point. One run each; n=1, so a ledger note.
+
+| QD1 size | native mean / p50 (us) | WSL2 mean / p50 (us) | WSL2 / native (mean) |
+|---|---|---|---|
+| 4k | 86.3 / 68.1 | 146.9 / 134.1 | **1.70** |
+| 32k | 122.3 / 102.9 | 181.8 / 171.0 | 1.49 |
+| 108k | 158.9 / 138.2 | 237.9 / 218.1 | 1.50 |
+| 216k | 202.2 / 179.2 | 288.7 / 268.3 | 1.43 |
+| 648k | 376.5 / 325.6 | 508.8 / 473.1 | 1.35 |
+| 1024k | 510.4 / 448.5 | 624.3 / 577.5 | 1.22 |
+
+| 216k bandwidth | native MB/s | WSL2 MB/s | WSL2 / native |
+|---|---|---|---|
+| QD1 | 1089 | 763 | 0.70 |
+| QD4 | 2882 | 2510 | 0.87 |
+| QD8 | 2980 | 2837 | 0.95 |
+| QD12 | 2984 | 2775 | 0.93 |
+
+Fits (mean latency): native **106.3 us + 0.403 us/KiB** (r2 0.994); WSL2 **174.1 us + 0.465 us/KiB**
+(r2 0.983). p50 fits: native 89.5 + 0.357, WSL2 161.2 + 0.431. So the VM adds about 68 us of fixed
+cost per request and 15% per byte; at depth 8-12 the device saturates near 3.0 GB/s either way.
+Neither environment is cached (4k QD1 far above 30 us). DRAM, not comparable across methods:
+sysbench single-thread read in WSL2 38.97 GB/s; .NET single-thread BlockCopy native 14.2 GB/s
+(a copy, counted once). Compare with the Pixel's UFS: 163 us + 0.63 us/KiB (S3-32); this NVMe is
+faster on both terms even through the VM.
+
+**What it means for PLAN 5.2, provisionally.** T0's rule is "WSL2 within 15% of native on QD1
+latency". At 1.70x on 4k (1.22-1.50x at the expert-sized reads) WSL2 fails T0 by a wide margin. If
+the clean re-run agrees, rule 2 applies: Linux native on a live USB, which needs Mohsen. Two caveats
+before that call is made: (1) this run was forced past the Defender check, and the host's real-time
+filter sits on the VHDX file that every WSL2 read passes through, so an exclusion could recover some
+of the fixed cost; (2) the decision also needs T1, which needs the model. **Not decided yet.**
+
+For the section-4 bound (once a ceiling exists): per token 45 x (fixed + 648 x per_KiB) = 45 x 367 us
+= 16.5 ms native, 45 x 475 us = 21.4 ms WSL2 at QD1; at QD12, 28.5 MiB / 2.98 GB/s = 10.0 ms native,
+/ 2.78 GB/s = 10.8 ms WSL2. The storage bound therefore sits near 60 tok/s at QD1 native and about
+47 tok/s at QD1 WSL2, above the expected 50-60 tok/s ceiling, i.e. the laptop should be compute-bound
+if the fetch overlaps well; that is what arm (c) against (b) will test.
+
+Artifacts: `laptopbench/results/probe.json` (both envs, tag s0pre), logs in
+`laptopbench/results/logs/s0pre/`, scripts in `C:\tmoe\logs\s0pre\`.
+
+**Retracted:** nothing.
