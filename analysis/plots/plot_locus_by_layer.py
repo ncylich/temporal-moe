@@ -79,8 +79,8 @@ def _rng_for(vals):
                         digest_size=8).digest()
     return np.random.default_rng(int.from_bytes(h, "little"))
 
-MOE_FINE, MOE_COARSE = "#0d3b66", "#5aa0dd"
-TMP_FINE, TMP_COARSE = "#145a14", "#5cc85c"
+MOE_FINE, MOE_COARSE = "#9e0f14", "#f4756b"      # the paper palette (isoFLOP figure)
+TMP_FINE, TMP_COARSE = "#0b5c1c", "#7ecb7e"
 BUDGET_MARKER = {"1e16": "o", "1e17": "s", "1e18": "D", "1e19": "^"}
 
 # (file, label, variant, colour, budget, legend, linestyle). variant kfull = w=k everywhere.
@@ -215,7 +215,7 @@ if PAPER:
     plt.rcParams.update({"font.size": 14, "axes.labelsize": 14, "legend.fontsize": 9,
                          "xtick.labelsize": 12, "ytick.labelsize": 12})
 
-fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(10.5, 3.3) if PAPER else (8.0, 7.4),
+fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(9.6, 3.3) if PAPER else (8.0, 7.4),
                              gridspec_kw={"height_ratios": [1, 1], "hspace": 0.08})
 
 slope_rows, counts, missing = [], [], []
@@ -287,22 +287,38 @@ fig.supylabel("median over experts:\ncontext AUC $-$ token AUC" if PAPER else
               "median over experts:  context AUC $-$ token AUC",
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
-    fig.subplots_adjust(left=0.10)
+    fig.subplots_adjust(left=0.105, right=0.70)
 hi.text(0.012, 0.90, "context-dominated (Temporal MoE)", transform=hi.transAxes,
-        fontsize=10, color="#145a14", weight="bold")
+        fontsize=10, color=TMP_FINE, weight="bold")
 lo.text(0.012, 0.88 if PAPER else 0.08, "token-dominated (standard MoE)",
-        transform=lo.transAxes, fontsize=10, color="#0d3b66", weight="bold")
+        transform=lo.transAxes, fontsize=10, color=MOE_FINE, weight="bold")
 
 hh, ll = hi.get_legend_handles_labels()
 h2, l2 = lo.get_legend_handles_labels()
 LEGEND_NCOL, LEGEND_Y = 2, -0.28
 if PAPER:
-    # colour/shade/marker encoding is carried by the caption (isoFLOP standard);
-    # only the two control series need naming in-figure
-    keep = [(h, l) for h, l in zip(hh + h2, ll + l2)
-            if "sigmoid" in l or "widest" in l]
-    lo.legend([h for h, _ in keep], [l for _, l in keep], loc="lower right",
-              fontsize=10, framealpha=0.95)
+    # full key to the right of the panels: colour = family and grain, marker = budget,
+    # dash = the softmax-router control
+    from matplotlib.lines import Line2D
+    blank = Line2D([], [], ls="none")
+    key = [(blank, "model"),
+           (Line2D([], [], color=TMP_FINE, lw=2.4), "Temporal MoE, 18 of 192"),
+           (Line2D([], [], color=TMP_COARSE, lw=2.4), "Temporal MoE, 6 of 64"),
+           (Line2D([], [], color=MOE_FINE, lw=2.4), "standard MoE, 18 of 192"),
+           (Line2D([], [], color=MOE_COARSE, lw=2.4), "standard MoE, 6 of 64"),
+           (blank, "compute budget"),
+           (Line2D([], [], color="0.25", marker="o", ls="none", ms=7), "$10^{16}$ FLOPs"),
+           (Line2D([], [], color="0.25", marker="s", ls="none", ms=7), "$10^{17}$ FLOPs"),
+           (Line2D([], [], color="0.25", marker="D", ls="none", ms=6.5), "$10^{18}$ FLOPs"),
+           (Line2D([], [], color="0.25", marker="^", ls="none", ms=7.5), "$10^{19}$ FLOPs"),
+           (blank, "control"),
+           (Line2D([], [], color=MOE_FINE, lw=1.8, ls="--"), "softmax router,\nwidest window only")]
+    leg = fig.legend([h for h, _ in key], [l for _, l in key], loc="center left",
+                     bbox_to_anchor=(0.71, 0.5), fontsize=9.5, frameon=False,
+                     handlelength=1.8, labelspacing=0.45, handletextpad=0.7)
+    for t in leg.get_texts():
+        if t.get_text() in ("model", "compute budget", "control"):
+            t.set_fontweight("bold")
 else:
     lo.legend(hh + h2, ll + l2, loc="upper center", bbox_to_anchor=(0.5, LEGEND_Y),
               framealpha=0.95, ncol=LEGEND_NCOL, handlelength=2.6, columnspacing=1.4)
