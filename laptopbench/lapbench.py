@@ -427,7 +427,8 @@ def defender_exclusions_ok(state: dict) -> tuple[bool, str]:
     vhdx = distro_basepath()
     need = [str(WIN_ROOT).lower(), vhdx.lower()]
     ex = (state.get("defender_exclusions") or "").lower()
-    if ex and ex != "unreadable":
+    # unelevated, Get-MpPreference returns the literal "N/A: Must be an administrator to view exclusions"
+    if ex and ex != "unreadable" and "administrator" not in ex and not ex.startswith("n/a"):
         ok = all(any(p.startswith(n) for p in ex.split(";")) for n in need)
         return ok, f"read:{ex}"
     att = WIN_ROOT / "DEFENDER_EXCLUSIONS.txt"
