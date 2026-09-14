@@ -33,6 +33,7 @@ def topk_ids(logits, k):
     idx = np.argpartition(-logits, k-1, axis=-1)[..., :k]
     m = np.zeros_like(logits, bool); np.put_along_axis(m, idx, True, axis=-1); return m
 
+RASTER_MOE, RASTER_TMP = "#f4756b", "#7ecb7e"   # paper palette, coarse 6-of-64 shades
 HAVE_LOGS = os.path.exists(f"{RUNS}/tmoe_minlogit_sh1_s2_1e17/router_log.pt")
 
 # tag, active-params(M), temporal run, full-MoE run (or None)
@@ -96,9 +97,9 @@ def raster(temporal_run, moe_run, tag, outfile, W=220):
     E = t["layers"][L]["logits"].shape[-1]; b = 0
     panels = []
     if moe_run:
-        m = load(moe_run); panels.append(("standard MoE (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
-    panels.append(("Temporal MoE (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
-    panels.append(("unconstrained temporally-trained MoE", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
+        m = load(moe_run); panels.append(("standard MoE (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), RASTER_MOE))
+    panels.append(("Temporal MoE (resident set used)", t["layers"][L]["mask"][:W, b], RASTER_TMP))
+    panels.append(("Temporal MoE (constraint removed, free top-k)", topk_ids(t["layers"][L]["logits"][:W, b], k), RASTER_TMP))
     _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
     _draw_raster(panels, k, E, L, tag, outfile)
 
@@ -121,12 +122,12 @@ def raster_from_csv(active_params_M, outfile):
     # display names for the panel keys stored in the committed CSV
     RENAME = {"full MoE  (top-k)": "standard MoE (top-k)",
               "temporal (resident set used)": "Temporal MoE (resident set used)",
-              "temporal (unconstrained preference)": "unconstrained temporally-trained MoE"}
+              "temporal (unconstrained preference)": "Temporal MoE (constraint removed, free top-k)"}
     panels = []
     for title, cells in by_panel.items():              # dict preserves CSV (panel) order
         M = np.zeros((W, E), bool)
         for tok, exp in cells: M[tok, exp] = True
-        panels.append((RENAME.get(title, title), M, "C0" if title.startswith("full MoE") else "C2"))
+        panels.append((RENAME.get(title, title), M, RASTER_MOE if title.startswith("full MoE") else RASTER_TMP))
     _draw_raster(panels, k, E, L, "", outfile)
 
 # ---------------- A3: learned-locality overlap vs scale ----------------
