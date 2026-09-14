@@ -283,7 +283,8 @@ for ax in (hi, lo):
     ax.set_xlim(0.0, 1.05)
 lo.set_xlabel("normalized depth  $l/L$" if PAPER else
               "normalized depth  $l/L$   (layer 1 is a dense FFN in every config)")
-fig.supylabel("median over experts:  context AUC $-$ token AUC",
+fig.supylabel("median over experts:\ncontext AUC $-$ token AUC" if PAPER else
+              "median over experts:  context AUC $-$ token AUC",
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
     fig.subplots_adjust(left=0.10)
