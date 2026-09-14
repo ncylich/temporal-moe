@@ -215,7 +215,7 @@ if PAPER:
     plt.rcParams.update({"font.size": 14, "axes.labelsize": 14, "legend.fontsize": 9,
                          "xtick.labelsize": 12, "ytick.labelsize": 12})
 
-fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(6.9, 4.25) if PAPER else (8.0, 7.4),
+fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(10.5, 3.3) if PAPER else (8.0, 7.4),
                              gridspec_kw={"height_ratios": [1, 1], "hspace": 0.08})
 
 slope_rows, counts, missing = [], [], []
@@ -286,7 +286,7 @@ lo.set_xlabel("normalized depth  $l/L$" if PAPER else
 fig.supylabel("median over experts:  context AUC $-$ token AUC",
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
-    fig.subplots_adjust(left=0.17)
+    fig.subplots_adjust(left=0.10)
 hi.text(0.012, 0.90, "context-dominated (Temporal MoE)", transform=hi.transAxes,
         fontsize=10, color="#145a14", weight="bold")
 lo.text(0.012, 0.88 if PAPER else 0.08, "token-dominated (standard MoE)",
