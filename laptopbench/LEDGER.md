@@ -297,3 +297,74 @@ Artifacts: `laptopbench/results/probe.json` (both envs, tag s0pre), logs in
 `laptopbench/results/logs/s0pre/`, scripts in `C:\tmoe\logs\s0pre\`.
 
 **Retracted:** nothing.
+
+### L1-1c -- Orchestrator decision (rule 3, Windows native), model verified, clean T0 at n=2, port drafted; push blocked
+
+**Decisions received 2026-09-14 ~00:15** (PLAN.md updated at 268fc1b6): Windows native is the reported
+environment; WSL2's one remaining job is the correctness oracle (G1-G3 on the x86 build, G2 PPL
+to every digit); the Windows port of PLAN section 6 is in scope on fork branch `temporal-moe-win`;
+no live USB. Local branch `laptop` rebased onto 268fc1b6.
+
+**Model.** The resolve URL returned 200 at 00:18:52 (`x-linked-size` 5,941,846,016). Downloaded at
+00:26-00:29 into `C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf`, 5,941,846,016 bytes, sha256
+`d8a3bdf4a9c4a1563ad694718a44e155b7588e5ca47d3ee569bf9a8b8c3a2229` = expected. The pipeline's
+`compute` stage copies it into `~/tmoe/models/` and re-hashes there (recorded with T1 in L1-2).
+
+**Defender.** Mohsen is adding the two exclusions from an elevated shell; per instruction the session
+proceeds under `C:\tmoe\DEFENDER_EXCLUSIONS.txt` (an attestation naming `C:\tmoe` and the distro's
+VHDX directory) and every row and json from here carries
+`provisional = "Defender exclusions attested in C:\tmoe\DEFENDER_EXCLUSIONS.txt, Get-MpPreference output pending; WSL2 rows pending Linux-native re-measurement"`.
+Driver bug found on the first attempt: unelevated `Get-MpPreference` returns the literal text
+"N/A: Must be an administrator to view exclusions" in the exclusion field, which the check treated
+as a readable (empty) list instead of falling back to the attestation; fixed (c81a6344).
+
+**Clean T0, tag `s1-provisional`** (attestation in place, before the download started; same fio
+commands as L1-1b; one run per point, so with L1-1b native T0 is at n=2):
+
+| QD1 size | native mean / p50 (us) | WSL2 mean / p50 (us) | ratio (mean) |
+|---|---|---|---|
+| 4k | 100.7 / 84.5 | 143.8 / 134.1 | 1.43 |
+| 32k | 140.2 / 127.5 | 188.7 / 177.2 | 1.35 |
+| 108k | 195.1 / 175.1 | 253.4 / 234.5 | 1.30 |
+| 216k | 229.8 / 205.8 | 305.4 / 280.6 | 1.33 |
+| 648k | 405.2 / 374.8 | 485.9 / 448.5 | 1.20 |
+| 1024k | 527.9 / 481.3 | 652.7 / 602.1 | 1.24 |
+| 216k bw QD1/4/8/12 MB/s | 958 / 2714 / 2873 / 2867 | 721 / 2649 / 2905 / 2840 | |
+
+Fits (mean): native **130.5 us + 0.402 us/KiB** (r2 0.985; p50 115.3 + 0.372); WSL2 **178.7 us +
+0.471 us/KiB** (r2 0.986; p50 166.2 + 0.433). Against L1-1b (106.3 + 0.403 native, 174.1 + 0.465
+WSL2): the per-KiB terms repeat to 1%, the native fixed term moved 106 -> 131 us (the 4k point
+86 -> 101 us), the WSL2 fixed term 174 -> 179. Run-to-run spread of the native fixed cost is
+therefore about 20% at n=2 and the bound in section 4 will be quoted with both fits (the
+orchestrator named 106 + 0.40; the clean run says 131 + 0.40). WSL2's excess over native is
+1.2-1.4x at every size, so the rule-3 decision does not move. Neither environment cached.
+DRAM: native .NET copy 15.5 GB/s, WSL2 sysbench read 36.9 GB/s (different methods, both single-thread).
+
+**Port, branch `temporal-moe-win` at 0f2bdc0d6 (local, from 61f6d1b4).** The pool was entirely
+inside `#if defined(__linux__)` with no-op stubs elsewhere, so a Windows binary of `temporal-moe`
+silently has no pool. The port adds `ggml/src/ggml-cpu/temporal-port.h`: on Linux every name is a
+macro expanding to the exact pre-port call (pthread, clock_gettime, C11 atomics, pread, madvise,
+posix_memalign), so the Linux preprocessed source is unchanged; on Windows the same names are
+overlapped `ReadFile` on a `FILE_FLAG_NO_BUFFERING` handle (offset in the OVERLAPPED, per-thread
+event, 4 KiB-aligned reads as before), `DiscardVirtualMemory` for both MADV flavours (resolved at run
+time; the SDK hides it below `_WIN32_WINNT` 0x0603), SRW lock + condition variable in exclusive mode,
+`CreateThread`, `QueryPerformanceCounter` into `struct timespec`, `Interlocked*` and
+`ReadAcquire8/WriteRelease8` under MSVC cl (clang-cl keeps `<stdatomic.h>`),
+`GetFinalPathNameByHandle` in place of readlink, `SetThreadAffinityMask`, and no-op fadvise.
+Linux-only under their own guards: ioprio_set, RWF_HIPRI preadv2, the preadv scatter of FUSED (on
+Windows one unbuffered read of the fused region into a bounce buffer plus three memcpys), io_uring
+(requesting `LLAMA_TEMPORAL_URING` on Windows aborts with a message). The rewrite of ggml-cpu.c was
+scripted (`C:\tmoe\tools\port_ggml_cpu.py`, kept out of the repo) with every structural
+substitution asserted to match exactly once and a final scan proving no POSIX call remains outside a
+`__linux__` block. Loader: `_open(_O_RDONLY|_O_BINARY)` / `_dup` for the side-file descriptor. Dump
+tool: `_fseeki64/_ftelli64/_chsize_s`, because MSVC `off_t` is 32-bit and the side-file is 6 GB.
+Diff: 3 files, +311/-221 plus the 230-line header. **Not compiled anywhere yet**: no Windows
+compiler is installed (Build Tools pending), and the Linux compile check waits for the WSL oracle
+run to finish so the build does not perturb it.
+
+**Push blocked.** `git push` to `ncylich/temporal-moe` and `ncylich/llama.cpp` is refused with
+"Permission ... denied to mohsenfayyaz": the only stored credential on this machine is that GitHub
+account (Windows credential manager), no `gh`, no fork. Both branches exist locally only until
+Mohsen grants push rights or supplies a credential. The orchestrator's "push now" cannot be honoured.
+
+**Retracted:** nothing.
