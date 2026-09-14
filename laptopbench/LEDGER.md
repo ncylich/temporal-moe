@@ -154,3 +154,96 @@ the Windows clone; it has no `laptop` branch yet because origin has none.
 | Power plan (Balanced -> Best performance), Modern Standby, Defender/Search exclusions for C:\tmoe and the VHDX path above | system/security settings, Mohsen's call |
 
 **Retracted:** nothing (still nothing measured).
+
+### L1-1 -- Phase 0 completed after the inputs arrived (all but the model), Phase 1 driver written and dry-run
+
+Inputs received 2026-09-13 ~23:00: branch `laptop` at ffbdd5a4 (PLAN.md, SESSION_PROMPT.md), fork
+`https://github.com/ncylich/llama.cpp.git` branch `temporal-moe` commit 61f6d1b4, model URL and sha256.
+
+**Phase 0 items closed**
+
+| item | result |
+|---|---|
+| repo | `C:\tmoe\temporal-moe` and `~/tmoe/temporal-moe` on `laptop`; L1-0/L1-0b rebased onto ffbdd5a4 |
+| fork, both sides | `C:\tmoe\llama.cpp`, `~/tmoe/llama.cpp` at 61f6d1b4e "temporal-MoE: expert slot pool with streamed residency on CPU". Tip diff touches ggml/include/ggml-cpu.h, ggml/src/ggml-cpu/ggml-cpu.c, ggml/src/ggml-cpu/repack.cpp, src/llama-context.cpp, src/llama-graph.cpp, src/llama-mmap.cpp, src/llama-model-loader.cpp, tools/llama-bench/llama-bench.cpp. Upstream base 0badc06a = tag b9959 (2026-07-10) |
+| **model** | **NOT AVAILABLE.** `https://huggingface.co/ncylich/temporal-moe-extras/resolve/main/serving/qwen3moe-rand-fine-Q4pure.gguf` returns HTTP 404 `X-Error-Code: EntryNotFound` (15-byte body). The repo API lists 413 files on its only branch `main`, last modified 2026-09-08T06:56Z; no `serving/` path and no `.gguf` anywhere. Datasets namespace: 401. PLAN 10.2 dates the upload 2026-09-14, after this session started. Re-checked 23:35 and 23:50: unchanged |
+| fio, Windows | axboe/fio release fio-3.42 (2026-04-07), `fio-3.42-x64.msi`, 2,834,432 bytes, sha256 `d6bc1c0eb7a4b3bd2810e6c0ce605917a4671cc126c9dae5be7eb4891464a5c6`; extracted with `msiexec /a ... TARGETDIR=C:\tmoe\tools\fio` (administrative extract, nothing registered). `C:\tmoe\tools\fio\fio\fio.exe` = fio-3.42, sha256 `fe1bc26d83cf050fcaeef8b498bae7709f07f47d86902125236a31ccae3a3121`, lists `windowsaio` |
+| stock llama-bench for native T1 | no C/C++ compiler on the Windows side (cl, clang, gcc, cmake, VS absent) and a toolchain is outside the allowed installs. Used the option the prompt allows: official ggml-org release b9959 (the fork's exact upstream base), `llama-b9959-bin-win-cpu-x64.zip`, 18,210,062 bytes, sha256 `e7b44f74a8413b96fc79551cebae517d1f5371ca4aec28d40d0a5589db0783b0`, extracted to `C:\tmoe\tools\llamacpp-b9959\`; `llama-bench.exe` sha256 `9e9a998886ec233ef5f3a07a142fd1de26444de3413b6c4cfb4efd63b33199a8`, loads `ggml-cpu-icelake.dll` (AVX-512 variant) on this CPU. Confound for T1: MSVC icelake variant against gcc 13 `-march=native`; a T1 gap of a few percent cannot be separated from the compiler |
+| WSL build | `cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF`, `--target llama-bench llama-perplexity`, gcc 13.3.0, "Adding CPU backend variant ggml-cpu: -march=native", BUILD_EXIT=0 (`~/tmoe/logs/build*.log`). The driver's `build` stage re-runs this incrementally, copies to `~/tmoe/bin/llama-bench-temporal`, records hashes; the side-file dump waits on the model |
+| power | Mohsen set the power mode: registry `ActiveOverlayAcPowerScheme = ded574b5-45a0-4f42-8737-46345c09c238` (Best performance overlay). `powercfg /getactivescheme` still prints the base plan "Balanced (381b4222...)" because on Windows 11 the mode is an overlay on the plan; both are recorded per row. Set per instruction: `powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0` -> STANDBYIDLE AC index 0x00000000, HIBERNATEIDLE AC 0x00000000. Modern Standby remains the firmware's only standby mode; with the AC timeouts at 0 and the lid open it is never entered. Processor AC: PROCTHROTTLEMAX 100%, PROCTHROTTLEMIN 5% |
+| Defender | real-time protection ON. Exclusion lists need elevation: `Get-MpPreference` returns "N/A: Must be an administrator" for every exclusion field and the registry key is access-denied. Defender operational log (event 5007) 22:01-22:25 shows a platform update and service restart, **no `Exclusions\Paths` entries**, so as of 23:50 nothing evidences exclusions for `C:\tmoe` or `C:\Users\mohsen\AppData\Local\wsl\{8193fb13-...}`. The driver accepts either a readable list or `C:\tmoe\DEFENDER_EXCLUSIONS.txt` written by Mohsen naming the excluded paths (recorded as "attested" in every row). Until one exists `check` refuses, and any stage run needs `--force`, which is stamped in the row |
+| Windows Search | WSearch running; crawl-scope WorkingSetRules contain nothing under C:\tmoe or the VHDX directory, and neither path is inside the default indexed scope (AppData\Local is default-excluded). Recorded, not changed |
+| WSL memory | default VM: MemTotal 7831 MB, **2 GB swap on /dev/sdc** (pitfall #20). The driver's `.wslconfig` sets `swap=0` with every cap and records the VmSwap peak per run; a swapped run is status `swapped`, never `ok` |
+| venvs | Windows `C:\tmoe\venv` (3.11.9), WSL `~/tmoe/venv` (3.12.3); the driver needs only the stdlib |
+
+**Phase 1: `laptopbench/lapbench.py`** (Windows Python; stages check, probe, compute, build, gates,
+arms, sweep, session, pack, plus report and decide). Design points, each traceable to a plan rule:
+
+- Transport: every WSL command is a generated bash script under `C:\tmoe\logs\<tag>\cmd_NNNN_<label>.sh`
+  run as `wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/<tag>/cmd_NNNN.sh"` (`-lc` for the build),
+  so the exact text that ran is on disk and is what `--dry-run` prints (pitfall #16 by construction).
+- Cap: rewrites `%UserProfile%\.wslconfig` (`memory=<MB>`, `swap=0`), `wsl --shutdown`, waits for the
+  distro, reads `MemTotal` inside and refuses if it is not within 80-102% of the cap. Per row:
+  `cap`, `cap_mb`, `memtotal_mb`.
+- `measure()` port: `~/tmoe/bin/wrap.sh` launches the engine and polls `/proc/<pid>/status`
+  (VmHWM, VmSwap, VmRSS peaks) and `/proc/<pid>/io` every 0.25 s while it lives; diskstats delta on
+  `sdd` as the device-wide cross-check; MemAvailable before and after; a zero decode or nonzero exit
+  is never `ok`.
+- Invariant 1: `arms` and `sweep` recompute the bench binary's sha256 and refuse unless `gates.json`
+  has `all_pass` and lists that hash. Invariant 2: expected pool counters per arm (a: fetches=0,
+  evictions=0; b: fetches=0, evictions>0, swaps>0; c and d: 45 fetches per token within 10% plus the
+  45xR fill, 0.60-0.67 MiB per fetch; e: 8-18 fetches per layer per token); a disagreeing run goes
+  to `refused.jsonl` with the counters, not to `runs.jsonl`. Invariant 3: `--set KEY=0` and
+  `--knob NAME=0` exit with the pitfall-17 message; `--set KEY=` (empty) removes a flag.
+  Invariant 4: the row carries tag, env, arm, tier, R, twopass, cap, flags, engine args, binary
+  hash, clock probe (value, session reference, ratio, degraded), VmHWM, VmSwap peak, pool counters,
+  read_bytes, host state (overlay, scheme, AC, battery, load, forced).
+- Clock gate (PLAN 5.4): before each batch, cap 12G, stock resident `llama-bench -t 4 -p 0 -n 256 -r 4
+  -mmp 0` (1024 tokens, about 20 s at the expected 50 tok/s); the session's first reading is the
+  reference, more than 3% under it is degraded, then rest and re-probe twice, and the batch carries
+  `degraded_clock` if still low. Then the arm's own cap is applied (a second restart for 4 GB arms),
+  one warmup (`-n 32 -r 1`), then the measured run with the plan's engine line.
+- Order: rounds of a, b, c, e for `--n`, a closing a, then d rounds over `--R`; `--rest` (300 s)
+  between batches; `--resume` skips a (label, round, cap) already `ok`.
+- Memory demonstration inside `arms`: ceiling at cap 4G recorded with rc, OOM detection and dmesg;
+  deploy at 2.5G with the full protocol; VmHWM for all of them in `memdemo_<tag>.json`.
+- Gates: G1 = `R=18`, no policy, `-n 16`, caches dropped first, pool `fetched_mib` against
+  `/proc/<pid>/io read_bytes` minus the lazy loader's non-expert read (file minus expert bytes), 10%;
+  G2 = `llama-perplexity` PROD+TWOPASS at R=192 vs R=18, `--chunks 2 -c 512 -t 4 --no-mmap`, every
+  digit equal; G3 = `LLAMA_NO_REPACK=1` vs repacked at R=18 TWOPASS: PPL equal and tok/s apart by
+  more than 3% and 2 sd.
+- Rows: `pack` writes `results/ablations/serving_benchmarks_laptop.csv` in `emit_row.py`'s 12 columns.
+  **Disagreement noted:** `emit_row.py` cannot be invoked verbatim; it hardcodes `android-cpu` and
+  tier `ceiling` and reads one raw llama-bench CSV. The driver writes the same schema itself:
+  `setup=laptop-wsl2-cpu`, `tier` in {ceiling, resident_control, deploy, floor}, `peak_vram_mib`
+  carries VmHWM (peak RSS) and says so in `note`, `copied_bytes_per_token` carries bytes fetched from
+  the NVMe per token (the laptop analogue of the CUDA swap copy; Android wrote 0).
+- Compute (T1) on Windows uses the official b9959 binary; in WSL the fork's own build with no
+  `LLAMA_TEMPORAL_*` variable, which is stock behaviour.
+- DRAM number: WSL `sysbench memory --memory-oper=read --threads=1`; Windows has no sysbench, so a
+  single-thread .NET `Buffer.BlockCopy` of 256 MiB x16 is recorded, labelled as a different method.
+
+**Dry runs** (`--dry-run` for probe, compute, build, gates, arms, sweep, pack; 1608 lines) are saved
+in `laptopbench/results/dryrun_commands.txt`; the arms schedule for `--n 3 --arms a,b,c,e` is 13
+batches: (a b c e) x3, closing a, then the 2.5 GB deploy and the 4 GB ceiling for the demonstration.
+Representative commands:
+
+```
+C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_4k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=4k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+fio --name=qd1_4k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=4k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+C:\tmoe\tools\llamacpp-b9959\llama-bench.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -o csv
+env -u LLAMA_TEMPORAL_R /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -o csv
+LLAMA_TEMPORAL_REPACK_DUMP=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf
+/home/mohsen/tmoe/bin/wrap.sh <out> env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=<side> LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m <model> -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+```
+
+Real `check --env windows` at 23:49 refused with exactly the two open items ("Defender exclusions do
+not cover ... read:n/a: must be an administrator", "model missing"), which is the behaviour wanted.
+One driver bug found by the dry run itself: `pack --dry-run` wrote a header-only CSV and an empty
+`comms/laptop/s2/`; both deleted, `pack` now returns before writing under `--dry-run`.
+
+**Blocked:** model (HF 404); Defender exclusions unverifiable. **Next:** a preliminary T0 probe under
+`--force` (tag `s0pre`) to validate the fio path and answer the WSL cached-read question early; the
+`s1` probe is re-run once exclusions read correctly; T1 and everything after wait for the model.
+
+**Retracted:** nothing.

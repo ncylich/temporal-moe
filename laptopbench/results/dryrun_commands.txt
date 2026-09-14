@@ -1,0 +1,1608 @@
+
+######## lapbench.py probe --env all --tag s1 --dry-run
+[23:49:14] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:14] check: dry run, state not evaluated
+[23:49:14] [win 0002 prep] C:\tmoe\tools\fio\fio\fio.exe --thread --name=prep --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=write --bs=1M --direct=1 --ioengine=windowsaio --fallocate=none --refill_buffers --end_fsync=1 --output-format=json
+[23:49:14] [win 0003 fio_4k_qd1] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_4k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=4k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0004 fio_32k_qd1] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_32k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=32k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0005 fio_108k_qd1] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_108k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=108k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0006 fio_216k_qd1] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_216k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0007 fio_648k_qd1] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_648k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=648k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0008 fio_1024k_qd1] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd1_1024k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=1024k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0009 fio_216k_qd4] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd4_216k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=4 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0010 fio_216k_qd8] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd8_216k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=8 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0011 fio_216k_qd12] C:\tmoe\tools\fio\fio\fio.exe --thread --name=qd12_216k --filename=C\:\tmoe\probe\probe.bin --size=8G --rw=randread --direct=1 --iodepth=12 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [win 0012 dram] powershell -NoProfile -NonInteractive -Command "$n=268435456; $a=New-Object byte[] $n; $b=New-Object byte[] $n; [Buffer]::BlockCopy($a,0,$b,0,$n); $sw=[Diagnostics.Stopwatch]::StartNew(); for($i=0;$i -lt 16;$i++){[Buffer]::BlockCopy($a,0,$b,0,$n)}; $sw.Stop(); 'dram_copy_MBps=' + [math]::Round(16*256/$sw.Elapsed.TotalSeconds)"
+[23:49:14] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:14] [win 0013 shutdown] wsl --shutdown
+[23:49:14] [wsl 0014 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0014_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:14] [wsl 0015 probestat] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0015_probestat.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | test -f /home/mohsen/tmoe/probe/probe.bin && stat -c '%s %b' /home/mohsen/tmoe/probe/probe.bin || echo missing
+[23:49:14] [wsl 0016 prep] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0016_prep.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=prep --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=write --bs=1M --direct=1 --ioengine=libaio --fallocate=none --refill_buffers --end_fsync=1 --output-format=json
+[23:49:14] [wsl 0017 fio_4k_qd1] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0017_fio_4k_qd1.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd1_4k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=4k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0018 fio_32k_qd1] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0018_fio_32k_qd1.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd1_32k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=32k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0019 fio_108k_qd1] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0019_fio_108k_qd1.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd1_108k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=108k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0020 fio_216k_qd1] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0020_fio_216k_qd1.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd1_216k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=216k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0021 fio_648k_qd1] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0021_fio_648k_qd1.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd1_648k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=648k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0022 fio_1024k_qd1] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0022_fio_1024k_qd1.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd1_1024k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=1024k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0023 fio_216k_qd4] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0023_fio_216k_qd4.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd4_216k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=4 --bs=216k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0024 fio_216k_qd8] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0024_fio_216k_qd8.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd8_216k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=8 --bs=216k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0025 fio_216k_qd12] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0025_fio_216k_qd12.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/probe
+      | fio --name=qd12_216k --filename=/home/mohsen/tmoe/probe/probe.bin --size=8G --rw=randread --direct=1 --iodepth=12 --bs=216k --ioengine=libaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json
+[23:49:14] [wsl 0026 dram] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0026_dram.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | sysbench memory --memory-block-size=1M --memory-total-size=16G --memory-oper=read --threads=1 run
+
+
+######## lapbench.py compute --env all --tag s1 --dry-run
+[23:49:14] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:14] check: dry run, state not evaluated
+[23:49:14] [win 0002 t1_t4] C:\tmoe\tools\llamacpp-b9959\llama-bench.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -o csv
+[23:49:14] [win 0003 t1_t8] C:\tmoe\tools\llamacpp-b9959\llama-bench.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 8 -p 0 -n 128 -r 8 -mmp 0 -o csv
+[23:49:14] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:14] [win 0004 shutdown] wsl --shutdown
+[23:49:14] [wsl 0005 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0005_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:14] [wsl 0006 benchsha] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0006_benchsha.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | sha256sum /home/mohsen/tmoe/bin/llama-bench-temporal | cut -d' ' -f1
+[23:49:14] [wsl 0007 t1_t4] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0007_t1_t4.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | cd /home/mohsen/tmoe && env -u LLAMA_TEMPORAL_R /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -o csv
+[23:49:14] [wsl 0008 t1_t8] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s1/cmd_0008_t1_t8.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | cd /home/mohsen/tmoe && env -u LLAMA_TEMPORAL_R /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 8 -p 0 -n 128 -r 8 -mmp 0 -o csv
+
+
+######## lapbench.py build --env wsl --tag s2 --dry-run
+[23:49:14] [wsl 0001 build] wsl -d Ubuntu-24.04 -e bash -lc "bash /mnt/c/tmoe/logs/s2/cmd_0001_build.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | set -e
+      | cd /home/mohsen/tmoe/llama.cpp
+      | git rev-parse --short=8 HEAD; git status --porcelain | wc -l
+      | cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF > /home/mohsen/tmoe/logs/build_configure.log 2>&1
+      | cmake --build build --config Release -j 8 --target llama-bench llama-perplexity > /home/mohsen/tmoe/logs/build.log 2>&1
+      | mkdir -p /home/mohsen/tmoe/bin
+      | cp build/bin/llama-bench /home/mohsen/tmoe/bin/llama-bench-temporal
+      | cp build/bin/llama-perplexity /home/mohsen/tmoe/bin/llama-perplexity
+      | cat > /home/mohsen/tmoe/bin/wrap.sh <<'WRAPEOF'
+      | #!/bin/bash
+      | # wrap.sh <outprefix> <cmd...>: run cmd, poll /proc/<pid>/{status,io} while alive, keep peaks.
+      | out="$1"; shift
+      | "$@" > "$out.stdout" 2> "$out.stderr" &
+      | pid=$!
+      | hwm=0; swp=0; rss=0
+      | while kill -0 "$pid" 2>/dev/null; do
+      |   s=$(cat /proc/$pid/status 2>/dev/null)
+      |   h=$(printf '%s\n' "$s" | awk '/^VmHWM/{print $2}')
+      |   w=$(printf '%s\n' "$s" | awk '/^VmSwap/{print $2}')
+      |   r=$(printf '%s\n' "$s" | awk '/^VmRSS/{print $2}')
+      |   [ -n "$h" ] && [ "$h" -gt "$hwm" ] && hwm=$h
+      |   [ -n "$w" ] && [ "$w" -gt "$swp" ] && swp=$w
+      |   [ -n "$r" ] && [ "$r" -gt "$rss" ] && rss=$r
+      |   cat /proc/$pid/io > "$out.io" 2>/dev/null
+      |   sleep 0.25
+      | done
+      | wait "$pid"; rc=$?
+      | echo "rc=$rc vmhwm_kb=$hwm vmswap_peak_kb=$swp vmrss_peak_kb=$rss pid=$pid" > "$out.meta"
+      | exit $rc
+      | WRAPEOF
+      | chmod +x /home/mohsen/tmoe/bin/wrap.sh
+      | sha256sum /home/mohsen/tmoe/bin/llama-bench-temporal /home/mohsen/tmoe/bin/llama-perplexity /home/mohsen/tmoe/bin/wrap.sh
+      | grep -m1 -E 'CMAKE_C_COMPILER:|CMAKE_CXX_COMPILER:' build/CMakeCache.txt || true
+      | gcc --version | head -1
+      | grep -c . /home/mohsen/tmoe/logs/build.log
+
+
+######## lapbench.py gates --env wsl --tag s2 --dry-run
+[23:49:15] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0002 shutdown] wsl --shutdown
+[23:49:15] [wsl 0003 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0003_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0004 g1_bytes] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0004_g1_bytes.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/g1_bytes env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/g1_bytes.meta; cat /home/mohsen/tmoe/logs/s2/g1_bytes.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/g1_bytes.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/g1_bytes.stdout
+      | exit $RC
+[23:49:15] [wsl 0005 g2_ppl_R192] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0005_g2_ppl_R192.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/g2_ppl_R192 env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-perplexity -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -f /mnt/c/tmoe/temporal-moe/androidbench/ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/g2_ppl_R192.meta; cat /home/mohsen/tmoe/logs/s2/g2_ppl_R192.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/g2_ppl_R192.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/g2_ppl_R192.stdout
+      | exit $RC
+[23:49:15] [wsl 0006 g2_ppl_R18] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0006_g2_ppl_R18.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/g2_ppl_R18 env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-perplexity -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -f /mnt/c/tmoe/temporal-moe/androidbench/ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/g2_ppl_R18.meta; cat /home/mohsen/tmoe/logs/s2/g2_ppl_R18.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/g2_ppl_R18.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/g2_ppl_R18.stdout
+      | exit $RC
+[23:49:15] [wsl 0007 g3_ppl_norepack_R18] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0007_g3_ppl_norepack_R18.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/g3_ppl_norepack_R18 env LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_NO_REPACK=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-perplexity -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -f /mnt/c/tmoe/temporal-moe/androidbench/ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/g3_ppl_norepack_R18.meta; cat /home/mohsen/tmoe/logs/s2/g3_ppl_norepack_R18.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/g3_ppl_norepack_R18.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/g3_ppl_norepack_R18.stdout
+      | exit $RC
+[23:49:15] [wsl 0008 g3_tps_repack] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0008_g3_tps_repack.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/g3_tps_repack env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/g3_tps_repack.meta; cat /home/mohsen/tmoe/logs/s2/g3_tps_repack.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/g3_tps_repack.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/g3_tps_repack.stdout
+      | exit $RC
+[23:49:15] [wsl 0009 g3_tps_norepack] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0009_g3_tps_norepack.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/g3_tps_norepack env LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_NO_REPACK=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/g3_tps_norepack.meta; cat /home/mohsen/tmoe/logs/s2/g3_tps_norepack.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/g3_tps_norepack.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/g3_tps_norepack.stdout
+      | exit $RC
+
+
+######## lapbench.py arms --env wsl --tag s2 --n 3 --arms a,b,c,e --R 24 --dry-run
+[23:49:15] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] arms schedule: 13 batches, rest 300 s: ceiling:r1 resident_control:r1 deploy_R18:r1 floor_R18:r1 ceiling:r2 resident_control:r2 deploy_R18:r2 floor_R18:r2 ceiling:r3 resident_control:r3 deploy_R18:r3 floor_R18:r3 ceiling:r4
+[23:49:15] [win 0002 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0003 shutdown] wsl --shutdown
+[23:49:15] [wsl 0004 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0004_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0005 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0005_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0006 shutdown] wsl --shutdown
+[23:49:15] [wsl 0007 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0007_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0008 ceiling_r1_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0008_ceiling_r1_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r1_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r1_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r1_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r1_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r1_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0009 ceiling_r1_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0009_ceiling_r1_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r1_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r1_12G.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r1_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r1_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r1_12G.stdout
+      | exit $RC
+[23:49:15] [win 0010 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0011 shutdown] wsl --shutdown
+[23:49:15] [wsl 0012 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0012_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0013 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0013_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0014 shutdown] wsl --shutdown
+[23:49:15] [wsl 0015 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0015_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0016 resident_control_r1_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0016_resident_control_r1_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/resident_control_r1_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/resident_control_r1_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/resident_control_r1_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/resident_control_r1_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/resident_control_r1_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0017 resident_control_r1_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0017_resident_control_r1_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/resident_control_r1_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/resident_control_r1_12G.meta; cat /home/mohsen/tmoe/logs/s2/resident_control_r1_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/resident_control_r1_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/resident_control_r1_12G.stdout
+      | exit $RC
+[23:49:15] [win 0018 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0019 shutdown] wsl --shutdown
+[23:49:15] [wsl 0020 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0020_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0021 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0021_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0022 shutdown] wsl --shutdown
+[23:49:15] [wsl 0023 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0023_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0024 deploy_R18_r1_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0024_deploy_R18_r1_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0025 deploy_R18_r1_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0025_deploy_R18_r1_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r1_4G.stdout
+      | exit $RC
+[23:49:15] [win 0026 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0027 shutdown] wsl --shutdown
+[23:49:15] [wsl 0028 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0028_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0029 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0029_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0030 shutdown] wsl --shutdown
+[23:49:15] [wsl 0031 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0031_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0032 floor_R18_r1_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0032_floor_R18_r1_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0033 floor_R18_r1_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0033_floor_R18_r1_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G.meta; cat /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/floor_R18_r1_4G.stdout
+      | exit $RC
+[23:49:15] [win 0034 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0035 shutdown] wsl --shutdown
+[23:49:15] [wsl 0036 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0036_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0037 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0037_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0038 shutdown] wsl --shutdown
+[23:49:15] [wsl 0039 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0039_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0040 ceiling_r2_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0040_ceiling_r2_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r2_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r2_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r2_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r2_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r2_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0041 ceiling_r2_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0041_ceiling_r2_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r2_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r2_12G.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r2_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r2_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r2_12G.stdout
+      | exit $RC
+[23:49:15] [win 0042 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0043 shutdown] wsl --shutdown
+[23:49:15] [wsl 0044 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0044_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0045 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0045_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0046 shutdown] wsl --shutdown
+[23:49:15] [wsl 0047 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0047_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0048 resident_control_r2_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0048_resident_control_r2_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/resident_control_r2_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/resident_control_r2_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/resident_control_r2_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/resident_control_r2_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/resident_control_r2_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0049 resident_control_r2_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0049_resident_control_r2_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/resident_control_r2_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/resident_control_r2_12G.meta; cat /home/mohsen/tmoe/logs/s2/resident_control_r2_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/resident_control_r2_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/resident_control_r2_12G.stdout
+      | exit $RC
+[23:49:15] [win 0050 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0051 shutdown] wsl --shutdown
+[23:49:15] [wsl 0052 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0052_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0053 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0053_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0054 shutdown] wsl --shutdown
+[23:49:15] [wsl 0055 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0055_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0056 deploy_R18_r2_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0056_deploy_R18_r2_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0057 deploy_R18_r2_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0057_deploy_R18_r2_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r2_4G.stdout
+      | exit $RC
+[23:49:15] [win 0058 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0059 shutdown] wsl --shutdown
+[23:49:15] [wsl 0060 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0060_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0061 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0061_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0062 shutdown] wsl --shutdown
+[23:49:15] [wsl 0063 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0063_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0064 floor_R18_r2_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0064_floor_R18_r2_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0065 floor_R18_r2_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0065_floor_R18_r2_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G.meta; cat /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/floor_R18_r2_4G.stdout
+      | exit $RC
+[23:49:15] [win 0066 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0067 shutdown] wsl --shutdown
+[23:49:15] [wsl 0068 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0068_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0069 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0069_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0070 shutdown] wsl --shutdown
+[23:49:15] [wsl 0071 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0071_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0072 ceiling_r3_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0072_ceiling_r3_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r3_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r3_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r3_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r3_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r3_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0073 ceiling_r3_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0073_ceiling_r3_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r3_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r3_12G.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r3_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r3_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r3_12G.stdout
+      | exit $RC
+[23:49:15] [win 0074 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0075 shutdown] wsl --shutdown
+[23:49:15] [wsl 0076 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0076_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0077 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0077_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0078 shutdown] wsl --shutdown
+[23:49:15] [wsl 0079 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0079_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0080 resident_control_r3_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0080_resident_control_r3_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/resident_control_r3_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/resident_control_r3_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/resident_control_r3_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/resident_control_r3_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/resident_control_r3_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0081 resident_control_r3_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0081_resident_control_r3_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/resident_control_r3_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/resident_control_r3_12G.meta; cat /home/mohsen/tmoe/logs/s2/resident_control_r3_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/resident_control_r3_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/resident_control_r3_12G.stdout
+      | exit $RC
+[23:49:15] [win 0082 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0083 shutdown] wsl --shutdown
+[23:49:15] [wsl 0084 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0084_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0085 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0085_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0086 shutdown] wsl --shutdown
+[23:49:15] [wsl 0087 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0087_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0088 deploy_R18_r3_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0088_deploy_R18_r3_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0089 deploy_R18_r3_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0089_deploy_R18_r3_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_r3_4G.stdout
+      | exit $RC
+[23:49:15] [win 0090 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0091 shutdown] wsl --shutdown
+[23:49:15] [wsl 0092 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0092_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0093 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0093_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0094 shutdown] wsl --shutdown
+[23:49:15] [wsl 0095 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0095_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0096 floor_R18_r3_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0096_floor_R18_r3_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0097 floor_R18_r3_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0097_floor_R18_r3_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G.meta; cat /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/floor_R18_r3_4G.stdout
+      | exit $RC
+[23:49:15] [win 0098 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0099 shutdown] wsl --shutdown
+[23:49:15] [wsl 0100 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0100_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0101 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0101_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0102 shutdown] wsl --shutdown
+[23:49:15] [wsl 0103 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0103_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0104 ceiling_r4_12G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0104_ceiling_r4_12G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r4_12G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r4_12G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r4_12G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r4_12G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r4_12G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0105 ceiling_r4_12G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0105_ceiling_r4_12G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/ceiling_r4_12G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/ceiling_r4_12G.meta; cat /home/mohsen/tmoe/logs/s2/ceiling_r4_12G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/ceiling_r4_12G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/ceiling_r4_12G.stdout
+      | exit $RC
+[23:49:15] memory demonstration
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0106 shutdown] wsl --shutdown
+[23:49:15] [wsl 0107 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0107_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0108 memdemo_ceiling_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0108_memdemo_ceiling_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/memdemo_ceiling_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/memdemo_ceiling_4G.meta; cat /home/mohsen/tmoe/logs/s2/memdemo_ceiling_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/memdemo_ceiling_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/memdemo_ceiling_4G.stdout
+      | exit $RC
+[23:49:15] [win 0109 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0110 shutdown] wsl --shutdown
+[23:49:15] [wsl 0111 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0111_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0112 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0112_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=2560MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0113 shutdown] wsl --shutdown
+[23:49:15] [wsl 0114 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0114_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0115 deploy_R18_cap2p5_r1_2p5G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0115_deploy_R18_cap2p5_r1_2p5G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0116 deploy_R18_cap2p5_r1_2p5G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0116_deploy_R18_cap2p5_r1_2p5G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_cap2p5_r1_2p5G.stdout
+      | exit $RC
+
+
+######## lapbench.py sweep --env wsl --tag s2 --knob LLAMA_TEMPORAL_FETCH_THREADS=4,8 --n 1 --dry-run
+[23:49:15] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] [win 0002 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0003 shutdown] wsl --shutdown
+[23:49:15] [wsl 0004 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0004_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0005 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0005_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0006 shutdown] wsl --shutdown
+[23:49:15] [wsl 0007 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0007_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0008 deploy_R18_FETCH_THREADS=4_r1_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0008_deploy_R18_FETCH_THREADS=4_r1_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=4 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0009 deploy_R18_FETCH_THREADS=4_r1_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0009_deploy_R18_FETCH_THREADS=4_r1_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=4 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=4_r1_4G.stdout
+      | exit $RC
+[23:49:15] [win 0010 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[23:49:15] check: dry run, state not evaluated
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=12288MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0011 shutdown] wsl --shutdown
+[23:49:15] [wsl 0012 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0012_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0013 clock_1789368555] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0013_clock_1789368555.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/clock_1789368555 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/clock_1789368555.meta; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/clock_1789368555.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/clock_1789368555.stdout
+      | exit $RC
+[23:49:15] cap: writing C:\Users\mohsen\.wslconfig memory=4096MB swap=0 and restarting Ubuntu-24.04
+[23:49:15] [win 0014 shutdown] wsl --shutdown
+[23:49:15] [wsl 0015 memtotal] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0015_memtotal.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | grep -E '^(MemTotal|SwapTotal):' /proc/meminfo; swapon --show --noheadings | wc -l
+[23:49:15] [wsl 0016 deploy_R18_FETCH_THREADS=8_r1_4G_warmup] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0016_deploy_R18_FETCH_THREADS=8_r1_4G_warmup.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G_warmup env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=8 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G_warmup.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G_warmup.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G_warmup.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G_warmup.stdout
+      | exit $RC
+[23:49:15] [wsl 0017 deploy_R18_FETCH_THREADS=8_r1_4G] wsl -d Ubuntu-24.04 -e bash -c "bash /mnt/c/tmoe/logs/s2/cmd_0017_deploy_R18_FETCH_THREADS=8_r1_4G.sh"
+      | #!/bin/bash
+      | set -o pipefail
+      | mkdir -p /home/mohsen/tmoe/logs/s2
+      | cd /home/mohsen/tmoe
+      | S0=$(awk '$3=="sdd"{print $6}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | /home/mohsen/tmoe/bin/wrap.sh /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G env LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=8 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 /home/mohsen/tmoe/bin/llama-bench-temporal -m /home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+      | RC=$?
+      | S1=$(awk '$3=="sdd"{print $6}' /proc/diskstats)
+      | echo "disk_sectors_delta=$((S1-S0))"
+      | grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+      | cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G.meta; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G.io
+      | echo '--- stderr tail ---'; tail -n 25 /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G.stderr
+      | echo '--- stdout ---'; cat /home/mohsen/tmoe/logs/s2/deploy_R18_FETCH_THREADS=8_r1_4G.stdout
+      | exit $RC
+
+
+######## lapbench.py pack --tag s2 --dry-run
+[23:49:15] pack: 0 rows -> C:\tmoe\temporal-moe\results\ablations\serving_benchmarks_laptop.csv; artifacts -> C:\tmoe\temporal-moe\comms\laptop\s2; logs -> C:\tmoe\temporal-moe\comms\laptop\s2\logs_s2.tar.gz
+[23:49:15] pack: commit with `git add results/ablations/serving_benchmarks_laptop.csv comms/laptop laptopbench && git commit`
+
