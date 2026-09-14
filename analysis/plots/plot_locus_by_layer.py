@@ -215,7 +215,7 @@ if PAPER:
     plt.rcParams.update({"font.size": 14, "axes.labelsize": 14, "legend.fontsize": 9,
                          "xtick.labelsize": 12, "ytick.labelsize": 12})
 
-fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(9.6, 3.3) if PAPER else (8.0, 7.4),
+fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(9.6, 2.85) if PAPER else (8.0, 7.4),
                              gridspec_kw={"height_ratios": [1, 1], "hspace": 0.08})
 
 slope_rows, counts, missing = [], [], []
@@ -267,8 +267,8 @@ for fname, label, variant, color, budget, legend, ls in SERIES:
                   f"/layer, layers {layers[0]}-{layers[-1]} of {depth}")
 
 hi.axhline(0, color="#888", linewidth=1.0, linestyle=":")
-hi.set_ylim(-0.02, 0.24)
-lo.set_ylim(-0.38, -0.13)
+hi.set_ylim(-0.02, 0.215)
+lo.set_ylim(-0.345, -0.13)
 hi.spines["bottom"].set_visible(False)
 lo.spines["top"].set_visible(False)
 hi.tick_params(labeltop=False, bottom=False)
