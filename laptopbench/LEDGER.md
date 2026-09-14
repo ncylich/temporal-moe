@@ -467,3 +467,35 @@ NO_REPACK with TWOPASS at R < 192. Gate timeouts are now 1800 s.
 driver defect (the Windows-side copy of the WSL logs was empty because pathlib collapsed the
 `\\wsl.localhost` prefix), not engine results; the WSL-side logs of that attempt carry the same
 pool numbers and the same PPL digits as the rerun.
+
+### L1-2b -- Port branch verified on Linux: builds, reproduces the oracle to every digit, semantic diff is cosmetic
+
+`temporal-moe-win` (0f2bdc0d6, on 61f6d1b4) built in a WSL2 worktree (`~/tmoe/llama.cpp-win`, same
+cmake line as the oracle build, gcc 13.3 `-march=native`): BUILD_EXIT=0; the only warnings are the
+loader's five pre-existing `-Wmissing-declarations` (`llama_temporal_register_hot` and friends,
+unchanged from 61f6d1b4).
+
+**Functional check on the port binary's Linux build** (same model, side-file and flags as G2, R=18,
+TWOPASS, `llama-perplexity --chunks 2 -c 512 -t 4 --no-mmap`):
+`Final estimate: PPL = 185548.9246 +/- 4953.87147`, pool `fetches=13095 fetched_mib=2762.2` -- the
+oracle's digits and the oracle run's fetch counts exactly.
+
+**"Linux build byte-identical" -- not literally, and here is the whole difference.** Binary hashes of
+the two trees differ, but that comparison is confounded twice (absolute worktree path in `__FILE__`
+strings; build number 9961 vs 9960 baked into the library SONAMEs). The honest test is the
+preprocessed `ggml-cpu.c` with the build's own flags (`-O3 -DNDEBUG -std=gnu11 -march=native ...`),
+line markers stripped, paths normalised: 833 differing lines, of which everything but 117 is
+whitespace and the typedef aliases (`tm_mutex_t` for `pthread_mutex_t`, `tm_cond_t`, `tm_au64_t`,
+`tm_ai32_t`, `tm_file_t`, `tm_ssize_t`, `tm_off_t`). After normalising those, the residue is:
+the seven typedef lines themselves; macro-parenthesised arguments (`(g_tm_odirect) ?`, `(use_free) ?`);
+`if (!((fd) >= 0))` for `if (fd < 0)`; the three `g_tm_uring*` flag declarations moved ahead of the
+io_uring block; `pthread_create/pthread_detach` wrapped in `do { pthread_t th; ... } while (0)`; and
+shifted `__LINE__` numbers inside `GGML_ASSERT`/`ggml_abort` message strings (the pool region grew by
+69 lines). No call, type, initializer or control flow differs on Linux. Verification artifacts:
+`~/tmoe/logs/pp/{llama.cpp,llama.cpp-win}.i`, `a.n`, `b.n`.
+
+**Windows compile: not yet.** Build Tools 2022 are still absent at 02:58 (no cl.exe, no clang-cl.exe,
+no installer process). The driver's `build --env windows` checks for them before every attempt and
+refuses otherwise; `dryrun_windows.txt` holds the exact cmake lines it will run.
+
+**Retracted:** nothing.
