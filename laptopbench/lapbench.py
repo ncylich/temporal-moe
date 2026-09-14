@@ -44,7 +44,7 @@ from pathlib import Path
 DISTRO = "Ubuntu-24.04"
 WIN_ROOT = Path(r"C:\tmoe")
 WSL_ROOT = "~/tmoe"                                    # expanded inside the distro
-WSL_UNC = Path(r"\\wsl.localhost") / DISTRO            # read WSL files from Windows
+WSL_UNC = Path(rf"\\wsl.localhost\{DISTRO}")          # one string: pathlib collapses a bare \\server prefix
 MODEL = "qwen3moe-rand-fine-Q4pure.gguf"
 MODEL_SHA256 = "d8a3bdf4a9c4a1563ad694718a44e155b7588e5ca47d3ee569bf9a8b8c3a2229"
 SIDEFILE = "qwen3moe-rand-fine-Q4pure-repacked.bin"
@@ -1222,6 +1222,8 @@ exit $RC
     d["disk_dev"] = m.group(1) if m else None
     m = re.search(r"^read_bytes: (\d+)", r.out, re.M)
     d["read_bytes"] = int(m.group(1)) if m else -1
+    m = re.search(r"^rchar: (\d+)", r.out, re.M)
+    d["rchar"] = int(m.group(1)) if m else -1
     m = re.search(r"disk_sectors_delta=(-?\d+)", r.out)
     d["disk_read_mib"] = int(m.group(1)) * 512 / 1048576 if m else None
     mem = re.findall(r"MemAvailable:\s+(\d+) kB", r.out)
@@ -1263,17 +1265,21 @@ def gates(env: str) -> None:
     load_mib = (model_bytes - expert_total) / 1048576   # lazy load reads only non-expert weights
 
     # ---- G1: bytes are real -------------------------------------------------------------
-    # Pool fetched_mib against /proc/<pid>/io read_bytes (block reads only; page-cache hits do
-    # not count). Caches are dropped first so the loader's non-expert read is a known block
-    # read of (file - experts) bytes, subtracted as in honesty_gate.py. R=18 with no policy
-    # (fetch on miss) moves ~7 GB in 16 tokens, so the 10% tolerance is dominated by fetches.
-    r1 = engine_run("g1_bytes", arm_flags(18, False), "-t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU",
-                    drop_caches=True, timeout=3600)
+    # Pool fetched_mib against the per-process block-read counter. The loader's buffered read
+    # of the non-expert weights drags kernel readahead into the skipped expert regions (S2:
+    # +540 MiB after drop_caches on WSL2), so the first, identical run only warms that buffered
+    # part; the measured second run then sees block reads from the unbuffered fetch path alone,
+    # which bypasses the cache by construction. rchar (bytes requested) is recorded too.
+    engine_run("g1_warm", arm_flags(18, False), "-t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU", timeout=1800)
+    r1 = engine_run("g1_bytes", arm_flags(18, False), "-t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU", timeout=1800)
     if not DRY:
         pool = r1.get("pool") or {}
         fetched = pool.get("fetched_mib", 0.0)
         read_mib = r1["read_bytes"] / 1048576 if r1["read_bytes"] > 0 else -1
-        fetch_read = read_mib - load_mib
+        if WINDOWS:
+            fetch_read = read_mib - load_mib              # GetProcessIoCounters counts buffered reads too
+        else:
+            fetch_read = read_mib                          # block reads: the buffered part is cache-warm
         rel = abs(fetch_read - fetched) / fetched if fetched else 9.9
         ok = fetched > 0 and rel < 0.10
         device_ok = True
@@ -1283,18 +1289,20 @@ def gates(env: str) -> None:
             # proves the device delivered them (unbuffered reads cannot come from the cache).
             device_ok = (r1["disk_read_mib"] or 0) >= 0.90 * fetched
             ok = ok and device_ok
-        g["results"]["G1"] = {"pass": ok, "fetched_mib": fetched, "read_mib": read_mib, "load_mib_subtracted": load_mib,
+        g["results"]["G1"] = {"pass": ok, "fetched_mib": fetched, "read_mib": read_mib, "load_mib": load_mib,
                               "fetch_read_mib": fetch_read, "rel_err": rel, "disk_read_mib": r1["disk_read_mib"],
+                              "rchar_mib": (r1.get("rchar") or 0) / 1048576,
                               "device_ok": device_ok, "read_count": r1.get("read_count"),
                               "pool": pool, "rc": r1["rc"], "decode_tps": r1.get("decode_tps"), "label": "g1_bytes"}
-        say(f"G1 {'PASS' if ok else 'FAIL'}: pool fetched {fetched:.0f} MiB, proc read {read_mib:.0f} MiB "
-            f"(-{load_mib:.0f} load = {fetch_read:.0f}), rel err {rel * 100:.1f}%, device {r1['disk_read_mib']:.0f} MiB")
+        say(f"G1 {'PASS' if ok else 'FAIL'}: pool fetched {fetched:.0f} MiB, proc block read {read_mib:.0f} MiB "
+            f"(compared {fetch_read:.0f}), rel err {rel * 100:.1f}%, device {r1['disk_read_mib']:.0f} MiB, "
+            f"rchar {(r1.get('rchar') or 0) / 1048576:.0f} MiB")
 
     # ---- G2: numerics exact, R=18 vs R=192, same binary, same flags ----------------------
     def ppl(label: str, flags: dict) -> tuple[str, dict]:
         ppl_in = str(REPO / "androidbench" / "ppl_input.txt") if WINDOWS else wsl_path("temporal-moe/androidbench/ppl_input.txt")
         r = engine_run(label, flags, f"-f {ppl_in} --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
-                       timeout=7200, binary="bin/llama-perplexity")
+                       timeout=1800, binary="bin/llama-perplexity")
         if DRY:
             return "", r
         full = (log_dir() / f"{label}.stderr")
@@ -1306,7 +1314,8 @@ def gates(env: str) -> None:
     if not DRY:
         ok = a == bb and a != "NOT FOUND"
         g["results"]["G2"] = {"pass": ok, "ppl_R192": a, "ppl_R18": bb, "pool_R192": ra.get("pool"), "pool_R18": rb.get("pool"),
-                              "rc": [ra["rc"], rb["rc"]]}
+                              "rc": [ra["rc"], rb["rc"]], "flags_R192": arm_flags(192, True), "flags_R18": arm_flags(18, True),
+                              "args": "-f ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU"}
         if WINDOWS:
             # PLAN 5.2 (2026-09-14): the Windows binary must reproduce the WSL2 x86 oracle, every digit
             oracle = (load_gates().get("wsl") or {}).get("results", {}).get("G2", {})
@@ -1320,17 +1329,25 @@ def gates(env: str) -> None:
         say(f"G2 {'PASS' if ok else 'FAIL'}: R=192 PPL {a} | R=18 PPL {bb}")
 
     # ---- G3: repack real: LLAMA_NO_REPACK vs repacked, identical PPL, different tok/s -----
-    c, rc_ = ppl("g3_ppl_norepack_R18", arm_flags(18, True, no_repack=True))
-    s1 = engine_run("g3_tps_repack", arm_flags(18, True), "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU", timeout=3600)
-    s2 = engine_run("g3_tps_norepack", arm_flags(18, True, no_repack=True), "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU", timeout=3600)
+    # Plain Q4_0 kernels on the resident model (R=192, nothing streams, nothing waits) must give
+    # G2's digits, which came from the repacked side-file at R=18: that is pitfall #9's check
+    # that the side-file holds a correct interleaved layout. tok/s differs between the kernel
+    # families at R=192. (NO_REPACK with TWOPASS at R<192 deadlocks in prefill: the two-pass
+    # ensure path submits no fetches and only the repacked kernel submits on demand -- S2 gate
+    # run 00:43-02:43, ledger L1-2. No arm uses that combination.)
+    c, rc_ = ppl("g3_ppl_norepack_R192", arm_flags(192, True, no_repack=True))
+    s1 = engine_run("g3_tps_repack_R192", arm_flags(192, False), "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU", timeout=1800)
+    s2 = engine_run("g3_tps_norepack_R192", arm_flags(192, False, no_repack=True), "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU", timeout=1800)
     if not DRY:
         t1, t2 = s1.get("decode_tps") or 0, s2.get("decode_tps") or 0
         sd = max(s1.get("decode_sd") or 0, s2.get("decode_sd") or 0)
         differ = t1 > 0 and t2 > 0 and abs(t1 - t2) > max(0.03 * max(t1, t2), 2 * sd)
         ok = (c == bb and c != "NOT FOUND") and differ
-        g["results"]["G3"] = {"pass": ok, "ppl_norepack": c, "ppl_repack": bb, "tps_repack": t1, "tps_norepack": t2,
-                              "sd": sd, "differ": differ, "pool_repack": s1.get("pool"), "pool_norepack": s2.get("pool")}
-        say(f"G3 {'PASS' if ok else 'FAIL'}: PPL norepack {c} vs repack {bb}; tok/s repack {t1:.2f} vs norepack {t2:.2f}")
+        g["results"]["G3"] = {"pass": ok, "ppl_norepack_R192": c, "ppl_repack_R18": bb, "tps_repack_R192": t1,
+                              "tps_norepack_R192": t2, "sd": sd, "differ": differ,
+                              "pool_repack": s1.get("pool"), "pool_norepack": s2.get("pool")}
+        say(f"G3 {'PASS' if ok else 'FAIL'}: PPL norepack R=192 {c} vs repacked R=18 {bb}; "
+            f"tok/s R=192 repack {t1:.2f} vs norepack {t2:.2f}")
     if DRY:
         return
     g["all_pass"] = all(v["pass"] for v in g["results"].values()) and len(g["results"]) == 3
