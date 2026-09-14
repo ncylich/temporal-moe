@@ -99,6 +99,10 @@ DRY = False
 FORCE = False
 _CMD_SEQ = 0
 _TAG = "untagged"
+PROVISIONAL = ""                                       # --provisional NOTE: stamped in every row/json
+NATIVE = False                                         # --env linux: run shell stages locally, no wsl -e
+CURRENT_CAP: str | None = None                         # linux: cap applied per run via systemd-run
+IS_LINUX = sys.platform.startswith("linux")
 
 
 # ----------------------------------------------------------------------------- utilities
@@ -207,40 +211,62 @@ def run_ps(script: str, timeout: int = 600, label: str = "") -> Result:
 
 
 def run_wsl(script: str, timeout: int = 7200, label: str = "", login: bool = True) -> Result:
-    """Run a bash script inside the distro. The script is written to C:\\tmoe\\logs\\<tag>\\
-    (LF endings) and executed as `wsl -d Ubuntu-24.04 -e bash -lc "bash /mnt/c/...sh"`, so the
-    exact text that ran is on disk and is what --dry-run prints."""
+    """Run a bash script in the Linux environment under test.
+
+    WSL2: the script is written to C:\\tmoe\\logs\\<tag>\\ (LF endings) and executed as
+    `wsl -d Ubuntu-24.04 -e bash -lc "bash /mnt/c/...sh"`.
+    Linux native (--env linux): the script is written to ~/tmoe/logs/<tag>/ and executed as
+    `bash <script>` directly; no wsl.exe anywhere.
+    Either way the exact text that ran is on disk and is what --dry-run prints."""
     global _CMD_SEQ
     _CMD_SEQ += 1
-    sdir = WIN_ROOT / "logs" / _TAG
-    sdir.mkdir(parents=True, exist_ok=True)
     name = f"cmd_{_CMD_SEQ:04d}{'_' + label if label else ''}.sh"
-    spath = sdir / name
     body = "#!/bin/bash\nset -o pipefail\n" + script.strip("\n") + "\n"
-    mnt = f"/mnt/c/tmoe/logs/{_TAG}/{name}"
-    args = ["wsl", "-d", DISTRO, "-e", "bash", "-lc" if login else "-c", f"bash {mnt}"]
+    if NATIVE:
+        sdir = Path(wsl_home()) / "tmoe" / "logs" / _TAG
+        spath = sdir / name
+        args = ["bash", str(spath)]
+        kind = "linux"
+    else:
+        sdir = WIN_ROOT / "logs" / _TAG
+        spath = sdir / name
+        mnt = f"/mnt/c/tmoe/logs/{_TAG}/{name}"
+        args = ["wsl", "-d", DISTRO, "-e", "bash", "-lc" if login else "-c", f"bash {mnt}"]
+        kind = "wsl"
     cmdline = subprocess.list2cmdline(args)
-    say(f"[wsl {_CMD_SEQ:04d}{' ' + label if label else ''}] {cmdline}\n" +
+    say(f"[{kind} {_CMD_SEQ:04d}{' ' + label if label else ''}] {cmdline}\n" +
         "\n".join("      | " + l for l in body.splitlines()))
     if DRY:
         return Result(0, "", "", 0.0, cmdline, body)
+    sdir.mkdir(parents=True, exist_ok=True)
     spath.write_bytes(body.encode("utf-8"))
     t0 = time.time()
     p = subprocess.run(args, capture_output=True, timeout=timeout)
     r = Result(p.returncode, decode_out(p.stdout), decode_out(p.stderr), time.time() - t0, cmdline, body)
-    (log_dir() / f"wsl_{_CMD_SEQ:04d}{'_' + label if label else ''}.log").write_text(
+    (log_dir() / f"{kind}_{_CMD_SEQ:04d}{'_' + label if label else ''}.log").write_text(
         f"$ {cmdline}\n--- script ---\n{body}\nrc={r.rc} wall={r.wall:.1f}s\n--- stdout ---\n{r.out}\n--- stderr ---\n{r.err}\n",
         encoding="utf-8")
     return r
 
 
+_HOME: str | None = None
+
+
 def wsl_home() -> str:
+    """$HOME of the Linux environment under test (the distro's, or the live USB user's)."""
+    global _HOME
+    if _HOME:
+        return _HOME
+    if NATIVE:
+        _HOME = os.path.expanduser("~") if IS_LINUX else "/home/" + (os.environ.get("USERNAME") or "user")
+        return _HOME
     if DRY:
         return "/home/mohsen"
     r = run_wsl("echo $HOME", label="home")
     h = r.out.strip().splitlines()[-1] if r.out.strip() else ""
     if not h.startswith("/"):
         die(f"cannot resolve $HOME in {DISTRO}: {r.text[-300:]}")
+    _HOME = h
     return h
 
 
@@ -250,8 +276,11 @@ def wsl_path(rel: str) -> str:
 
 
 def wsl_read(rel: str) -> str:
-    """Read a file under ~/tmoe from Windows through \\\\wsl.localhost."""
-    p = WSL_UNC / wsl_home().lstrip("/").replace("/", "\\") / "tmoe" / rel.replace("/", "\\")
+    """Read a file under ~/tmoe: locally on Linux native, through \\\\wsl.localhost from Windows."""
+    if NATIVE:
+        p = Path(wsl_home()) / "tmoe" / rel
+    else:
+        p = WSL_UNC / wsl_home().lstrip("/").replace("/", "\\") / "tmoe" / rel.replace("/", "\\")
     return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
 
 
@@ -296,10 +325,20 @@ def wsl_restart() -> None:
 
 
 def set_cap(cap: str) -> dict:
-    """Apply a WSL memory cap; returns what is actually in effect (MemTotal inside the VM)."""
+    """Apply a memory cap and return what is in effect.
+
+    WSL2: rewrite .wslconfig, restart the VM, read MemTotal inside it (PLAN 5.3).
+    Linux native: the cap is a cgroup limit applied per engine run through
+    `systemd-run --user --scope -p MemoryMax=<cap> -p MemorySwapMax=0`; wrap.sh reads back the
+    scope's memory.max and the row refuses if it is not the cap requested."""
+    global CURRENT_CAP
     if cap not in CAP_MB:
         die(f"unknown cap {cap}; use one of {list(CAP_MB)}")
     want = CAP_MB[cap]
+    if NATIVE:
+        CURRENT_CAP = cap
+        say(f"cap: {cap} will be applied per run as systemd-run MemoryMax={want}M MemorySwapMax=0")
+        return {"cap": cap, "cap_mb": want, "memtotal_mb": None, "mechanism": "systemd-run --scope MemoryMax"}
     if current_cap_mb() != want or "swap=0" not in (WSLCONFIG.read_text() if WSLCONFIG.exists() else ""):
         say(f"cap: writing {WSLCONFIG} memory={want}MB swap=0 and restarting {DISTRO}")
         if not DRY:
@@ -355,7 +394,33 @@ $ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch
     return d
 
 
+def linux_state() -> dict:
+    """Laptop state on the live USB: AC from /sys/class/power_supply, load, free disk, governor."""
+    r = run_wsl("""
+for p in /sys/class/power_supply/*; do n=$(basename $p); [ -f $p/online ] && echo "online_$n=$(cat $p/online)"; [ -f $p/status ] && echo "status_$n=$(cat $p/status)"; [ -f $p/capacity ] && echo "capacity_$n=$(cat $p/capacity)"; done
+echo load="$(cut -d' ' -f1 /proc/loadavg)"
+echo governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
+echo max_khz=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 2>/dev/null)
+echo free_gb=$(df -BG """ + WSL_ROOT + """ | tail -1 | awk '{print $4}' | tr -d G)
+echo swap_lines=$(swapon --show --noheadings | wc -l)
+echo systemd_run=$(command -v systemd-run || echo missing)
+""", label="linuxstate", login=False)
+    if DRY:
+        return {"dry": True, "linux": True}
+    d = dict(l.split("=", 1) for l in r.out.splitlines() if "=" in l)
+    ac = any(k.startswith("online_") and v.strip() == "1" for k, v in d.items())
+    st = {"linux": True, "power_online": ac, "cpu_load_pct": int(float(d.get("load", "0")) * 100 / 8),
+          "c_free_gb": float(d.get("free_gb", "0")), "governor": d.get("governor"), "max_khz": d.get("max_khz"),
+          "swap_lines": int(d.get("swap_lines", "0")), "systemd_run": d.get("systemd_run"),
+          "best_performance": True, "standby_ac_zero": True, "hibernate_ac_zero": True,
+          "overlay_ac": "n/a (linux native)", "scheme": f"governor={d.get('governor')}",
+          "defender_exclusions": "n/a (linux native)", "raw": d, "ts": now()}
+    return st
+
+
 def defender_exclusions_ok(state: dict) -> tuple[bool, str]:
+    if NATIVE:
+        return True, "n/a (linux native, no Defender in the path)"
     """Exclusion lists need elevation to read. Accept (1) a readable list covering C:\\tmoe and
     the distro's VHDX directory, or (2) C:\\tmoe\\DEFENDER_EXCLUSIONS.txt written by hand listing
     the paths that were excluded (recorded in every row as 'attested')."""
@@ -384,11 +449,15 @@ def distro_basepath() -> str:
 # ----------------------------------------------------------------------------- check
 def check(env: str, quick: bool = False) -> dict:
     """Refuses on any failure unless --force (then the row says forced)."""
-    st = win_state()
+    st = linux_state() if NATIVE else win_state()
     fails = []
     if DRY:
         say("check: dry run, state not evaluated")
         return st
+    if NATIVE and st.get("systemd_run") == "missing":
+        fails.append("systemd-run missing: the MemoryMax cap cannot be applied")
+    if NATIVE and st.get("swap_lines"):
+        fails.append("swap is active on the live USB; `sudo swapoff -a` first (pitfall #20)")
     if not st.get("power_online"):
         fails.append("not on AC (M1)")
     if not st["best_performance"]:
@@ -404,15 +473,16 @@ def check(env: str, quick: bool = False) -> dict:
     if not ok:
         fails.append(f"Defender exclusions do not cover C:\\tmoe and the VHDX dir: {how}")
     if not quick:
-        mp = WIN_ROOT / "models" / MODEL
-        if not mp.exists():
-            fails.append(f"model missing: {mp}")
-        else:
-            h = sha256_file(mp)
-            st["model_sha256_win"] = h
-            if h != MODEL_SHA256:
-                fails.append(f"model sha256 mismatch on Windows: {h}")
-        if env in ("wsl", "all"):
+        if not NATIVE:
+            mp = WIN_ROOT / "models" / MODEL
+            if not mp.exists():
+                fails.append(f"model missing: {mp}")
+            else:
+                h = sha256_file(mp)
+                st["model_sha256_win"] = h
+                if h != MODEL_SHA256:
+                    fails.append(f"model sha256 mismatch on Windows: {h}")
+        if env in ("wsl", "linux", "all"):
             r = run_wsl(f"""
 set -e
 cd {wsl_path('llama.cpp')} && echo fork=$(git rev-parse --short=8 HEAD) dirty=$(git status --porcelain | wc -l)
@@ -428,9 +498,12 @@ if [ -f "$M" ]; then echo model_present=1; else echo model_present=0; fi
             elif int(m.group(2)) != 0:
                 fails.append("WSL fork checkout is dirty")
             if "model_present=1" not in r.out:
-                say("check: model absent in WSL; copying from C:\\tmoe\\models")
-                run_wsl(f"mkdir -p {wsl_path('models')} && cp /mnt/c/tmoe/models/{MODEL} {wsl_path('models/' + MODEL)}",
-                        label="copymodel", timeout=3600, login=False)
+                if NATIVE:
+                    fails.append(f"model missing at {wsl_path('models/' + MODEL)} (PLAN 5.4: read it from the NTFS volume through ntfs3, or copy it)")
+                else:
+                    say("check: model absent in WSL; copying from C:\\tmoe\\models")
+                    run_wsl(f"mkdir -p {wsl_path('models')} && cp /mnt/c/tmoe/models/{MODEL} {wsl_path('models/' + MODEL)}",
+                            label="copymodel", timeout=3600, login=False)
             hr = run_wsl(f"sha256sum {wsl_path('models/' + MODEL)} | cut -d' ' -f1", label="wslsha", timeout=1800, login=False)
             hw = hr.out.strip().splitlines()[-1] if hr.out.strip() else ""
             st["model_sha256_wsl"] = hw
@@ -439,6 +512,7 @@ if [ -f "$M" ]; then echo model_present=1; else echo model_present=0; fi
             st["wsl_check_raw"] = r.out.strip()
     st["check_fails"] = fails
     st["forced"] = bool(fails) and FORCE
+    st["provisional"] = PROVISIONAL
     if fails and not FORCE:
         die("check failed:\n  - " + "\n  - ".join(fails))
     if fails:
@@ -585,6 +659,7 @@ def probe(env: str) -> None:
             set_cap("12G")
         res[e] = probe_env(e)
         res[e]["tag"] = _TAG
+        res[e]["provisional"] = PROVISIONAL
         if not DRY:
             jdump(RESULTS / "probe.json", res)
     if not DRY:
@@ -617,7 +692,7 @@ def compute(env: str) -> None:
     envs = ["windows", "wsl"] if env == "all" else [env]
     res = jload(RESULTS / "compute.json", {})
     for e in envs:
-        entry = {"env": e, "ts": now(), "tag": _TAG, "runs": {}}
+        entry = {"env": e, "ts": now(), "tag": _TAG, "runs": {}, "provisional": PROVISIONAL}
         if e == "windows":
             exe = official_bench_exe()
             entry["binary"] = str(exe)
@@ -634,7 +709,7 @@ def compute(env: str) -> None:
             set_cap("12G")
             b = wsl_path("bin/llama-bench-temporal")
             entry["binary"] = b
-            entry["binary_note"] = "fork tree built in WSL with GGML_NATIVE=ON, no LLAMA_TEMPORAL_* env (stock behaviour)"
+            entry["binary_note"] = f"fork tree built in {e} with GGML_NATIVE=ON, no LLAMA_TEMPORAL_* env (stock behaviour)"
             hr = run_wsl(f"sha256sum {b} | cut -d' ' -f1", label="benchsha", login=False)
             entry["binary_sha256"] = None if DRY else hr.out.strip().splitlines()[-1]
             for t in (4, 8):
@@ -695,14 +770,16 @@ while kill -0 "$pid" 2>/dev/null; do
   sleep 0.25
 done
 wait "$pid"; rc=$?
-echo "rc=$rc vmhwm_kb=$hwm vmswap_peak_kb=$swp vmrss_peak_kb=$rss pid=$pid" > "$out.meta"
+cg=$(awk -F: '{print $3}' /proc/self/cgroup | head -1)
+mm=$(cat /sys/fs/cgroup$cg/memory.max 2>/dev/null || echo unknown)
+echo "rc=$rc vmhwm_kb=$hwm vmswap_peak_kb=$swp vmrss_peak_kb=$rss pid=$pid cgroup=$cg memory_max=$mm" > "$out.meta"
 exit $rc
 '''
 
 
 def build(env: str) -> None:
-    if env != "wsl":
-        die("build: only --env wsl is implemented in this session (no native compiler; the Windows port is out of scope)")
+    if env not in ("wsl", "linux"):
+        die("build: --env wsl or linux only (no native Windows compiler; the Windows port is out of scope)")
     llama = wsl_path("llama.cpp")
     bind = wsl_path("bin")
     r = run_wsl(f"""
@@ -728,7 +805,7 @@ grep -c . {wsl_path('logs')}/build.log
         die(f"build failed: {r.text[-800:]}")
     hashes = dict(re.findall(r"^([0-9a-f]{64})\s+\S+/(\S+)$", r.out, re.M))
     inv = {v: k for k, v in hashes.items()}
-    info = {"ts": now(), "tag": _TAG, "env": env, "fork_commit": r.out.strip().splitlines()[0],
+    info = {"ts": now(), "tag": _TAG, "env": env, "provisional": PROVISIONAL, "fork_commit": r.out.strip().splitlines()[0],
             "bench_sha256": inv.get("llama-bench-temporal"), "ppl_sha256": inv.get("llama-perplexity"),
             "wrap_sha256": inv.get("wrap.sh"), "compiler": [l for l in r.out.splitlines() if "gcc" in l.lower()][:2],
             "cmake": "cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF; "
@@ -825,14 +902,20 @@ def engine_run(label: str, flags: dict | None, args: str, timeout: int = 7200, d
     outp = wsl_path(f"logs/{_TAG}/{label}")
     envs = ("env " + env_string(flags) + " ") if flags else ""
     pre = "sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'\n" if drop_caches else ""
+    # Linux native: the cap is a transient cgroup scope around this one run (PLAN 5.3)
+    capw = ""
+    if NATIVE and CURRENT_CAP:
+        capw = f"systemd-run --user --scope --quiet -p MemoryMax={CAP_MB[CURRENT_CAP]}M -p MemorySwapMax=0 "
+    # block device backing the model's filesystem (sdd in WSL2, nvme0n1pN on the live USB)
     script = f"""
 mkdir -p {wsl_path('logs/' + _TAG)}
 cd {wsl_path('')}
-{pre}S0=$(awk '$3=="sdd"{{print $6}}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
-{wsl_path('bin/wrap.sh')} {outp} {envs}{binp} -m {model} {args} -o csv
+DEV=$(df --output=source {model} | tail -1 | sed 's#^/dev/##')
+{pre}S0=$(awk -v d="$DEV" '$3==d{{print $6}}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
+{capw}{wsl_path('bin/wrap.sh')} {outp} {envs}{binp} -m {model} {args} -o csv
 RC=$?
-S1=$(awk '$3=="sdd"{{print $6}}' /proc/diskstats)
-echo "disk_sectors_delta=$((S1-S0))"
+S1=$(awk -v d="$DEV" '$3==d{{print $6}}' /proc/diskstats)
+echo "disk_dev=$DEV disk_sectors_delta=$((S1-S0))"
 grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
 cat {outp}.meta; cat {outp}.io
 echo '--- stderr tail ---'; tail -n 25 {outp}.stderr
@@ -854,6 +937,15 @@ exit $RC
     if m:
         d["rc"] = int(m.group(1)); d["vmhwm_mib"] = int(m.group(2)) / 1024
         d["vmswap_peak_mib"] = int(m.group(3)) / 1024; d["vmrss_peak_mib"] = int(m.group(4)) / 1024
+    m = re.search(r"memory_max=(\S+)", r.out)
+    d["cgroup_memory_max"] = m.group(1) if m else None
+    if NATIVE and CURRENT_CAP:
+        want = CAP_MB[CURRENT_CAP] * 1048576
+        d["cap_in_effect"] = d["cgroup_memory_max"] == str(want)
+        if not d["cap_in_effect"]:
+            say(f"WARNING: cgroup memory.max {d['cgroup_memory_max']} is not the requested {want}; the row will be refused")
+    m = re.search(r"disk_dev=(\S+)", r.out)
+    d["disk_dev"] = m.group(1) if m else None
     m = re.search(r"^read_bytes: (\d+)", r.out, re.M)
     d["read_bytes"] = int(m.group(1)) if m else -1
     m = re.search(r"disk_sectors_delta=(-?\d+)", r.out)
@@ -867,8 +959,8 @@ exit $RC
 
 # ----------------------------------------------------------------------------- gates
 def gates(env: str) -> None:
-    if env != "wsl":
-        die("gates: only --env wsl in this session")
+    if env not in ("wsl", "linux"):
+        die("gates: --env wsl or linux only")
     b = jload(RESULTS / "build.json")
     if not b and not DRY:
         die("gates: no build.json; run build first")
@@ -880,8 +972,11 @@ def gates(env: str) -> None:
         bench_hash, ppl_hash = hr.out.split()[:2] if len(hr.out.split()) >= 2 else (None, None)
         if bench_hash != b["bench_sha256"]:
             die(f"gates: binary hash {bench_hash} differs from build.json {b['bench_sha256']}; rebuild first")
-    g = {"ts": now(), "tag": _TAG, "bench_sha256": bench_hash, "results": {}}
-    model_bytes = (WIN_ROOT / "models" / MODEL).stat().st_size if (WIN_ROOT / "models" / MODEL).exists() else 0
+    g = {"ts": now(), "tag": _TAG, "env": env, "provisional": PROVISIONAL, "bench_sha256": bench_hash, "results": {}}
+    model_bytes = 0
+    if not DRY:
+        sr = run_wsl(f"stat -c %s {wsl_path('models/' + MODEL)}", label="modelsize", login=False)
+        model_bytes = int(sr.out.split()[-1]) if sr.out.strip() else 0
     expert_total = SLICE_BYTES * N_EXPERT * N_LAYER * 3
     load_mib = (model_bytes - expert_total) / 1048576   # lazy load reads only non-expert weights
 
@@ -907,7 +1002,7 @@ def gates(env: str) -> None:
 
     # ---- G2: numerics exact, R=18 vs R=192, same binary, same flags ----------------------
     def ppl(label: str, flags: dict) -> tuple[str, dict]:
-        r = engine_run(label, flags, f"-f /mnt/c/tmoe/temporal-moe/androidbench/ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
+        r = engine_run(label, flags, f"-f {wsl_path('temporal-moe/androidbench/ppl_input.txt')} --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
                        timeout=7200, binary="bin/llama-perplexity")
         if DRY:
             return "", r
@@ -1026,8 +1121,10 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
         return None
     tokens = 128 * 8
     ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"))
-    row = {"tag": _TAG, "env": "wsl", "arm": arm, "tier": tier, "label": label, "R": R, "twopass": twopass,
+    row = {"tag": _TAG, "env": "linux" if NATIVE else "wsl", "provisional": PROVISIONAL, "arm": arm, "tier": tier,
+           "label": label, "R": R, "twopass": twopass,
            "round": rnd, "cap": cap, "cap_mb": capinfo["cap_mb"], "memtotal_mb": capinfo["memtotal_mb"],
+           "cgroup_memory_max": m.get("cgroup_memory_max"),
            "flags": flags, "overrides": overrides, "engine_args": ENGINE_ARGS, "cmd": m["cmd"],
            "binary_sha256": bench_hash, "gated": True,
            "clock_probe": probes[-1], "clock_probes_all": probes, "degraded": probes[-1]["degraded"],
@@ -1040,6 +1137,8 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
            "status": "ok"}
     if (row["decode_tok_s"] or 0) <= 0 or m["rc"] != 0:
         row["status"] = f"error_rc{m['rc']}" + ("_oom" if m.get("oom") else "")
+    elif NATIVE and not m.get("cap_in_effect", True):
+        ok, why = False, f"cgroup memory.max={m.get('cgroup_memory_max')} is not the requested cap {cap}"
     elif (row["vmswap_peak_mib"] or 0) > 0:
         row["status"] = "swapped"                            # pitfall #20
     elif probes[-1]["degraded"]:
@@ -1073,8 +1172,8 @@ def already_done(label: str, rnd: int, cap: str) -> bool:
 
 
 def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str], resume: bool, demo: bool) -> None:
-    if env != "wsl":
-        die("arms: only --env wsl in this session")
+    if env not in ("wsl", "linux"):
+        die("arms: --env wsl or linux only")
     overrides = parse_overrides(sets)
     bench_hash = require_gated()
     check("wsl")
@@ -1116,7 +1215,8 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
     capinfo = set_cap("4G")
     m = engine_run("memdemo_ceiling_4G", arm_flags(192, False, overrides), ENGINE_ARGS, timeout=3600)
     if not DRY:
-        dm = run_wsl("sudo dmesg 2>/dev/null | grep -i -E 'out of memory|oom-kill|killed process' | tail -3", label="dmesg", login=False)
+        dm = run_wsl("(sudo -n dmesg 2>/dev/null || dmesg 2>/dev/null || journalctl -k --no-pager 2>/dev/null) | grep -i -E 'out of memory|oom-kill|killed process' | tail -3",
+                     label="dmesg", login=False)
         d["ceiling_4G"] = {"rc": m["rc"], "decode_tok_s": m.get("decode_tps"), "vmhwm_mib": m.get("vmhwm_mib"),
                            "oom": m.get("oom"), "dmesg": dm.out.strip()[-500:], "stderr_tail": m["stderr_tail"][-600:],
                            "cap": capinfo, "failed_to_start": (m["rc"] != 0 or not m.get("decode_tps"))}
@@ -1139,8 +1239,8 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
 
 # ----------------------------------------------------------------------------- sweep
 def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str) -> None:
-    if env != "wsl":
-        die("sweep: only --env wsl in this session")
+    if env not in ("wsl", "linux"):
+        die("sweep: --env wsl or linux only")
     if not knob or "=" not in knob:
         die("--knob NAME=v1,v2 required")
     name, vals = knob.split("=", 1)
@@ -1234,7 +1334,10 @@ def to_csv_row(r: dict) -> list:
             f"swaps={p.get('swaps')};clock_probe={r['clock_probe'].get('tok_s')};clock_ref={r['clock_probe'].get('ref_tok_s')};"
             f"vmhwm_mib=VmHWM;read_bytes={r['read_bytes']};binary={r['binary_sha256'][:12]};tag={r['tag']};"
             f"flags={env_string(r['flags'])};args={r['engine_args']}" + (f";{r['note']}" if r.get("note") else ""))
-    return ["decode", MODEL, r["tier"], "laptop-wsl2-cpu", "", "", "",
+    setup = "laptop-linux-cpu" if r.get("env") == "linux" else "laptop-wsl2-cpu"
+    if r.get("provisional"):
+        note = f"[provisional: {r['provisional']}] " + note
+    return ["decode", MODEL, r["tier"], setup, "", "", "",
             f"{r['decode_tok_s']:.4f}", f"{r['vmhwm_mib']:.0f}" if r.get("vmhwm_mib") else "", note,
             f"{r['decode_sd']:.4f}", int(p.get("fetched_mib", 0) * 1048576 / r["tokens"]) if r.get("tokens") else 0]
 
@@ -1271,12 +1374,20 @@ def pack() -> None:
         if sdir.exists():
             t.add(sdir, arcname=f"scripts/{_TAG}")
     say(f"pack: {len(rows)} rows -> {csvp}; artifacts -> {out}; logs -> {tarp}")
-    say("pack: commit with `git add results/ablations/serving_benchmarks_laptop.csv comms/laptop laptopbench && git commit`")
+    envs = sorted({r.get("env", "wsl") for r in rows}) or ["wsl"]
+    msg = (f"laptopbench: {len(rows)} decode rows, tag {_TAG}, {'/'.join(envs)} on i7-11370H + PM981a"
+           + (f" (provisional: {PROVISIONAL})" if PROVISIONAL else "")
+           + f"\n\nRows in results/ablations/serving_benchmarks_laptop.csv; probe, compute, gates,\n"
+             f"runs.jsonl and the log tarball under comms/laptop/{_TAG}/.")
+    r = run_win(["git", "-C", str(REPO), "add", "results/ablations/serving_benchmarks_laptop.csv", f"comms/laptop/{_TAG}",
+                 "laptopbench/LEDGER.md", "laptopbench/lapbench.py", "laptopbench/results"], label="gitadd")
+    r = run_win(["git", "-C", str(REPO), "-c", "core.hooksPath=.githooks", "commit", "-q", "-m", msg], label="gitcommit")
+    say(f"pack: commit rc={r.rc} {r.text.strip()[-300:]}")
 
 
 # ----------------------------------------------------------------------------- main
 def main() -> None:
-    global DRY, FORCE, _TAG
+    global DRY, FORCE, _TAG, PROVISIONAL, NATIVE
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "session", "pack", "report", "decide"])
     ap.add_argument("--env", default="wsl", choices=["wsl", "linux", "windows", "all"])
@@ -1293,10 +1404,15 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true", help="override a failed check; recorded in the row")
     ap.add_argument("--no-demo", action="store_true", help="arms: skip the memory demonstration")
+    ap.add_argument("--provisional", default="", metavar="NOTE",
+                    help="stamp every row and json with provisional=NOTE (e.g. Defender exclusions attested, not read)")
     a = ap.parse_args()
-    DRY, FORCE = a.dry_run, a.force
-    if a.env == "linux":
-        die("--env linux (live USB) needs Mohsen; not available in this session")
+    DRY, FORCE, PROVISIONAL = a.dry_run, a.force, a.provisional
+    NATIVE = a.env == "linux"
+    if NATIVE and not IS_LINUX and not DRY:
+        die("--env linux runs on the live USB itself (Linux Python); on Windows only --dry-run is allowed")
+    if a.env == "all" and IS_LINUX:
+        die("--env all means windows+wsl; on the live USB use --env linux")
     if a.stage in ("arms", "sweep", "gates", "pack", "session", "report") and not a.tag:
         die("--tag is required for this stage")
     _TAG = a.tag or "untagged"
