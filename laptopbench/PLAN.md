@@ -155,19 +155,24 @@ physics level they are the same environment; T0 on both, when both exist, should
 within noise. So "WSL is terrible and Windows is best" means the VM is the tax, and the
 question is only how to get off the VM.
 
-### 5.2 The rule
+### 5.2 The rule, and the decision taken on 2026-09-14
 
 Run T0 and T1 on native Windows and WSL2 first. Both are cheap and neither needs the fork.
 
-1. WSL2 passes T0 and T1: use WSL2. Proceed to section 3.
-2. WSL2 fails, or later section 7 attributes a deploy gap to the virtual disk: move to Linux
-   native on a live USB. Same fork, same scripts, same gates. Windows-native physics is
-   reached without the port.
-3. Linux native is unavailable (Mohsen declines to boot it, firmware blocks it, or the paper
-   wants "runs on Windows" as a claim): do the Windows port. It is the only route that
-   costs engineering, so it is chosen last and only by one of those three facts.
+1. WSL2 passes T0 and T1: use WSL2.
+2. WSL2 fails and Linux native on a live USB is available: use the live USB.
+3. Otherwise: the Windows port.
 
-The choice is recorded in the ledger with the T0 and T1 numbers that made it.
+Decision for Mohsen's laptop: rule 3, Windows native. Preliminary T0 (ledger L1-1b) put
+WSL2's 4k QD1 latency at 1.70x native (147 us against 86 us), a per-request virtualization
+cost on the disk path that Defender exclusions do not touch, while QD12 bandwidth matched
+within 7%. A live USB was ruled out as too much to ask of the machine's owner. No WSL2 or
+Linux row is reported.
+
+WSL2 keeps one job: G1, G2 and G3 pass there first on the x86 build, and the G2 perplexity,
+every printed digit, becomes the oracle the Windows binary must match. That is a stronger
+correctness check for a fresh unbuffered-I/O path on NTFS than self-consistency alone.
+After that WSL2 is not used.
 
 ### 5.3 Applying the cap
 
@@ -327,12 +332,14 @@ conventions on a branch named `laptop`. No SSH, no tunnel.
 ## 12. Sequence
 
 1. Mohsen does section 5.4; the laptop session writes `lapbench.py` in its Phase 1.
-2. Session 1: `probe` and `compute` with `--env all`. Apply section 5.2. If rule 3, start
-   section 6 and the schedule slips a week.
-3. Session 2: `session` in the chosen environment. First laptop rows in the CSV, first ledger
-   entries, the memory demonstration.
-4. Section 7: attribute any gap, then sweep. Two or three sessions.
-5. Final session: all five arms in one sitting, ledger verdict block modelled on the top of
+2. Session 1: `probe` and `compute` with `--env all`. Done; rule 3 (section 5.2).
+3. Session 2: gates in WSL2 for the oracle, then the port of section 6 on branch
+   `temporal-moe-win` of the fork. Mohsen installs Visual Studio Build Tools (C++ workload)
+   meanwhile. About a week.
+4. Session 3: G1, G2 against the oracle, G3, T1, then `session --env windows`. First laptop
+   rows in the CSV, the memory demonstration under a job-object cap.
+5. Section 7: attribute any gap, then sweep. Two or three sessions.
+6. Final session: all five arms in one sitting, ledger verdict block modelled on the top of
    `androidbench/LEDGER.md`, paper column.
 
 Out of scope: prefill, the iGPU, other laptops until this one has a number.
