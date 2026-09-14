@@ -1493,8 +1493,8 @@ def already_done(label: str, rnd: int, cap: str) -> bool:
 
 
 def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str], resume: bool, demo: bool) -> None:
-    if env not in ("wsl", "linux"):
-        die("arms: --env wsl or linux only")
+    if env not in ("wsl", "linux", "windows"):
+        die("arms: --env wsl, linux or windows")
     overrides = parse_overrides(sets)
     bench_hash = require_gated(env)
     check(env)
@@ -1564,8 +1564,8 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
 
 # ----------------------------------------------------------------------------- sweep
 def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str) -> None:
-    if env not in ("wsl", "linux"):
-        die("sweep: --env wsl or linux only")
+    if env not in ("wsl", "linux", "windows"):
+        die("sweep: --env wsl, linux or windows")
     if not knob or "=" not in knob:
         die("--knob NAME=v1,v2 required")
     name, vals = knob.split("=", 1)

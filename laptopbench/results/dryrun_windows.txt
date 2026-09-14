@@ -1,0 +1,539 @@
+﻿
+######## lapbench.py check --env windows --dry-run
+[00:40:53] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:53] check: dry run, state not evaluated
+{
+ "dry": true
+}
+
+######## lapbench.py build --env windows --tag w1 --dry-run
+[00:40:54] compiler check: cl=None clang-cl=None cmake=None
+[00:40:54] [win 0001 forkrev] git -C C:\tmoe\llama.cpp rev-parse --short=8 HEAD
+[00:40:54] [win 0002 forkbranch] git -C C:\tmoe\llama.cpp branch --show-current
+[00:40:54] [win 0003 forkstatus] git -C C:\tmoe\llama.cpp status --porcelain
+[00:40:54] [win 0004 cmake_configure] cmake -S C:\tmoe\llama.cpp -B C:\tmoe\llama.cpp\build-win -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF
+[00:40:54] [win 0005 cmake_build] cmake --build C:\tmoe\llama.cpp\build-win --config Release --target llama-bench llama-perplexity -j 8
+[00:40:54] build (dry): would copy build-win\bin\Release\llama-bench.exe -> C:\tmoe\bin\llama-bench-temporal.exe, llama-perplexity.exe and *.dll, then dump C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin
+
+######## lapbench.py compute --env windows --tag w1 --dry-run
+[00:40:54] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] [win 0002 t1_t4] C:\tmoe\tools\llamacpp-b9959\llama-bench.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -o csv
+[00:40:54] [win 0003 t1_t8] C:\tmoe\tools\llamacpp-b9959\llama-bench.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 8 -p 0 -n 128 -r 8 -mmp 0 -o csv
+
+######## lapbench.py gates --env windows --tag w1 --dry-run
+[00:40:54] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0002 g1_bytes] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0003 g2_ppl_R192] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-perplexity.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -f C:\tmoe\temporal-moe\androidbench\ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU
+[00:40:54] [windows 0004 g2_ppl_R18] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-perplexity.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -f C:\tmoe\temporal-moe\androidbench\ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU
+[00:40:54] [windows 0005 g3_ppl_norepack_R18] [job cap 12288 MB] LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_NO_REPACK=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-perplexity.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -f C:\tmoe\temporal-moe\androidbench\ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU
+[00:40:54] [windows 0006 g3_tps_repack] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0007 g3_tps_norepack] [job cap 12288 MB] LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_NO_REPACK=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU -o csv
+
+######## lapbench.py arms --env windows --tag w1 --n 3 --arms a,b,c,e --R 24,36,48 --dry-run
+[00:40:54] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] arms schedule: 13 batches, rest 300 s: ceiling:r1 resident_control:r1 deploy_R18:r1 floor_R18:r1 ceiling:r2 resident_control:r2 deploy_R18:r2 floor_R18:r2 ceiling:r3 resident_control:r3 deploy_R18:r3 floor_R18:r3 ceiling:r4
+[00:40:54] [win 0002 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0003 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0004 ceiling_r1_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0005 ceiling_r1_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0006 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0007 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0008 resident_control_r1_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0009 resident_control_r1_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0010 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0011 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0012 deploy_R18_r1_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0013 deploy_R18_r1_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0014 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0015 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0016 floor_R18_r1_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0017 floor_R18_r1_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0018 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0019 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0020 ceiling_r2_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0021 ceiling_r2_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0022 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0023 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0024 resident_control_r2_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0025 resident_control_r2_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0026 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0027 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0028 deploy_R18_r2_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0029 deploy_R18_r2_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0030 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0031 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0032 floor_R18_r2_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0033 floor_R18_r2_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0034 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0035 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0036 ceiling_r3_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0037 ceiling_r3_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0038 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0039 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0040 resident_control_r3_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0041 resident_control_r3_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0042 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0043 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0044 deploy_R18_r3_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0045 deploy_R18_r3_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0046 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0047 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0048 floor_R18_r3_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0049 floor_R18_r3_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0050 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0051 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0052 ceiling_r4_12G_warmup] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0053 ceiling_r4_12G] [job cap 12288 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] memory demonstration
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0054 memdemo_ceiling_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=192 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0055 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0056 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 2.5G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=2560 MB
+[00:40:54] [windows 0057 deploy_R18_cap2p5_r1_2p5G_warmup] [job cap 2560 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0058 deploy_R18_cap2p5_r1_2p5G] [job cap 2560 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+
+######## lapbench.py sweep --env windows --tag w1 --knob LLAMA_TEMPORAL_FETCH_THREADS=4,8 --n 1 --dry-run
+[00:40:54] [win 0001 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] [win 0002 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0003 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0004 deploy_R18_FETCH_THREADS=4_r1_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=4 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0005 deploy_R18_FETCH_THREADS=4_r1_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=4 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [win 0006 winstate] powershell -NoProfile -NonInteractive -Command "
+$o = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue
+$b = Get-CimInstance BatteryStatus -Namespace root\wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+$bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+$sc = (powercfg /getactivescheme) -join ' '
+$st = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$hi = (powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE | Select-String 'Current AC Power Setting Index').Line.Trim()
+$cpu = (Get-CimInstance Win32_Processor).LoadPercentage
+$free = [math]::Round((Get-PSDrive C).Free/1GB,1)
+$ws = (Get-Service WSearch -ErrorAction SilentlyContinue).Status
+$mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+$ex = try { (Get-MpPreference -ErrorAction Stop).ExclusionPath -join ';' } catch { 'unreadable' }
+[pscustomobject]@{
+  overlay_ac = $o.ActiveOverlayAcPowerScheme; scheme = $sc; standby_ac = $st; hibernate_ac = $hi
+  power_online = $b.PowerOnline; battery_pct = $bat.EstimatedChargeRemaining
+  cpu_load_pct = $cpu; c_free_gb = $free; wsearch = \"$ws\"
+  defender_rtp = $mp.RealTimeProtectionEnabled; defender_exclusions = \"$ex\"
+} | ConvertTo-Json -Compress
+"
+[00:40:54] check: dry run, state not evaluated
+[00:40:54] cap: 12G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=12288 MB
+[00:40:54] [windows 0007 clock_1789371654] [job cap 12288 MB] C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 256 -r 4 -mmp 0 -o csv
+[00:40:54] cap: 4G will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY=4096 MB
+[00:40:54] [windows 0008 deploy_R18_FETCH_THREADS=8_r1_4G_warmup] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=8 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU -o csv
+[00:40:54] [windows 0009 deploy_R18_FETCH_THREADS=8_r1_4G] [job cap 4096 MB] LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=C:\tmoe\models\qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=8 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_TWOPASS=1 C:\tmoe\bin\llama-bench-temporal.exe -m C:\tmoe\models\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -o csv
+
+######## lapbench.py pack --tag w1 --dry-run
+[00:40:55] pack (dry): would append 0 rows to C:\tmoe\temporal-moe\results\ablations\serving_benchmarks_laptop.csv, copy results json/jsonl to C:\tmoe\temporal-moe\comms\laptop\w1, tar logs from C:\tmoe\temporal-moe\laptopbench\results\logs\w1 and C:\tmoe\logs\w1
+
