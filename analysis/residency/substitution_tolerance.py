@@ -181,7 +181,7 @@ def figure(rows, paper, budgets=None):
                     ys.append((ln / L, np.mean(v), np.min(v), np.max(v), len(v)))
                 x = [y[0] for y in ys]
                 ax.plot(x, [y[1] for y in ys], marker=mk, ls=ls, color=color, ms=4.5,
-                        label=f"{'full MoE' if regime == 'full' else 'temporal'}, {budget}"
+                        label=f"{'standard MoE' if regime == 'full' else 'Temporal MoE'}, {budget}"
                               + (f" ({ys[0][4]} seeds)" if ys[0][4] > 1 else ""))
                 if ys[0][4] > 1:
                     ax.fill_between(x, [y[2] for y in ys], [y[3] for y in ys], color=color, alpha=0.15,
@@ -195,7 +195,7 @@ def figure(rows, paper, budgets=None):
         for h, l in zip(*ax.get_legend_handles_labels()):
             if l not in handles:
                 handles[l] = h; labels.append(l)
-    order = sorted(labels, key=lambda l: (l.startswith("temporal"), l))
+    order = sorted(labels, key=lambda l: (l.startswith("Temporal MoE"), l))
     fig.legend([handles[l] for l in order], order, frameon=False, loc="lower center", ncol=4,
                fontsize=9, bbox_to_anchor=(0.5, -0.02))
     if not paper:
@@ -206,6 +206,7 @@ def figure(rows, paper, budgets=None):
     os.makedirs(FIG, exist_ok=True)
     name = f"substitution_depth{'_nocaption' if paper else ''}.png"
     fig.savefig(os.path.join(FIG, name), dpi=170, bbox_inches="tight")
+    if name.endswith(".png"): fig.savefig(os.path.join(FIG, name[:-4] + ".pdf"), bbox_inches="tight")
     print(f"wrote {name}")
 
 

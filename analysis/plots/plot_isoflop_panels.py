@@ -44,7 +44,7 @@ _ap.add_argument("--no-caption", action="store_true")
 _ap.add_argument("--out", default=f"{REPO}/paper/talk_figures/slide06_isoflop_highlight.png")
 ARGS, _ = _ap.parse_known_args()
 FADE_KEYS = {"moe_f", "tmp_c"}          # curve series faded on the deck variant
-FADE_BARS = {"temporal\ncoarse"}        # 1e19 bar faded on the deck variant
+FADE_BARS = {"Temporal MoE\ncoarse"}        # 1e19 bar faded on the deck variant
 
 DENSE_C = "#7f7f7f"
 MOE_COARSE, MOE_FINE = "#f4756b", "#9e0f14"
@@ -75,13 +75,13 @@ P18 = {
 # 38M midpoint seeds (h100 split, 3/arm; plotted values = means, per-seed table in the paper):
 # tmp_c {1.3128,1.3111,1.3128}  moe_c {1.3158,1.3197,1.3169}
 # tmp_f {1.3354,1.3339,1.3323}  moe_f {1.3461,1.3489,1.3483}
-P19 = [("dense", 1.1260, DENSE_C), ("temporal\ncoarse", 1.0680, TMP_COARSE),
-       ("temporal\nfine", 1.0655, TMP_FINE), ("full MoE\ncoarse", 1.0514, MOE_COARSE),
-       ("full MoE\nfine", 1.0604, MOE_FINE)]   # moe_fine_g3_1e19, trained 2026-09-03 (t19_1e19_curves.csv)
+P19 = [("dense", 1.1260, DENSE_C), ("Temporal MoE\ncoarse", 1.0680, TMP_COARSE),
+       ("Temporal MoE\nfine", 1.0655, TMP_FINE), ("standard MoE\ncoarse", 1.0514, MOE_COARSE),
+       ("standard MoE\nfine", 1.0604, MOE_FINE)]   # moe_fine_g3_1e19, trained 2026-09-03 (t19_1e19_curves.csv)
 
 STYLE = [("dense", DENSE_C, 1.4), ("moe_c", MOE_COARSE, 1.9), ("moe_f", MOE_FINE, 1.9),
          ("tmp_c", TMP_COARSE, 1.9), ("tmp_f", TMP_FINE, 2.9)]
-LEG = ["dense", "MoE · coarse", "MoE · fine", "temporal · coarse", "temporal · fine (ours)"]
+LEG = ["dense", "standard MoE · coarse", "standard MoE · fine", "Temporal MoE · coarse", "Temporal MoE · fine (ours)"]
 # sub-point vertical dodge so coincident series render side by side rather than
 # stacked; a pure drawing offset (max 0.9pt), the plotted values are untouched
 DODGE_PT = {"dense": 0.0, "moe_c": -0.9, "moe_f": -0.3, "tmp_c": 0.3, "tmp_f": 0.9}
@@ -120,7 +120,7 @@ def curve_panel(ax, data, title, legend=False, ticks=None, xlabel=True, ylabel=T
 def bar_panel(ax, title, ylabel=True):
     labels = [p[0] for p in P19]; vals = [p[1] for p in P19]; cols = [p[2] for p in P19]
     bars = ax.bar(labels, vals, color=cols, width=0.66, edgecolor="k",
-                  linewidth=[1.6 if l == "temporal\nfine" else 0.6 for l in labels])
+                  linewidth=[1.6 if l == "Temporal MoE\nfine" else 0.6 for l in labels])
     for b, v, lab in zip(bars, vals, labels):
         faded = ARGS.highlight_deck and lab in FADE_BARS
         if faded:
@@ -132,6 +132,9 @@ def bar_panel(ax, title, ylabel=True):
     ax.set_title(title)
     if ylabel: ax.set_ylabel("test BPB")
     ax.tick_params(axis="x", labelsize=7.5)
+    # three-line tick labels so "standard MoE" and "Temporal MoE" keep clear air at this width
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels([l.replace(" MoE\n", "\nMoE\n") for l in labels])
 
 
 # paper tiles (one file per budget, no baked caption)
@@ -175,14 +178,15 @@ curve_panel(axes[0][1], P17, "$10^{17}$ FLOPs · 16k vocab", ticks=TICKS["1e17"]
 curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"])
 bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab", ylabel=False)
 _h = [Line2D([0], [0], color=c, lw=3.2 if k == "tmp_f" else 2.6) for k, c, _ in STYLE]
-_leg = fig.legend(_h, LEG, ncol=5, loc="upper center", fontsize=10.5, frameon=False,
-                  bbox_to_anchor=(0.5, 1.008), columnspacing=1.0, handlelength=1.6)
+_leg = fig.legend(_h, LEG, ncol=5, loc="upper center", fontsize=9.6, frameon=False,
+                  bbox_to_anchor=(0.5, 1.008), columnspacing=0.9, handlelength=1.5)
 _leg.get_texts()[-1].set_fontweight("bold")
 fig.tight_layout(rect=[0, 0, 1, 0.925])
 fig.subplots_adjust(wspace=0.16, hspace=0.42)
 out = f"{OUTD}/isoflop_panels_2x2_nocaption.png"
 # tight bbox: the shared legend sits above the axes and was clipped at the right edge otherwise
-fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.02); print("wrote", out); plt.close(fig)
+fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.02); print("wrote", out)
+fig.savefig(out[:-4] + ".pdf", bbox_inches="tight", pad_inches=0.02); print("wrote", out[:-4] + ".pdf"); plt.close(fig)
 
 # captioned 2x2 overview for the repo
 fig, axes = plt.subplots(2, 2, figsize=(9.4, 7.6))
@@ -192,8 +196,8 @@ curve_panel(axes[1][0], P18, "$10^{18}$ FLOPs · 50k vocab", ticks=TICKS["1e18"]
 bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab")
 fig.suptitle("Quality at fixed compute — one independent panel per budget", fontsize=13)
 fig.text(0.5, 0.005,
-         "Test-set bits-per-byte (lower better) at four compute budgets. Hue = method (dense gray, full MoE red, "
-         "temporal green); shade = granularity (coarse 6-of-64 normal, fine 18-of-192 dark). Panels are independent: "
+         "Test-set bits-per-byte (lower better) at four compute budgets. Hue = method (dense gray, standard MoE red, "
+         "Temporal MoE green); shade = granularity (coarse 6-of-64 normal, fine 18-of-192 dark). Panels are independent: "
          "1e16/1e17 use the 16k-BPE tokenizer, 1e18/1e19 use pythia-50k, so compare within a panel, not across. "
          "'temporal' = rolling residency (top-k resident, swap 1/token).",
          ha="center", fontsize=8, color="dimgray", wrap=True)

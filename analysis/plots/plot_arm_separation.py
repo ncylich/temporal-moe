@@ -106,7 +106,7 @@ for (reg, g), pts in series.items():
 seen = set()
 for run, (reg, bud, t, c, dom) in sorted(A.items()):
     col = TMP if reg == "temporal" else MOE
-    lab = f"{'temporal' if reg=='temporal' else 'unconstrained'} at $10^{{{bud[2:]}}}$"
+    lab = f"{'Temporal MoE' if reg=='temporal' else 'standard MoE'} at $10^{{{bud[2:]}}}$"
     ax.scatter(t, c, s=70, color=col, marker=MARKER.get(bud, "o"), alpha=0.85,
                edgecolor="white", linewidth=0.8, zorder=3,
                label=lab if lab not in seen else None)
@@ -148,6 +148,7 @@ else:
 
 os.makedirs(OUT, exist_ok=True)
 fig.savefig(out, dpi=190, bbox_inches="tight")
+if out.endswith(".png"): fig.savefig(out[:-4] + ".pdf", bbox_inches="tight")
 print(f"wrote {out}  ({len(A)} arms: "
       f"{sum(1 for v in A.values() if v[0]=='temporal')} temporal, "
       f"{sum(1 for v in A.values() if v[0]!='temporal')} unconstrained; "

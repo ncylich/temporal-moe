@@ -85,20 +85,20 @@ BUDGET_MARKER = {"1e16": "o", "1e17": "s", "1e18": "D", "1e19": "^"}
 
 # (file, label, variant, colour, budget, legend, linestyle). variant kfull = w=k everywhere.
 SERIES = [
-    ("mechinterp_locus.csv",      "s0_TEMPORAL",          "kfull", TMP_FINE,   "1e16", "temporal 18/192", "-"),
-    ("mechinterp_locus_1e19.csv", "temporal_fine_1e19",   "kfull", TMP_FINE,   "1e19", "temporal 18/192", "-"),
-    ("mechinterp_locus.csv",      "s2_TEMPORAL",          "kfull", TMP_COARSE, "1e17", "temporal 6/64",   "-"),
-    ("mechinterp_locus_1e19.csv", "temporal_coarse_1e19", "kfull", TMP_COARSE, "1e19", "temporal 6/64",   "-"),
-    ("mechinterp_locus.csv",      "s0_FULL",              "kfull", MOE_FINE,   "1e16", "full MoE 18/192 (sigmoid router)", "-"),
-    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "full MoE 18/192 (widest window only)", "--"),
-    ("mechinterp_locus.csv",      "s2_FULL",              "kfull", MOE_COARSE, "1e17", "full MoE 6/64",   "-"),
-    ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",      "kfull", MOE_COARSE, "1e19", "full MoE 6/64",   "-"),
+    ("mechinterp_locus.csv",      "s0_TEMPORAL",          "kfull", TMP_FINE,   "1e16", "Temporal MoE 18/192", "-"),
+    ("mechinterp_locus_1e19.csv", "temporal_fine_1e19",   "kfull", TMP_FINE,   "1e19", "Temporal MoE 18/192", "-"),
+    ("mechinterp_locus.csv",      "s2_TEMPORAL",          "kfull", TMP_COARSE, "1e17", "Temporal MoE 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "temporal_coarse_1e19", "kfull", TMP_COARSE, "1e19", "Temporal MoE 6/64",   "-"),
+    ("mechinterp_locus.csv",      "s0_FULL",              "kfull", MOE_FINE,   "1e16", "standard MoE 18/192 (sigmoid router)", "-"),
+    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "standard MoE 18/192 (widest window only)", "--"),
+    ("mechinterp_locus.csv",      "s2_FULL",              "kfull", MOE_COARSE, "1e17", "standard MoE 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",      "kfull", MOE_COARSE, "1e19", "standard MoE 6/64",   "-"),
     # 1e18, the budget at which the temporal model wins and where no capture-based measurement existed
     # before the Step 3 sweep. Matched temporal/unconstrained pairs at both granularities.
-    ("mechinterp_locus_1e19.csv", "flame38m_g3_temporal", "kfull", TMP_FINE,   "1e18", "temporal 18/192", "-"),
-    ("mechinterp_locus_1e19.csv", "flame38m_g1_temporal", "kfull", TMP_COARSE, "1e18", "temporal 6/64",   "-"),
-    ("mechinterp_locus_1e19.csv", "flame38m_g3_moe",      "kfull", MOE_FINE,   "1e18", "full MoE 18/192", "-"),
-    ("mechinterp_locus_1e19.csv", "flame38m_g1_moe",      "kfull", MOE_COARSE, "1e18", "full MoE 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g3_temporal", "kfull", TMP_FINE,   "1e18", "Temporal MoE 18/192", "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g1_temporal", "kfull", TMP_COARSE, "1e18", "Temporal MoE 6/64",   "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g3_moe",      "kfull", MOE_FINE,   "1e18", "standard MoE 18/192", "-"),
+    ("mechinterp_locus_1e19.csv", "flame38m_g1_moe",      "kfull", MOE_COARSE, "1e18", "standard MoE 6/64",   "-"),
 ]
 
 
@@ -287,9 +287,9 @@ fig.supylabel("median over experts:  context AUC $-$ token AUC",
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
     fig.subplots_adjust(left=0.17)
-hi.text(0.012, 0.90, "context-dominated (temporal)", transform=hi.transAxes,
+hi.text(0.012, 0.90, "context-dominated (Temporal MoE)", transform=hi.transAxes,
         fontsize=10, color="#145a14", weight="bold")
-lo.text(0.012, 0.88 if PAPER else 0.08, "token-dominated (unconstrained MoE)",
+lo.text(0.012, 0.88 if PAPER else 0.08, "token-dominated (standard MoE)",
         transform=lo.transAxes, fontsize=10, color="#0d3b66", weight="bold")
 
 hh, ll = hi.get_legend_handles_labels()
@@ -350,6 +350,7 @@ if missing and "--replace" not in sys.argv and os.path.exists(out):
           f"--both-splits.\n         Pass --replace if a narrower figure is intended.")
 
 fig.savefig(out, dpi=190, bbox_inches="tight")
+if out.endswith(".png"): fig.savefig(out[:-4] + ".pdf", bbox_inches="tight")
 print("wrote", out)
 for c in counts:
     print("  " + c)

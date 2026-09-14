@@ -84,7 +84,7 @@ def draw():
         ax.set_xlim(8.5, 0.2)   # fewer loads to the right, so upper right is best
         ax.set_ylim(40, 93)
         ax.axhline(free, color=REF, lw=1.1, ls=(0, (5, 4)), zorder=1)
-        ax.text(0.21, free + 1.4, f"free model {free:.1f}", ha="right",
+        ax.text(0.21, free + 1.4, f"standard MoE, free routing {free:.1f}", ha="right",
                 fontsize=7.5, color=REF)
         ax.axvline(1.0, color=OURS, lw=0.9, ls=(0, (4, 3)), alpha=0.5, zorder=1)
         pts = sorted((LOADS[r], acc(r)) for r in curve)
@@ -97,10 +97,10 @@ def draw():
         ax.plot(1.0, acc(remoe), "s", color=REMOE, ms=5.5,
                 label="ReMoE, best learning rate", zorder=4)
         ax.plot(1.0, acc(base), "D", mfc="none", mec=OURS, mew=1.7, ms=5.5,
-                label="released model, hard 1-swap cap", zorder=3)
+                label="standard MoE, hard 1-swap cap", zorder=3)
         a = acc(ours)
         ax.plot(1.0, a, "D", color=OURS, ms=5.5, zorder=6,
-                label="ours, adapted (hard 1-swap cap)")
+                label="Temporal MoE, adapted (hard 1-swap cap)")
         off = (-32, -11) if title.startswith("gemma") else (10, -12)
         ax.annotate(f"{a:.1f}", (1.0, a), textcoords="offset points",
                     xytext=off, fontsize=8, color=OURS)
@@ -123,7 +123,7 @@ def draw():
     ax.bar([x - d for x in xs], fr, width=w, color=SKLIAR, alpha=0.88,
            label="Skliar, $\\lambda{=}0.5$ (mean 0.94)")
     ours_fr = [100.0 if i == 1 else 0.0 for i in xs]
-    ax.bar([x + d for x in xs], ours_fr, width=w, color=OURS, label="ours (hard cap)")
+    ax.bar([x + d for x in xs], ours_fr, width=w, color=OURS, label="Temporal MoE (hard cap)")
     for i, f in zip(xs, fr):
         if f > 0.5:
             ax.annotate(f"{f:.0f}%", (i - d, f), textcoords="offset points",
@@ -146,6 +146,7 @@ def draw():
     fig.tight_layout()
     p = f"{FIG}/baseline_frontier.png"
     fig.savefig(p, dpi=300, bbox_inches="tight", pad_inches=0.02)
+    if p.endswith(".png"): fig.savefig(p[:-4] + ".pdf", bbox_inches="tight", pad_inches=0.02)
     print("wrote", p)
     for _, _, ours, base, remoe, curve, own50 in PANELS:
         for r in [ours, base, remoe] + curve + own50:

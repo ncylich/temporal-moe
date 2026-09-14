@@ -38,8 +38,8 @@ MOE, TMP = "#0d3b66", "#145a14"
 RANDOM_FLOOR = 6 / 64          # == 18/192; identical at both granularities
 
 # The one budget/granularity cell where both regimes have a preserved router log.
-PAIR = {"moe_coarse_1e19": ("unconstrained MoE", MOE),
-        "g1_tmoe_coarse_1e19": ("temporal", TMP)}
+PAIR = {"moe_coarse_1e19": ("standard MoE", MOE),
+        "g1_tmoe_coarse_1e19": ("Temporal MoE", TMP)}
 # Plain temporal recipes at other cells. The 1e16 router-recipe variants (ant/bursty/head/mom/momr)
 # are selection-shaping experiments, not the shipped recipe, and are excluded rather than dimmed --
 # fourteen of them would swamp the comparison this figure exists to show.
@@ -71,7 +71,7 @@ for run, (lab, col) in PAIR.items():
             label=(f"{lab}, 6 of 64 at $10^{{19}}$ (matched pair)" if PAPER
                    else f"{lab} — 1e19, 6 of 64 (matched pair)"))
 ax.plot([], [], color=TMP, alpha=0.32, lw=1.4, marker="o", ms=3.5,
-        label=("other temporal models, $10^{17}$ to $10^{19}$" if PAPER
+        label=("other Temporal MoE models, $10^{17}$ to $10^{19}$" if PAPER
                else "other temporal arms (1e17, 1e18, 1e19)"))
 
 ax.set_xlabel("MoE layer" if PAPER else "MoE layer  (layer 1 is a dense FFN in every config)")
@@ -99,4 +99,5 @@ else:
 
 os.makedirs(OUT, exist_ok=True)
 fig.savefig(out, dpi=190, bbox_inches="tight")
+if out.endswith(".png"): fig.savefig(out[:-4] + ".pdf", bbox_inches="tight")
 print(f"wrote {out}")

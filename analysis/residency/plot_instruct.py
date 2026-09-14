@@ -36,6 +36,7 @@ MODE_COL = {"off": "#4878b0", "on": "#d1605e"}
 
 def _save(fig, name):
     fig.savefig(f"{FIG}/{name}{'_nocaption' if PAPER else ''}.png", dpi=170)
+    if PAPER: fig.savefig(f"{FIG}/{name}_nocaption.pdf")
     print(f"wrote {name}{'_nocaption' if PAPER else ''}.png")
 
 

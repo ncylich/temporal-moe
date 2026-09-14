@@ -162,7 +162,8 @@ def bandwidth_timeline():
     fig.tight_layout(pad=0.15)
     p = f"{OUT}/bandwidth_timeline_odi.png"
     fig.savefig(p, dpi=300)
-    print("wrote", p)
+    fig.savefig(p[:-4] + ".pdf")
+    print("wrote", p, "+ pdf")
     plt.close(fig)
 
 
@@ -191,12 +192,12 @@ P18 = {
     "tmp_c": {6.88: 1.3198, 12.19: 1.3122, 48.50: 1.3762},
     "tmp_f": {6.88: 1.3379, 12.19: 1.3339, 48.50: 1.4047},
 }
-P19 = [("dense", 1.1260, DENSE_C), ("temporal\ncoarse", 1.0680, TMP_COARSE),
-       ("temporal\nfine", 1.0655, TMP_FINE), ("full MoE\ncoarse", 1.0514, MOE_COARSE),
-       ("full MoE\nfine", 1.0604, MOE_FINE)]
+P19 = [("dense", 1.1260, DENSE_C), ("Temporal MoE\ncoarse", 1.0680, TMP_COARSE),
+       ("Temporal MoE\nfine", 1.0655, TMP_FINE), ("standard MoE\ncoarse", 1.0514, MOE_COARSE),
+       ("standard MoE\nfine", 1.0604, MOE_FINE)]
 STYLE = [("dense", DENSE_C, 1.4), ("moe_c", MOE_COARSE, 1.8), ("moe_f", MOE_FINE, 1.8),
          ("tmp_c", TMP_COARSE, 1.8), ("tmp_f", TMP_FINE, 2.9)]
-LEG = ["dense", "MoE · coarse", "MoE · fine", "temporal · coarse", "temporal · fine (ours)"]
+LEG = ["dense", "standard MoE · coarse", "standard MoE · fine", "Temporal MoE · coarse", "Temporal MoE · fine (ours)"]
 # sub-point vertical dodge so coincident series render side by side rather than
 # stacked; a pure drawing offset (max 0.9pt), the plotted values are untouched
 DODGE_PT = {"dense": 0.0, "moe_c": -0.9, "moe_f": -0.3, "tmp_c": 0.3, "tmp_f": 0.9}
@@ -238,7 +239,7 @@ def isoflop_panels():
         vals = [p[1] for p in P19]
         cols = [p[2] for p in P19]
         bars = ax.bar(labels, vals, color=cols, width=0.66, edgecolor="k",
-                      linewidth=[1.6 if l == "temporal\nfine" else 0.6 for l in labels])
+                      linewidth=[1.6 if l == "Temporal MoE\nfine" else 0.6 for l in labels])
         for b, v in zip(bars, vals):
             ax.text(b.get_x() + b.get_width() / 2, v + 0.004, f"{v:.3f}",
                     ha="center", fontsize=9, fontweight="bold")
@@ -261,15 +262,16 @@ def isoflop_panels():
     bar_panel(axes[1][1], "$10^{19}$ FLOPs · 50k vocab", ylabel=False)
     handles = [Line2D([0], [0], color=c, lw=3.2 if k == "tmp_f" else 2.2)
                for k, c, _ in STYLE]
-    leg = fig.legend(handles, LEG, ncol=5, loc="upper center", fontsize=9.3,
+    leg = fig.legend(handles, LEG, ncol=5, loc="upper center", fontsize=8.3,
                      frameon=False, bbox_to_anchor=(0.5, 1.002),
-                     columnspacing=0.8, handlelength=1.3)
+                     columnspacing=0.7, handlelength=1.2)
     leg.get_texts()[-1].set_fontweight("bold")
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     fig.subplots_adjust(wspace=0.18, hspace=0.52)
     p = f"{OUT}/isoflop_panels_odi.png"
     fig.savefig(p, dpi=300, bbox_inches="tight", pad_inches=0.03)
-    print("wrote", p)
+    fig.savefig(p[:-4] + ".pdf", bbox_inches="tight", pad_inches=0.03)
+    print("wrote", p, "+ pdf")
     plt.close(fig)
     plt.rcParams.update(plt.rcParamsDefault)
     matplotlib.use("Agg")
@@ -298,8 +300,8 @@ def serving_context():
         axr.set_ylabel("peak VRAM (GB)", color=VRC, labelpad=3)
         axr.tick_params(axis="y", labelcolor=VRC)
         axr.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(4))
-        ax.plot(ctx, tps_A, "-o", color=CEIL, ms=5, lw=2.0, label="all-resident MoE")
-        ax.plot(ctx, tps_C, "-s", color=DEPL, ms=5, lw=2.0, label="temporal (ours)")
+        ax.plot(ctx, tps_A, "-o", color=CEIL, ms=5, lw=2.0, label="standard MoE (all-resident)")
+        ax.plot(ctx, tps_C, "-s", color=DEPL, ms=5, lw=2.0, label="Temporal MoE (ours)")
         ax.set_xscale("log", base=2)
         ax.set_xticks(ctx)
         ax.set_xticklabels(["1k", "2k", "4k", "8k", "16k"])
@@ -323,7 +325,8 @@ def serving_context():
     fig.tight_layout(rect=[0, 0, 1, 0.83], w_pad=1.6)
     p = f"{OUT}/serving_context_odi.png"
     fig.savefig(p, dpi=300, bbox_inches="tight", pad_inches=0.03)
-    print("wrote", p)
+    fig.savefig(p[:-4] + ".pdf", bbox_inches="tight", pad_inches=0.03)
+    print("wrote", p, "+ pdf")
     plt.close(fig)
     plt.rcParams.update(plt.rcParamsDefault)
     matplotlib.use("Agg")

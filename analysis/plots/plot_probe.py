@@ -87,16 +87,18 @@ def _draw_raster(panels, k, E, L, tag, outfile):
                  "expert stays selected across many consecutive tokens (temporal locality); this is descriptive, "
                  "not better/worse.", ha="center", fontsize=8, wrap=True)
     fig.tight_layout(rect=[0, 0, 1, 1] if PAPER else [0, 0.06, 1, 1])
-    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=200 if PAPER else 140); plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
+    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=200 if PAPER else 140)
+    if PAPER: fig.savefig(f"{OUT}/{outname(outfile)[:-4]}.pdf")
+    plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
 
 def raster(temporal_run, moe_run, tag, outfile, W=220):
     t = load(temporal_run); L = sorted(t["layers"])[-1]; k = t["layers"][L]["k"]
     E = t["layers"][L]["logits"].shape[-1]; b = 0
     panels = []
     if moe_run:
-        m = load(moe_run); panels.append(("full MoE  (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
-    panels.append(("temporal (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
-    panels.append(("temporal (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
+        m = load(moe_run); panels.append(("standard MoE (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
+    panels.append(("Temporal MoE (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
+    panels.append(("unconstrained temporally-trained MoE", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
     _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
     _draw_raster(panels, k, E, L, tag, outfile)
 
@@ -116,11 +118,15 @@ def raster_from_csv(active_params_M, outfile):
     if not by_panel:
         raise SystemExit(f"no rows with active_params_M={active_params_M} in {src}")
     W = 1 + max(tok for cells in by_panel.values() for tok, _ in cells)
+    # display names for the panel keys stored in the committed CSV
+    RENAME = {"full MoE  (top-k)": "standard MoE (top-k)",
+              "temporal (resident set used)": "Temporal MoE (resident set used)",
+              "temporal (unconstrained preference)": "unconstrained temporally-trained MoE"}
     panels = []
     for title, cells in by_panel.items():              # dict preserves CSV (panel) order
         M = np.zeros((W, E), bool)
         for tok, exp in cells: M[tok, exp] = True
-        panels.append((title, M, "C0" if title.startswith("full MoE") else "C2"))
+        panels.append((RENAME.get(title, title), M, "C0" if title.startswith("full MoE") else "C2"))
     _draw_raster(panels, k, E, L, "", outfile)
 
 # ---------------- A3: learned-locality overlap vs scale ----------------

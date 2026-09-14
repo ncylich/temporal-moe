@@ -67,4 +67,5 @@ if not PAPER:
 
 fig.tight_layout(rect=(0, 0.05, 1, 0.93) if not PAPER else (0, 0, 1, 1))
 fig.savefig(OUT, dpi=220)
+if PAPER: fig.savefig(OUT[:-4] + ".pdf")
 print(OUT)
