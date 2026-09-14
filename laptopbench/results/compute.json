@@ -1,0 +1,72 @@
+{
+ "windows": {
+  "binary": "C:\\tmoe\\tools\\llamacpp-b9959\\llama-bench.exe",
+  "binary_note": "official ggml-org release b9959 win-cpu-x64 (no native compiler on this machine)",
+  "binary_sha256": "9e9a998886ec233ef5f3a07a142fd1de26444de3413b6c4cfb4efd63b33199a8",
+  "env": "windows",
+  "provisional": "Defender exclusions attested in C:\\tmoe\\DEFENDER_EXCLUSIONS.txt, Get-MpPreference output pending; WSL2 rows pending Linux-native re-measurement",
+  "runs": {
+   "t4": {
+    "cmd": "C:\\tmoe\\tools\\llamacpp-b9959\\llama-bench.exe -m C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure.gguf -t 4 -p 0 -n 128 -r 8 -mmp 0 -o csv",
+    "decode_sd": 6.446402,
+    "decode_tps": 24.048261,
+    "n_depth": "0",
+    "n_gen": 128,
+    "n_threads": "4",
+    "n_ubatch": "512",
+    "rc": 0,
+    "stderr_tail": "load_backend: loaded RPC backend from C:\\tmoe\\tools\\llamacpp-b9959\\ggml-rpc.dll\nload_backend: loaded CPU backend from C:\\tmoe\\tools\\llamacpp-b9959\\ggml-cpu-icelake.dll\n",
+    "wall_s": 61.30916380882263
+   },
+   "t8": {
+    "cmd": "C:\\tmoe\\tools\\llamacpp-b9959\\llama-bench.exe -m C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure.gguf -t 8 -p 0 -n 128 -r 8 -mmp 0 -o csv",
+    "decode_sd": 4.708739,
+    "decode_tps": 36.163638,
+    "n_depth": "0",
+    "n_gen": 128,
+    "n_threads": "8",
+    "n_ubatch": "512",
+    "rc": 0,
+    "stderr_tail": "load_backend: loaded RPC backend from C:\\tmoe\\tools\\llamacpp-b9959\\ggml-rpc.dll\nload_backend: loaded CPU backend from C:\\tmoe\\tools\\llamacpp-b9959\\ggml-cpu-icelake.dll\n",
+    "wall_s": 35.09349846839905
+   }
+  },
+  "tag": "s1-provisional",
+  "ts": "2026-09-14T00:31:08"
+ },
+ "wsl": {
+  "binary": "/home/mohsen/tmoe/bin/llama-bench-temporal",
+  "binary_note": "fork tree built in wsl with GGML_NATIVE=ON, no LLAMA_TEMPORAL_* env (stock behaviour)",
+  "binary_sha256": "b5498ebdde0d5da29d71f6796c349c7ab4013e0157c270ae9d8fafbfbdd624c3",
+  "env": "wsl",
+  "provisional": "Defender exclusions attested in C:\\tmoe\\DEFENDER_EXCLUSIONS.txt, Get-MpPreference output pending; WSL2 rows pending Linux-native re-measurement",
+  "runs": {
+   "t4": {
+    "cmd": "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0010_t1_t4.sh\"",
+    "decode_sd": 3.973434,
+    "decode_tps": 29.604683,
+    "n_depth": "0",
+    "n_gen": 128,
+    "n_threads": "4",
+    "n_ubatch": "512",
+    "rc": 0,
+    "stderr_tail": "",
+    "wall_s": 74.9390435218811
+   },
+   "t8": {
+    "cmd": "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0011_t1_t8.sh\"",
+    "decode_sd": 7.649712,
+    "decode_tps": 26.792851,
+    "n_depth": "0",
+    "n_gen": 128,
+    "n_threads": "8",
+    "n_ubatch": "512",
+    "rc": 0,
+    "stderr_tail": "",
+    "wall_s": 83.3274757862091
+   }
+  },
+  "tag": "s1-provisional",
+  "ts": "2026-09-14T00:39:32"
+ }
+}

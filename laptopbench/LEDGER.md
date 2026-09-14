@@ -368,3 +368,102 @@ account (Windows credential manager), no `gh`, no fork. Both branches exist loca
 Mohsen grants push rights or supplies a credential. The orchestrator's "push now" cannot be honoured.
 
 **Retracted:** nothing.
+
+### L1-2 -- WSL2 oracle: G1 exact, G2 = 185548.9246 +/- 4953.87147, G3 fails on kernel-family numerics; T1 reference; two engine findings
+
+Environment decision: rule 3 (Windows native), taken by the orchestrator at 268fc1b6 on the L1-1b/L1-1c
+T0 numbers (WSL2 4k QD1 1.43-1.70x native). The driver's own `decide` on the s1 data says the same
+thing: T0 wsl/native 1.429 (143.8 vs 100.7 us), fail; T1 wsl/native 1.231 at -t 4 and 0.741 at -t 8,
+fail. WSL2's only remaining job is the oracle below.
+
+**Binary under test (WSL2, x86, gcc 13.3 `-march=native`, fork 61f6d1b4):**
+`~/tmoe/bin/llama-bench-temporal` sha256 `b5498ebdde0d5da29d71f6796c349c7ab4013e0157c270ae9d8fafbfbdd624c3`,
+`~/tmoe/bin/llama-perplexity` sha256 `7d9d65d8dd8e9cea58e31b592f560f910cfd8d0c9508ce015445e8d6dbde9e0c`.
+Side-file built here: `~/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin`, 11,674,939,392 bytes,
+98.2% allocated on disk (the rest are the 4 KiB alignment gaps the dump tool leaves), sha256
+`cc5b8c60a699eff74e2fa70b44f04b4731f79d7ca53a202f765c6ab4a9a887f9`. Model in WSL re-hashed =
+d8a3bdf4...2229. Full flag set for every gate run (the Pixel production set):
+`LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=<side-file> LLAMA_TEMPORAL_ODIRECT=1
+LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6
+LLAMA_TEMPORAL_SPIN_US=5000` plus `LLAMA_TEMPORAL_R=<R>` and, for the PPL runs,
+`LLAMA_TEMPORAL_TWOPASS=1`. Cap 12G (.wslconfig memory=12288MB swap=0; MemTotal 11.9 GB). All rows
+provisional (Defender attestation, L1-1c).
+
+**T1 reference (stock behaviour, no LLAMA_TEMPORAL_ variable), `-p 0 -n 128 -r 8 -mmp 0`, one batch each:**
+
+| | -t 4 tok/s (sd) | -t 8 tok/s (sd) | binary |
+|---|---|---|---|
+| Windows native | 24.05 (6.45) | 36.16 (4.71) | official b9959 win-cpu-x64, `ggml-cpu-icelake.dll`, sha256 9e9a9988... |
+| WSL2 | 29.60 (3.97) | 26.79 (7.65) | fork build above |
+
+The two binaries differ in compiler and kernel dispatch, so the cross-environment ratio is not a VM
+measurement; it is reference only. Standard deviations of 15-30% on single batches say the
+clock-probe and n=3 discipline of the arms stage is needed before any of these is quoted. The plan's
+1.6 band (50-60 tok/s ceiling) was optimistic for LPDDR4x-4267: about 1 GB of weights move per
+token here (0.5 GB non-expert + 45 x 18 x 648 KiB), and 24-36 tok/s is 24-36 GB/s of effective
+bandwidth against a ~34 GB/s dual-channel peak, i.e. the ceiling is memory-bound where it should be.
+
+**G1, bytes are real: PASS, exact.** Two identical runs of `R=18`, no policy, `-t 4 -p 0 -n 16 -r 1
+-mmp 0 -ot _exps=CPU`; the first warms the loader's buffered read, the second is measured:
+
+| pool `fetched_mib` | `/proc/<pid>/io read_bytes` | rel. error | diskstats (sdd) | rchar |
+|---|---|---|---|---|
+| 1466.9 MiB (6954 fetches) | 1466.86 MiB | **0.003%** | 1466.9 MiB | 1667.0 MiB = pool + 199 MiB loader |
+
+*Finding 1 (method).* The first attempt (00:42) did it honesty_gate.py's way: drop caches, one run,
+subtract the loader's non-expert bytes (file minus experts = 199.1 MiB). It read 2206 MiB at the
+block level for 1467 MiB of pool traffic, a 37% miss, while `rchar` matched pool + loader to 0.1%.
+The extra 540 MiB is kernel readahead on the loader's buffered reads spilling into the skipped expert
+regions (135 gaps, a few MiB each on the WSL2 virtual disk). Warming the buffered part first removes
+it; the unbuffered fetch path cannot be served from cache by construction. G1 is now stricter than
+before, not looser: the tolerance is unchanged and the comparison is direct.
+
+**G2, numerics exact: PASS.** `llama-perplexity -f androidbench/ppl_input.txt --chunks 2 -c 512 -t 4
+--no-mmap -ot _exps=CPU`, PROD + TWOPASS:
+
+| arm | Final estimate | pool line |
+|---|---|---|
+| R=192 (load-time repack, resident) | **PPL = 185548.9246 +/- 4953.87147** | fetches=0 evictions=0 swaps=0 |
+| R=18 (streamed from the side-file) | **PPL = 185548.9246 +/- 4953.87147** | fetches=13095 fetched_mib=2762.2 evictions=0 |
+
+Identical in every printed digit, and identical again to the 00:43 first attempt (both runs both
+times). **This is the oracle the Windows binary must reproduce.** (The Pixel's ARM value for the
+same input was 185405.9848; the x86 and ARM kernel families differ in the 4th significant digit,
+which is expected and irrelevant to the gate.) TWOPASS shows `swaps=0` here because the two-pass
+split only engages at n_tokens == 1 (decode); perplexity is prefill, so the run exercises the
+single-pass residency path, which is the one G1 measures too.
+
+**G3, repack real: FAIL as written.** Restated at R=192 (see finding 2), plain Q4_0 kernels
+(`LLAMA_NO_REPACK=1`, no side-file, nothing streams) against the repacked path:
+
+| arm | PPL | tok/s (-n 64 -r 3) |
+|---|---|---|
+| NO_REPACK, R=192 | 185544.4891 +/- 4953.07021 | 25.92 |
+| repacked, R=192 (side-file bytes at R=18 gave the same digits) | 185548.9246 +/- 4953.87147 | 28.95 (sd 1.30) |
+
+tok/s differ by 12% (> 3% and > 2 sd): the repacked kernel is in use. PPL differs at the 5th
+significant digit. Because G2 already shows side-file bytes == load-time-repacked bytes to every
+digit, the side-file is byte-correct (pitfall #9 is excluded); what differs is the AVX-512 repacked
+GEMM's accumulation order against the plain `vec_dot_q4_0_q8_0`. On the Pixel the two ARM kernels
+agreed, which is why the plan wrote "identical PPL"; on x86 they do not. **Not redefined here.** The
+driver keeps `all_pass=false` for this binary, so nothing is timed on it; the orchestrator is asked
+whether G3 on x86 should read "streamed-repacked == resident-repacked to every digit (G2) and
+tok/s differs between kernel families", which the data above satisfies, or something else.
+
+*Finding 2 (engine).* The first G3 attempt ran `LLAMA_NO_REPACK=1` with `TWOPASS=1` at R=18 through
+llama-perplexity and hung for the full 7200 s timeout: stderr stops after "temporal-pool: active",
+`read_bytes: 0`, rchar 206 MB (the non-expert weights). Mechanism, from the source: in two-pass mode
+`ggml_tm_ensure` only orders the compute and submits nothing (window_fill does the submitting in
+decode), and the plain `mul_mat_id` waits for experts that are never submitted; the repacked kernel's
+`ggml_tm_wait_src_expert` submits on demand, which is why the repacked R=18 run works. No arm uses
+NO_REPACK with TWOPASS at R < 192. Gate timeouts are now 1800 s.
+
+**Not timed:** nothing on this binary (all_pass=false). WSL2 is not used for arms in any case.
+
+**Artifacts:** `laptopbench/results/gates.json` (keyed by env), `compute.json`, `decision.json`,
+`build.json`, logs in `laptopbench/results/logs/s2-provisional/` and `~/tmoe/logs/s2-provisional/`.
+
+**Retracted:** the 00:43 "G1 FAIL 990%" and "G2 NOT FOUND" lines in `pipeline_gates_s2.log` were a
+driver defect (the Windows-side copy of the WSL logs was empty because pathlib collapsed the
+`\\wsl.localhost` prefix), not engine results; the WSL-side logs of that attempt carry the same
+pool numbers and the same PPL digits as the rerun.

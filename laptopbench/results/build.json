@@ -1,0 +1,22 @@
+{
+ "bench_sha256": "b5498ebdde0d5da29d71f6796c349c7ab4013e0157c270ae9d8fafbfbdd624c3",
+ "cmake": "cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF; cmake --build build --config Release -j 8 --target llama-bench llama-perplexity",
+ "compiler": [
+  "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+ ],
+ "env": "wsl",
+ "fork_commit": "61f6d1b4",
+ "ppl_sha256": "7d9d65d8dd8e9cea58e31b592f560f910cfd8d0c9508ce015445e8d6dbde9e0c",
+ "provisional": "Defender exclusions attested in C:\\tmoe\\DEFENDER_EXCLUSIONS.txt, Get-MpPreference output pending; WSL2 rows pending Linux-native re-measurement",
+ "sidefile": {
+  "blocks512": 22394888,
+  "dump_tail": "size=11674939392 blocks512=22394888\ncc5b8c60a699eff74e2fa70b44f04b4731f79d7ca53a202f765c6ab4a9a887f9\n",
+  "on_disk_fraction": 0.9821192445638693,
+  "path": "/home/mohsen/tmoe/models/qwen3moe-rand-fine-Q4pure-repacked.bin",
+  "sha256": "cc5b8c60a699eff74e2fa70b44f04b4731f79d7ca53a202f765c6ab4a9a887f9",
+  "size": 11674939392
+ },
+ "tag": "s2-provisional",
+ "ts": "2026-09-14T00:38:57",
+ "wrap_sha256": "446e598addbf390381993b381627cdc268350b87e20cd20418c6909cae9312f7"
+}
