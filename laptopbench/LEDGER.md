@@ -105,3 +105,52 @@ Phase 0 can run.
    for C:\tmoe and the distro VHDX. These are system/security settings; not changed here.
 
 **Retracted:** nothing (nothing was measured).
+
+### L1-0b -- after the restart: WSL2 starts, Ubuntu-24.04 installed and provisioned; inputs still missing
+
+Mohsen restarted Windows (uptime 00:01:36 at resume; CBS RebootPending cleared). `wsl --status`
+now returns only `Default Version: 2`, no virtualization error. Confirms L1-0: the blocker was
+the pending feature enablement, not firmware.
+
+**Commands (Windows PowerShell)**
+
+```
+wsl --install -d Ubuntu-24.04 --no-launch            # "Distribution successfully installed"
+wsl -d Ubuntu-24.04 -u root -e bash -lc "useradd -m -s /bin/bash -G sudo mohsen; \
+   echo 'mohsen ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/mohsen; \
+   printf '[user]\ndefault=mohsen\n[boot]\nsystemd=true\n' > /etc/wsl.conf"
+wsl -d Ubuntu-24.04 -u root -e bash -lc "apt-get update && apt-get install -y build-essential cmake fio sysbench python3-venv git"
+wsl --terminate Ubuntu-24.04
+wsl -d Ubuntu-24.04 -e bash -lc "mkdir -p ~/tmoe/models ~/tmoe/logs; git clone /mnt/c/tmoe/temporal-moe ~/tmoe/temporal-moe; \
+   cd ~/tmoe/temporal-moe; git remote set-url origin https://github.com/ncylich/temporal-moe.git; git fetch origin; \
+   git checkout -B main origin/main; python3 -m venv ~/tmoe/venv"
+```
+
+The WSL clone was taken from the local Windows clone (source only; the checkout itself is on
+the ext4 root, not /mnt/c) and re-pointed at GitHub. It sits on `main` at 68645b22, same as
+the Windows clone; it has no `laptop` branch yet because origin has none.
+
+**WSL-side facts**
+
+| item | value |
+|---|---|
+| Distro | Ubuntu 24.04.4 LTS, WSL2, default user mohsen (uid 1000, sudo NOPASSWD), systemd on |
+| Kernel | 6.18.33.2-microsoft-standard-WSL2 |
+| CPUs visible | 8 |
+| RAM visible | 7 GiB total (WSL default, no .wslconfig yet; the 12 GB / 4 GB / 2.5 GB caps come later from the driver) |
+| Root fs | /dev/sdd ext4, 1007G, 2.8G used, 953G free |
+| VHDX | C:\Users\mohsen\AppData\Local\wsl\{8193fb13-76e8-49c9-965b-4daa7b3aaff0}\ext4.vhdx, 3.01 GB |
+| Toolchain | gcc 13.3.0, cmake 3.28.3, fio 3.36, sysbench 1.0.20 |
+| Python | 3.12.3 system; venv at ~/tmoe/venv |
+
+**Still not done, and why**
+
+| item | reason |
+|---|---|
+| Fork clone, both sides | fork URL not supplied |
+| Model download, sha256, copy into ~/tmoe/models | model URL and sha256 not supplied |
+| `laptopbench/PLAN.md` | branch `laptop` still absent on origin (re-checked at resume) |
+| Windows fio under C:\tmoe\tools | third-party executable download; left for Mohsen to place, or to approve explicitly. Not needed until Phase 2, which is blocked anyway |
+| Power plan (Balanced -> Best performance), Modern Standby, Defender/Search exclusions for C:\tmoe and the VHDX path above | system/security settings, Mohsen's call |
+
+**Retracted:** nothing (still nothing measured).
