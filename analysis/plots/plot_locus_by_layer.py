@@ -89,8 +89,8 @@ SERIES = [
     ("mechinterp_locus_1e19.csv", "temporal_fine_1e19",   "kfull", TMP_FINE,   "1e19", "Temporal MoE 18/192", "-"),
     ("mechinterp_locus.csv",      "s2_TEMPORAL",          "kfull", TMP_COARSE, "1e17", "Temporal MoE 6/64",   "-"),
     ("mechinterp_locus_1e19.csv", "temporal_coarse_1e19", "kfull", TMP_COARSE, "1e19", "Temporal MoE 6/64",   "-"),
-    ("mechinterp_locus.csv",      "s0_FULL",              "kfull", MOE_FINE,   "1e16", "standard MoE 18/192 (sigmoid router)", "-"),
-    ("mechinterp_locus.csv",      "s0_SOFTMAX_BASELINE",  "base",  MOE_FINE,   "1e16", "standard MoE 18/192 (widest window only)", "--"),
+    # the 10^16 fine standard-MoE cell is not drawn: the softmax run was probed only at w=32 and the
+    # w=k capture is a sigmoid-gate variant (both sit at about -0.30; the structural table covers the cell)
     ("mechinterp_locus.csv",      "s2_FULL",              "kfull", MOE_COARSE, "1e17", "standard MoE 6/64",   "-"),
     ("mechinterp_locus_1e19.csv", "moe_coarse_1e19",      "kfull", MOE_COARSE, "1e19", "standard MoE 6/64",   "-"),
     # 1e18, the budget at which the temporal model wins and where no capture-based measurement existed
@@ -310,14 +310,12 @@ if PAPER:
            (Line2D([], [], color="0.25", marker="o", ls="none", ms=7), "$10^{16}$ FLOPs"),
            (Line2D([], [], color="0.25", marker="s", ls="none", ms=7), "$10^{17}$ FLOPs"),
            (Line2D([], [], color="0.25", marker="D", ls="none", ms=6.5), "$10^{18}$ FLOPs"),
-           (Line2D([], [], color="0.25", marker="^", ls="none", ms=7.5), "$10^{19}$ FLOPs"),
-           (blank, "control"),
-           (Line2D([], [], color=MOE_FINE, lw=1.8, ls="--"), "softmax router,\nwidest window only")]
+           (Line2D([], [], color="0.25", marker="^", ls="none", ms=7.5), "$10^{19}$ FLOPs")]
     leg = fig.legend([h for h, _ in key], [l for _, l in key], loc="center left",
                      bbox_to_anchor=(0.71, 0.5), fontsize=9.5, frameon=False,
                      handlelength=1.8, labelspacing=0.45, handletextpad=0.7)
     for t in leg.get_texts():
-        if t.get_text() in ("model", "compute budget", "control"):
+        if t.get_text() in ("model", "compute budget"):
             t.set_fontweight("bold")
 else:
     lo.legend(hh + h2, ll + l2, loc="upper center", bbox_to_anchor=(0.5, LEGEND_Y),
