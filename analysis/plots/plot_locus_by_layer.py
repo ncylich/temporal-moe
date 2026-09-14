@@ -288,10 +288,11 @@ fig.supylabel("median over experts:\ncontext AUC $-$ token AUC" if PAPER else
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
     fig.subplots_adjust(left=0.105, right=0.70)
-hi.text(0.012, 0.90, "context-dominated (Temporal MoE)", transform=hi.transAxes,
-        fontsize=10, color=TMP_FINE, weight="bold")
-lo.text(0.012, 0.88 if PAPER else 0.08, "token-dominated (standard MoE)",
-        transform=lo.transAxes, fontsize=10, color=MOE_FINE, weight="bold")
+hi.text(0.012, 0.965, "context-dominated (Temporal MoE)", transform=hi.transAxes,
+        fontsize=10, color=TMP_FINE, weight="bold", va="top")
+lo.text(0.012, 0.955 if PAPER else 0.08, "token-dominated (standard MoE)",
+        transform=lo.transAxes, fontsize=10, color=MOE_FINE, weight="bold",
+        va="top" if PAPER else "baseline")
 
 hh, ll = hi.get_legend_handles_labels()
 h2, l2 = lo.get_legend_handles_labels()
