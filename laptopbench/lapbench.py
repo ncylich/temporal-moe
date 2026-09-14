@@ -711,7 +711,9 @@ def compute(env: str) -> None:
             b = wsl_path("bin/llama-bench-temporal")
             entry["binary"] = b
             entry["binary_note"] = f"fork tree built in {e} with GGML_NATIVE=ON, no LLAMA_TEMPORAL_* env (stock behaviour)"
-            hr = run_wsl(f"sha256sum {b} | cut -d' ' -f1", label="benchsha", login=False)
+            hr = run_wsl(f"test -f {b} && sha256sum {b} | cut -d' ' -f1 || echo MISSING", label="benchsha", login=False)
+            if not DRY and (not hr.out.strip() or "MISSING" in hr.out):
+                die(f"compute: {b} is missing; run `build --env {e}` first (it copies the fork's llama-bench there)")
             entry["binary_sha256"] = None if DRY else hr.out.strip().splitlines()[-1]
             for t in (4, 8):
                 r = run_wsl(f"cd {wsl_path('')} && env -u LLAMA_TEMPORAL_R {b} -m {wsl_path('models/' + MODEL)} "
@@ -1033,21 +1035,31 @@ def gates(env: str) -> None:
         return
     g["all_pass"] = all(v["pass"] for v in g["results"].values()) and len(g["results"]) == 3
     g["gated_hashes"] = [bench_hash] if g["all_pass"] else []
-    jdump(RESULTS / "gates.json", g)
-    say(f"gates.json written; all_pass={g['all_pass']}")
+    allg = load_gates()
+    allg[env] = g
+    jdump(RESULTS / "gates.json", allg)
+    say(f"gates.json[{env}] written; all_pass={g['all_pass']}")
     if not g["all_pass"]:
         sys.exit(1)
 
 
-def require_gated() -> str:
-    """Invariant 1: the bench binary's current hash must be stamped as gated."""
-    g = jload(RESULTS / "gates.json")
+def load_gates() -> dict:
+    """gates.json is keyed by environment; a legacy flat file is treated as the wsl entry."""
+    allg = jload(RESULTS / "gates.json", {})
+    if "results" in allg:
+        allg = {"wsl": allg}
+    return allg
+
+
+def require_gated(env: str = "wsl") -> str:
+    """Invariant 1: the bench binary's current hash must be stamped as gated for this environment."""
+    g = load_gates().get(env)
     if DRY:
         return "dry"
     hr = run_wsl(f"sha256sum {wsl_path('bin/llama-bench-temporal')} | cut -d' ' -f1", label="armsha", login=False)
     h = hr.out.strip().splitlines()[-1] if hr.out.strip() else ""
     if not g or not g.get("all_pass") or h not in g.get("gated_hashes", []):
-        die(f"binary {h[:12]} is not gated (gates.json all_pass={g.get('all_pass') if g else None}, "
+        die(f"binary {h[:12]} is not gated for {env} (gates.json all_pass={g.get('all_pass') if g else None}, "
             f"gated={[x[:12] for x in (g or {}).get('gated_hashes', [])]}); run gates first")
     return h
 
@@ -1176,8 +1188,8 @@ def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str]
     if env not in ("wsl", "linux"):
         die("arms: --env wsl or linux only")
     overrides = parse_overrides(sets)
-    bench_hash = require_gated()
-    check("wsl")
+    bench_hash = require_gated(env)
+    check(env)
     sess = session_state()
     order = [a for a in "abce" if a in which]              # interleaved a, b, c, e per round
     schedule: list[tuple] = []
@@ -1249,8 +1261,8 @@ def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str
     if any(v.strip() == "0" for v in vals):
         die(f"--knob {name}=0 refused (pitfall #17); use an empty value to remove the flag")
     overrides = parse_overrides(sets)
-    bench_hash = require_gated()
-    check("wsl")
+    bench_hash = require_gated(env)
+    check(env)
     sess = session_state()
     tier, label, R, tp, cap = ARMS[base_arm]
     for rnd in range(1, n + 1):
