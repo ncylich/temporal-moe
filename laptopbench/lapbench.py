@@ -101,8 +101,13 @@ _CMD_SEQ = 0
 _TAG = "untagged"
 PROVISIONAL = ""                                       # --provisional NOTE: stamped in every row/json
 NATIVE = False                                         # --env linux: run shell stages locally, no wsl -e
-CURRENT_CAP: str | None = None                         # linux: cap applied per run via systemd-run
+WINDOWS = False                                        # --env windows: the ported binary, job-object cap
+TARGET = "wsl"                                         # environment the engine runs in for this invocation
+CURRENT_CAP: str | None = None                         # linux/windows: cap applied per run
 IS_LINUX = sys.platform.startswith("linux")
+WIN_BIN = WIN_ROOT / "bin"                             # ported binaries copied here by `build --env windows`
+WIN_SIDE = WIN_ROOT / "models" / SIDEFILE
+BUILDTOOLS = Path(r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools")
 
 
 # ----------------------------------------------------------------------------- utilities
@@ -339,6 +344,12 @@ def set_cap(cap: str) -> dict:
         CURRENT_CAP = cap
         say(f"cap: {cap} will be applied per run as systemd-run MemoryMax={want}M MemorySwapMax=0")
         return {"cap": cap, "cap_mb": want, "memtotal_mb": None, "mechanism": "systemd-run --scope MemoryMax"}
+    if WINDOWS:
+        CURRENT_CAP = cap
+        say(f"cap: {cap} will be applied per run as a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY={want} MB")
+        import psutil
+        return {"cap": cap, "cap_mb": want, "memtotal_mb": psutil.virtual_memory().total // 1048576,
+                "mechanism": "job object JOB_OBJECT_LIMIT_PROCESS_MEMORY (commit limit)"}
     if current_cap_mb() != want or "swap=0" not in (WSLCONFIG.read_text() if WSLCONFIG.exists() else ""):
         say(f"cap: writing {WSLCONFIG} memory={want}MB swap=0 and restarting {DISTRO}")
         if not DRY:
@@ -465,14 +476,44 @@ def check(env: str, quick: bool = False) -> dict:
         fails.append(f"power mode overlay is not Best performance: {st.get('overlay_ac')}")
     if not (st["standby_ac_zero"] and st["hibernate_ac_zero"]):
         fails.append(f"AC standby/hibernate timeouts not 0: {st.get('standby_ac')} / {st.get('hibernate_ac')}")
-    if (st.get("cpu_load_pct") or 0) > 25:
-        fails.append(f"host busy: CPU load {st['cpu_load_pct']}% (M9)")
+    # M9: the host must be quiet. A single sample right after our own previous stage (side-file
+    # dump, model copy) reads the tail of that work, so wait up to 60 s for it to settle first.
+    load = st.get("cpu_load_pct") or 0
+    samples = [load]
+    for _ in range(12):
+        if load <= 25:
+            break
+        time.sleep(5)
+        if NATIVE:
+            r = run_wsl("cut -d' ' -f1 /proc/loadavg", label="load", login=False)
+            load = int(float(r.out.strip() or "0") * 100 / 8)
+        else:
+            r = run_ps("(Get-CimInstance Win32_Processor).LoadPercentage", label="load")
+            load = int((r.out.strip().splitlines() or ["0"])[-1] or 0)
+        samples.append(load)
+    st["cpu_load_samples"] = samples
+    st["cpu_load_pct"] = load
+    if load > 25:
+        fails.append(f"host busy: CPU load {samples}% over {5 * (len(samples) - 1)} s (M9)")
     if (st.get("c_free_gb") or 0) < 20:
         fails.append(f"C: free {st['c_free_gb']} GB < 20")
     ok, how = defender_exclusions_ok(st)
     st["defender_exclusions_check"] = how
     if not ok:
         fails.append(f"Defender exclusions do not cover C:\\tmoe and the VHDX dir: {how}")
+    if WINDOWS:
+        tc = find_compiler()
+        st["toolchain"] = tc
+        for exe in ("llama-bench-temporal.exe", "llama-perplexity.exe"):
+            st[exe] = (WIN_BIN / exe).exists()
+        st["sidefile_present"] = WIN_SIDE.exists()
+        rb = run_win(["git", "-C", str(WIN_ROOT / "llama.cpp"), "log", "-1", "--format=%h %s"], label="forkhead")
+        st["fork_head"] = rb.out.strip()
+        if not quick:
+            if not st["llama-bench-temporal.exe"] or not st["llama-perplexity.exe"]:
+                fails.append("ported binaries missing under C:\\tmoe\\bin; run build --env windows")
+            if not st["sidefile_present"]:
+                fails.append(f"side-file missing: {WIN_SIDE}")
     if not quick:
         if not NATIVE:
             mp = WIN_ROOT / "models" / MODEL
@@ -780,9 +821,85 @@ exit $rc
 '''
 
 
+def find_compiler() -> dict:
+    """Visual Studio Build Tools 2022 (C++ workload, CMake). Checked before every Windows build
+    attempt; nothing is installed by the driver."""
+    cl = sorted((BUILDTOOLS / "VC" / "Tools" / "MSVC").glob("*/bin/Hostx64/x64/cl.exe")) if BUILDTOOLS.exists() else []
+    clangcl = BUILDTOOLS / "VC" / "Tools" / "Llvm" / "x64" / "bin" / "clang-cl.exe"
+    cmake = BUILDTOOLS / "Common7" / "IDE" / "CommonExtensions" / "Microsoft" / "CMake" / "CMake" / "bin" / "cmake.exe"
+    return {"cl": str(cl[-1]) if cl else None, "clang_cl": str(clangcl) if clangcl.exists() else None,
+            "cmake": str(cmake) if cmake.exists() else (shutil.which("cmake") or None)}
+
+
+def build_windows() -> None:
+    """PLAN section 6 build: fork branch temporal-moe-win, Visual Studio 17 2022 generator (ClangCL
+    toolset when present, else MSVC), GGML_NATIVE=ON, targets llama-bench and llama-perplexity;
+    binaries and their DLLs copied to C:\\tmoe\\bin as llama-bench-temporal.exe / llama-perplexity.exe;
+    then the repacked side-file is dumped on this machine."""
+    tc = find_compiler()
+    say(f"compiler check: cl={tc['cl']} clang-cl={tc['clang_cl']} cmake={tc['cmake']}")
+    if not DRY and not (tc["cl"] or tc["clang_cl"]):
+        die("build: no cl.exe or clang-cl.exe under Build Tools 2022; Mohsen is installing it. Not installing a compiler here.")
+    if not DRY and not tc["cmake"]:
+        die("build: cmake.exe not found (Build Tools 'C++ CMake tools for Windows' component)")
+    cmake = tc["cmake"] or "cmake"
+    src = WIN_ROOT / "llama.cpp"
+    r = run_win(["git", "-C", str(src), "rev-parse", "--short=8", "HEAD"], label="forkrev")
+    rb = run_win(["git", "-C", str(src), "branch", "--show-current"], label="forkbranch")
+    rs = run_win(["git", "-C", str(src), "status", "--porcelain"], label="forkstatus")
+    if not DRY and rb.out.strip() != "temporal-moe-win":
+        die(f"build: C:\\tmoe\\llama.cpp is on '{rb.out.strip()}', expected temporal-moe-win")
+    gen = [str(cmake), "-S", str(src), "-B", str(src / "build-win"), "-G", "Visual Studio 17 2022", "-A", "x64"]
+    if tc["clang_cl"]:
+        gen += ["-T", "ClangCL"]
+    gen += ["-DCMAKE_BUILD_TYPE=Release", "-DGGML_NATIVE=ON", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
+            "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_SERVER=OFF"]
+    r1 = run_win(gen, timeout=1800, label="cmake_configure")
+    r2 = run_win([str(cmake), "--build", str(src / "build-win"), "--config", "Release", "--target", "llama-bench",
+                  "llama-perplexity", "-j", "8"], timeout=7200, label="cmake_build")
+    if DRY:
+        say(f"build (dry): would copy build-win\\bin\\Release\\llama-bench.exe -> {WIN_BIN}\\llama-bench-temporal.exe, "
+            f"llama-perplexity.exe and *.dll, then dump {WIN_SIDE}")
+        return
+    if r1.rc != 0 or r2.rc != 0:
+        die(f"build failed: configure rc={r1.rc} build rc={r2.rc}\n{r1.text[-800:]}\n{r2.text[-1500:]}")
+    out = src / "build-win" / "bin" / "Release"
+    WIN_BIN.mkdir(parents=True, exist_ok=True)
+    shutil.copy(out / "llama-bench.exe", WIN_BIN / "llama-bench-temporal.exe")
+    shutil.copy(out / "llama-perplexity.exe", WIN_BIN / "llama-perplexity.exe")
+    for dll in out.glob("*.dll"):
+        shutil.copy(dll, WIN_BIN / dll.name)
+    info = {"ts": now(), "tag": _TAG, "env": "windows", "provisional": PROVISIONAL,
+            "fork_commit": r.out.strip(), "fork_branch": rb.out.strip(), "fork_dirty": len(rs.out.strip().splitlines()),
+            "bench_sha256": sha256_file(WIN_BIN / "llama-bench-temporal.exe", cache=False),
+            "ppl_sha256": sha256_file(WIN_BIN / "llama-perplexity.exe", cache=False),
+            "toolchain": tc, "generator": "Visual Studio 17 2022" + (" -T ClangCL" if tc["clang_cl"] else " (MSVC)"),
+            "cmake": subprocess.list2cmdline(gen), "dlls": sorted(p.name for p in WIN_BIN.glob("*.dll"))}
+    if not WIN_SIDE.exists():
+        env = dict(os.environ); env["LLAMA_TEMPORAL_REPACK_DUMP"] = str(WIN_SIDE)
+        say(f"[windows dump] LLAMA_TEMPORAL_REPACK_DUMP={WIN_SIDE} {WIN_BIN / 'llama-bench-temporal.exe'} -m {WIN_ROOT / 'models' / MODEL}")
+        p = subprocess.run([str(WIN_BIN / "llama-bench-temporal.exe"), "-m", str(WIN_ROOT / "models" / MODEL)],
+                           env=env, capture_output=True, timeout=3600, cwd=str(WIN_ROOT))
+        (log_dir() / "sidefile_dump.log").write_bytes(p.stdout + p.stderr)
+        if p.returncode != 0 or not WIN_SIDE.exists():
+            info["sidefile_error"] = decode_out(p.stderr)[-800:]
+            allb = load_build(); allb["windows"] = info; jdump(RESULTS / "build.json", allb)
+            die(f"side-file dump failed rc={p.returncode}: {decode_out(p.stderr)[-800:]}")
+    st = WIN_SIDE.stat()
+    r3 = run_ps(f"(Get-Item '{WIN_SIDE}').Length; fsutil sparse queryflag '{WIN_SIDE}'", label="sidestat")
+    info["sidefile"] = {"path": str(WIN_SIDE), "size": st.st_size, "sha256": sha256_file(WIN_SIDE, cache=False),
+                        "sparse_query": r3.out.strip()[-120:]}
+    allb = load_build(); allb["windows"] = info
+    jdump(RESULTS / "build.json", allb)
+    say(f"build ok (windows): bench {info['bench_sha256'][:12]} ppl {info['ppl_sha256'][:12]} side-file {st.st_size / 2 ** 30:.2f} GiB")
+
+
 def build(env: str) -> None:
+    if env == "windows":
+        build_windows()
+        return
     if env not in ("wsl", "linux"):
-        die("build: --env wsl or linux only (no native Windows compiler; the Windows port is out of scope)")
+        die("build: --env wsl, linux or windows")
     llama = wsl_path("llama.cpp")
     bind = wsl_path("bin")
     r = run_wsl(f"""
@@ -828,13 +945,15 @@ sha256sum {side} | cut -d' ' -f1
 """, timeout=3600, label="sidefile")
     if r2.rc != 0:
         info["sidefile_error"] = r2.text[-800:]
-        jdump(RESULTS / "build.json", info)
+        allb = load_build(); allb[env] = info
+        jdump(RESULTS / "build.json", allb)
         die(f"side-file dump failed: {r2.text[-800:]}")
     m = re.search(r"size=(\d+) blocks512=(\d+)", r2.out)
     info["sidefile"] = {"path": side, "size": int(m.group(1)), "blocks512": int(m.group(2)),
                         "on_disk_fraction": int(m.group(2)) * 512 / int(m.group(1)),
                         "sha256": r2.out.strip().splitlines()[-1], "dump_tail": r2.out[-600:]}
-    jdump(RESULTS / "build.json", info)
+    allb = load_build(); allb[env] = info
+    jdump(RESULTS / "build.json", allb)
     say(f"build ok: bench {info['bench_sha256'][:12]} ppl {info['ppl_sha256'][:12]} side-file "
         f"{info['sidefile']['size'] / 2 ** 30:.2f} GiB ({info['sidefile']['on_disk_fraction']:.3f} on disk)")
 
@@ -865,9 +984,13 @@ def env_string(flags: dict) -> str:
     return " ".join(f"{k}={v}" for k, v in flags.items() if v is not None)
 
 
+def side_path() -> str:
+    return str(WIN_SIDE) if WINDOWS else wsl_path("models/" + SIDEFILE)
+
+
 def arm_flags(R: int, twopass: bool, overrides: dict | None = None, no_repack: bool = False) -> dict:
     f = dict(PROD_FLAGS)
-    f["LLAMA_TEMPORAL_REPACK_FILE"] = wsl_path("models/" + SIDEFILE)
+    f["LLAMA_TEMPORAL_REPACK_FILE"] = side_path()
     if no_repack:
         f.pop("LLAMA_TEMPORAL_REPACK"); f.pop("LLAMA_TEMPORAL_REPACK_FILE")
         f["LLAMA_NO_REPACK"] = "1"
@@ -897,9 +1020,156 @@ def parse_overrides(sets: list[str]) -> dict:
     return o
 
 
+# ----------------------------------------------------------------------------- Windows native engine runs
+class JobCap:
+    """PLAN 5.3, Windows: a job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY bounds the child's
+    commit charge, so `-mmp 0` (which commits every weight) fails to start above the cap exactly
+    as the cgroup limit does on Linux. The child is created suspended, assigned, then resumed."""
+    JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100
+    JobObjectExtendedLimitInformation = 9
+
+    def __init__(self, cap_mb: int):
+        import ctypes
+        from ctypes import wintypes as wt
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+        class IO_COUNTERS(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_ulonglong) for n in ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                                                          "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+        class BASIC(ctypes.Structure):
+            _fields_ = [("PerProcessUserTimeLimit", ctypes.c_longlong), ("PerJobUserTimeLimit", ctypes.c_longlong),
+                        ("LimitFlags", wt.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                        ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wt.DWORD),
+                        ("Affinity", ctypes.c_size_t), ("PriorityClass", wt.DWORD), ("SchedulingClass", wt.DWORD)]
+
+        class EXTENDED(ctypes.Structure):
+            _fields_ = [("BasicLimitInformation", BASIC), ("IoInfo", IO_COUNTERS), ("ProcessMemoryLimit", ctypes.c_size_t),
+                        ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                        ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        self.k32, self.EXTENDED, self.ctypes = k32, EXTENDED, ctypes
+        self.h = k32.CreateJobObjectW(None, None)
+        if not self.h:
+            raise OSError(ctypes.get_last_error(), "CreateJobObjectW")
+        info = EXTENDED()
+        info.BasicLimitInformation.LimitFlags = self.JOB_OBJECT_LIMIT_PROCESS_MEMORY
+        info.ProcessMemoryLimit = cap_mb * 1048576
+        if not k32.SetInformationJobObject(self.h, self.JobObjectExtendedLimitInformation, ctypes.byref(info), ctypes.sizeof(info)):
+            raise OSError(ctypes.get_last_error(), "SetInformationJobObject")
+        self.cap_bytes = cap_mb * 1048576
+
+    def assign(self, pid: int) -> None:
+        PROCESS_SET_QUOTA, PROCESS_TERMINATE = 0x0100, 0x0001
+        hp = self.k32.OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, pid)
+        if not hp:
+            raise OSError(self.ctypes.get_last_error(), "OpenProcess")
+        ok = self.k32.AssignProcessToJobObject(self.h, hp)
+        self.k32.CloseHandle(hp)
+        if not ok:
+            raise OSError(self.ctypes.get_last_error(), "AssignProcessToJobObject")
+
+    def query(self) -> dict:
+        info = self.EXTENDED()
+        ret = self.ctypes.c_ulong(0)
+        ok = self.k32.QueryInformationJobObject(self.h, self.JobObjectExtendedLimitInformation, self.ctypes.byref(info),
+                                                self.ctypes.sizeof(info), self.ctypes.byref(ret))
+        if not ok:
+            return {"limit_bytes": None, "peak_process_bytes": None}
+        return {"limit_bytes": int(info.ProcessMemoryLimit), "peak_process_bytes": int(info.PeakProcessMemoryUsed),
+                "limit_flags": int(info.BasicLimitInformation.LimitFlags)}
+
+    def close(self) -> None:
+        self.k32.CloseHandle(self.h)
+
+
+def engine_run_windows(label: str, flags: dict | None, args: str, timeout: int = 7200,
+                       binary: str = "bin/llama-bench-temporal") -> dict:
+    """One native engine invocation: psutil io_counters (GetProcessIoCounters) polled while the
+    process lives for read_bytes, memory_info().peak_wset for peak RSS, device-level read bytes
+    from psutil.disk_io_counters as the cross-check, optional job-object commit cap."""
+    exe = WIN_ROOT / (binary + ".exe")
+    model = WIN_ROOT / "models" / MODEL
+    is_bench = "llama-bench" in binary
+    argv = [str(exe), "-m", str(model)] + args.split() + (["-o", "csv"] if is_bench else [])
+    env = dict(os.environ)
+    for k in [k for k in env if k.startswith("LLAMA_TEMPORAL_") or k == "LLAMA_NO_REPACK"]:
+        env.pop(k)
+    env.update({k: v for k, v in (flags or {}).items() if v is not None})
+    global _CMD_SEQ
+    _CMD_SEQ += 1
+    cmdline = subprocess.list2cmdline(argv)
+    capw = f"[job cap {CAP_MB[CURRENT_CAP]} MB] " if CURRENT_CAP else ""
+    say(f"[windows {_CMD_SEQ:04d} {label}] {capw}{env_string(flags) + ' ' if flags else ''}{cmdline}")
+    d = {"label": label, "flags": flags or {}, "args": args, "cmd": cmdline, "script": "", "ts": now(), "binary": str(exe),
+         "cap": CURRENT_CAP}
+    if DRY:
+        d.update({"rc": 0, "wall_s": 0.0})
+        return d
+    import psutil
+    ld = log_dir()
+    out_f = open(ld / f"{label}.stdout", "wb")
+    err_f = open(ld / f"{label}.stderr", "wb")
+    vm0 = psutil.virtual_memory().available // 1048576
+    disk0 = psutil.disk_io_counters().read_bytes
+    job = JobCap(CAP_MB[CURRENT_CAP]) if CURRENT_CAP else None
+    t0 = time.time()
+    CREATE_SUSPENDED = 0x00000004
+    p = subprocess.Popen(argv, env=env, stdout=out_f, stderr=err_f, cwd=str(WIN_ROOT),
+                         creationflags=CREATE_SUSPENDED if job else 0)
+    ps = psutil.Process(p.pid)
+    if job:
+        job.assign(p.pid)
+        ps.resume()
+    last_io, last_mem = None, None
+    while True:
+        try:
+            last_io = ps.io_counters()
+            last_mem = ps.memory_info()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+        try:
+            p.wait(timeout=0.25)
+            break
+        except subprocess.TimeoutExpired:
+            if time.time() - t0 > timeout:
+                p.kill()
+                break
+    wall = time.time() - t0
+    out_f.close(); err_f.close()
+    stdout = (ld / f"{label}.stdout").read_text(encoding="utf-8", errors="replace")
+    stderr = (ld / f"{label}.stderr").read_text(encoding="utf-8", errors="replace")
+    d.update(parse_bench_csv(stdout))
+    d["rc"], d["wall_s"] = p.returncode, wall
+    d["pool"] = parse_pool(stderr)
+    d["vmhwm_mib"] = (last_mem.peak_wset / 1048576) if last_mem else None
+    d["peak_commit_mib"] = (last_mem.peak_pagefile / 1048576) if last_mem else None
+    d["vmswap_peak_mib"] = 0.0                              # commit is bounded by the job; no swap notion
+    d["read_bytes"] = int(last_io.read_bytes) if last_io else -1
+    d["read_count"] = int(last_io.read_count) if last_io else -1
+    d["disk_read_mib"] = (psutil.disk_io_counters().read_bytes - disk0) / 1048576
+    d["mem_avail_mib"] = [vm0, psutil.virtual_memory().available // 1048576]
+    d["stderr_tail"] = stderr[-1500:]
+    d["oom"] = bool(re.search(r"failed to allocate|bad_alloc|not enough memory|Cannot allocate|unable to allocate|error loading model",
+                              stderr, re.I))
+    if job:
+        q = job.query()
+        d["job"] = q
+        d["cgroup_memory_max"] = str(q.get("limit_bytes"))
+        d["cap_in_effect"] = q.get("limit_bytes") == job.cap_bytes
+        if not d["cap_in_effect"]:
+            say(f"WARNING: job object limit {q.get('limit_bytes')} is not the requested {job.cap_bytes}; the row will be refused")
+        job.close()
+    else:
+        d["cgroup_memory_max"] = None
+    return d
+
+
 def engine_run(label: str, flags: dict | None, args: str, timeout: int = 7200, drop_caches: bool = False,
                binary: str = "bin/llama-bench-temporal") -> dict:
     """One engine invocation inside WSL under wrap.sh; returns everything the row needs."""
+    if WINDOWS:
+        return engine_run_windows(label, flags, args, timeout, binary)
     binp = wsl_path(binary)
     model = wsl_path("models/" + MODEL)
     outp = wsl_path(f"logs/{_TAG}/{label}")
@@ -909,13 +1179,14 @@ def engine_run(label: str, flags: dict | None, args: str, timeout: int = 7200, d
     capw = ""
     if NATIVE and CURRENT_CAP:
         capw = f"systemd-run --user --scope --quiet -p MemoryMax={CAP_MB[CURRENT_CAP]}M -p MemorySwapMax=0 "
+    ocsv = " -o csv" if "llama-bench" in binary else ""   # llama-perplexity has no -o csv
     # block device backing the model's filesystem (sdd in WSL2, nvme0n1pN on the live USB)
     script = f"""
 mkdir -p {wsl_path('logs/' + _TAG)}
 cd {wsl_path('')}
 DEV=$(df --output=source {model} | tail -1 | sed 's#^/dev/##')
 {pre}S0=$(awk -v d="$DEV" '$3==d{{print $6}}' /proc/diskstats); grep -E '^(MemAvailable|MemFree|Cached):' /proc/meminfo
-{capw}{wsl_path('bin/wrap.sh')} {outp} {envs}{binp} -m {model} {args} -o csv
+{capw}{wsl_path('bin/wrap.sh')} {outp} {envs}{binp} -m {model} {args}{ocsv}
 RC=$?
 S1=$(awk -v d="$DEV" '$3==d{{print $6}}' /proc/diskstats)
 echo "disk_dev=$DEV disk_sectors_delta=$((S1-S0))"
@@ -961,23 +1232,31 @@ exit $RC
 
 
 # ----------------------------------------------------------------------------- gates
+def load_build() -> dict:
+    """build.json keyed by environment; a legacy flat file is the wsl entry."""
+    b = jload(RESULTS / "build.json", {})
+    if "bench_sha256" in b:
+        b = {b.get("env", "wsl"): b}
+    return b
+
+
 def gates(env: str) -> None:
-    if env not in ("wsl", "linux"):
-        die("gates: --env wsl or linux only")
-    b = jload(RESULTS / "build.json")
+    if env not in ("wsl", "linux", "windows"):
+        die("gates: --env wsl, linux or windows")
+    b = load_build().get(env)
     if not b and not DRY:
-        die("gates: no build.json; run build first")
+        die(f"gates: no build.json entry for {env}; run build --env {env} first")
     set_cap("12G")                                        # G2 runs R=192, which needs the full model
     bench_hash = None
     if not DRY:
-        hr = run_wsl(f"sha256sum {wsl_path('bin/llama-bench-temporal')} {wsl_path('bin/llama-perplexity')} | cut -d' ' -f1",
-                     label="gatesha", login=False)
-        bench_hash, ppl_hash = hr.out.split()[:2] if len(hr.out.split()) >= 2 else (None, None)
+        bench_hash = bench_binary_hash()
         if bench_hash != b["bench_sha256"]:
             die(f"gates: binary hash {bench_hash} differs from build.json {b['bench_sha256']}; rebuild first")
     g = {"ts": now(), "tag": _TAG, "env": env, "provisional": PROVISIONAL, "bench_sha256": bench_hash, "results": {}}
     model_bytes = 0
-    if not DRY:
+    if not DRY and WINDOWS:
+        model_bytes = (WIN_ROOT / "models" / MODEL).stat().st_size
+    elif not DRY:
         sr = run_wsl(f"stat -c %s {wsl_path('models/' + MODEL)}", label="modelsize", login=False)
         model_bytes = int(sr.out.split()[-1]) if sr.out.strip() else 0
     expert_total = SLICE_BYTES * N_EXPERT * N_LAYER * 3
@@ -997,19 +1276,30 @@ def gates(env: str) -> None:
         fetch_read = read_mib - load_mib
         rel = abs(fetch_read - fetched) / fetched if fetched else 9.9
         ok = fetched > 0 and rel < 0.10
+        device_ok = True
+        if WINDOWS:
+            # GetProcessIoCounters counts bytes REQUESTED (buffered or not), so the per-process
+            # figure proves the fetch path asked for the bytes; the physical-disk counter delta
+            # proves the device delivered them (unbuffered reads cannot come from the cache).
+            device_ok = (r1["disk_read_mib"] or 0) >= 0.90 * fetched
+            ok = ok and device_ok
         g["results"]["G1"] = {"pass": ok, "fetched_mib": fetched, "read_mib": read_mib, "load_mib_subtracted": load_mib,
                               "fetch_read_mib": fetch_read, "rel_err": rel, "disk_read_mib": r1["disk_read_mib"],
+                              "device_ok": device_ok, "read_count": r1.get("read_count"),
                               "pool": pool, "rc": r1["rc"], "decode_tps": r1.get("decode_tps"), "label": "g1_bytes"}
         say(f"G1 {'PASS' if ok else 'FAIL'}: pool fetched {fetched:.0f} MiB, proc read {read_mib:.0f} MiB "
-            f"(-{load_mib:.0f} load = {fetch_read:.0f}), rel err {rel * 100:.1f}%, diskstats {r1['disk_read_mib']:.0f} MiB")
+            f"(-{load_mib:.0f} load = {fetch_read:.0f}), rel err {rel * 100:.1f}%, device {r1['disk_read_mib']:.0f} MiB")
 
     # ---- G2: numerics exact, R=18 vs R=192, same binary, same flags ----------------------
     def ppl(label: str, flags: dict) -> tuple[str, dict]:
-        r = engine_run(label, flags, f"-f {wsl_path('temporal-moe/androidbench/ppl_input.txt')} --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
+        ppl_in = str(REPO / "androidbench" / "ppl_input.txt") if WINDOWS else wsl_path("temporal-moe/androidbench/ppl_input.txt")
+        r = engine_run(label, flags, f"-f {ppl_in} --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
                        timeout=7200, binary="bin/llama-perplexity")
         if DRY:
             return "", r
-        m = re.search(r"Final estimate: PPL = ([0-9.]+ \+/- [0-9.]+)", r["stderr_tail"] + wsl_read(f"logs/{_TAG}/{label}.stderr"))
+        full = (log_dir() / f"{label}.stderr")
+        text = r["stderr_tail"] + (full.read_text(encoding="utf-8", errors="replace") if full.exists() else "")
+        m = re.search(r"Final estimate: PPL = ([0-9.]+ \+/- [0-9.]+)", text)
         return (m.group(1) if m else "NOT FOUND"), r
     a, ra = ppl("g2_ppl_R192", arm_flags(192, True))
     bb, rb = ppl("g2_ppl_R18", arm_flags(18, True))
@@ -1017,6 +1307,16 @@ def gates(env: str) -> None:
         ok = a == bb and a != "NOT FOUND"
         g["results"]["G2"] = {"pass": ok, "ppl_R192": a, "ppl_R18": bb, "pool_R192": ra.get("pool"), "pool_R18": rb.get("pool"),
                               "rc": [ra["rc"], rb["rc"]]}
+        if WINDOWS:
+            # PLAN 5.2 (2026-09-14): the Windows binary must reproduce the WSL2 x86 oracle, every digit
+            oracle = (load_gates().get("wsl") or {}).get("results", {}).get("G2", {})
+            o = oracle.get("ppl_R192")
+            if not o or not oracle.get("pass"):
+                die("G2 on Windows needs a passing WSL oracle in gates.json (run gates --env wsl first)")
+            ok = ok and (a == o)
+            g["results"]["G2"].update({"oracle_wsl_ppl": o, "oracle_bench_sha256": (load_gates()["wsl"].get("bench_sha256")),
+                                       "pass": ok, "matches_oracle": a == o})
+            say(f"G2 oracle: WSL {o} | Windows {a} -> {'MATCH' if a == o else 'MISMATCH'}")
         say(f"G2 {'PASS' if ok else 'FAIL'}: R=192 PPL {a} | R=18 PPL {bb}")
 
     # ---- G3: repack real: LLAMA_NO_REPACK vs repacked, identical PPL, different tok/s -----
@@ -1051,13 +1351,21 @@ def load_gates() -> dict:
     return allg
 
 
+def bench_binary_hash() -> str:
+    """sha256 of the bench binary the engine runs in TARGET, recomputed at call time."""
+    if WINDOWS:
+        exe = WIN_BIN / "llama-bench-temporal.exe"
+        return sha256_file(exe, cache=False) if exe.exists() else ""
+    hr = run_wsl(f"sha256sum {wsl_path('bin/llama-bench-temporal')} | cut -d' ' -f1", label="armsha", login=False)
+    return hr.out.strip().splitlines()[-1] if hr.out.strip() else ""
+
+
 def require_gated(env: str = "wsl") -> str:
     """Invariant 1: the bench binary's current hash must be stamped as gated for this environment."""
     g = load_gates().get(env)
     if DRY:
         return "dry"
-    hr = run_wsl(f"sha256sum {wsl_path('bin/llama-bench-temporal')} | cut -d' ' -f1", label="armsha", login=False)
-    h = hr.out.strip().splitlines()[-1] if hr.out.strip() else ""
+    h = bench_binary_hash()
     if not g or not g.get("all_pass") or h not in g.get("gated_hashes", []):
         die(f"binary {h[:12]} is not gated for {env} (gates.json all_pass={g.get('all_pass') if g else None}, "
             f"gated={[x[:12] for x in (g or {}).get('gated_hashes', [])]}); run gates first")
@@ -1114,7 +1422,7 @@ def clock_probe(session: dict) -> dict:
 
 def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, rnd: int, session: dict,
               overrides: dict, rest: int, bench_hash: str, extra_note: str = "", cap_override: str | None = None) -> dict | None:
-    st = check("wsl", quick=True)
+    st = check(TARGET, quick=True)
     probes = []
     p = clock_probe(session)
     probes.append(p)
@@ -1134,7 +1442,7 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
         return None
     tokens = 128 * 8
     ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"))
-    row = {"tag": _TAG, "env": "linux" if NATIVE else "wsl", "provisional": PROVISIONAL, "arm": arm, "tier": tier,
+    row = {"tag": _TAG, "env": TARGET, "provisional": PROVISIONAL, "arm": arm, "tier": tier,
            "label": label, "R": R, "twopass": twopass,
            "round": rnd, "cap": cap, "cap_mb": capinfo["cap_mb"], "memtotal_mb": capinfo["memtotal_mb"],
            "cgroup_memory_max": m.get("cgroup_memory_max"),
@@ -1150,7 +1458,7 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
            "status": "ok"}
     if (row["decode_tok_s"] or 0) <= 0 or m["rc"] != 0:
         row["status"] = f"error_rc{m['rc']}" + ("_oom" if m.get("oom") else "")
-    elif NATIVE and not m.get("cap_in_effect", True):
+    elif (NATIVE or WINDOWS) and not m.get("cap_in_effect", True):
         ok, why = False, f"cgroup memory.max={m.get('cgroup_memory_max')} is not the requested cap {cap}"
     elif (row["vmswap_peak_mib"] or 0) > 0:
         row["status"] = "swapped"                            # pitfall #20
@@ -1228,10 +1536,14 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
     capinfo = set_cap("4G")
     m = engine_run("memdemo_ceiling_4G", arm_flags(192, False, overrides), ENGINE_ARGS, timeout=3600)
     if not DRY:
-        dm = run_wsl("(sudo -n dmesg 2>/dev/null || dmesg 2>/dev/null || journalctl -k --no-pager 2>/dev/null) | grep -i -E 'out of memory|oom-kill|killed process' | tail -3",
-                     label="dmesg", login=False)
+        if WINDOWS:
+            dmesg = f"job object: {m.get('job')}"      # the commit limit refuses the allocation; no kernel log
+        else:
+            dm = run_wsl("(sudo -n dmesg 2>/dev/null || dmesg 2>/dev/null || journalctl -k --no-pager 2>/dev/null) | grep -i -E 'out of memory|oom-kill|killed process' | tail -3",
+                         label="dmesg", login=False)
+            dmesg = dm.out.strip()[-500:]
         d["ceiling_4G"] = {"rc": m["rc"], "decode_tok_s": m.get("decode_tps"), "vmhwm_mib": m.get("vmhwm_mib"),
-                           "oom": m.get("oom"), "dmesg": dm.out.strip()[-500:], "stderr_tail": m["stderr_tail"][-600:],
+                           "oom": m.get("oom"), "dmesg": dmesg, "stderr_tail": m["stderr_tail"][-600:],
                            "cap": capinfo, "failed_to_start": (m["rc"] != 0 or not m.get("decode_tps"))}
         say(f"ceiling @4G: rc={m['rc']} decode={m.get('decode_tps')} -> "
             f"{'FAILED TO START (expected)' if d['ceiling_4G']['failed_to_start'] else 'RAN (unexpected: cap not binding)'}")
@@ -1347,7 +1659,7 @@ def to_csv_row(r: dict) -> list:
             f"swaps={p.get('swaps')};clock_probe={r['clock_probe'].get('tok_s')};clock_ref={r['clock_probe'].get('ref_tok_s')};"
             f"vmhwm_mib=VmHWM;read_bytes={r['read_bytes']};binary={r['binary_sha256'][:12]};tag={r['tag']};"
             f"flags={env_string(r['flags'])};args={r['engine_args']}" + (f";{r['note']}" if r.get("note") else ""))
-    setup = "laptop-linux-cpu" if r.get("env") == "linux" else "laptop-wsl2-cpu"
+    setup = {"linux": "laptop-linux-cpu", "windows": "laptop-windows-cpu"}.get(r.get("env"), "laptop-wsl2-cpu")
     if r.get("provisional"):
         note = f"[provisional: {r['provisional']}] " + note
     return ["decode", MODEL, r["tier"], setup, "", "", "",
@@ -1400,7 +1712,7 @@ def pack() -> None:
 
 # ----------------------------------------------------------------------------- main
 def main() -> None:
-    global DRY, FORCE, _TAG, PROVISIONAL, NATIVE
+    global DRY, FORCE, _TAG, PROVISIONAL, NATIVE, WINDOWS, TARGET
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "session", "pack", "report", "decide"])
     ap.add_argument("--env", default="wsl", choices=["wsl", "linux", "windows", "all"])
@@ -1422,6 +1734,8 @@ def main() -> None:
     a = ap.parse_args()
     DRY, FORCE, PROVISIONAL = a.dry_run, a.force, a.provisional
     NATIVE = a.env == "linux"
+    WINDOWS = a.env == "windows"
+    TARGET = "wsl" if a.env == "all" else a.env
     if NATIVE and not IS_LINUX and not DRY:
         die("--env linux runs on the live USB itself (Linux Python); on Windows only --dry-run is allowed")
     if a.env == "all" and IS_LINUX:
