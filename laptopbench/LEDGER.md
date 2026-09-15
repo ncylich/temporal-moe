@@ -499,3 +499,98 @@ no installer process). The driver's `build --env windows` checks for them before
 refuses otherwise; `dryrun_windows.txt` holds the exact cmake lines it will run.
 
 **Retracted:** nothing.
+
+### L1-3 -- Windows build of the port, smoke tests, and the four deviations the overnight run carries
+
+Build Tools 2022 arrived 2026-09-15 ~13:20 (MSVC 14.44.35207, clang-cl, CMake). Mohsen added the
+Defender exclusions from an elevated shell; Defender's own log (event 5007) records both paths
+(`...Exclusions\Paths\C:\tmoe = 0x0`, `...Paths\C:\Users\mohsen\AppData\Local\wsl\{8193fb13-...} = 0x0`),
+which the driver now accepts as evidence; the `Get-MpPreference` paste is still pending, so rows stay
+provisional. Push to both GitHub repos is still refused (`mohsenfayyaz` has no write access).
+
+**Windows build** (`build --env windows`): `cmake -S C:\tmoe\llama.cpp -B build-win -G "Visual Studio 17 2022"
+-A x64 -T ClangCL -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF ...`, targets llama-bench and
+llama-perplexity, copied to `C:\tmoe\bin\llama-bench-temporal.exe` / `llama-perplexity.exe` with their DLLs.
+CPU backend variant `/arch:AVX512`. First compile stopped on one error: the four pool call sites inside
+`mul_mat_id` (lines 3376-3438) were still under `#if defined(__linux__)`; widened (3d8cc14a). The side-file
+dumped on NTFS by the ported dump tool has sha256 `cc5b8c60...887f9`, **identical to the WSL side-file**: the
+Windows repack and the 64-bit seek/truncate path produce the same bytes. Latest binaries: see build.json
+(`windows`), rebuilt after each port change below; the overnight gates hash the final one.
+
+**Smoke tests on the ported engine (deploy config, `-n 4`, host not quiet, informational only):**
+
+| run | rc | pool line | peak wset / peak commit |
+|---|---|---|---|
+| deploy, no cap, first port | 0 | fetches=2970 (2430 fill + 4x135) fetched 626.5 MiB evictions=540 swaps=180 | 823 / **5963 MiB** |
+| deploy, job cap 4G, first port | 1 "failed to load model" | none | commit refused at allocation |
+| deploy, no cap, reserve-mode port | 0 | same counters | 799 / **1000 MiB** |
+| deploy, cap 4G and 2.5G, reserve-mode | 0 | same counters, 12.4 / 11.8 tok/s (fill-dominated) | 798 / 1001 MiB, job limit read back |
+| deploy, cap 768M | abort: "FATAL VirtualAlloc(MEM_COMMIT, 110592 bytes) failed (1455)" | none | fails to start, as a cap should |
+| (e) literal, repacked, R=18 no policy | 0 | fetches=5862 **evictions=0 swaps=0** | residency grows, not a floor |
+| (e) repacked + SWAP_PROB=1.0 | 0 | identical to the literal run | SWAP_PROB ignored by the repacked kernel |
+| (e) NO_REPACK + SWAP_PROB=1.0 | 0 | fetches=14112 (2920/token) **evictions=9252** (2313/token) hook_calls=675 | the vanilla floor |
+| deploy + TRACE + FETCHPROF | 0 | fetchprof: 1.00 syscalls/fetch, wall 1153 us, sys 1146 us, **outside_sys 7 us**, 0 short reads; trace 5.9 MB, 62,789 events | instrumentation works on Windows |
+| `llama-perplexity` R=18, oracle input | 0 | fetches=13101 fetched 2763.5 MiB | **PPL = 185468.5410 +/- 4951.23870** |
+| same, repeated; and R=64 | 0 | 13101 both | 185468.5410 both: deterministic, residency-invariant |
+
+Zero-copy note: the reserved buffer comes from `VirtualAlloc` (64 KiB aligned), so the pool's
+"O_DIRECT zero-copy fetch ENABLED" path is taken on Windows; in WSL2 the heap buffer (`dst%4096=64`)
+forced the bounce+memcpy path. The plain-kernel floor is in the plain CPU buffer and bounces.
+
+**Port change 3, reserve-mode weight buffers (9cff55d1c).** Finding: ggml allocates the 5.3 GB expert
+buffer with `_aligned_malloc`, and Windows charges commit for every committed page, touched or not, so
+a `JOB_OBJECT_LIMIT_PROCESS_MEMORY` of 4 GB refused the *deploy* configuration at allocation, before the
+lazy loader could skip anything (5963 MiB peak commit against 823 MiB peak working set). PLAN 5.3's
+premise ("-mmp 0 commits everything, so the ceiling fails to start") was true of the ceiling and, on
+Windows, of every configuration. Fix, Windows only, no-ops elsewhere: while the loader allocates weight
+buffers with the pool configured (`LLAMA_TEMPORAL_R` set), CPU buffers of 1 GiB or more are
+`VirtualAlloc(MEM_RESERVE)`d; `set_tensor`, `memset_tensor`, `cpy_tensor`, `clear`, the repack
+`set_tensor`, the loader's direct `read_raw` and the pool's fetch commit the pages they write; eviction
+decommits (`VirtualFree MEM_DECOMMIT`, both MADV flavours); free releases. Commit charge = resident
+experts + non-expert weights + KV/compute, i.e. the memory claim, and the ceiling (which commits all
+5.3 GB through `set_tensor`) fails at 4 GB with a clear "commit refused". Consequences: a refetch pays
+commit + zero-fill (the MADV_DONTNEED cost model; MADV_FREE's overwrite-in-place does not exist here),
+and computing on an evicted expert faults instead of reading zeros.
+
+**Deviation 1: arm (e).** The plan's literal (e) (R=18, no TWOPASS, no ENFORCE, production flags)
+never evicts on this fork: eviction, trim and SWAP_PROB live in `ggml_tm_ensure`, which only the plain
+`mul_mat_id` calls; the repacked kernel has `ggml_tm_wait_src_expert` only (pitfalls #8 and #18, and
+G1 in L1-2 showed `evictions=0`). Its fetches decay toward zero as residency grows, so it would report
+a second ceiling. The overnight run records it once as `floor_R18_literal` with status `documentary`,
+and reports as the vanilla floor `floor_R18_swap1_norepack`: `LLAMA_NO_REPACK=1`, R=18,
+`LLAMA_TEMPORAL_SWAP_PROB=1.0`, no TWOPASS (the CUDA bench's prescribed turnover: every needed expert
+refetched each op, 45 x 18 x 3 = 2430 slices per token expected, 2920 measured with sibling prefetch).
+The kernel family differs from the other arms (plain vs repacked, 12% on tok/s at R=192); the floor is
+storage-bound by two orders of magnitude, so that confound is noted, not corrected.
+
+**Deviation 2: counters are per slice.** PLAN 1.2's "fetches ~45, fetched_mib ~28.5 per token" reads
+as per expert; the pool counts per slice: 135 fetches of 216 KiB per token (28.5 MiB), 135 evictions,
+45 swaps, plus a fill of 45 x R x 3. Verified exactly on the 4-token smoke run; the driver's
+invariant-2 bands are set to that.
+
+**Deviation 3: G2 against the oracle.** Windows R=18 gives 185468.5410, the WSL oracle 185548.9246;
+6 more slice fetches (13101 vs 13095) say the router chose differently at some point. Windows is
+deterministic (repeat identical) and residency-invariant (R=64 identical, same fetch count), which
+argues for compiler rounding (clang-cl vs gcc on the same AVX-512 kernels, the same phenomenon as G3's
+kernel-family difference) rather than a corrupted slice, but the decisive test is Windows R=192 vs
+Windows R=18 on the same binary (6.6 GB; overnight, first thing). The overnight gates run with
+`--gates-x86`: G2 passes on same-binary identity and records the oracle comparison; G3 passes on tok/s
+differing between kernel families and records the PPL comparison. Both forms, and the as-written
+verdicts, are stored in gates.json and stamped in every row's `provisional` note. If the orchestrator
+rules otherwise, the rows are void; nothing is hidden.
+
+**Deviation 4: ceiling-vs-cap semantics.** With reserve-mode, "the ceiling must fail to start at 4 GB"
+holds through the commit refusal; deploy at 4 GB and 2.5 GB runs (smoke: 1001 MiB commit). Peak RSS is
+reported as the peak working set; peak commit is recorded alongside.
+
+**Overnight plan** (`C:\tmoe\tools\overnight.ps1`, detached; waits for load <= 20% and >= 9 GB free for
+five consecutive minutes before starting; every stage retried on a check refusal and resumed):
+gates --gates-x86 -> arms n=3 (a b c e interleaved x3, closing a, e-literal once, d at R=24/36/48 x3,
+memory demonstration) -> attribute (a, b, c traced + fetch-profiled, decomposition (b)/(a) and (c)/(b))
+-> sweeps in PLAN 7 order, n=3, interleaved, rest 180 s: FETCH_THREADS {4,6,8,12}, SPLIT {1,2,3},
+SPIN_US {300,1000,2000,5000}, FUSED {off,on}, THREADS {4,8}, NOMADV {off,on} (diagnostic), SPINNERS {2,6},
+EVICT_DEFER {off,on}, JANITOR_NOLOCK {off,on} -> pack (CSV rows, comms/laptop/w1, local commit) -> report.
+Not in the sweep: URING (Linux-only), WORKER_AFFINITY (no effect on the Pixel; SetThreadAffinityMask
+is wired if wanted), MADV_FREE vs DONTNEED (one call on Windows).
+
+**Retracted:** nothing.
