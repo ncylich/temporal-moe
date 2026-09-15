@@ -442,6 +442,14 @@ def defender_exclusions_ok(state: dict) -> tuple[bool, str]:
     if ex and ex != "unreadable" and "administrator" not in ex and not ex.startswith("n/a"):
         ok = all(any(p.startswith(n) for p in ex.split(";")) for n in need)
         return ok, f"read:{ex}"
+    # Defender's own configuration-change log (event 5007) records each added exclusion path
+    # and is readable without elevation; accept it when it names both paths.
+    r = run_ps("Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=5007} "
+               "-MaxEvents 400 -ErrorAction SilentlyContinue | ForEach-Object { ($_.Message -split \"`n\" | "
+               "Where-Object { $_ -match 'Exclusions.Paths' }) } | ForEach-Object { $_.Trim() }", label="mp5007")
+    ev = r.out.lower()
+    if all(("new value: hklm\\software\\microsoft\\windows defender\\exclusions\\paths\\" + n + " = ") in ev for n in need):
+        return True, "event5007:" + "; ".join(l.strip() for l in r.out.splitlines() if "New value" in l)[:300]
     att = WIN_ROOT / "DEFENDER_EXCLUSIONS.txt"
     if att.exists():
         t = att.read_text().lower()
