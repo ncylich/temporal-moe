@@ -505,6 +505,13 @@ def check(env: str, quick: bool = False) -> dict:
         fails.append(f"host busy: CPU load {samples}% over {5 * (len(samples) - 1)} s (M9)")
     if (st.get("c_free_gb") or 0) < 20:
         fails.append(f"C: free {st['c_free_gb']} GB < 20")
+    if WINDOWS:
+        import psutil
+        avail_mb = psutil.virtual_memory().available // 1048576
+        st["mem_avail_mb"] = avail_mb
+        need_mb = 7500                                     # resident model + KV + headroom for a 12G-cap run
+        if avail_mb < need_mb:
+            fails.append(f"host memory: {avail_mb} MB available < {need_mb} MB needed for the resident arms (close other applications)")
     ok, how = defender_exclusions_ok(st)
     st["defender_exclusions_check"] = how
     if not ok:
