@@ -17,19 +17,20 @@ TMP_C, TMP_F = "#5cc85c", "#145a14"
 BITS = [8, 4, 3]
 
 P19 = [
-    ("MoE · coarse", MOE_C, [0.0000, 0.0076, 0.0452]),
-    ("temporal · coarse", TMP_C, [0.0000, 0.0066, 0.0383]),
-    ("temporal · fine", TMP_F, [0.0000, 0.0059, 0.0340]),
+    ("standard MoE · coarse", MOE_C, [0.0000, 0.0076, 0.0452]),
+    ("Temporal MoE · coarse", TMP_C, [0.0000, 0.0066, 0.0383]),
+    ("Temporal MoE · fine", TMP_F, [0.0000, 0.0059, 0.0340]),
+    ("standard MoE · fine", MOE_F, [0.0000, 0.0072, 0.0421]),   # moe_fine_g3_1e19, 2026-09-03 (stability_fakequant.csv)
 ]
 P18 = [
-    ("MoE · coarse", MOE_C, [0.0001, 0.0180, 0.1077]),
-    ("temporal · coarse", TMP_C, [0.0000, 0.0144, 0.0866]),
-    ("MoE · fine", MOE_F, [0.0000, 0.0126, 0.0722]),
-    ("temporal · fine", TMP_F, [0.0001, 0.0106, 0.0618]),
+    ("standard MoE · coarse", MOE_C, [0.0001, 0.0180, 0.1077]),
+    ("Temporal MoE · coarse", TMP_C, [0.0000, 0.0144, 0.0866]),
+    ("standard MoE · fine", MOE_F, [0.0000, 0.0126, 0.0722]),
+    ("Temporal MoE · fine", TMP_F, [0.0001, 0.0106, 0.0618]),
 ]
 
 plt.rcParams.update({"font.size": 9.5, "axes.titlesize": 11, "axes.labelsize": 10})
-fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
+fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.4))
 for ax, data, title in [(axes[0], P19, "$10^{19}$ FLOPs"), (axes[1], P18, "$10^{18}$ FLOPs · 38M")]:
     for label, color, ys in data:
         ax.plot(range(len(BITS)), ys, "-o", color=color, ms=5, lw=1.8)
@@ -43,4 +44,5 @@ fig.legend(handles, [l for l, _, _ in P18], ncol=4, loc="upper center", fontsize
 fig.tight_layout(rect=[0, 0, 1, 0.92])
 out = f"{OUTD}/fakequant_degradation_nocaption.png"
 fig.savefig(out, dpi=200)
+if out.endswith(".png"): fig.savefig(out[:-4] + ".pdf")
 print("wrote", out)

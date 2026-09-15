@@ -103,6 +103,18 @@ def _register(model):
                 st["done"] = True
                 o = (out[0] if isinstance(out, tuple) else out).detach().float().cpu()  # [T,H]
                 tpe = st.get("tpe"); interm = st.pop("_interm", None)                   # [T, fc1_out]
+                if interm is None and hasattr(m, "weight1"):
+                    # Legacy GroupedMLP (--moe-use-legacy-grouped-gemm, the fast sync-free path)
+                    # has no linear_fc1 child to hook, so recompute the pre-activation fc1
+                    # output per expert from the permuted input and the packed weights, in the
+                    # model dtype, exactly what TE's linear_fc1 hook returns on the other path.
+                    with torch.no_grad():
+                        x = args[0].detach()
+                        E_ = tpe.numel()
+                        w1 = m.weight1.view(E_, x.shape[-1], -1)
+                        b_ = torch.cumsum(torch.cat([torch.zeros(1, dtype=torch.int64), tpe]), 0)
+                        parts = [x[int(b_[e]):int(b_[e + 1])] @ w1[e] for e in range(E_)]
+                        interm = torch.cat(parts, 0).float().cpu()
                 E = tpe.numel()
                 bounds = torch.cumsum(torch.cat([torch.zeros(1, dtype=torch.int64), tpe]), 0)
                 rownorm = o.norm(dim=-1)                                                 # [T]

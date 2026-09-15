@@ -21,3 +21,28 @@ results/phase0/probe_batch_cache/
 # macOS / editor droppings
 .DS_Store
 .obsidian/
+
+# PLE program: per-measurement intermediates. These WERE ignored, on the reasoning that
+# consolidate.py folds them into the committed CSVs so only the CSVs need tracking. That reasoning
+# has one hole and it cost real work: consolidate.py REBUILDS the committed files from these, so a
+# checkout without them produces a valid, much smaller CSV and exits 0. Run in a fresh worktree it
+# cut ple_results.csv from 459 rows to 180 and layer_freeing_results.csv from 124 to 46, and only
+# `git status` showed it. There is now a guard that aborts on any dropped row -- but a guard that
+# fires means work stops, and the honest fix is for the inputs to be present.
+#
+# They total 18 KB. Tracking them makes the repository able to rebuild its own results.
+#
+# results/ablations/ple_accounting.csv          } all now TRACKED
+# results/ablations/ple_cal_stack.csv           }
+# results/ablations/ple_calib_meta*.json        }
+# results/ablations/ple_coverage.csv            }
+# results/ablations/ple_heldout.csv             }
+# results/ablations/joint_free.csv              }
+# results/ablations/layer_damage.csv            }
+# results/ablations/ple_locus.csv               }
+# results/ablations/ple_parity.csv              }
+# results/ablations/ple_row_norms.csv           }
+# results/ablations/ple_trainfree_and_buckets.csv }
+results/ablations/ple_ladder.csv
+analysis/ple/unsloth_compiled_cache/
+unsloth_compiled_cache/

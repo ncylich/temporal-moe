@@ -1,0 +1,65 @@
+{
+ "tag": "ce_free_0_1_15",
+ "rank": "off",
+ "lr": 0.0003,
+ "table_wd": 0.0,
+ "lora": 32,
+ "ple_start": 0,
+ "calib_init": false,
+ "free_layers": 0,
+ "free_set": "0,1,15",
+ "calib_suffix": "",
+ "adam8bit": false,
+ "mb": 16,
+ "seed": 1234,
+ "train_tokens": 50003968,
+ "steps": 763,
+ "ple_params": 0,
+ "final_bpb": 0.7978104132878707,
+ "final_swap": 0.9996910074434113,
+ "final_entropy": 0.9980096220970154,
+ "divisor": 3.1089070924799973,
+ "divisor_source": "bpb_slice_meta.json (ln2 * bytes_per_token)",
+ "curve": [
+  {
+   "tok": 10027008,
+   "bpb": 0.8172509275868988,
+   "swap_rate": 0.9996283430778623,
+   "usage_entropy": 0.9970188736915588,
+   "train_lm": 2.839665412902832,
+   "train_bpb": 0.9133966787787186
+  },
+  {
+   "tok": 20054016,
+   "bpb": 0.8058383388315122,
+   "swap_rate": 0.9996509433408471,
+   "usage_entropy": 0.9978944659233093,
+   "train_lm": 2.6131014823913574,
+   "train_bpb": 0.840520930558548
+  },
+  {
+   "tok": 30015488,
+   "bpb": 0.8023190513850557,
+   "swap_rate": 0.9996699481074481,
+   "usage_entropy": 0.9980480074882507,
+   "train_lm": 2.577058792114258,
+   "train_bpb": 0.8289275669729068
+  },
+  {
+   "tok": 40042496,
+   "bpb": 0.7991668947511796,
+   "swap_rate": 0.9996798540668733,
+   "usage_entropy": 0.9979419708251953,
+   "train_lm": 2.5651068687438965,
+   "train_bpb": 0.8250831538029952
+  },
+  {
+   "tok": 50003968,
+   "bpb": 0.7978104132878707,
+   "swap_rate": 0.9996910074434113,
+   "usage_entropy": 0.9980096220970154,
+   "train_lm": 2.5661795139312744,
+   "train_bpb": 0.8254281770396087
+  }
+ ]
+}

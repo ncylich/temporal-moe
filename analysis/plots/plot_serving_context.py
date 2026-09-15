@@ -31,15 +31,15 @@ def panel(ax, tps_A, tps_C, title):
     axr.set_ylim(0, 11); axr.set_ylabel("peak VRAM (GB)", color=VRC)
     axr.tick_params(axis="y", labelcolor=VRC)
     # throughput (left, solid)
-    ax.plot(ctx, tps_A, "-o", color=CEIL, ms=5, lw=2.0, label="all-resident MoE")
-    ax.plot(ctx, tps_C, "-s", color=DEPL, ms=5, lw=2.0, label="temporal (ours)")
+    ax.plot(ctx, tps_A, "-o", color=CEIL, ms=5, lw=2.0, label="standard MoE (all-resident)")
+    ax.plot(ctx, tps_C, "-s", color=DEPL, ms=5, lw=2.0, label="Temporal MoE (ours)")
     ax.set_xscale("log", base=2); ax.set_xticks(ctx); ax.set_xticklabels(["1k","2k","4k","8k","16k"])
     ax.set_xlabel("context length (tokens)")
     ax.set_ylabel("throughput (tok/s, higher better)")
     ax.set_ylim(0, max(tps_A)*1.12); ax.set_title(title); ax.grid(True, ls=":", alpha=0.35)
     return axr
 
-fig, (axp, axd) = plt.subplots(1, 2, figsize=(7.4, 3.1))
+fig, (axp, axd) = plt.subplots(1, 2, figsize=(7.4, 2.8))
 panel(axp, A_pp, C_pp, "Prefill")
 panel(axd, A_tg, C_tg, "Decode (100-token gen)")
 # legend: method = color, metric = linestyle (kept separate so the dotted 8 GB line reads as VRAM)
@@ -48,8 +48,8 @@ handles = [Line2D([0],[0], color=CEIL, marker="o", ls="", ms=8),
            Line2D([0],[0], color=DEPL, marker="s", ls="", ms=8),
            Line2D([0],[0], color="0.25", lw=2.0, ls="-"),
            Line2D([0],[0], color="0.45", lw=1.6, ls="--")]
-labels  = ["all-resident MoE", "temporal (ours)", "throughput (left axis)", "peak VRAM (right axis)"]
+labels  = ["standard MoE (all-resident)", "Temporal MoE (ours)", "throughput (left axis)", "peak VRAM (right axis)"]
 fig.legend(handles, labels, ncol=4, loc="upper center", frameon=False, bbox_to_anchor=(0.5, 1.03))
 fig.tight_layout(rect=[0,0,1,0.93])
 out = f"{OUT}/serving_context_sweep_nocaption.png"
-fig.savefig(out, dpi=200); print("wrote", out)
+fig.savefig(out, dpi=200); fig.savefig(out[:-4] + ".pdf"); print("wrote", out, "+ pdf")
