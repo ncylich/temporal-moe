@@ -1,6 +1,6 @@
 {
  "windows": {
-  "bench_sha256": "3c4ea77a66ad58986bc79afef4cb1a4a6eadc9e8a46630415984b77aad59f9d5",
+  "bench_sha256": "36e143792cb60dd0700a7a7cd9fdae082cdcfe0cd86ef6d2c75b50d9c24dd999",
   "cmake": "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe\" -S C:\\tmoe\\llama.cpp -B C:\\tmoe\\llama.cpp\\build-win -G \"Visual Studio 17 2022\" -A x64 -T ClangCL -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF",
   "dlls": [
    "ggml-base.dll",
@@ -13,10 +13,10 @@
   ],
   "env": "windows",
   "fork_branch": "temporal-moe-win",
-  "fork_commit": "9cff55d1",
+  "fork_commit": "f9c46b37",
   "fork_dirty": 0,
   "generator": "Visual Studio 17 2022 -T ClangCL",
-  "ppl_sha256": "76b47ac7f87bcc392c154d2ca00f8a56f15cab745c1abc5ee5fffc6646a1a30f",
+  "ppl_sha256": "3c614e174f89ca8f55ccaafd6cf6a8c0b5f34229529cc51ec6e96f2b17e9dc39",
   "provisional": "Defender exclusions recorded by Defender event 5007 on 2026-09-15; Get-MpPreference paste pending",
   "sidefile": {
    "path": "C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure-repacked.bin",
@@ -30,7 +30,7 @@
    "clang_cl": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin\\clang-cl.exe",
    "cmake": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"
   },
-  "ts": "2026-09-15T14:15:16"
+  "ts": "2026-09-15T14:25:16"
  },
  "wsl": {
   "bench_sha256": "b5498ebdde0d5da29d71f6796c349c7ab4013e0157c270ae9d8fafbfbdd624c3",
