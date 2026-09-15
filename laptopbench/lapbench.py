@@ -87,11 +87,18 @@ PROBE_ARGS = "-t 4 -p 0 -n 256 -r 4 -mmp 0"          # ~1024 resident tokens, ~2
 CLOCK_TOL = 0.03                                        # PLAN 5.4: >3% under first probe = degraded
 
 ARMS = {
-    # key: (tier, label, R, twopass, cap)
-    "a": ("ceiling", "ceiling", 192, False, "12G"),
-    "b": ("resident_control", "resident_control", 192, True, "12G"),
-    "c": ("deploy", "deploy_R18", 18, True, "4G"),
-    "e": ("floor", "floor_R18", 18, False, "4G"),
+    # key: (tier, label, R, twopass, cap, extra flags, no_repack)
+    "a": ("ceiling", "ceiling", 192, False, "12G", {}, False),
+    "b": ("resident_control", "resident_control", 192, True, "12G", {}, False),
+    "c": ("deploy", "deploy_R18", 18, True, "4G", {}, False),
+    # (e) vanilla floor. The plan's literal definition (R=18, no TWOPASS, no ENFORCE, repacked
+    # kernel) cannot evict on this fork: eviction, trim and SWAP_PROB live in ggml_tm_ensure,
+    # which only the plain mul_mat_id calls (pitfall #8/#18); the repacked kernel just accumulates
+    # residency. The measurable vanilla-offload row is the plain kernel with prescribed turnover
+    # (the CUDA bench's TEMPORAL_SWAP_PROB=1.0 analogue): every needed expert refetched each op.
+    "e": ("floor", "floor_R18_swap1_norepack", 18, False, "4G", {"LLAMA_TEMPORAL_SWAP_PROB": "1.0"}, True),
+    # documentary, one batch, never a floor: the plan-literal (e) as written, to show its counters
+    "e0": ("floor_literal", "floor_R18_literal", 18, False, "4G", {}, False),
 }
 CAP_MB = {"12G": 12288, "4G": 4096, "2.5G": 2560}
 
@@ -104,6 +111,7 @@ NATIVE = False                                         # --env linux: run shell 
 WINDOWS = False                                        # --env windows: the ported binary, job-object cap
 TARGET = "wsl"                                         # environment the engine runs in for this invocation
 CURRENT_CAP: str | None = None                         # linux/windows: cap applied per run
+GATES_X86 = False                                      # --gates-x86: x86 forms of G2/G3 (see main)
 IS_LINUX = sys.platform.startswith("linux")
 WIN_BIN = WIN_ROOT / "bin"                             # ported binaries copied here by `build --env windows`
 WIN_SIDE = WIN_ROOT / "models" / SIDEFILE
@@ -1165,8 +1173,8 @@ def engine_run_windows(label: str, flags: dict | None, args: str, timeout: int =
     d["disk_read_mib"] = (psutil.disk_io_counters().read_bytes - disk0) / 1048576
     d["mem_avail_mib"] = [vm0, psutil.virtual_memory().available // 1048576]
     d["stderr_tail"] = stderr[-1500:]
-    d["oom"] = bool(re.search(r"failed to allocate|bad_alloc|not enough memory|Cannot allocate|unable to allocate|error loading model",
-                              stderr, re.I))
+    d["oom"] = bool(re.search(r"failed to allocate|bad_alloc|not enough memory|Cannot allocate|unable to allocate|error loading model"
+                              r"|MEM_COMMIT|commit refused|failed to commit", stderr, re.I))
     if job:
         q = job.query()
         d["job"] = q
@@ -1337,10 +1345,14 @@ def gates(env: str) -> None:
             o = oracle.get("ppl_R192")
             if not o or not oracle.get("pass"):
                 die("G2 on Windows needs a passing WSL oracle in gates.json (run gates --env wsl first)")
-            ok = ok and (a == o)
+            self_ok = ok
+            if not GATES_X86:
+                ok = ok and (a == o)
             g["results"]["G2"].update({"oracle_wsl_ppl": o, "oracle_bench_sha256": (load_gates()["wsl"].get("bench_sha256")),
-                                       "pass": ok, "matches_oracle": a == o})
-            say(f"G2 oracle: WSL {o} | Windows {a} -> {'MATCH' if a == o else 'MISMATCH'}")
+                                       "pass": ok, "pass_same_binary": self_ok, "matches_oracle": a == o,
+                                       "x86_form": GATES_X86})
+            say(f"G2 oracle: WSL {o} | Windows {a} -> {'MATCH' if a == o else 'MISMATCH'}"
+                + ("  (x86 form: same-binary identity decides; oracle recorded)" if GATES_X86 else ""))
         say(f"G2 {'PASS' if ok else 'FAIL'}: R=192 PPL {a} | R=18 PPL {bb}")
 
     # ---- G3: repack real: LLAMA_NO_REPACK vs repacked, identical PPL, different tok/s -----
@@ -1357,15 +1369,18 @@ def gates(env: str) -> None:
         t1, t2 = s1.get("decode_tps") or 0, s2.get("decode_tps") or 0
         sd = max(s1.get("decode_sd") or 0, s2.get("decode_sd") or 0)
         differ = t1 > 0 and t2 > 0 and abs(t1 - t2) > max(0.03 * max(t1, t2), 2 * sd)
-        ok = (c == bb and c != "NOT FOUND") and differ
-        g["results"]["G3"] = {"pass": ok, "ppl_norepack_R192": c, "ppl_repack_R18": bb, "tps_repack_R192": t1,
-                              "tps_norepack_R192": t2, "sd": sd, "differ": differ,
+        ppl_same = (c == bb and c != "NOT FOUND")
+        ok = (ppl_same and differ) if not GATES_X86 else (differ and c != "NOT FOUND" and bb != "NOT FOUND")
+        g["results"]["G3"] = {"pass": ok, "pass_as_written": ppl_same and differ, "ppl_norepack_R192": c,
+                              "ppl_repack_R18": bb, "ppl_same": ppl_same, "tps_repack_R192": t1,
+                              "tps_norepack_R192": t2, "sd": sd, "differ": differ, "x86_form": GATES_X86,
                               "pool_repack": s1.get("pool"), "pool_norepack": s2.get("pool")}
         say(f"G3 {'PASS' if ok else 'FAIL'}: PPL norepack R=192 {c} vs repacked R=18 {bb}; "
             f"tok/s R=192 repack {t1:.2f} vs norepack {t2:.2f}")
     if DRY:
         return
     g["all_pass"] = all(v["pass"] for v in g["results"].values()) and len(g["results"]) == 3
+    g["x86_form"] = GATES_X86
     g["gated_hashes"] = [bench_hash] if g["all_pass"] else []
     allg = load_gates()
     allg[env] = g
@@ -1405,19 +1420,56 @@ def require_gated(env: str = "wsl") -> str:
 
 
 # ----------------------------------------------------------------------------- arms
-def expected_counters(arm: str, R: int, twopass: bool, tokens: int) -> dict:
-    """What the pool line must show for the arm requested (PLAN 1.2, pitfall #18)."""
+SLICE_MIB = SLICE_BYTES / 1048576                      # 0.2109: the pool counts fetches per SLICE (one tensor's expert)
+
+
+def expected_counters(arm: str, R: int, twopass: bool, tokens: int, swap_prob: bool = False) -> dict:
+    """What the pool line must show for the arm requested (PLAN 1.2, pitfall #18).
+
+    Measured on this fork (smoke, 4 tokens): the counter is per slice, so one swap per layer
+    per token is 45 x 3 = 135 fetches of 216 KiB (28.5 MiB), 135 evictions and 45 swaps per
+    token, plus the initial fill of 45 x R x 3 slices. The vanilla floor on the plain kernel
+    with SWAP_PROB=1.0 refetches every needed expert: 45 x 18 x 3 = 2430 slices per token."""
     if R >= N_EXPERT and not twopass:
         return {"fetches": (0, 0), "evictions": (0, 0), "swaps": (0, 0)}
     if R >= N_EXPERT and twopass:
-        return {"fetches": (0, 0), "evictions": (1, 10 ** 12), "swaps": (1, 10 ** 12)}
-    fill = N_LAYER * R
+        return {"fetches": (0, 0), "evictions": (int(0.9 * 3 * N_LAYER * tokens), 10 ** 12),
+                "swaps": (int(0.9 * N_LAYER * tokens), int(1.1 * N_LAYER * (tokens + 2)))}
+    fill = N_LAYER * R * 3
     if twopass:                                            # one swap per layer per token
-        return {"fetches": (int(0.90 * N_LAYER * tokens), int(1.10 * N_LAYER * (tokens + 2)) + fill),
-                "evictions": (1, 10 ** 12), "swaps": (1, 10 ** 12), "mib_per_fetch": (0.60, 0.67)}
-    # vanilla floor: free top-k with fetch on miss, ~16 of 18 experts missed per layer
-    return {"fetches": (N_LAYER * 8 * tokens, N_LAYER * K_ACTIVE * (tokens + 2) + fill),
-            "evictions": (0, 10 ** 12), "swaps": (0, 0), "mib_per_fetch": (0.60, 0.67)}
+        per = 3 * N_LAYER
+        return {"fetches": (int(0.90 * per * tokens), int(1.10 * per * (tokens + 2)) + fill),
+                "evictions": (int(0.90 * per * tokens), 10 ** 12),
+                "swaps": (int(0.90 * N_LAYER * tokens), int(1.10 * N_LAYER * (tokens + 2))),
+                "mib_per_fetch": (0.95 * SLICE_MIB, 1.05 * SLICE_MIB)}
+    if swap_prob:                                          # vanilla floor: every needed expert refetched
+        per = 3 * N_LAYER * K_ACTIVE
+        return {"fetches": (int(0.80 * per * tokens), int(1.10 * per * (tokens + 2)) + fill),
+                "evictions": (int(0.80 * per * tokens), 10 ** 12), "swaps": (0, 0),
+                "mib_per_fetch": (0.95 * SLICE_MIB, 1.05 * SLICE_MIB)}
+    # plan-literal (e): R=18, no policy, repacked kernel. On this fork the repacked kernel never
+    # evicts outside two-pass mode (pitfall #8/#18), so residency grows and fetches decay; the run
+    # is recorded as documentary, never as a floor. Only a sane per-fetch size is required.
+    return {"fetches": (1, 10 ** 12), "evictions": (0, 10 ** 12), "swaps": (0, 0),
+            "mib_per_fetch": (0.95 * SLICE_MIB, 1.05 * SLICE_MIB)}
+
+
+def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None, swap_prob: bool = False) -> tuple[bool, str]:
+    if pool is None:
+        return False, "no temporal-pool line in stderr"
+    exp = expected_counters(arm, R, twopass, tokens, swap_prob)
+    for k, (lo, hi) in exp.items():
+        if k == "mib_per_fetch":
+            v = pool["fetched_mib"] / pool["fetches"] if pool["fetches"] else 0
+        else:
+            v = pool.get(k, -1)
+        if not (lo <= v <= hi):
+            return False, f"{k}={v} outside [{lo}, {hi}] for arm {arm} R={R} twopass={twopass} swap_prob={swap_prob} tokens={tokens}"
+    return True, "ok"
+
+
+def _verify_counters_old(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None) -> tuple[bool, str]:
+    return verify_counters(arm, R, twopass, tokens, pool)
 
 
 def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None) -> tuple[bool, str]:
@@ -1452,8 +1504,15 @@ def clock_probe(session: dict) -> dict:
     return d
 
 
+def engine_args_for(overrides: dict, base: str = ENGINE_ARGS) -> str:
+    """ENGINE_ARGS with the sweep's thread knob applied (--knob THREADS=4,8 sets __threads)."""
+    t = (overrides or {}).get("__threads")
+    return base.replace("-t 4", f"-t {t}") if t else base
+
+
 def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, rnd: int, session: dict,
-              overrides: dict, rest: int, bench_hash: str, extra_note: str = "", cap_override: str | None = None) -> dict | None:
+              overrides: dict, rest: int, bench_hash: str, extra_note: str = "", cap_override: str | None = None,
+              extra_flags: dict | None = None, no_repack: bool = False) -> dict | None:
     st = check(TARGET, quick=True)
     probes = []
     p = clock_probe(session)
@@ -1466,19 +1525,23 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
         p = clock_probe(session); probes.append(p)
     cap = cap_override or cap
     capinfo = set_cap(cap)
-    flags = arm_flags(R, twopass, overrides)
+    merged = dict(extra_flags or {})
+    merged.update({k: v for k, v in (overrides or {}).items() if not k.startswith("__")})
+    flags = arm_flags(R, twopass, merged, no_repack=no_repack)
+    eargs = engine_args_for(overrides)
     tag = f"{label}_r{rnd}_{cap.replace('.', 'p')}"
-    engine_run(f"{tag}_warmup", flags, WARMUP_ARGS, timeout=3600)
-    m = engine_run(tag, flags, ENGINE_ARGS, timeout=7200)
+    engine_run(f"{tag}_warmup", flags, engine_args_for(overrides, WARMUP_ARGS), timeout=3600)
+    m = engine_run(tag, flags, eargs, timeout=7200)
     if DRY:
         return None
     tokens = 128 * 8
-    ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"))
+    ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"), swap_prob="LLAMA_TEMPORAL_SWAP_PROB" in flags)
     row = {"tag": _TAG, "env": TARGET, "provisional": PROVISIONAL, "arm": arm, "tier": tier,
            "label": label, "R": R, "twopass": twopass,
            "round": rnd, "cap": cap, "cap_mb": capinfo["cap_mb"], "memtotal_mb": capinfo["memtotal_mb"],
            "cgroup_memory_max": m.get("cgroup_memory_max"),
-           "flags": flags, "overrides": overrides, "engine_args": ENGINE_ARGS, "cmd": m["cmd"],
+           "flags": flags, "overrides": overrides, "engine_args": eargs, "cmd": m["cmd"],
+           "no_repack": no_repack, "gates_x86": GATES_X86,
            "binary_sha256": bench_hash, "gated": True,
            "clock_probe": probes[-1], "clock_probes_all": probes, "degraded": probes[-1]["degraded"],
            "decode_tok_s": m.get("decode_tps"), "decode_sd": m.get("decode_sd"), "tokens": tokens,
@@ -1496,6 +1559,8 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
         row["status"] = "swapped"                            # pitfall #20
     elif probes[-1]["degraded"]:
         row["status"] = "degraded_clock"
+    if arm == "e0" and row["status"] == "ok":
+        row["status"] = "documentary"                        # plan-literal (e): recorded, never a result
     if not ok:
         row["status"] = "refused_counters"
         append_jsonl(RESULTS / "refused.jsonl", row)
@@ -1519,7 +1584,7 @@ def save_session(s: dict) -> None:
 
 def already_done(label: str, rnd: int, cap: str) -> bool:
     for r in read_jsonl(RESULTS / "runs.jsonl"):
-        if r["tag"] == _TAG and r["label"] == label and r["round"] == rnd and r["cap"] == cap and r["status"] == "ok":
+        if r["tag"] == _TAG and r["label"] == label and r["round"] == rnd and r["cap"] == cap and r["status"] in ("ok", "documentary"):
             return True
     return False
 
@@ -1535,21 +1600,24 @@ def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str]
     schedule: list[tuple] = []
     for rnd in range(1, n + 1):
         for a in order:
-            tier, label, R, tp, cap = ARMS[a]
-            schedule.append((a, tier, label, R, tp, cap, rnd))
+            tier, label, R, tp, cap, extra, norep = ARMS[a]
+            schedule.append((a, tier, label, R, tp, cap, rnd, extra, norep))
     if "a" in which:
-        schedule.append(("a", *ARMS["a"], n + 1))            # closing ceiling shows drift (PLAN 1.3)
+        schedule.append(("a", *ARMS["a"][:5], n + 1, {}, False))   # closing ceiling shows drift (PLAN 1.3)
+    if "e" in which:
+        schedule.append(("e0", *ARMS["e0"][:5], 1, {}, False))     # plan-literal (e), documentary, once
     if "d" in which:
         for rnd in range(1, n + 1):
             for R in Rs:
-                schedule.append(("d", "deploy", f"deploy_R{R}", R, True, "4G", rnd))
+                schedule.append(("d", "deploy", f"deploy_R{R}", R, True, "4G", rnd, {}, False))
     say(f"arms schedule: {len(schedule)} batches, rest {rest} s: " +
         " ".join(f"{s[2]}:r{s[6]}" for s in schedule))
-    for i, (a, tier, label, R, tp, cap, rnd) in enumerate(schedule):
+    for i, (a, tier, label, R, tp, cap, rnd, extra, norep) in enumerate(schedule):
         if resume and already_done(label, rnd, cap):
             say(f"skip {label} r{rnd} (done)")
             continue
-        row = one_batch(a, tier, label, R, tp, cap, rnd, sess, overrides, rest, bench_hash)
+        row = one_batch(a, tier, label, R, tp, cap, rnd, sess, overrides, rest, bench_hash,
+                        extra_flags=extra, no_repack=norep)
         save_session(sess)
         if not DRY and i < len(schedule) - 1:
             say(f"rest {rest} s")
@@ -1581,7 +1649,7 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
             f"{'FAILED TO START (expected)' if d['ceiling_4G']['failed_to_start'] else 'RAN (unexpected: cap not binding)'}")
         time.sleep(min(rest, 120))
     # deploy at 2.5 GB, full protocol with clock probe (deploy at 4 GB already has n=3 rows)
-    tier, label, R, tp, cap = ARMS["c"]
+    tier, label, R, tp, cap = ARMS["c"][:5]
     row = one_batch("c", tier, label + "_cap2p5", R, tp, cap, 1, sess, overrides, rest, bench_hash,
                     extra_note="memory demonstration", cap_override="2.5G")
     if not DRY:
@@ -1595,7 +1663,7 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
 
 
 # ----------------------------------------------------------------------------- sweep
-def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str) -> None:
+def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str, resume_ok: bool = False) -> None:
     if env not in ("wsl", "linux", "windows"):
         die("sweep: --env wsl, linux or windows")
     if not knob or "=" not in knob:
@@ -1608,17 +1676,119 @@ def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str
     bench_hash = require_gated(env)
     check(env)
     sess = session_state()
-    tier, label, R, tp, cap = ARMS[base_arm]
+    tier, label, R, tp, cap, extra, norep = ARMS[base_arm]
+    key = "__threads" if name == "THREADS" else name         # THREADS is an engine argument, not an env flag
     for rnd in range(1, n + 1):
         for v in vals:                                       # A/B/A/B interleaved
-            o = dict(overrides); o[name] = None if v == "" else v
-            one_batch(base_arm, tier, f"{label}_{name.replace('LLAMA_TEMPORAL_', '')}={v or 'unset'}", R, tp, cap, rnd,
-                      sess, o, rest, bench_hash, extra_note=f"sweep {name}")
+            o = dict(overrides); o[key] = None if v == "" else v
+            lab = f"{label}_{name.replace('LLAMA_TEMPORAL_', '')}={v or 'unset'}"
+            if resume_ok and already_done(lab, rnd, cap):
+                say(f"skip {lab} r{rnd} (done)")
+                continue
+            one_batch(base_arm, tier, lab, R, tp, cap, rnd,
+                      sess, o, rest, bench_hash, extra_note=f"sweep {name}", extra_flags=extra, no_repack=norep)
             save_session(sess)
             if not DRY:
                 time.sleep(rest)
     if not DRY:
         report()
+
+
+# ----------------------------------------------------------------------------- attribution (PLAN 7)
+def trace_stats(path: Path) -> dict:
+    """Port of androidbench/make_timeline.py's stats(): a steady decode token's GEMV mean, median
+    per-layer wall, fetches inside the token, token wall; plus per-type totals over the whole
+    trace, with mean and median so a shootdown signature (mean up, median flat; S3-38) is visible."""
+    import statistics
+    ev = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    if not ev:
+        return {"error": "empty trace"}
+    types: dict[str, list] = {}
+    for e in ev:
+        types.setdefault(e["cat"], []).append(e["dur"])
+    per_type = {k: {"n": len(v), "total_ms": sum(v) / 1e3, "mean_us": statistics.mean(v), "median_us": statistics.median(v),
+                    "p95_us": sorted(v)[int(0.95 * (len(v) - 1))]} for k, v in types.items()}
+
+    def layer_of(e):
+        m = re.search(r"L(\d+)", e["name"]); return int(m.group(1)) if m else -1
+    g = sorted((e for e in ev if e["cat"] == "GEMV"), key=lambda e: e["ts"])
+    toks, cur, last = [], [], None
+    for e in g:
+        L = layer_of(e)
+        if last is not None and L < last - 5:
+            toks.append(cur); cur = []
+        cur.append(e); last = L
+    toks.append(cur)
+    toks = [t for t in toks if t]
+    out = {"per_type": per_type, "n_events": len(ev), "n_tokens_seen": len(toks)}
+    if toks:
+        from collections import Counter
+        n = Counter(len(t) for t in toks).most_common(1)[0][0]
+        full = [t for t in toks if len(t) == n]
+        tk = full[len(full) // 2] if full else max(toks, key=len)
+        lo, hi = min(e["ts"] for e in tk), max(e["ts"] + e["dur"] for e in tk)
+        byL: dict[int, list] = {}
+        for e in tk:
+            byL.setdefault(layer_of(e), []).append(e)
+        walls = [max(x["ts"] + x["dur"] for x in v) - min(x["ts"] for x in v) for v in byL.values()]
+        inside = [e for e in ev if lo <= e["ts"] <= hi]
+        out["steady_token"] = {
+            "gemv_mean_us": statistics.mean(e["dur"] for e in tk), "gemv_median_us": statistics.median(e["dur"] for e in tk),
+            "layer_wall_median_us": statistics.median(walls), "n_layers": len(walls), "token_wall_us": hi - lo,
+            "fetch_per_token": sum(1 for e in inside if e["cat"] == "FETCH"),
+            "wait_total_us": sum(e["dur"] for e in inside if e["cat"] == "WAIT"),
+            "evict_total_us": sum(e["dur"] for e in inside if e["cat"] == "EVICT"),
+            "fetch_mean_us": (statistics.mean([e["dur"] for e in inside if e["cat"] == "FETCH"]) if any(e["cat"] == "FETCH" for e in inside) else 0.0)}
+    return out
+
+
+def attribute(env: str, sets: list[str]) -> None:
+    """PLAN section 7 step 1: one traced + fetch-profiled run of (a), (b), (c) before any knob is
+    touched. (b) far below (a) is the policy (GEMV/WAIT/EVICT split); (c) far below (b) is storage
+    (FETCHPROF's inside/outside-syscall split). Writes attribute_<tag>.json."""
+    if env not in ("wsl", "linux", "windows"):
+        die("attribute: --env wsl, linux or windows")
+    overrides = parse_overrides(sets)
+    bench_hash = require_gated(env)
+    check(env)
+    out = {"tag": _TAG, "env": env, "ts": now(), "binary_sha256": bench_hash, "provisional": PROVISIONAL, "runs": {}}
+    for key in ("a", "b", "c"):
+        tier, label, R, tp, cap, extra, norep = ARMS[key]
+        set_cap(cap)
+        merged = dict(extra); merged.update({k: v for k, v in overrides.items() if not k.startswith("__")})
+        flags = arm_flags(R, tp, merged, no_repack=norep)
+        flags["LLAMA_TEMPORAL_TRACE"] = "1"
+        flags["LLAMA_TEMPORAL_FETCHPROF"] = "1"
+        tpath = log_dir() / f"trace_{label}.json"
+        flags["LLAMA_TEMPORAL_TRACE_FILE"] = str(tpath) if WINDOWS else wsl_path(f"logs/{_TAG}/trace_{label}.json")
+        m = engine_run(f"attr_{label}", flags, "-t 4 -p 0 -n 32 -r 2 -mmp 0 -ot _exps=CPU", timeout=3600)
+        if DRY:
+            continue
+        if not WINDOWS:
+            src = wsl_read(f"logs/{_TAG}/trace_{label}.json")
+            if src:
+                tpath.write_text(src, encoding="utf-8")
+        st = trace_stats(tpath) if tpath.exists() else {"error": "no trace file"}
+        out["runs"][key] = {"label": label, "R": R, "twopass": tp, "cap": cap, "flags": flags, "decode_tok_s": m.get("decode_tps"),
+                            "decode_sd": m.get("decode_sd"), "pool": m.get("pool"), "fetchprof": (m.get("pool") or {}).get("fetchprof"),
+                            "vmhwm_mib": m.get("vmhwm_mib"), "rc": m["rc"], "trace_file": str(tpath), "trace": st}
+        stt = st.get("steady_token", {})
+        say(f"attribute {label}: {m.get('decode_tps')} tok/s (traced); GEMV mean {stt.get('gemv_mean_us', 0):.1f} us "
+            f"median {stt.get('gemv_median_us', 0):.1f}; token wall {stt.get('token_wall_us', 0) / 1e3:.1f} ms; "
+            f"fetch/token {stt.get('fetch_per_token')}; WAIT {stt.get('wait_total_us', 0) / 1e3:.1f} ms; "
+            f"EVICT {stt.get('evict_total_us', 0) / 1e3:.1f} ms; {(m.get('pool') or {}).get('fetchprof')}")
+        if not DRY:
+            jdump(RESULTS / f"attribute_{_TAG}.json", out)
+            time.sleep(60)
+    if DRY:
+        return
+    ra, rb, rc = (out["runs"].get(k, {}) for k in ("a", "b", "c"))
+    ta, tb, tc = (r.get("decode_tok_s") or 0 for r in (ra, rb, rc))
+    if ta and tb and tc:
+        out["decomposition"] = {"policy_cost_b_over_a": tb / ta, "storage_cost_c_over_b": tc / tb, "c_over_a": tc / ta,
+                                "note": "(b)/(a) is the two-pass policy with zero bytes moved; (c)/(b) is streaming"}
+        say(f"decomposition: (b)/(a) = {tb / ta:.3f}  (c)/(b) = {tc / tb:.3f}  (c)/(a) = {tc / ta:.3f}")
+    jdump(RESULTS / f"attribute_{_TAG}.json", out)
 
 
 # ----------------------------------------------------------------------------- report / pack
@@ -1744,9 +1914,13 @@ def pack() -> None:
 
 # ----------------------------------------------------------------------------- main
 def main() -> None:
-    global DRY, FORCE, _TAG, PROVISIONAL, NATIVE, WINDOWS, TARGET
+    global DRY, FORCE, _TAG, PROVISIONAL, NATIVE, WINDOWS, TARGET, GATES_X86
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "session", "pack", "report", "decide"])
+    ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "attribute", "session", "pack", "report", "decide"])
+    ap.add_argument("--gates-x86", action="store_true",
+                    help="x86 forms of G2/G3: G2 passes on same-binary R=192 == R=18 (the oracle comparison is recorded, "
+                         "not required); G3 passes on tok/s differing between kernel families (their PPLs differ on x86). "
+                         "Recorded in gates.json and every row; pending the orchestrator's ruling")
     ap.add_argument("--env", default="wsl", choices=["wsl", "linux", "windows", "all"])
     ap.add_argument("--arms", default="a,b,c,d,e", help="subset, default all")
     ap.add_argument("--R", default="24,36,48", help="sweep points for (d)")
@@ -1765,6 +1939,7 @@ def main() -> None:
                     help="stamp every row and json with provisional=NOTE (e.g. Defender exclusions attested, not read)")
     a = ap.parse_args()
     DRY, FORCE, PROVISIONAL = a.dry_run, a.force, a.provisional
+    GATES_X86 = a.gates_x86
     NATIVE = a.env == "linux"
     WINDOWS = a.env == "windows"
     TARGET = "wsl" if a.env == "all" else a.env
@@ -1800,7 +1975,9 @@ def main() -> None:
     elif a.stage == "arms":
         arms(a.env, which, a.n, Rs, a.rest, a.set, a.resume, not a.no_demo)
     elif a.stage == "sweep":
-        sweep(a.env, a.knob, a.n, a.rest, a.set, a.base_arm)
+        sweep(a.env, a.knob, a.n, a.rest, a.set, a.base_arm, a.resume)
+    elif a.stage == "attribute":
+        attribute(a.env, a.set)
     elif a.stage == "session":
         check(a.env)
         if not (RESULTS / "probe.json").exists() or a.env not in jload(RESULTS / "probe.json", {}):
