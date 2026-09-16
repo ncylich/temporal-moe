@@ -1433,7 +1433,13 @@ def expected_counters(arm: str, R: int, twopass: bool, tokens: int, swap_prob: b
     if R >= N_EXPERT and not twopass:
         return {"fetches": (0, 0), "evictions": (0, 0), "swaps": (0, 0)}
     if R >= N_EXPERT and twopass:
-        return {"fetches": (0, 0), "evictions": (int(0.9 * 3 * N_LAYER * tokens), 10 ** 12),
+        # (b) resident control: every swap evicts one expert; once each expert has been evicted
+        # once, a random new expert has to be refetched, so over 1024 tokens the traffic converges
+        # to deploy's (measured 112 slices/token in round 1; the Samsung's fetches=372 was a
+        # ~48-token transient). The control is the policy with the same eviction/refetch machinery
+        # at full residency; fetches are recorded, not bounded, and must stay at or below deploy's.
+        per = 3 * N_LAYER
+        return {"fetches": (0, int(1.10 * per * (tokens + 2))), "evictions": (int(0.9 * per * tokens), 10 ** 12),
                 "swaps": (int(0.9 * N_LAYER * tokens), int(1.1 * N_LAYER * (tokens + 2)))}
     fill = N_LAYER * R * 3
     if twopass:                                            # one swap per layer per token
@@ -1475,9 +1481,12 @@ def clock_probe(session: dict) -> dict:
     if DRY:
         return {"tok_s": None}
     tps = r.get("decode_tps") or 0.0
-    if session.get("clock_ref_tok_s") is None and tps > 0:
+    # The reference is the BEST probe of the session, not the first: a first probe taken while
+    # the host is still settling (27.7 vs 35-40 later, w1 round 1) would make the gate toothless.
+    if tps > (session.get("clock_ref_tok_s") or 0):
         session["clock_ref_tok_s"] = tps
         session["clock_ref_ts"] = now()
+    session.setdefault("clock_probes", []).append({"ts": now(), "tok_s": tps})
     ref = session.get("clock_ref_tok_s") or tps
     d = {"tok_s": tps, "ref_tok_s": ref, "ratio": (tps / ref) if ref else 0, "degraded": tps < (1 - CLOCK_TOL) * ref,
          "label": r["label"], "wall_s": r["wall_s"]}
@@ -1528,6 +1537,7 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
            "clock_probe": probes[-1], "clock_probes_all": probes, "degraded": probes[-1]["degraded"],
            "decode_tok_s": m.get("decode_tps"), "decode_sd": m.get("decode_sd"), "tokens": tokens,
            "wall_s": m["wall_s"], "rc": m["rc"], "pool": m.get("pool"), "vmhwm_mib": m.get("vmhwm_mib"),
+           "peak_commit_mib": m.get("peak_commit_mib"), "job": m.get("job"), "read_count": m.get("read_count"),
            "vmswap_peak_mib": m.get("vmswap_peak_mib"), "read_bytes": m["read_bytes"], "disk_read_mib": m["disk_read_mib"],
            "mem_avail_mib": m["mem_avail_mib"], "host": {k: st.get(k) for k in ("overlay_ac", "scheme", "power_online",
                                                                              "battery_pct", "cpu_load_pct", "forced")},
