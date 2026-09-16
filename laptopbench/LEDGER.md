@@ -594,3 +594,49 @@ Not in the sweep: URING (Linux-only), WORKER_AFFINITY (no effect on the Pixel; S
 is wired if wanted), MADV_FREE vs DONTNEED (one call on Windows).
 
 **Retracted:** nothing.
+
+### L1-4 -- Windows gates: G1 0.35%, G2 same-binary identical, oracle difference attributed to the compiler; overnight run started
+
+Runner: Scheduled Task `tmoe-overnight` (restart on failure, allowed on battery, wake to run; the first
+detached attempt died when the laptop was unplugged and entered Modern Standby at 15:26). Battery-side
+standby/hibernate timeouts set to 0 like the AC side. Started 23:15:58 with load 14%, 8.4 GB free, AC on.
+Binary under test: `C:\tmoe\bin\llama-bench-temporal.exe` sha256 `36e143792cb6...` (fork
+`temporal-moe-win` f9c46b374, clang-cl, /arch:AVX512), `llama-perplexity.exe` `3c614e174f89...`, Windows
+side-file sha256 cc5b8c60... (= WSL's). Flags: the Pixel production set as in L1-2. Rows provisional
+(Defender paste pending; gates in x86 form).
+
+**G1, bytes are real on NTFS: PASS.** R=18, no policy, `-n 16 -r 1`, warm run first, then measured:
+pool `fetched_mib` **1504.2**, process `ReadTransferCount` 1698.0 MiB minus the loader's 199.1 MiB =
+**1498.9 MiB, rel. error 0.35%**; physical-disk read delta 1510.4 MiB (device_ok); 16,078 read calls.
+The per-process counter on Windows counts requested bytes (buffered and unbuffered alike), so the
+loader term is subtracted deterministically; the disk counter proves the device delivered them.
+
+**G2, numerics exact: PASS on the same binary; the oracle is not matched, and the reason is now known.**
+
+| arm (Windows binary) | Final estimate |
+|---|---|
+| R=192, nothing fetched | **185468.5410 +/- 4951.23870** |
+| R=18, streamed from the side-file | **185468.5410 +/- 4951.23870** |
+| WSL2 oracle (gcc build, L1-2), both arms | 185548.9246 +/- 4953.87147 |
+
+Identical to every digit between the resident and the streamed arm: the ported fetch path delivers
+exactly the bytes the resident model has (this also closes L1-3's open question: no slice is
+corrupted). The resident arm, which fetches nothing, already differs from the gcc oracle, so the
+difference is in the compute, i.e. clang-cl and gcc round the same AVX-512 kernels differently
+(fp contraction and vectorisation order). G3 below shows the same across the plain kernels. The
+"every printed digit against the WSL oracle" form of G2 therefore cannot be met by any Windows build of
+this tree, and the same-binary form is the correctness gate that means something here. Recorded as
+`pass_same_binary=true, matches_oracle=false, x86_form=true`; the orchestrator's ruling stands
+outstanding.
+
+**G3, repack real: PASS in x86 form, FAIL as written.** Plain kernels (`LLAMA_NO_REPACK=1`, R=192):
+PPL 185526.5380 +/- 4954.46146, 25.12 tok/s; repacked R=192: 34.46 tok/s (sd 1.94): **+37% from the
+repacked kernel on this CPU** (ARM gained 33%). PPL differs between kernel families, as on WSL2 (where
+the plain kernels gave 185544.4891, also different from Windows' plain kernels: the cross-compiler
+effect is independent of the repack).
+
+`gates.json[windows].all_pass = true` under `--gates-x86`; the driver timed nothing before this.
+Arms started 23:18:03 (schedule of 23 batches, 300 s rests, then the memory demonstration, attribution,
+sweeps, pack). Results follow in L1-5.
+
+**Retracted:** nothing.
