@@ -1468,24 +1468,6 @@ def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | N
     return True, "ok"
 
 
-def _verify_counters_old(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None) -> tuple[bool, str]:
-    return verify_counters(arm, R, twopass, tokens, pool)
-
-
-def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None) -> tuple[bool, str]:
-    if pool is None:
-        return False, "no temporal-pool line in stderr"
-    exp = expected_counters(arm, R, twopass, tokens)
-    for k, (lo, hi) in exp.items():
-        if k == "mib_per_fetch":
-            v = pool["fetched_mib"] / pool["fetches"] if pool["fetches"] else 0
-        else:
-            v = pool.get(k, -1)
-        if not (lo <= v <= hi):
-            return False, f"{k}={v} outside [{lo}, {hi}] for arm {arm} R={R} twopass={twopass} tokens={tokens}"
-    return True, "ok"
-
-
 def clock_probe(session: dict) -> dict:
     """PLAN 5.4: a resident stock llama-bench before each batch, compared with the session's first."""
     set_cap("12G")
