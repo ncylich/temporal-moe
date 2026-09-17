@@ -1,0 +1,274 @@
+{
+ "binary_sha256": "36e143792cb60dd0700a7a7cd9fdae082cdcfe0cd86ef6d2c75b50d9c24dd999",
+ "decomposition": {
+  "c_over_a": 0.38104432155992035,
+  "note": "(b)/(a) is the two-pass policy with zero bytes moved; (c)/(b) is streaming",
+  "policy_cost_b_over_a": 0.6470447851483474,
+  "storage_cost_c_over_b": 0.5888994553484557
+ },
+ "env": "windows",
+ "provisional": "Defender exclusions recorded by Defender event 5007 on 2026-09-15, Get-MpPreference paste pending; gates in x86 form (G2 same-binary identity, oracle recorded; G3 tok/s only) pending the orchestrator's ruling",
+ "runs": {
+  "a": {
+   "R": 192,
+   "cap": "12G",
+   "decode_sd": 1.499599,
+   "decode_tok_s": 39.660179,
+   "fetchprof": null,
+   "flags": {
+    "LLAMA_TEMPORAL_FETCHPROF": "1",
+    "LLAMA_TEMPORAL_FETCH_THREADS": "6",
+    "LLAMA_TEMPORAL_MADV_FREE": "1",
+    "LLAMA_TEMPORAL_ODIRECT": "1",
+    "LLAMA_TEMPORAL_R": "192",
+    "LLAMA_TEMPORAL_REPACK": "1",
+    "LLAMA_TEMPORAL_REPACK_FILE": "C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure-repacked.bin",
+    "LLAMA_TEMPORAL_SPIN_US": "5000",
+    "LLAMA_TEMPORAL_SPLIT": "2",
+    "LLAMA_TEMPORAL_TRACE": "1",
+    "LLAMA_TEMPORAL_TRACE_FILE": "C:\\tmoe\\temporal-moe\\laptopbench\\results\\logs\\w1\\trace_ceiling.json"
+   },
+   "label": "ceiling",
+   "pool": {
+    "R_active": 192,
+    "avg_fetch_us": 0.0,
+    "evictions": 0,
+    "fetched_mib": 0.0,
+    "fetches": 0,
+    "fetchprof": null,
+    "hook_calls": 0,
+    "hook_miss": 0,
+    "odirect": 1,
+    "qwait_hi_us": 0.0,
+    "sibling": 1,
+    "split": 2,
+    "swaps": 0,
+    "tensors": 135,
+    "wait_ms": 0.0,
+    "workers": 6
+   },
+   "rc": 0,
+   "trace": {
+    "n_events": 631800,
+    "n_tokens_seen": 65,
+    "per_type": {
+     "GEMV": {
+      "mean_us": 5.95378252611586,
+      "median_us": 5.4,
+      "n": 631800,
+      "p95_us": 7.8,
+      "total_ms": 3761.599800000518
+     }
+    },
+    "steady_token": {
+     "evict_total_us": 0,
+     "fetch_mean_us": 0.0,
+     "fetch_per_token": 0,
+     "gemv_mean_us": 5.328569958847736,
+     "gemv_median_us": 5.3,
+     "layer_wall_median_us": 304.5,
+     "n_layers": 45,
+     "token_wall_us": 18283.599999999627,
+     "wait_total_us": 0
+    }
+   },
+   "trace_file": "C:\\tmoe\\temporal-moe\\laptopbench\\results\\logs\\w1\\trace_ceiling.json",
+   "twopass": false,
+   "vmhwm_mib": 5719.6015625
+  },
+  "b": {
+   "R": 192,
+   "cap": "12G",
+   "decode_sd": 2.641032,
+   "decode_tok_s": 25.661912,
+   "fetchprof": "temporal-fetchprof: fetches=2772 syscalls/fetch=1.00 wall/fetch=735us sys/fetch=719us first_call=719us outside_sys=17us max_call=55916us short_reads=0",
+   "flags": {
+    "LLAMA_TEMPORAL_FETCHPROF": "1",
+    "LLAMA_TEMPORAL_FETCH_THREADS": "6",
+    "LLAMA_TEMPORAL_MADV_FREE": "1",
+    "LLAMA_TEMPORAL_ODIRECT": "1",
+    "LLAMA_TEMPORAL_R": "192",
+    "LLAMA_TEMPORAL_REPACK": "1",
+    "LLAMA_TEMPORAL_REPACK_FILE": "C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure-repacked.bin",
+    "LLAMA_TEMPORAL_SPIN_US": "5000",
+    "LLAMA_TEMPORAL_SPLIT": "2",
+    "LLAMA_TEMPORAL_TRACE": "1",
+    "LLAMA_TEMPORAL_TRACE_FILE": "C:\\tmoe\\temporal-moe\\laptopbench\\results\\logs\\w1\\trace_resident_control.json",
+    "LLAMA_TEMPORAL_TWOPASS": "1"
+   },
+   "label": "resident_control",
+   "pool": {
+    "R_active": 192,
+    "avg_fetch_us": 1470.8,
+    "evictions": 8640,
+    "fetched_mib": 292.4,
+    "fetches": 1386,
+    "fetchprof": "temporal-fetchprof: fetches=2772 syscalls/fetch=1.00 wall/fetch=735us sys/fetch=719us first_call=719us outside_sys=17us max_call=55916us short_reads=0",
+    "hook_calls": 0,
+    "hook_miss": 0,
+    "odirect": 1,
+    "qwait_hi_us": 87.3,
+    "sibling": 1,
+    "split": 2,
+    "swaps": 2880,
+    "tensors": 135,
+    "wait_ms": 392.3,
+    "workers": 6
+   },
+   "rc": 0,
+   "trace": {
+    "n_events": 646707,
+    "n_tokens_seen": 65,
+    "per_type": {
+     "EVICT": {
+      "mean_us": 25.407650462962962,
+      "median_us": 23.1,
+      "n": 8640,
+      "p95_us": 37.1,
+      "total_ms": 219.52210000000093
+     },
+     "FETCH": {
+      "mean_us": 735.4012987012987,
+      "median_us": 645.75,
+      "n": 2772,
+      "p95_us": 1088.3,
+      "total_ms": 2038.5324000000019
+     },
+     "GEMV": {
+      "mean_us": 7.0055,
+      "median_us": 6.9,
+      "n": 631800,
+      "p95_us": 8.8,
+      "total_ms": 4426.074899999991
+     },
+     "ROUTER": {
+      "mean_us": 87.29256854256855,
+      "median_us": 102.95,
+      "n": 2772,
+      "p95_us": 175.8,
+      "total_ms": 241.97499999999994
+     },
+     "WAIT": {
+      "mean_us": 542.5405947441217,
+      "median_us": 384.7,
+      "n": 723,
+      "p95_us": 687.8,
+      "total_ms": 392.2568500000001
+     }
+    },
+    "steady_token": {
+     "evict_total_us": 3443.8000000000025,
+     "fetch_mean_us": 642.2078947368421,
+     "fetch_per_token": 38,
+     "gemv_mean_us": 7.207654320987654,
+     "gemv_median_us": 6.8,
+     "layer_wall_median_us": 469.3999999985099,
+     "n_layers": 45,
+     "token_wall_us": 32001.10000000149,
+     "wait_total_us": 3556.2
+    }
+   },
+   "trace_file": "C:\\tmoe\\temporal-moe\\laptopbench\\results\\logs\\w1\\trace_resident_control.json",
+   "twopass": true,
+   "vmhwm_mib": 5704.484375
+  },
+  "c": {
+   "R": 18,
+   "cap": "4G",
+   "decode_sd": 0.640486,
+   "decode_tok_s": 15.112286,
+   "fetchprof": "temporal-fetchprof: fetches=22140 syscalls/fetch=1.00 wall/fetch=1103us sys/fetch=1090us first_call=1090us outside_sys=13us max_call=115799us short_reads=0",
+   "flags": {
+    "LLAMA_TEMPORAL_FETCHPROF": "1",
+    "LLAMA_TEMPORAL_FETCH_THREADS": "6",
+    "LLAMA_TEMPORAL_MADV_FREE": "1",
+    "LLAMA_TEMPORAL_ODIRECT": "1",
+    "LLAMA_TEMPORAL_R": "18",
+    "LLAMA_TEMPORAL_REPACK": "1",
+    "LLAMA_TEMPORAL_REPACK_FILE": "C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure-repacked.bin",
+    "LLAMA_TEMPORAL_SPIN_US": "5000",
+    "LLAMA_TEMPORAL_SPLIT": "2",
+    "LLAMA_TEMPORAL_TRACE": "1",
+    "LLAMA_TEMPORAL_TRACE_FILE": "C:\\tmoe\\temporal-moe\\laptopbench\\results\\logs\\w1\\trace_deploy_R18.json",
+    "LLAMA_TEMPORAL_TWOPASS": "1"
+   },
+   "label": "deploy_R18",
+   "pool": {
+    "R_active": 18,
+    "avg_fetch_us": 2205.3,
+    "evictions": 8640,
+    "fetched_mib": 2335.1,
+    "fetches": 11070,
+    "fetchprof": "temporal-fetchprof: fetches=22140 syscalls/fetch=1.00 wall/fetch=1103us sys/fetch=1090us first_call=1090us outside_sys=13us max_call=115799us short_reads=0",
+    "hook_calls": 0,
+    "hook_miss": 0,
+    "odirect": 1,
+    "qwait_hi_us": 5339.7,
+    "sibling": 1,
+    "split": 2,
+    "swaps": 2880,
+    "tensors": 135,
+    "wait_ms": 3942.6,
+    "workers": 6
+   },
+   "rc": 0,
+   "trace": {
+    "n_events": 690485,
+    "n_tokens_seen": 65,
+    "per_type": {
+     "EVICT": {
+      "mean_us": 28.026805555555555,
+      "median_us": 25.5,
+      "n": 8640,
+      "p95_us": 46.6,
+      "total_ms": 242.15160000000003
+     },
+     "FETCH": {
+      "mean_us": 1102.6586359530263,
+      "median_us": 761.1500000000001,
+      "n": 22140,
+      "p95_us": 1094.6,
+      "total_ms": 24412.862200000043
+     },
+     "GEMV": {
+      "mean_us": 7.738330800886357,
+      "median_us": 7.1,
+      "n": 631800,
+      "p95_us": 9.4,
+      "total_ms": 4889.077399999907
+     },
+     "ROUTER": {
+      "mean_us": 5339.691242095754,
+      "median_us": 112.9,
+      "n": 22140,
+      "p95_us": 33939.2,
+      "total_ms": 118220.76410000077
+     },
+     "WAIT": {
+      "mean_us": 683.8896617519514,
+      "median_us": 451.8,
+      "n": 5765,
+      "p95_us": 719.1,
+      "total_ms": 3942.6239000000082
+     }
+    },
+    "steady_token": {
+     "evict_total_us": 3944.5000000000005,
+     "fetch_mean_us": 662.1056818181818,
+     "fetch_per_token": 264,
+     "gemv_mean_us": 7.937839506172839,
+     "gemv_median_us": 7.1,
+     "layer_wall_median_us": 1158.699999999255,
+     "n_layers": 45,
+     "token_wall_us": 63087.59999999963,
+     "wait_total_us": 25220.499999999996
+    }
+   },
+   "trace_file": "C:\\tmoe\\temporal-moe\\laptopbench\\results\\logs\\w1\\trace_deploy_R18.json",
+   "twopass": true,
+   "vmhwm_mib": 819.8671875
+  }
+ },
+ "tag": "w1",
+ "ts": "2026-09-15T23:19:48"
+}

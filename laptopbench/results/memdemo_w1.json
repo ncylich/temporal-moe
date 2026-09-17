@@ -1,0 +1,63 @@
+{
+ "ceiling_12G": {
+  "n": 2,
+  "vmhwm_mib": [
+   5707.37890625,
+   5701.41015625
+  ]
+ },
+ "ceiling_4G": {
+  "cap": {
+   "cap": "4G",
+   "cap_mb": 4096,
+   "mechanism": "job object JOB_OBJECT_LIMIT_PROCESS_MEMORY (commit limit)",
+   "memtotal_mb": 16167
+  },
+  "decode_tok_s": null,
+  "dmesg": "job object: {'limit_bytes': 4294967296, 'peak_process_bytes': 4273831936, 'limit_flags': 256}",
+  "failed_to_start": true,
+  "oom": true,
+  "rc": 3221226505,
+  "stderr_tail": "temporal-pool: active, R=192 swap_prob=0.000 odirect=1 workers=6 sibling=1 split=2\nC:\\tmoe\\llama.cpp\\ggml\\src\\ggml-backend.cpp:2255: temporal: commit refused; the model does not fit the memory cap\n",
+  "vmhwm_mib": 4050.57421875
+ },
+ "deploy_2.5G": {
+  "decode_sd": 0.090261,
+  "decode_tok_s": 15.485103,
+  "pool": {
+   "R_active": 18,
+   "avg_fetch_us": 1313.4,
+   "evictions": 138240,
+   "fetched_mib": 29672.6,
+   "fetches": 140670,
+   "fetchprof": null,
+   "hook_calls": 0,
+   "hook_miss": 0,
+   "odirect": 1,
+   "qwait_hi_us": 230.5,
+   "sibling": 1,
+   "split": 2,
+   "swaps": 46080,
+   "tensors": 135,
+   "wait_ms": 32696.8,
+   "workers": 6
+  },
+  "rc": 0,
+  "status": "ok",
+  "vmhwm_mib": 798.72265625,
+  "vmswap_peak_mib": 0.0
+ },
+ "deploy_4G": {
+  "decode_tok_s": [
+   15.135716,
+   15.345969
+  ],
+  "n": 2,
+  "vmhwm_mib": [
+   798.6640625,
+   799.375
+  ]
+ },
+ "tag": "w1",
+ "ts": "2026-09-16T05:42:19"
+}
