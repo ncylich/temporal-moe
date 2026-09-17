@@ -640,3 +640,87 @@ Arms started 23:18:03 (schedule of 23 batches, 300 s rests, then the memory demo
 sweeps, pack). Results follow in L1-5.
 
 **Retracted:** nothing.
+
+### L1-5 -- Windows-native results, tag w1: five arms n=3, memory demonstration, attribution, first sweeps; SPLIT=1 is the finding
+
+Overnight run 2026-09-16 00:17 to 10:04 (Scheduled Task, restarted once at 00:17 after the
+verify_counters bug in L1-4's first attempt; rows before the restart were kept, the refused one was
+rerun). Binary 36e143792cb6 (fork temporal-moe-win f9c46b374, clang-cl), gates in x86 form (L1-4).
+Protocol as PLAN 1.3: `-t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU`, one warmup per batch, 300 s rests,
+clock probe before every batch, job-object caps (12G / 4G / 2.5G) read back on every run. All rows
+provisional (Defender paste pending; gates x86 form). 49 rows in `runs.jsonl`, 2 in `refused.jsonl`.
+
+**The five arms** (mean over all completed batches +/- population sd; `ok` rows are the subset whose
+clock probe was within 3% of the session's best, see the probe note):
+
+| arm | flags | cap | n | tok/s | ratio to ceiling | peak working set | per token (pool line) |
+|---|---|---|---|---|---|---|---|
+| (a) ceiling | R=192 | 12G | 4 | **32.84 +/- 1.75** (31.10, 35.73, 31.94, 32.58) | 1.000 | 5707 MiB | fetches 0, evictions 0 |
+| (b) resident control | R=192 + TWOPASS | 12G | 3 | **17.36 +/- 0.43** (17.71, 17.62, 16.76) | 0.529 | 5705 MiB | 112.1 fetches (23.7 MiB), 135 evictions, 45 swaps |
+| (c) deploy | R=18 + TWOPASS | 4G | 3 | **15.17 +/- 0.13** (15.14, 15.35, 15.04) | **0.462** | **799 MiB** | 137.4 fetches (28.98 MiB), 135 evictions, 45 swaps |
+| (d) R=24 / 36 / 48 | TWOPASS | 4G | 3 each | 15.28 / 15.23 / 15.54 | 0.465 / 0.464 / 0.473 | 799-800 MiB | as (c) |
+| (e) floor | R=18, NO_REPACK, SWAP_PROB=1.0 | 4G | 3 | **0.82 +/- 0.01** | 0.025 | 1345 MiB | 2469.8 fetches (521 MiB), 2465 evictions |
+| (e-literal) documentary | R=18, no policy, repacked | 4G | 1 | aborted at 27.5 s | -- | 3933 MiB at abort | residency grew until "VirtualAlloc(MEM_COMMIT) failed (1455)": the cap refused the next fetch. Pitfall #18 made visible by the commit cap |
+
+Counters match the arm requested in every recorded row (invariant 2); (b)'s 112 fetches per token
+are the steady-state refetch of evicted experts (L1-4 note). Peak commit (stamped from the restart on):
+deploy 1078 MiB, control 6035 MiB.
+
+**Memory demonstration (PLAN 1.4).** Ceiling under the 4 GB cap: **failed to start** --
+`ggml-backend.cpp:2255: temporal: commit refused; the model does not fit the memory cap`, job peak
+4274 MB at the limit, working set 4051 MiB at abort, no decode. Deploy under 4 GB: 15.17 tok/s (n=3),
+799 MiB. Deploy under **2.5 GB: 15.49 tok/s, 799 MiB** (n=1). The reserve-mode port (L1-3) is what makes
+this observation possible on Windows.
+
+**Bound (PLAN 4, native fit from L1-1c: 130.5 us + 0.402 us/KiB; QD12 216k = 2867 MB/s).**
+fetch_QD1 = 45 x (130.5 + 648 x 0.402) us = 17.6 ms/token; fetch_QD12 = 28.5 MiB / 2867 MB/s = 10.4 ms/token;
+1/ceiling = 30.5 ms/token. The storage term is below the compute term at either depth, so the bound
+is the ceiling itself, 32.84 tok/s, and **deploy sits at 46% of the bound** (with the L1-1b fit,
+106 + 0.403: fetch_QD1 16.5 ms, same conclusion). Perfect overlap would hide the fetch entirely; the
+engine does not, see the attribution.
+
+**Attribution (PLAN 7 step 1; `attribute_w1.json`; traced runs are -n 32 -r 2, 64 tokens, tracing costs
+~8%):**
+
+| arm | tok/s traced | GEMV mean / median us | per token: wall, WAIT, EVICT | fetch parts / token | FETCHPROF |
+|---|---|---|---|---|---|
+| (a) | 39.66 | 5.3 / 5.3 | 18.3 ms, 0, 0 | 0 | -- |
+| (b) | 25.66 | 7.2 / 6.8 | 32.0 ms, 3.6 ms, 3.4 ms | 38 (transient: 64 tokens) | 735 us/part, sys 719, outside 17 |
+| (c) | 15.11 | 7.9 / 7.1 | 63.1 ms, **25.2 ms**, 3.9 ms | 264 (135 slices x 2 parts) | **1103 us/part** (108 KiB), sys 1090, outside 13, 1.00 syscalls/part, 0 short reads |
+
+(b)/(a) = 0.647: the two-pass policy costs 35% before any byte moves, and it is a genuine per-GEMV
+cost (mean and median both up, 5.3 -> 7.2 / 6.8), not a shootdown tail (S3-38's signature was mean
+up, median flat). In steady state (b) also refetches (112/token) and lands at 17.4. (c)/(b) = 0.589:
+streaming costs another 41% at the production flags, and the trace says where: 25 ms of every 63 ms
+token is WAIT, because a 108 KiB part costs **1.1 ms inside the read call** with 12 in flight, against
+195 us at QD1 in fio and 2867 MB/s at depth 12. Our code is not in it (13 us outside the syscall,
+one call per part). The Windows overlapped unbuffered path pays a large per-request cost under
+concurrency, which is exactly what the SPLIT sweep found:
+
+**Sweeps done (n=3 each, all-row means):**
+
+| knob | values -> tok/s | verdict |
+|---|---|---|
+| FETCH_THREADS | 4: 13.84, 6: 15.45, 8: 15.19, 12: 15.31 | flat above 6; 4 costs 10%. Pixel's 6 holds |
+| **SPLIT** | **1: 22.82**, 2: 15.51, 3: 11.52 | **SPLIT=1 is +47% over the Pixel production value**: fewer, larger requests win on this path (the Pixel found the opposite, pitfall #19). Deploy at SPLIT=1 = **69% of the ceiling / of the bound**, 799 MiB |
+| SPIN_US | 300: 16.02 (n=2), 1000: 15.50, 2000: 15.56, 5000: 15.55 (n=1 each) | incomplete; 300 looks 3% better, inside noise until n=3 |
+
+Pending (blocked on host memory since 10:04, see below): SPIN_US rounds 2-3, FUSED (one 648 KiB read
+per swap: the SPLIT trend says this is the next candidate), THREADS 4 vs 8, NOMADV diagnostic,
+SPINNERS, EVICT_DEFER, JANITOR_NOLOCK, then pack.
+
+**Clock-probe note (method).** The resident probe itself drifted 27.7 -> 42.3 tok/s over the night
+(session best 42.3), so under the 3% rule 26 of 49 rows carry `degraded_clock`; yet the deploy rows
+span 15.04-15.68 across probes of 31.5-41.5 (storage-bound, clock-insensitive) while the ceiling
+tracks its probe (31-36). Both means are reported (all rows; `ok` only); the arms' own spread is 2-4x
+smaller than the probe's, so the gate as written mostly measures the probe. Suggested to the
+orchestrator: apply the 3% rule to the resident arms and record the probe for the streamed ones.
+
+**Refused rows:** (b) round 1 under the old band (rerun, L1-4); (e-literal) as above.
+**Blocked:** the remaining sweeps and `pack`: Chrome and VS Code opened at 10:00 on 09-16 and free
+memory has been 4.5-5.2 GB since; the clock probe needs ~6 GB, the check needs 7.5 GB, so the runner
+has correctly waited (heartbeat every 10 min in overnight.log). Push: `laptop` pushed at 37debb8e
+(access granted); `ncylich/llama.cpp` still refuses `mohsenfayyaz`, so `temporal-moe-win`
+(f9c46b374) is local only.
+
+**Retracted:** nothing.

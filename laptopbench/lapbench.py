@@ -1811,6 +1811,12 @@ def report() -> None:
         groups.setdefault((r["label"], r["cap"]), []).append(r)
     for (label, cap), rs in groups.items():
         good = [r for r in rs if r["status"] == "ok"]
+        alln = [r for r in rs if r.get("decode_tok_s")]
+        if alln and len(alln) != len(good):
+            t = [r["decode_tok_s"] for r in alln]
+            mean_all = sum(t) / len(t); sd_all = (sum((x - mean_all) ** 2 for x in t) / len(t)) ** 0.5
+            print(f"{label:<26}{cap:>5}{len(alln):>3}{mean_all:>9.2f}{sd_all:>7.2f}{(mean_all / ceiling * 100 if ceiling else 0):>7.1f}%"
+                  f"{'':>11}{'':>10}{'':>9}{'':>8}{'':>7}  all rows incl. degraded_clock")
         if good:
             t = [r["decode_tok_s"] for r in good]
             mean = sum(t) / len(t)
@@ -1824,7 +1830,8 @@ def report() -> None:
                   + ",".join(sorted({r['status'] for r in rs})))
         else:
             print(f"{label:<26}{cap:>5}{0:>3}{'-':>9}{'-':>7}{'-':>8}{'-':>11}  " + ",".join(sorted({r['status'] for r in rs})))
-    pr = jload(RESULTS / "probe.json", {}).get("wsl", {}).get("fit")
+    env = (ok or rows)[0].get("env", "wsl") if (ok or rows) else "wsl"
+    pr = jload(RESULTS / "probe.json", {}).get(env, {}).get("fit")
     dep = [r["decode_tok_s"] for r in ok if r["label"] == "deploy_R18" and r["cap"] == "4G"]
     if ceiling and pr and dep:
         b = bound_tok_s(ceiling, pr)
