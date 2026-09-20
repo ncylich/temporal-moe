@@ -71,7 +71,7 @@ PROD_FLAGS = {
     "LLAMA_TEMPORAL_REPACK_FILE": None,                # filled with the side-file path
     "LLAMA_TEMPORAL_ODIRECT": "1",
     "LLAMA_TEMPORAL_MADV_FREE": "1",
-    "LLAMA_TEMPORAL_SPLIT": "2",
+    "LLAMA_TEMPORAL_SPLIT": "1",                       # laptop production: 1 (L1-5 sweep, +47% over the Pixel's 2)
     "LLAMA_TEMPORAL_FETCH_THREADS": "6",
     "LLAMA_TEMPORAL_SPIN_US": "5000",
 }
@@ -1020,6 +1020,12 @@ def arm_flags(R: int, twopass: bool, overrides: dict | None = None, no_repack: b
     f["LLAMA_TEMPORAL_R"] = str(R)
     if twopass:
         f["LLAMA_TEMPORAL_TWOPASS"] = "1"
+    # production_flags.json: knobs promoted to production by a sweep (queue B: FUSED if it wins);
+    # applied before per-run overrides so an A/B can still switch them off with --set KEY=
+    pf = RESULTS / "production_flags.json"
+    if pf.exists():
+        for k, v in json.loads(pf.read_text()).items():
+            f[k] = v
     for k, v in (overrides or {}).items():
         if v is None:
             f.pop(k, None)
@@ -1495,15 +1501,17 @@ def clock_probe(session: dict) -> dict:
     return d
 
 
-def engine_args_for(overrides: dict, base: str = ENGINE_ARGS) -> str:
-    """ENGINE_ARGS with the sweep's thread knob applied (--knob THREADS=4,8 sets __threads)."""
+def engine_args_for(overrides: dict, base: str = ENGINE_ARGS, depth: int = 0) -> str:
+    """ENGINE_ARGS with the sweep's thread knob (--knob THREADS=4,8 sets __threads) and the context
+    depth (-d, pitfall #30: it defaults to 0 and the paper's protocol is 1024)."""
     t = (overrides or {}).get("__threads")
-    return base.replace("-t 4", f"-t {t}") if t else base
+    a = base.replace("-t 4", f"-t {t}") if t else base
+    return f"{a} -d {depth}"
 
 
 def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, rnd: int, session: dict,
               overrides: dict, rest: int, bench_hash: str, extra_note: str = "", cap_override: str | None = None,
-              extra_flags: dict | None = None, no_repack: bool = False) -> dict | None:
+              extra_flags: dict | None = None, no_repack: bool = False, depth: int = 0) -> dict | None:
     st = check(TARGET, quick=True)
     probes = []
     p = clock_probe(session)
@@ -1519,16 +1527,16 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
     merged = dict(extra_flags or {})
     merged.update({k: v for k, v in (overrides or {}).items() if not k.startswith("__")})
     flags = arm_flags(R, twopass, merged, no_repack=no_repack)
-    eargs = engine_args_for(overrides)
+    eargs = engine_args_for(overrides, depth=depth)
     tag = f"{label}_r{rnd}_{cap.replace('.', 'p')}"
-    engine_run(f"{tag}_warmup", flags, engine_args_for(overrides, WARMUP_ARGS), timeout=3600)
+    engine_run(f"{tag}_warmup", flags, engine_args_for(overrides, WARMUP_ARGS, depth=depth), timeout=3600)
     m = engine_run(tag, flags, eargs, timeout=7200)
     if DRY:
         return None
     tokens = 128 * 8
     ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"), swap_prob="LLAMA_TEMPORAL_SWAP_PROB" in flags)
     row = {"tag": _TAG, "env": TARGET, "provisional": PROVISIONAL, "arm": arm, "tier": tier,
-           "label": label, "R": R, "twopass": twopass,
+           "label": label, "R": R, "twopass": twopass, "depth": depth,
            "round": rnd, "cap": cap, "cap_mb": capinfo["cap_mb"], "memtotal_mb": capinfo["memtotal_mb"],
            "cgroup_memory_max": m.get("cgroup_memory_max"),
            "flags": flags, "overrides": overrides, "engine_args": eargs, "cmd": m["cmd"],
@@ -1549,8 +1557,8 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
         ok, why = False, f"cgroup memory.max={m.get('cgroup_memory_max')} is not the requested cap {cap}"
     elif (row["vmswap_peak_mib"] or 0) > 0:
         row["status"] = "swapped"                            # pitfall #20
-    elif probes[-1]["degraded"]:
-        row["status"] = "degraded_clock"
+    elif probes[-1]["degraded"] and arm == "a":
+        row["status"] = "degraded_clock"                     # ruling 2026-09-20: 3% rule on the ceiling only
     if arm == "e0" and row["status"] == "ok":
         row["status"] = "documentary"                        # plan-literal (e): recorded, never a result
     if not ok:
@@ -1581,7 +1589,8 @@ def already_done(label: str, rnd: int, cap: str) -> bool:
     return False
 
 
-def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str], resume: bool, demo: bool) -> None:
+def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str], resume: bool, demo: bool,
+         depths: list[int] | None = None) -> None:
     if env not in ("wsl", "linux", "windows"):
         die("arms: --env wsl, linux or windows")
     overrides = parse_overrides(sets)
@@ -1589,44 +1598,52 @@ def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str]
     check(env)
     sess = session_state()
     order = [a for a in "abce" if a in which]              # interleaved a, b, c, e per round
+    depths = depths or [0]
+    dl = lambda d: f"_d{d}" if d else ""                    # depth-0 labels stay as before
     schedule: list[tuple] = []
     for rnd in range(1, n + 1):
-        for a in order:
-            tier, label, R, tp, cap, extra, norep = ARMS[a]
-            schedule.append((a, tier, label, R, tp, cap, rnd, extra, norep))
+        for d in depths:                                     # per depth: the arms, with their own ceiling (pitfall #27)
+            for a in order:
+                tier, label, R, tp, cap, extra, norep = ARMS[a]
+                schedule.append((a, tier, label + dl(d), R, tp, cap, rnd, extra, norep, d))
     if "a" in which:
-        schedule.append(("a", *ARMS["a"][:5], n + 1, {}, False))   # closing ceiling shows drift (PLAN 1.3)
-    if "e" in which:
-        schedule.append(("e0", *ARMS["e0"][:5], 1, {}, False))     # plan-literal (e), documentary, once
+        for d in depths:
+            schedule.append(("a", *ARMS["a"][:5], n + 1, {}, False, d))   # closing ceiling shows drift (PLAN 1.3)
+            schedule[-1] = schedule[-1][:2] + (ARMS["a"][1] + dl(d),) + schedule[-1][3:]
+    if "e" in which and 0 in depths:
+        schedule.append(("e0", *ARMS["e0"][:5], 1, {}, False, 0))     # plan-literal (e), documentary, once
     if "d" in which:
+        # R above top_k is INERT under TWOPASS (pitfall #26): these are an R-inert control, not an R-curve
         for rnd in range(1, n + 1):
             for R in Rs:
-                schedule.append(("d", "deploy", f"deploy_R{R}", R, True, "4G", rnd, {}, False))
+                for d in depths:
+                    schedule.append(("d", "r_inert_control", f"deploy_R{R}" + dl(d), R, True, "4G", rnd, {}, False, d))
     say(f"arms schedule: {len(schedule)} batches, rest {rest} s: " +
         " ".join(f"{s[2]}:r{s[6]}" for s in schedule))
-    for i, (a, tier, label, R, tp, cap, rnd, extra, norep) in enumerate(schedule):
+    for i, (a, tier, label, R, tp, cap, rnd, extra, norep, d) in enumerate(schedule):
         if resume and already_done(label, rnd, cap):
             say(f"skip {label} r{rnd} (done)")
             continue
         row = one_batch(a, tier, label, R, tp, cap, rnd, sess, overrides, rest, bench_hash,
-                        extra_flags=extra, no_repack=norep)
+                        extra_flags=extra, no_repack=norep, depth=d)
         save_session(sess)
         if not DRY and i < len(schedule) - 1:
             say(f"rest {rest} s")
             time.sleep(rest)
     if demo:
-        memdemo(sess, overrides, rest, bench_hash)
+        memdemo(sess, overrides, rest, bench_hash, depth=max(depths))
     if not DRY:
         report()
 
 
-def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
+def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str, depth: int = 0) -> None:
     """PLAN 1.4: the ceiling must FAIL to start under 4 GB; deploy must run at 4 GB and 2.5 GB."""
     say("memory demonstration")
     d = jload(RESULTS / f"memdemo_{_TAG}.json", {"tag": _TAG, "ts": now()})
     # ceiling at 4 GB: expected to fail (OOM / allocation failure). No clock probe needed.
     capinfo = set_cap("4G")
-    m = engine_run("memdemo_ceiling_4G", arm_flags(192, False, overrides), ENGINE_ARGS, timeout=3600)
+    m = engine_run("memdemo_ceiling_4G" + (f"_d{depth}" if depth else ""), arm_flags(192, False, overrides),
+                   engine_args_for(overrides, depth=depth), timeout=3600)
     if not DRY:
         if WINDOWS:
             dmesg = f"job object: {m.get('job')}"      # the commit limit refuses the allocation; no kernel log
@@ -1642,20 +1659,21 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str) -> None:
         time.sleep(min(rest, 120))
     # deploy at 2.5 GB, full protocol with clock probe (deploy at 4 GB already has n=3 rows)
     tier, label, R, tp, cap = ARMS["c"][:5]
-    row = one_batch("c", tier, label + "_cap2p5", R, tp, cap, 1, sess, overrides, rest, bench_hash,
-                    extra_note="memory demonstration", cap_override="2.5G")
+    row = one_batch("c", tier, label + (f"_d{depth}" if depth else "") + "_cap2p5", R, tp, cap, 1, sess, overrides, rest, bench_hash,
+                    extra_note="memory demonstration", cap_override="2.5G", depth=depth)
     if not DRY:
         d["deploy_2.5G"] = {k: row.get(k) for k in ("decode_tok_s", "decode_sd", "vmhwm_mib", "vmswap_peak_mib", "rc", "status", "pool")} if row else None
-        rows4 = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["label"] == "deploy_R18" and r["status"] == "ok"]
+        rows4 = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["label"] == "deploy_R18" + (f"_d{depth}" if depth else "") and r["status"] == "ok"]
         d["deploy_4G"] = {"n": len(rows4), "vmhwm_mib": [r["vmhwm_mib"] for r in rows4],
-                          "decode_tok_s": [r["decode_tok_s"] for r in rows4]}
+                          "decode_tok_s": [r["decode_tok_s"] for r in rows4], "depth": depth}
         rowsa = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["arm"] == "a" and r["status"] == "ok"]
         d["ceiling_12G"] = {"n": len(rowsa), "vmhwm_mib": [r["vmhwm_mib"] for r in rowsa]}
         jdump(RESULTS / f"memdemo_{_TAG}.json", d)
 
 
 # ----------------------------------------------------------------------------- sweep
-def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str, resume_ok: bool = False) -> None:
+def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str, resume_ok: bool = False,
+          depth: int = 0) -> None:
     if env not in ("wsl", "linux", "windows"):
         die("sweep: --env wsl, linux or windows")
     if not knob or "=" not in knob:
@@ -1673,12 +1691,12 @@ def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str
     for rnd in range(1, n + 1):
         for v in vals:                                       # A/B/A/B interleaved
             o = dict(overrides); o[key] = None if v == "" else v
-            lab = f"{label}_{name.replace('LLAMA_TEMPORAL_', '')}={v or 'unset'}"
+            lab = f"{label}{f'_d{depth}' if depth else ''}_{name.replace('LLAMA_TEMPORAL_', '')}={v or 'unset'}"
             if resume_ok and already_done(lab, rnd, cap):
                 say(f"skip {lab} r{rnd} (done)")
                 continue
             one_batch(base_arm, tier, lab, R, tp, cap, rnd,
-                      sess, o, rest, bench_hash, extra_note=f"sweep {name}", extra_flags=extra, no_repack=norep)
+                      sess, o, rest, bench_hash, extra_note=f"sweep {name}", extra_flags=extra, no_repack=norep, depth=depth)
             save_session(sess)
             if not DRY:
                 time.sleep(rest)
@@ -1783,6 +1801,50 @@ def attribute(env: str, sets: list[str]) -> None:
     jdump(RESULTS / f"attribute_{_TAG}.json", out)
 
 
+# ----------------------------------------------------------------------------- prefill diagnostic (queue F)
+def prefill(env: str, n: int, rest: int, sets: list[str], ubatches: list[int]) -> None:
+    """Reported as unoptimized: the CPU fork has no expert-major prefill path. Deploy and ceiling at
+    -p 512 -n 0, ubatch 64 and 512, interleaved, n batches, clock probe and rests as for decode."""
+    if env not in ("wsl", "linux", "windows"):
+        die("prefill: --env wsl, linux or windows")
+    overrides = parse_overrides(sets)
+    bench_hash = require_gated(env)
+    check(env)
+    sess = session_state()
+    for rnd in range(1, n + 1):
+        for ub in ubatches:
+            for key in ("a", "c"):
+                tier, label, R, tp, cap, extra, norep = ARMS[key]
+                lab = f"prefill_{label}_ub{ub}"
+                if already_done(lab, rnd, cap):
+                    say(f"skip {lab} r{rnd} (done)"); continue
+                st = check(TARGET, quick=True)
+                p = clock_probe(sess)
+                capinfo = set_cap(cap)
+                merged = dict(extra); merged.update({k: v for k, v in overrides.items() if not k.startswith("__")})
+                flags = arm_flags(R, tp, merged, no_repack=norep)
+                args = f"-t 4 -p 512 -n 0 -ub {ub} -b 512 -r {3 if n else 3} -mmp 0 -ot _exps=CPU"
+                m = engine_run(f"{lab}_r{rnd}", flags, args, timeout=7200)
+                if DRY:
+                    continue
+                row = {"tag": _TAG, "env": TARGET, "provisional": PROVISIONAL, "arm": key, "tier": tier + "_prefill",
+                       "label": lab, "R": R, "twopass": tp, "depth": 0, "ubatch": ub, "round": rnd, "cap": cap,
+                       "cap_mb": capinfo["cap_mb"], "memtotal_mb": capinfo["memtotal_mb"], "flags": flags, "overrides": overrides,
+                       "engine_args": args, "cmd": m["cmd"], "binary_sha256": bench_hash, "gated": True, "clock_probe": p,
+                       "degraded": p["degraded"], "prefill_tok_s": m.get("prefill_tps"), "prefill_sd": m.get("prefill_sd"),
+                       "decode_tok_s": None, "decode_sd": None, "tokens": 512 * 3, "wall_s": m["wall_s"], "rc": m["rc"],
+                       "pool": m.get("pool"), "vmhwm_mib": m.get("vmhwm_mib"), "peak_commit_mib": m.get("peak_commit_mib"),
+                       "read_bytes": m["read_bytes"], "disk_read_mib": m["disk_read_mib"], "counters_ok": True,
+                       "counters_note": "prefill: single-pass path, fetch on miss, no eviction (unoptimized)", "ts": now(),
+                       "note": "prefill diagnostic, unoptimized", "status": "ok" if (m.get("prefill_tps") or 0) > 0 and m["rc"] == 0 else f"error_rc{m['rc']}"}
+                if key == "a" and p["degraded"] and row["status"] == "ok":
+                    row["status"] = "degraded_clock"
+                append_jsonl(RESULTS / "runs.jsonl", row)
+                say(f"PREFILL ROW {lab} r{rnd}: {row['prefill_tok_s']} tok/s sd {row['prefill_sd']} pool={row['pool']}")
+                save_session(sess)
+                time.sleep(rest)
+
+
 # ----------------------------------------------------------------------------- report / pack
 def bound_tok_s(ceiling: float, fit: dict, n_inflight: int = 12) -> dict:
     """PLAN section 4."""
@@ -1800,16 +1862,24 @@ def report() -> None:
     if not rows:
         say("report: no rows for this tag"); return
     ok = [r for r in rows if r["status"] == "ok"]
-    ceil = [r["decode_tok_s"] for r in ok if r["arm"] == "a"]
+    ceil = [r["decode_tok_s"] for r in ok if r["arm"] == "a" and (r.get("depth") or 0) == 0]
     ceiling = sum(ceil) / len(ceil) if ceil else None
+    ceil_by_depth: dict[int, float] = {}
+    for d in sorted({r.get("depth") or 0 for r in ok}):
+        c = [r["decode_tok_s"] for r in ok if r["arm"] == "a" and (r.get("depth") or 0) == d]
+        if c:
+            ceil_by_depth[d] = sum(c) / len(c)
     print("\n" + "=" * 110)
     print(f"LAPTOP i7-11370H / PM981a / WSL2 -- tag {_TAG} -- {len(rows)} rows ({len(ok)} ok)")
     print("=" * 110)
     print(f"{'label':<26}{'cap':>5}{'n':>3}{'tok/s':>9}{'sd':>7}{'ratio':>8}{'VmHWM MiB':>11}{'fetch/tok':>10}{'MiB/tok':>9}{'evict':>8}{'swaps':>7}  status")
     groups: dict[str, list] = {}
     for r in rows:
+        if r.get("prefill_tok_s") is not None and r.get("decode_tok_s") is None:
+            continue
         groups.setdefault((r["label"], r["cap"]), []).append(r)
     for (label, cap), rs in groups.items():
+        ceiling = ceil_by_depth.get(rs[0].get("depth") or 0, ceiling)   # same-depth denominator (pitfall #27)
         good = [r for r in rs if r["status"] == "ok"]
         alln = [r for r in rs if r.get("decode_tok_s")]
         if alln and len(alln) != len(good):
@@ -1855,7 +1925,7 @@ def to_csv_row(r: dict) -> list:
     """emit_row.py schema, one row per measured batch. peak_vram_mib carries VmHWM (peak RSS, the
     laptop's analogue); copied_bytes_per_token carries the bytes fetched from the NVMe per token."""
     p = r.get("pool") or {}
-    note = (f"[{r['status']}] R={r['R']};twopass={int(r['twopass'])};cap={r['cap']};memtotal_mb={r['memtotal_mb']};"
+    note = (f"[{r['status']}] R={r['R']};twopass={int(r['twopass'])};depth={r.get('depth') or 0};cap={r['cap']};memtotal_mb={r['memtotal_mb']};"
             f"round={r['round']};fetches={p.get('fetches')};fetched_mib={p.get('fetched_mib')};evictions={p.get('evictions')};"
             f"swaps={p.get('swaps')};clock_probe={r['clock_probe'].get('tok_s')};clock_ref={r['clock_probe'].get('ref_tok_s')};"
             f"vmhwm_mib=VmHWM;read_bytes={r['read_bytes']};binary={r['binary_sha256'][:12]};tag={r['tag']};"
@@ -1863,13 +1933,19 @@ def to_csv_row(r: dict) -> list:
     setup = {"linux": "laptop-linux-cpu", "windows": "laptop-windows-cpu"}.get(r.get("env"), "laptop-wsl2-cpu")
     if r.get("provisional"):
         note = f"[provisional: {r['provisional']}] " + note
-    return ["decode", MODEL, r["tier"], setup, "", "", "",
+    depth = r.get("depth") or 0
+    if r.get("prefill_tok_s") is not None and r.get("decode_tok_s") is None:
+        prefill_ms = 512.0 / r["prefill_tok_s"] * 1000.0 if r["prefill_tok_s"] else ""
+        return ["prefill", MODEL, r["tier"], setup, r.get("ubatch", ""), depth, f"{prefill_ms:.3f}" if prefill_ms else "",
+                "", f"{r['vmhwm_mib']:.0f}" if r.get("vmhwm_mib") else "", note + ";prefill_tok_s=%s;unoptimized" % r["prefill_tok_s"],
+                "", 0]
+    return ["decode", MODEL, r["tier"], setup, "", depth, "",
             f"{r['decode_tok_s']:.4f}", f"{r['vmhwm_mib']:.0f}" if r.get("vmhwm_mib") else "", note,
             f"{r['decode_sd']:.4f}", int(p.get("fetched_mib", 0) * 1048576 / r["tokens"]) if r.get("tokens") else 0]
 
 
 def pack() -> None:
-    rows = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["status"] in ("ok",)]
+    rows = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["status"] in ("ok", "documentary")]
     csvp = REPO / "results" / "ablations" / "serving_benchmarks_laptop.csv"
     if DRY:
         say(f"pack (dry): would append {len(rows)} rows to {csvp}, copy results json/jsonl to "
@@ -1915,7 +1991,9 @@ def pack() -> None:
 def main() -> None:
     global DRY, FORCE, _TAG, PROVISIONAL, NATIVE, WINDOWS, TARGET, GATES_X86
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "attribute", "session", "pack", "report", "decide"])
+    ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "attribute", "prefill", "session", "pack", "report", "decide"])
+    ap.add_argument("--depth", default="0", help="context depth(s) -d for arms (comma list) / sweep (one); paper protocol is 1024")
+    ap.add_argument("--ubatch", default="64,512", help="prefill diagnostic ubatch sizes")
     ap.add_argument("--gates-x86", action="store_true",
                     help="x86 forms of G2/G3: G2 passes on same-binary R=192 == R=18 (the oracle comparison is recorded, "
                          "not required); G3 passes on tok/s differing between kernel families (their PPLs differ on x86). "
@@ -1972,9 +2050,11 @@ def main() -> None:
         check(a.env)
         gates(a.env)
     elif a.stage == "arms":
-        arms(a.env, which, a.n, Rs, a.rest, a.set, a.resume, not a.no_demo)
+        arms(a.env, which, a.n, Rs, a.rest, a.set, a.resume, not a.no_demo, [int(x) for x in a.depth.split(",") if x])
     elif a.stage == "sweep":
-        sweep(a.env, a.knob, a.n, a.rest, a.set, a.base_arm, a.resume)
+        sweep(a.env, a.knob, a.n, a.rest, a.set, a.base_arm, a.resume, int(a.depth.split(",")[0] or 0))
+    elif a.stage == "prefill":
+        prefill(a.env, a.n, a.rest, a.set, [int(x) for x in a.ubatch.split(",") if x])
     elif a.stage == "attribute":
         attribute(a.env, a.set)
     elif a.stage == "session":
@@ -1987,7 +2067,7 @@ def main() -> None:
             build(a.env)
         if not a.resume or not (jload(RESULTS / "gates.json") or {}).get("all_pass"):
             gates(a.env)
-        arms(a.env, which, a.n, Rs, a.rest, a.set, a.resume, not a.no_demo)
+        arms(a.env, which, a.n, Rs, a.rest, a.set, a.resume, not a.no_demo, [int(x) for x in a.depth.split(",") if x])
     elif a.stage == "report":
         report()
     elif a.stage == "pack":
