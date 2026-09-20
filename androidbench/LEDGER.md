@@ -2668,3 +2668,86 @@ correctness gate (resident vs streamed, bit-identical PPL) is what catches it.
 The trace answered in one run what two sessions of A/B could not, because it measures
 WHERE the time goes rather than IF a knob helps. When a flag is worth 1.8x and every
 plausible implementation of that flag measures neutral, stop A/B-ing and instrument.
+
+---
+
+## 8. Session 4 (2026-08-24): design-point turnover vs context depth — and a repeat of #8
+
+Goal: close the two open Pixel items in `paper/TODO.md` (fairer baseline, defensible
+ceiling), plus test fine-graining to k=24 and longer context. Full writeup and the table:
+`androidbench/CTX_DESIGNPOINT_2026-08-24.md`. Data: `results/ctx_designpoint_2026-08-24.csv`.
+
+### S4-1. Four invalid runs before a valid one (all archived, all root-caused)
+
+Recorded because each was a *silent* failure that produced publishable-looking numbers:
+
+1. **n=48 decode tokens** instead of the 128 the historical curve used. Short-run
+   window-fill transient reads high (R=36: 15.8 vs 10.5 tok/s). Also attempted the
+   fully-resident E=192 arm that OOM-panicked this device in S3-2 — `oom_score_adj=1000`
+   caught it cleanly this time, but the arm should never have been issued: the
+   BASELINE_POLICY ceiling model existed and was simply not used.
+2. **Thermal throttle mid-run** — e112 ceiling read 20.0 against a 27.5-36 history while
+   `Thermal Status` read 0 and cores sat at ~86% of rated. -> pitfall #29.
+3. **Wrong context depth** — replication run at `-d 1024` when the curve being replicated
+   passed no `-d` at all (depth 0). -> pitfall #30.
+4. **`TWOPASS` removed** on the reasoning that the paper describes *natural* random-router
+   churn, so enforcement looked like an idealisation. Wrong in this engine: with `REPACK=1`
+   the natural path's eviction logic is unreachable, so "natural churn" is **no churn**.
+   -> S4-2.
+
+### S4-2. Pitfall #8 recurrence: `REPACK` disables residency management (4th time)
+
+An entire overnight dataset (12 arms, 85-99% of ceiling, monotone and clean-looking) was
+measuring a lazily-loaded, effectively-resident model. `LLAMA_TEMPORAL_R` never evicted
+anything because the FIFO trim lives in `ggml_tm_ensure` inside `mul_mat_id`, which
+`CPU_REPACK` bypasses. Diagnostic evidence, in the data the whole time:
+
+- `evictions=0` and `hook_calls=0` on every streamed arm;
+- `fetches`/`fetched_mib` **byte-identical** across R=18/36/48 at every depth;
+- 15,321 slices x 216 KiB = 3232 MiB resident against a 513 MiB R=18 cap (6.3x over);
+- flipping only `LLAMA_NO_REPACK=1`: fetches 8,235 -> 67,358, evictions 0 -> 64,644,
+  decode 16.58 -> 6.47 tok/s.
+
+Two paths keep residency real under repack: `TWOPASS` (drives residency from
+`ggml_temporal_window_fill`, a separate graph op) — used for the reported table; or
+`LLAMA_NO_REPACK=1` (restores the `ensure` path) — used for the R-curve. -> pitfalls
+#25, #26; `ENGINE_FLAGS.md` R row rewritten; `run_ctx_designpoint.py` now voids any
+streamed arm with `evictions == 0` and refuses to retry it.
+
+### S4-3. Result: design point vs context depth, R=k, measured ceiling
+
+At R=k (10.7x expert-memory cut) with prescribed ~1.05 swaps/layer/token, against a
+same-shape same-depth directly-measured ceiling:
+
+| ctx | fine (E=192,k=18) | k24 (E=256,k=24) |
+|---|---|---|
+| 0    | 63.9% | 65.5% |
+| 1024 | 70.0% | 71.4% |
+| 2048 | 77.4% | 74.9% |
+| 4096 | **83.4%** | **88.0%** |
+
+Context depth is the strongest lever measured on this rig: ~20 points for both shapes,
+because attention cost grows with depth while the enforced swap cost per layer does not.
+k24 moves ~24% fewer bytes at equal active compute and pulls ahead at 4096.
+
+**Not a replication.** The 2026-07-24 curve (R=18 -> 5.65) used the natural degenerate
+router at 2.09 experts/layer/token with no two-pass overlap; this enforces 1.05. Neither
+regime tried reproduced those absolutes (TWOPASS 20.70, natural-jitter 12.04 at R=18).
+These numbers are an **emulation of the trained-router design point** (S3-9's ~1 swap/layer
+projection, which it put at ~70-72%) and every downstream claim must say so.
+
+### S4-4. R is only a real cache size in the non-repacked path
+
+Control under TWOPASS: R=18 -> 20.70, R=36 -> 20.51, byte-identical counters — the window
+is `top_k`-sized (pitfall #26). In the `NO_REPACK` path R behaves as intended: R=18 ->
+12.04 tok/s at 1.61 experts/layer/token churn, R=36 -> 17.29 at 0.61 (**+44%**), as slack
+lets jitter-displaced experts survive instead of being refetched. R=48/64 were not run
+(R=k is the deployment point of interest). `results/rcurve_norepack_2026-08-24.csv`.
+
+### Method note
+Three of the four invalid runs were caught only by comparing against an expected number
+(history, or an internal control). The fourth — the repack one — was caught only when the
+anomaly (`evictions=0`) was finally *investigated* rather than repeatedly noted as a
+caveat. A counter that is impossible for a working configuration is not a caveat; it is a
+failed run. Instrument the invariant and let the harness void the arm, which
+`run_ctx_designpoint.py` now does.

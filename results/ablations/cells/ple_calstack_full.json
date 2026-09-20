@@ -1,0 +1,63 @@
+{
+ "tag": "calstack_full",
+ "rank": "full",
+ "lr": 0.0003,
+ "table_wd": 0.0,
+ "lora": 0,
+ "ple_start": 0,
+ "calib_init": true,
+ "calib_suffix": "",
+ "adam8bit": true,
+ "mb": 4,
+ "seed": 1234,
+ "train_tokens": 50003968,
+ "steps": 763,
+ "ple_params": 1648361488,
+ "final_bpb": 0.8736745622110837,
+ "final_swap": 0.9997359465621184,
+ "final_entropy": 0.998688817024231,
+ "divisor": 3.1089070924799973,
+ "divisor_source": "bpb_slice_meta.json (ln2 * bytes_per_token)",
+ "curve": [
+  {
+   "tok": 10027008,
+   "bpb": 0.9266253766653884,
+   "swap_rate": 0.9996376345009158,
+   "usage_entropy": 0.9982303977012634,
+   "train_lm": 3.1420271396636963,
+   "train_bpb": 1.0106532766012248
+  },
+  {
+   "tok": 20054016,
+   "bpb": 0.902900837005786,
+   "swap_rate": 0.9996642246642247,
+   "usage_entropy": 0.9984152317047119,
+   "train_lm": 2.9509437084198,
+   "train_bpb": 0.9491900596057411
+  },
+  {
+   "tok": 30015488,
+   "bpb": 0.8897978941125141,
+   "swap_rate": 0.9996959420787546,
+   "usage_entropy": 0.9985854029655457,
+   "train_lm": 2.8771555423736572,
+   "train_bpb": 0.9254556205082763
+  },
+  {
+   "tok": 40042496,
+   "bpb": 0.8805754107060807,
+   "swap_rate": 0.9997227110996643,
+   "usage_entropy": 0.9986230134963989,
+   "train_lm": 2.8431551456451416,
+   "train_bpb": 0.9145191738030153
+  },
+  {
+   "tok": 50003968,
+   "bpb": 0.8736745622110837,
+   "swap_rate": 0.9997359465621184,
+   "usage_entropy": 0.998688817024231,
+   "train_lm": 2.823467969894409,
+   "train_bpb": 0.9081866668592238
+  }
+ ]
+}

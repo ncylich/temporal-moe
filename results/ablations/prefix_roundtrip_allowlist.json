@@ -1,0 +1,5 @@
+{
+ "note": "(record, task) pairs whose saved transcripts re-tokenize to the exact original sequence. ONLY these may use a continuation/resume path; everything else must regenerate from scratch. Producer: analysis/residency/tests/test_prefix_roundtrip.py",
+ "items_sampled_per_dump": 60,
+ "allow": []
+}

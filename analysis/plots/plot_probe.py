@@ -33,6 +33,7 @@ def topk_ids(logits, k):
     idx = np.argpartition(-logits, k-1, axis=-1)[..., :k]
     m = np.zeros_like(logits, bool); np.put_along_axis(m, idx, True, axis=-1); return m
 
+RASTER_MOE, RASTER_TMP = "#f4756b", "#7ecb7e"   # paper palette, coarse 6-of-64 shades
 HAVE_LOGS = os.path.exists(f"{RUNS}/tmoe_minlogit_sh1_s2_1e17/router_log.pt")
 
 # tag, active-params(M), temporal run, full-MoE run (or None)
@@ -72,7 +73,7 @@ def _draw_raster(panels, k, E, L, tag, outfile):
     if len(panels) == 1: axes = [axes]
     for ax, (title, M, c) in zip(axes, panels):
         ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(2.4 if PAPER else 6), c=c, marker="o", linewidths=0)
-        ax.set_ylabel("expert idx"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
+        ax.set_ylabel("expert index"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
         ax.set_ylim(-1, E); ax.set_yticks([0, (E-1)//2, E-1]); ax.grid(True, ls=":", alpha=0.3)
     axes[-1].set_xlabel("token position" if PAPER else f"token position (sequence 0, MoE layer {L})")
     if PAPER:
@@ -87,16 +88,18 @@ def _draw_raster(panels, k, E, L, tag, outfile):
                  "expert stays selected across many consecutive tokens (temporal locality); this is descriptive, "
                  "not better/worse.", ha="center", fontsize=8, wrap=True)
     fig.tight_layout(rect=[0, 0, 1, 1] if PAPER else [0, 0.06, 1, 1])
-    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=200 if PAPER else 140); plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
+    fig.savefig(f"{OUT}/{outname(outfile)}", dpi=200 if PAPER else 140)
+    if PAPER: fig.savefig(f"{OUT}/{outname(outfile)[:-4]}.pdf")
+    plt.close(fig); print("wrote", f"{OUT}/{outname(outfile)}")
 
 def raster(temporal_run, moe_run, tag, outfile, W=220):
     t = load(temporal_run); L = sorted(t["layers"])[-1]; k = t["layers"][L]["k"]
     E = t["layers"][L]["logits"].shape[-1]; b = 0
     panels = []
     if moe_run:
-        m = load(moe_run); panels.append(("full MoE  (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), "C0"))
-    panels.append(("temporal (resident set used)", t["layers"][L]["mask"][:W, b], "C2"))
-    panels.append(("temporal (unconstrained preference)", topk_ids(t["layers"][L]["logits"][:W, b], k), "C2"))
+        m = load(moe_run); panels.append(("standard MoE (top-k)", topk_ids(m["layers"][L]["logits"][:W, b], k), RASTER_MOE))
+    panels.append(("Temporal MoE (resident set used)", t["layers"][L]["mask"][:W, b], RASTER_TMP))
+    panels.append(("Temporal MoE (constraint removed, free top-k)", topk_ids(t["layers"][L]["logits"][:W, b], k), RASTER_TMP))
     _raster_csv(outfile, panels, k, E, L)             # dump the condensed CSV alongside the figure
     _draw_raster(panels, k, E, L, tag, outfile)
 
@@ -116,11 +119,15 @@ def raster_from_csv(active_params_M, outfile):
     if not by_panel:
         raise SystemExit(f"no rows with active_params_M={active_params_M} in {src}")
     W = 1 + max(tok for cells in by_panel.values() for tok, _ in cells)
+    # display names for the panel keys stored in the committed CSV
+    RENAME = {"full MoE  (top-k)": "standard MoE (top-k)",
+              "temporal (resident set used)": "Temporal MoE (resident set used)",
+              "temporal (unconstrained preference)": "Temporal MoE (constraint removed, free top-k)"}
     panels = []
     for title, cells in by_panel.items():              # dict preserves CSV (panel) order
         M = np.zeros((W, E), bool)
         for tok, exp in cells: M[tok, exp] = True
-        panels.append((title, M, "C0" if title.startswith("full MoE") else "C2"))
+        panels.append((RENAME.get(title, title), M, RASTER_MOE if title.startswith("full MoE") else RASTER_TMP))
     _draw_raster(panels, k, E, L, "", outfile)
 
 # ---------------- A3: learned-locality overlap vs scale ----------------
@@ -140,7 +147,7 @@ def a3_scale():
         rows = []
         with open(f"{REPO}/results/ablations/learned_locality_vs_scale.csv") as f:
             for r in csv.DictReader(f):
-                if "coarse" not in r["model"]:
+                if "coarse" not in r["grain"]:
                     continue
                 rows.append((float(r["active_params_M"]), float(r["temporal_overlap_pct"]),
                              float(r["full_moe_overlap_pct"]) if r["full_moe_overlap_pct"] else None,
