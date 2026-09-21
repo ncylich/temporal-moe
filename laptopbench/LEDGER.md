@@ -8,10 +8,36 @@ degraded ones, appears here.
 
 ## VERDICT (read this first)
 
-**Nothing has been timed.** Phase 0 stopped on missing inputs and a WSL that cannot start
-until Windows is restarted. No number below is a result.
+**Laptop column (Windows native, i7-11370H, 16 GB LPDDR4x-4267, Samsung PM981a NVMe), depth 1024,
+one sitting, n=3, same binary (L1-10):**
 
----
+| arm | tok/s | ratio to ceiling | peak working set (decode phase) |
+|---|---|---|---|
+| ceiling, fully resident (R=192) | 28.30 +/- 0.78 | 1.00 | 5968 MiB |
+| resident control (R=192, two-pass policy) | 19.60 +/- 0.13 | 0.69 | 5972 MiB |
+| **deploy (R=18, two-pass, streamed from the NVMe, 4 GB cap)** | **18.67 +/- 0.08** | **0.66** | **2563 MiB (1066 MiB)** |
+| vanilla floor (R=18, plain kernel, every needed expert refetched) | 0.82 at depth 0 | 0.025 | 1345 MiB |
+
+Deploy runs at 95% of the resident control: **streaming the experts from the NVMe costs almost
+nothing; the two-pass swap policy costs 31%**, of which about three quarters is the split itself and
+one quarter eviction (NOMADV control, L1-8). Deploy over its own-depth ceiling: 0.70 at depth 0,
+0.65 at 1024, 0.68 at 2048, 0.75 at 4096 (L1-7). The ceiling fails to start under a 4 GB cap; deploy
+runs under it, and under 2.5 GB at depth 0 but not at depth 1024, because the depth prefill (no
+expert-major path in this fork) needs ~3 GB of commit before decode. The one tuning that mattered:
+SPLIT=1, +47% over the Pixel's SPLIT=2 (L1-5); everything else swept flat, `-t 8` halves throughput.
+
+**Gates on the reported binary:** G1 exact (rel. error 1e-6, L1-6); G2 same-binary identity to every
+digit (185468.5410 +/- 4951.23870); G3 repacked vs plain kernels 32.4 vs 26.6 tok/s. Gates in their x86
+form (ruling 2026-09-20): clang-cl and gcc round the same kernels differently, so the WSL2 oracle
+(185548.9246) is recorded, not matched.
+
+**Provisional until:** the `Get-MpPreference` paste replaces the attestation (every row is marked), and
+the orchestrator accepts the x86 gate forms. **Retracted during the campaign:** nothing in numbers; two
+driver defects were corrected before any row was taken (L1-2 log copies, L1-4 counter checker) and
+24 rows changed status under the clock-rule ruling (L1-6).
+
+**Environment decision:** rule 3, Windows native (L1-1b/L1-1c: WSL2 4k QD1 latency 1.43-1.70x native).
+WSL2's only product is the oracle. The port is on the fork at `temporal-moe-win` 43bec5f31.
 
 ## 0. Phase 0 -- checkout and preflight
 
@@ -899,5 +925,44 @@ Between sittings the same deploy configuration reads 16.74 (queue A, 17:00-00:30
 0.02-0.10 sd. The streamed arm therefore drifts by up to 10% over hours while its own probes stay
 within 3%; the closing-ceiling drift check per depth was flat. This is why queue E takes all four
 arms in one sitting.
+
+**Retracted:** nothing.
+
+### L1-10 -- Queue E and F: the final one-sitting session at depth 1024 (tag w2), the memory demonstration at depth, the prefill diagnostic; verdict block written
+
+Windows native, i7-11370H, PM981a, binary 99225874a8f0 (fork temporal-moe-win 43bec5f31, clang-cl,
+gates L1-6), production flags (Pixel set with SPLIT=1), `-t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU
+-d 1024`, one warmup and a resident clock probe per batch, 300 s rests, interleaved a b c e x3 plus a
+closing ceiling, 2026-09-21 08:31-10:29, host quiet throughout (probes 34.6-36.6 tok/s).
+
+| arm | tok/s (n) | ratio to ceiling | peak working set | decode-phase | per token (pool line) |
+|---|---|---|---|---|---|
+| (a) ceiling R=192 | **28.30 +/- 0.78** (4) | 1.000 | 5968 MiB | 5967 MiB | fetches 0 |
+| (b) resident control R=192 + TWOPASS | **19.60 +/- 0.13** (3) | 0.693 | 5972 MiB | 1031 MiB (evicted experts are decommitted) | 112.1 fetches, 135 evictions, 45 swaps |
+| (c) deploy R=18 + TWOPASS, cap 4G | **18.67 +/- 0.08** (3; 18.68, 18.56, 18.76) | **0.660** | **2563 MiB** | **1066 MiB** | 144.3 fetches (30.4 MiB), 141.9 evictions, 45 swaps |
+| (e) floor R=18 NO_REPACK SWAP_PROB=1.0, cap 4G | aborted x3 | -- | 3.9 GB at abort | -- | the plain-kernel prefill of the 1024-token context needs every needed expert resident per op and hits the commit cap; the floor stands at depth 0 (0.82 tok/s, L1-5) |
+
+Deploy over control: 0.953. Counters match the arm in every recorded row; the three floor attempts
+and the 2.5 GB demonstration are in refused.jsonl with their abort lines.
+
+**Memory demonstration at depth 1024.** Ceiling under 4 GB: failed to start ("commit refused; the
+model does not fit the memory cap", job peak at the limit, working set 4079 MiB at abort). Deploy
+under 4 GB: ran, 18.67 tok/s, 2563 MiB peak, 1066 MiB in decode. Deploy under 2.5 GB: **failed** at
+2169 MiB working set, commit refused during the depth prefill, which fetches on miss without
+eviction and needs ~3.0 GB of commit before decode starts (L1-6); at depth 0 the same arm ran under
+2.5 GB at 799 MiB (L1-5). The fork has no expert-major prefill path; the decode-phase residency is
+the R=k claim, the prefill excursion is the caveat.
+
+**Prefill diagnostic (queue F), unoptimized by construction:** `-p 512 -n 0 -b 512`, n=3.
+Ceiling: **ubatch 64: 69.06 tok/s, ubatch 512: 74.39 tok/s** (probes 34.2-34.6 against the sitting's
+36.6 best, so flagged by the ceiling's clock rule; sd < 1). Deploy under its 4 GB cap: aborted at both
+ubatch sizes (peaks 3.7-3.9 GB): with no decode token the window trim never runs and four consecutive
+512-token prefills accumulate residency past the cap. Deploy's prefill speed is being measured
+uncapped (12G) in the follow-up and goes into L1-11 with the TRIM A/B.
+
+**Sitting-to-sitting.** The same four configurations read differently across the week (ceiling 32.8
+at depth 0 on 09-16; depth-1024 ceiling 25.9 in the seven-hour depth arm on 09-20, 28.3 here; deploy
+16.7 / 18.0 / 18.7), while within a sitting the interleaved repeats agree to 1-3% and the probe stays
+within 3%. Ratios are therefore always quoted within a sitting; this entry's are the paper's.
 
 **Retracted:** nothing.
