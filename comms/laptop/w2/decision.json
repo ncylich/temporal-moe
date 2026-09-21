@@ -1,0 +1,27 @@
+{
+ "decision": "linux-native (rule 2): needs Mohsen; if unavailable, rule 3 (Windows port), not this session",
+ "t0_4k_qd1_us": {
+  "windows": 100.670331128,
+  "wsl": 143.840405835,
+  "wsl_over_native": 1.4288261916225373
+ },
+ "t0_cached": {
+  "windows": false,
+  "wsl": false
+ },
+ "t0_pass": false,
+ "t1": {
+  "t4": {
+   "windows": 24.048261,
+   "wsl": 29.604683,
+   "wsl_over_native": 1.2310529647029365
+  },
+  "t8": {
+   "windows": 36.163638,
+   "wsl": 26.792851,
+   "wsl_over_native": 0.7408781992563912
+  }
+ },
+ "t1_pass": false,
+ "ts": "2026-09-14T00:42:11"
+}

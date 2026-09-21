@@ -1,0 +1,305 @@
+{
+ "windows": {
+  "cached": false,
+  "cmds": [
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd1_4k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=4k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd1_32k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=32k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd1_108k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=108k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd1_216k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd1_648k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=648k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd1_1024k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=1 --bs=1024k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd4_216k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=4 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd8_216k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=8 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "C:\\tmoe\\tools\\fio\\fio\\fio.exe --thread --name=qd12_216k --filename=C\\:\\tmoe\\probe\\probe.bin --size=8G --rw=randread --direct=1 --iodepth=12 --bs=216k --ioengine=windowsaio --runtime=20 --time_based --norandommap --randrepeat=0 --group_reporting --output-format=json",
+   "powershell -NoProfile -NonInteractive -Command \"$n=268435456; $a=New-Object byte[] $n; $b=New-Object byte[] $n; [Buffer]::BlockCopy($a,0,$b,0,$n); $sw=[Diagnostics.Stopwatch]::StartNew(); for($i=0;$i -lt 16;$i++){[Buffer]::BlockCopy($a,0,$b,0,$n)}; $sw.Stop(); 'dram_copy_MBps=' + [math]::Round(16*256/$sw.Elapsed.TotalSeconds)\""
+  ],
+  "dram": {
+   "MBps": 15508,
+   "method": "single-thread .NET BlockCopy 256 MiB x16 (read+write counted once)"
+  },
+  "env": "windows",
+  "file_bytes": 8589934592,
+  "fio_version": "fio-3.42",
+  "fit": {
+   "bw_MBps_by_qd": {
+    "1": 958.452941,
+    "12": 2867.230718,
+    "4": 2713.8694,
+    "8": 2872.638396
+   },
+   "fixed_us": 130.45543659246704,
+   "fixed_us_p50": 115.34555632058336,
+   "per_kib_us": 0.4016850352220462,
+   "per_kib_us_p50": 0.37248359354158456,
+   "r2": 0.985399810685993,
+   "r2_p50": 0.9823331292304542
+  },
+  "provisional": "Defender exclusions attested in C:\\tmoe\\DEFENDER_EXCLUSIONS.txt, Get-MpPreference output pending; WSL2 rows pending Linux-native re-measurement",
+  "qd": {
+   "12": {
+    "bw_MBps": 2867.230718,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 57347481600,
+    "iops": 12963.101845,
+    "lat_mean_us": 924.237719387,
+    "lat_p50_us": 897.024,
+    "lat_p99_us": 1122.304,
+    "runtime_ms": 20001,
+    "total_ios": 259275
+   },
+   "4": {
+    "bw_MBps": 2713.8694,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 54280101888,
+    "iops": 12269.736513,
+    "lat_mean_us": 324.685565921,
+    "lat_p50_us": 305.152,
+    "lat_p99_us": 468.992,
+    "runtime_ms": 20001,
+    "total_ios": 245407
+   },
+   "8": {
+    "bw_MBps": 2872.638396,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 57455640576,
+    "iops": 12987.550622,
+    "lat_mean_us": 614.829128301,
+    "lat_p50_us": 593.92,
+    "lat_p99_us": 782.336,
+    "runtime_ms": 20001,
+    "total_ios": 259764
+   }
+  },
+  "sizes": {
+   "1024k": {
+    "bw_MBps": 1981.394997,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 39629881344,
+    "iops": 1889.60552,
+    "lat_mean_us": 527.941053183,
+    "lat_p50_us": 481.28,
+    "lat_p99_us": 659.456,
+    "runtime_ms": 20001,
+    "total_ios": 37794
+   },
+   "108k": {
+    "bw_MBps": 564.15135,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 11283591168,
+    "iops": 5101.19494,
+    "lat_mean_us": 195.107471552,
+    "lat_p50_us": 175.104,
+    "lat_p99_us": 284.672,
+    "runtime_ms": 20001,
+    "total_ios": 102029
+   },
+   "216k": {
+    "bw_MBps": 958.452941,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 19170017280,
+    "iops": 4333.283336,
+    "lat_mean_us": 229.822064001,
+    "lat_p50_us": 205.824,
+    "lat_p99_us": 309.248,
+    "runtime_ms": 20001,
+    "total_ios": 86670
+   },
+   "32k": {
+    "bw_MBps": 232.344632,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 4647124992,
+    "iops": 7090.59547,
+    "lat_mean_us": 140.19634594800002,
+    "lat_p50_us": 127.488,
+    "lat_p99_us": 177.152,
+    "runtime_ms": 20001,
+    "total_ios": 141819
+   },
+   "4k": {
+    "bw_MBps": 40.367543,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 807391232,
+    "iops": 9855.357232,
+    "lat_mean_us": 100.670331128,
+    "lat_p50_us": 84.48,
+    "lat_p99_us": 148.48,
+    "runtime_ms": 20001,
+    "total_ios": 197117
+   },
+   "648k": {
+    "bw_MBps": 1632.88665,
+    "error": 0,
+    "fio_version": "fio-3.42",
+    "io_bytes": 32659365888,
+    "iops": 2460.826959,
+    "lat_mean_us": 405.21934531399995,
+    "lat_p50_us": 374.784,
+    "lat_p99_us": 497.664,
+    "runtime_ms": 20001,
+    "total_ios": 49219
+   }
+  },
+  "sparse_query": "This file is NOT set as sparse",
+  "tag": "s1-provisional",
+  "ts": "2026-09-14T00:20:27"
+ },
+ "wsl": {
+  "cached": false,
+  "cmds": [
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0019_fio_4k_qd1.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0020_fio_32k_qd1.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0021_fio_108k_qd1.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0022_fio_216k_qd1.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0023_fio_648k_qd1.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0024_fio_1024k_qd1.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0025_fio_216k_qd4.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0026_fio_216k_qd8.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0027_fio_216k_qd12.sh\"",
+   "wsl -d Ubuntu-24.04 -e bash -c \"bash /mnt/c/tmoe/logs/s1-provisional/cmd_0028_dram.sh\""
+  ],
+  "dram": {
+   "MBps": 36857.939230719996,
+   "method": "sysbench memory read 1M blocks 16G single thread"
+  },
+  "env": "wsl",
+  "file_stat": "size=8589934592 blocks512=16777224\n/home/mohsen/tmoe/probe/probe.bin: 6 extents found",
+  "fio_version": "fio-3.36",
+  "fit": {
+   "bw_MBps_by_qd": {
+    "1": 721.112257,
+    "12": 2839.816332,
+    "4": 2649.065729,
+    "8": 2904.863294
+   },
+   "fixed_us": 178.73543022901833,
+   "fixed_us_p50": 166.1560814542868,
+   "per_kib_us": 0.4712676143862648,
+   "per_kib_us_p50": 0.4330981846822241,
+   "r2": 0.9860329086373855,
+   "r2_p50": 0.9867972563215737
+  },
+  "provisional": "Defender exclusions attested in C:\\tmoe\\DEFENDER_EXCLUSIONS.txt, Get-MpPreference output pending; WSL2 rows pending Linux-native re-measurement",
+  "qd": {
+   "12": {
+    "bw_MBps": 2839.816332,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 56799166464,
+    "iops": 12839.158042,
+    "lat_mean_us": 933.39197211,
+    "lat_p50_us": 913.408,
+    "lat_p99_us": 1122.304,
+    "runtime_ms": 20001,
+    "total_ios": 256796
+   },
+   "4": {
+    "bw_MBps": 2649.065729,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 52983963648,
+    "iops": 11976.751162,
+    "lat_mean_us": 332.83392428999997,
+    "lat_p50_us": 313.344,
+    "lat_p99_us": 468.992,
+    "runtime_ms": 20001,
+    "total_ios": 239547
+   },
+   "8": {
+    "bw_MBps": 2904.863294,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 58100170752,
+    "iops": 13133.243338,
+    "lat_mean_us": 607.976463111,
+    "lat_p50_us": 585.728,
+    "lat_p99_us": 774.144,
+    "runtime_ms": 20001,
+    "total_ios": 262678
+   }
+  },
+  "sizes": {
+   "1024k": {
+    "bw_MBps": 1602.406151,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 32049725440,
+    "iops": 1528.173591,
+    "lat_mean_us": 652.743491412,
+    "lat_p50_us": 602.112,
+    "lat_p99_us": 864.256,
+    "runtime_ms": 20001,
+    "total_ios": 30565
+   },
+   "108k": {
+    "bw_MBps": 434.245423,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 8685342720,
+    "iops": 3926.553672,
+    "lat_mean_us": 253.421300834,
+    "lat_p50_us": 234.496,
+    "lat_p99_us": 342.016,
+    "runtime_ms": 20001,
+    "total_ios": 78535
+   },
+   "216k": {
+    "bw_MBps": 721.112257,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 14422966272,
+    "iops": 3260.236988,
+    "lat_mean_us": 305.435527359,
+    "lat_p50_us": 280.576,
+    "lat_p99_us": 428.032,
+    "runtime_ms": 20001,
+    "total_ios": 65208
+   },
+   "32k": {
+    "bw_MBps": 172.573873,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 3451650048,
+    "iops": 5266.536673,
+    "lat_mean_us": 188.716170749,
+    "lat_p50_us": 177.152,
+    "lat_p99_us": 259.072,
+    "runtime_ms": 20001,
+    "total_ios": 105336
+   },
+   "4k": {
+    "bw_MBps": 28.279008,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 565608448,
+    "iops": 6904.054797,
+    "lat_mean_us": 143.840405835,
+    "lat_p50_us": 134.144,
+    "lat_p99_us": 207.872,
+    "runtime_ms": 20001,
+    "total_ios": 138088
+   },
+   "648k": {
+    "bw_MBps": 1361.441099,
+    "error": 0,
+    "fio_version": "fio-3.36",
+    "io_bytes": 27230183424,
+    "iops": 2051.747413,
+    "lat_mean_us": 485.87147761800003,
+    "lat_p50_us": 448.512,
+    "lat_p99_us": 651.264,
+    "runtime_ms": 20001,
+    "total_ios": 41037
+   }
+  },
+  "tag": "s1-provisional",
+  "ts": "2026-09-14T00:23:37"
+ }
+}
