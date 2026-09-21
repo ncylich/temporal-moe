@@ -788,3 +788,44 @@ a, b, c, e at depth 1024 n=3 plus the memory demonstration -> F prefill diagnost
 Driver: `--depth`, `prefill` stage, per-depth ceilings in `report`, `production_flags.json`.
 
 **Retracted:** nothing. (The 24 relabelled rows change status, not numbers.)
+
+### L1-7 -- Queue A, the context-depth arm (paper row): deploy against a same-depth ceiling at 0 / 1024 / 2048 / 4096
+
+Windows native, binary 99225874a8f0 (fork 43bec5f31, gates L1-6), production flags with SPLIT=1,
+`-t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -d <depth>`, interleaved per depth (ceiling, deploy),
+three rounds plus a closing ceiling per depth, 300 s rests, job caps 12G (ceiling) / 4G (deploy).
+2026-09-20 17:03 to 09-21 00:26. Rows provisional as before (Defender paste pending; x86 gates).
+
+| depth | ceiling tok/s (n) | deploy tok/s (n=3) | deploy / same-depth ceiling | deploy peak wset / decode-phase | deploy per token |
+|---|---|---|---|---|---|
+| 0 | 32.84 +/- 1.75 (4, L1-5) | 22.82 +/- 0.05 (the SPLIT=1 sweep rows, identical flags) | **0.695** | 799 / 799 MiB | 137.4 fetches, 135 evictions, 45 swaps |
+| 1024 | 25.89 +/- 0.32 (4) | 16.74 +/- 0.77 (15.90, 16.57, 17.76) | **0.647** | 2563 / 1052-1066 MiB | 144.3 fetches, 141.9 evictions, 45 swaps |
+| 2048 | 20.42 +/- 0.43 (4) | 13.83 +/- 0.55 | **0.677** | 2821 / (field noisy, see below) | 144.6 / 142.3 / 45 |
+| 4096 | 13.17 +/- 0.14 (4) | 9.93 +/- 0.22 | **0.754** | 3257 / (same) | 145.0 / 142.6 / 45 |
+
+Same-depth ceilings, as pitfall #27 requires; the ceiling falls 2.5x from depth 0 to 4096 (the Pixel's
+e80 fell 2.2x). Counters match the arm at every depth (invariant 2); the +9 fetches and +7 evictions
+per token above depth 0 are the window trim's refetches after each rep's prefill (L1-6).
+
+**Reading.** From depth 1024 the ratio rises with depth (0.647 -> 0.677 -> 0.754), the Pixel's
+mechanism (fixed swap cost amortised against attention; Pixel fine-shape: 0.639 -> 0.700 -> 0.774 ->
+0.834). The depth-0 point (0.695) sits above depth 1024, unlike the Pixel; two things differ at
+depth 0 on this rig: no trim refetches (137 vs 144 fetches/token) and no prefill excursion, and the
+depth-0 ceiling comes from the 09-16 sitting (probes 27.7-35.2) while today's probes sat at
+32.8-34.8. The depth-0 deploy rows are the `deploy_R18_SPLIT=1` sweep rows (same flags as production
+now); the resume logic skipped a fresh depth-0 batch because the label collided with the old SPLIT=2
+rows, which is recorded rather than patched. Queue E re-measures a, b, c, e at depth 1024 in one
+sitting.
+
+**Memory at depth.** Peak working set grows with depth because the depth prefill fetches on miss
+and never evicts (L1-6); decode-phase residency after the trim is ~1.05 GiB at depth 1024 (799 MiB
+of experts and non-expert weights plus the KV cache). For depth 2048/4096 the `wset_last_mib` field
+in these rows is the raw last sample and sometimes caught teardown (values from 185 to 2136 MiB);
+from queue B on it is the median of the run's last fifth (72d17e50). The peaks are exact.
+
+**Clock probes** in this sitting: 32.8-34.8 tok/s on every batch; the ceilings carry
+`degraded_clock` only because the session's reference was the 09-16 best (42.3); the reference now
+resets per sitting (6 h), so those flags are a bookkeeping artifact of the rule, and the per-depth
+closing ceilings show no drift (25.53 -> 25.64 -> 26.2 -> 26.1 at 1024; sd 0.32).
+
+**Retracted:** nothing.
