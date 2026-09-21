@@ -81,6 +81,10 @@ PRESENCE_FLAGS = {"LLAMA_TEMPORAL_TWOPASS", "LLAMA_TEMPORAL_FUSED", "LLAMA_TEMPO
                   "LLAMA_TEMPORAL_URING_IOPOLL", "LLAMA_TEMPORAL_TRACE", "LLAMA_NO_REPACK",
                   "LLAMA_TEMPORAL_REPACK"}
 
+# flags the engine parses with atoi (0 = off); every other LLAMA_TEMPORAL_ flag is presence-parsed
+VALUE_PARSED = {"LLAMA_TEMPORAL_TRIM", "LLAMA_TEMPORAL_NOMADV", "LLAMA_TEMPORAL_MADV_FREE", "LLAMA_TEMPORAL_ODIRECT",
+                "LLAMA_TEMPORAL_ENFORCE", "LLAMA_TEMPORAL_EVICT_DEFER", "LLAMA_TEMPORAL_JANITOR_NOLOCK",
+                "LLAMA_TEMPORAL_SIBLING_PREFETCH", "LLAMA_TEMPORAL_LRU", "LLAMA_TEMPORAL_SWAP_PROB"}
 ENGINE_ARGS = "-t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU"
 WARMUP_ARGS = "-t 4 -p 0 -n 32 -r 1 -mmp 0 -ot _exps=CPU"
 PROBE_ARGS = "-t 4 -p 0 -n 256 -r 4 -mmp 0"          # ~1024 resident tokens, ~20 s at 50 tok/s
@@ -1042,7 +1046,7 @@ def parse_overrides(sets: list[str]) -> dict:
         if "=" not in s:
             die(f"--set needs KEY=VAL: {s}")
         k, v = s.split("=", 1)
-        if v.strip() == "0":
+        if v.strip() == "0" and k not in VALUE_PARSED:
             die(f"--set {k}=0 refused: {k} would be ENABLED by that if it is presence-parsed "
                 f"(pitfall #17); use --set {k}= to remove it")
         o[k] = None if v == "" else v
@@ -1706,7 +1710,9 @@ def sweep(env: str, knob: str, n: int, rest: int, sets: list[str], base_arm: str
         die("--knob NAME=v1,v2 required")
     name, vals = knob.split("=", 1)
     vals = [v for v in vals.split(",")]
-    if any(v.strip() == "0" for v in vals):
+    # pitfall #17 guards PRESENCE-parsed flags (setting them to 0 turns them on). Value-parsed
+    # flags (atoi) are legitimately switched off with 0: LLAMA_TEMPORAL_TRIM=0 is the trim A/B.
+    if any(v.strip() == "0" for v in vals) and name not in VALUE_PARSED:
         die(f"--knob {name}=0 refused (pitfall #17); use an empty value to remove the flag")
     overrides = parse_overrides(sets)
     bench_hash = require_gated(env)
