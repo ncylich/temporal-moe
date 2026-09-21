@@ -873,3 +873,31 @@ until E: n=2 on the NOMADV arm, and the control's sd (1.36) is 5x deploy's.
 is waiting for the host to be free. Queue D follows.
 
 **Retracted:** nothing.
+
+### L1-9 -- Queue D: the depth-1024 knob sweeps. Flat except threads (SMT hurts 46%) and a 2% eviction-deferral gain
+
+Same binary (99225874a8f0), deploy at production flags (SPLIT=1), depth 1024, cap 4G, n=3 per value,
+A/B/A/B interleaved, 180 s rests, 2026-09-21 02:00-08:31 (after Chrome was closed). Every row's
+counters match the arm (144.3 fetches, 141.9 evictions, 45 swaps per token; peak 2563 MiB,
+decode-phase 1066 MiB). The "unset" value of each knob is the production configuration measured
+inside that sweep, so each comparison is same-sitting.
+
+| knob | values -> tok/s (sd) | delta | verdict |
+|---|---|---|---|
+| FETCH_THREADS | 4: 18.44 (0.08), 6: 18.77 (0.02), 8: 18.60 (0.09), 12: 18.55 (0.02) | +/-2% | flat; 6 stays |
+| SPIN_US | 300: 18.76 (0.68), 1000: 18.65, 2000: 18.70, 5000: 18.67 | <1% | flat; 5000 stays |
+| SPINNERS | 2: 18.71 (0.05), 6: 18.76 (0.01) | +0.3% | flat |
+| EVICT_DEFER | off: 18.75 (0.02), on: **19.13 (0.02)** | **+2.0%** | small, > 2 sd, < 3%: not promoted, noted (the Pixel rejected it at -4.1%, the Samsung was neutral; pitfall #19 again) |
+| JANITOR_NOLOCK | off: 18.70 (0.10), on: 18.93 (0.02) | +1.2% | inside the 3% band; noted |
+| THREADS | 4: 18.68 (0.03), 8: **10.08 (0.08)** | **-46%** | eight compute threads on four cores put the SMT siblings under the fetch workers and the spin waits; `-t 4` is the only sane setting (the Samsung saw t8 -20%) |
+| FUSED (queue B) | off 18.04, on 17.26 | -4.3% | rejected (L1-8) |
+| NOMADV on deploy | off: 18.55 (0.09); on: **aborted, all three batches** | | with no page release the streamed arm's residency grows without bound and the 4 GB commit cap refuses it ("commit refused" before the pool line, refused.jsonl); the cap turning an unbounded-residency arm into a hard failure instead of a quiet swap is pitfall #20 handled; the meaningful NOMADV A/B is the resident control's (L1-8) |
+| TRIM | -- | | the sweep was refused 50 times by the driver's own pitfall-17 guard (`=0`); TRIM is value-parsed, the guard now exempts value-parsed flags, and the A/B runs after queue E/F |
+
+Between sittings the same deploy configuration reads 16.74 (queue A, 17:00-00:30), 18.04 (queue B,
+00:30-01:10) and 18.5-19.1 (queue D, 02:00-08:30); within a sweep the interleaved values agree to
+0.02-0.10 sd. The streamed arm therefore drifts by up to 10% over hours while its own probes stay
+within 3%; the closing-ceiling drift check per depth was flat. This is why queue E takes all four
+arms in one sitting.
+
+**Retracted:** nothing.
