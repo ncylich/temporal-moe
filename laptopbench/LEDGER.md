@@ -829,3 +829,47 @@ resets per sitting (6 h), so those flags are a bookkeeping artifact of the rule,
 closing ceilings show no drift (25.53 -> 25.64 -> 26.08 -> 26.32 at 1024; sd 0.32).
 
 **Retracted:** nothing.
+
+### L1-8 -- Queue B: FUSED loses at depth 1024, SPLIT=1 stays production. Queue C: the policy cost splits into two-pass and eviction
+
+Same binary and protocol as L1-7, depth 1024, deploy cap 4G, control cap 12G, 2026-09-21 00:26-01:58.
+
+**B. FUSED (one 648 KiB read per swap) against the production three-slice reads, deploy, n=3 each,
+interleaved:** FUSED off **18.04 +/- 0.26** (17.67, 18.17, 18.28); FUSED on **17.26 +/- 0.31** (16.83,
+17.52, 17.43). Counters identical (144.3 fetches, 141.9 evictions per token), working set identical
+(2563 / 2567 MiB peak, 1066 / 1070 MiB decode phase). Difference -4.3%, larger than 3% and than 2 sd,
+against FUSED. On Windows the fused path is one unbuffered read plus three memcpys (L1-3); the Pixel
+rejected it for a different reason (the 512 KiB block-layer split). **Not promoted;** production stays
+at SPLIT=1, `production_flags.json` was not written (decision file
+`production_flags_decision.json`).
+
+Sitting note: the same deploy configuration measured 16.74 +/- 0.77 in queue A (17:03-00:26, three
+rounds spread over seven hours) and 18.04 here (00:26-01:09); the closing-ceiling drift check per
+depth stayed flat, so this is between-sitting variation of the streamed arm itself, not clocks. Queue
+E measures everything in one sitting.
+
+**C. NOMADV on the resident control (R=192 + TWOPASS), depth 1024, n=3 vs n=2:** eviction on
+**18.18 +/- 1.36** (n=3); NOMADV=1 (state machine and fetches unchanged, no page release)
+**20.09 +/- 0.13** (n=2; the third batch was refused by the host check, below). Fetches 112.1 per
+token both, evictions 135.0 both (counted, not executed under NOMADV), decode-phase working set 1035
+MiB vs 5974 MiB (NOMADV never releases, as intended). Against the depth-1024 ceiling 25.89 (L1-7):
+
+| | tok/s | fraction of ceiling | cost |
+|---|---|---|---|
+| ceiling | 25.89 | 1.000 | |
+| control, no page release (NOMADV) | 20.09 | 0.776 | two-pass split + wait: **22%** |
+| control, production eviction | 18.18 | 0.702 | eviction (decommit + refault): **a further 7.4%** |
+| deploy (streamed, SPLIT=1, from B) | 18.04 | 0.697 | streaming at R=18: **~0%** on top of the control |
+
+So at depth 1024 the policy costs 30% of the ceiling, of which roughly three quarters is the
+two-pass split itself and one quarter the eviction; streaming the experts from the NVMe on top of
+that policy costs nothing measurable here, which is L1-5's "control below the streamed arm" resolved:
+the control refetches 112 slices per token in steady state (L1-4) and pays the eviction on top, so
+it is not a zero-traffic arm, and the streamed arm at SPLIT=1 is as fast as the control. Two caveats
+until E: n=2 on the NOMADV arm, and the control's sd (1.36) is 5x deploy's.
+
+**Refused batch.** The third NOMADV=1 batch was refused at 01:58 by the memory check: 6174 MB available
+< 7500 MB. Chrome had been started again on the host (about 2 GB across its processes); the runner
+is waiting for the host to be free. Queue D follows.
+
+**Retracted:** nothing.
