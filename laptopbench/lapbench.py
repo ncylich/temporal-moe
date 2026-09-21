@@ -1151,10 +1151,12 @@ def engine_run_windows(label: str, flags: dict | None, args: str, timeout: int =
         job.assign(p.pid)
         ps.resume()
     last_io, last_mem = None, None
+    wsamples: list[tuple[float, float]] = []                   # (t since start, working set MiB)
     while True:
         try:
             last_io = ps.io_counters()
             last_mem = ps.memory_info()
+            wsamples.append((time.time() - t0, last_mem.wset / 1048576))
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
         try:
@@ -1173,6 +1175,15 @@ def engine_run_windows(label: str, flags: dict | None, args: str, timeout: int =
     d["pool"] = parse_pool(stderr)
     d["vmhwm_mib"] = (last_mem.peak_wset / 1048576) if last_mem else None
     d["peak_commit_mib"] = (last_mem.peak_pagefile / 1048576) if last_mem else None
+    # working-set time series: the peak sits in the depth prefill (no eviction there); the
+    # decode-phase residency is what the second half of the run shows (L1-6)
+    if wsamples:
+        half = [w for _, w in wsamples[len(wsamples) // 2:]]
+        d["wset_last_mib"] = wsamples[-1][1]
+        d["wset_second_half_median_mib"] = sorted(half)[len(half) // 2]
+        d["wset_samples_n"] = len(wsamples)
+        step = max(1, len(wsamples) // 40)
+        d["wset_series"] = [(round(t, 1), round(w)) for t, w in wsamples[::step]]
     d["vmswap_peak_mib"] = 0.0                              # commit is bounded by the job; no swap notion
     d["read_bytes"] = int(last_io.read_bytes) if last_io else -1
     d["read_count"] = int(last_io.read_count) if last_io else -1
@@ -1546,6 +1557,8 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
            "decode_tok_s": m.get("decode_tps"), "decode_sd": m.get("decode_sd"), "tokens": tokens,
            "wall_s": m["wall_s"], "rc": m["rc"], "pool": m.get("pool"), "vmhwm_mib": m.get("vmhwm_mib"),
            "peak_commit_mib": m.get("peak_commit_mib"), "job": m.get("job"), "read_count": m.get("read_count"),
+           "wset_last_mib": m.get("wset_last_mib"), "wset_second_half_median_mib": m.get("wset_second_half_median_mib"),
+           "wset_series": m.get("wset_series"),
            "vmswap_peak_mib": m.get("vmswap_peak_mib"), "read_bytes": m["read_bytes"], "disk_read_mib": m["disk_read_mib"],
            "mem_avail_mib": m["mem_avail_mib"], "host": {k: st.get(k) for k in ("overlay_ac", "scheme", "power_online",
                                                                              "battery_pct", "cpu_load_pct", "forced")},
