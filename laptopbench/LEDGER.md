@@ -966,3 +966,39 @@ at depth 0 on 09-16; depth-1024 ceiling 25.9 in the seven-hour depth arm on 09-2
 within 3%. Ratios are therefore always quoted within a sitting; this entry's are the paper's.
 
 **Retracted:** nothing.
+
+### L1-11 -- Follow-ups: the TRIM A/B is free, deploy's prefill uncapped; pack complete
+
+Same binary and sitting conditions as L1-10, 2026-09-21 11:24-13:05, host quiet.
+
+**TRIM (L1-6 engine change) A/B, deploy, depth 1024, cap 4G, n=3 interleaved:** TRIM=1 (production)
+**20.53 +/- 0.45**, TRIM=0 **20.32 +/- 0.07**; difference +1%, inside noise. Counters: with the trim
+144.3 fetches and 141.9 evictions per token (the 7-9 extra are the trimmed experts refetched), without
+it 137.4 / 135.0; decode-phase working set 1066 vs 1074 MiB (without the trim the prefill-resident
+experts stay, but at the row level the run ends in decode either way and this field is the tail
+median; the peak is the prefill's 2563 MiB in both). The trim's one-off eviction burst per rep costs
+nothing at 1024 decode tokens. Kept as production. Note the streamed arm read 20.3-20.5 tok/s in this
+sitting against 18.67 two hours earlier in the same conditions: the between-sitting drift of L1-9,
+now within a day; the ratios in L1-10 stand as measured in their own sitting.
+
+**Deploy prefill, unoptimized, uncapped (12G job cap so the no-eviction prefill path fits), `-p 512
+-n 0 -b 512`, n=3:** ubatch 64 **60.22 +/- 0.31 tok/s**, ubatch 512 **66.78 +/- 2.17 tok/s**; ceiling
+(L1-10) 69.06 and 74.39 -> deploy prefills at **87% / 90% of the resident model**. Peak working set
+4170 / 4247 MiB: the prefill path fetches every needed expert on miss (11.9 slices per prompt token
+over the 4 x 512-token passes) and never evicts, so it does not fit the 4 GB deploy cap (L1-10). The
+CPU fork has no expert-major prefill path; this is the number for the current code, reported as such
+per the orchestrator's instruction and not tuned.
+
+**Pack.** `results/ablations/serving_benchmarks_laptop.csv`: 125 w1 rows and 15 w2 rows (decode rows
+with depth in the context column; prefill rows as phase=prefill with prefill_ms; the ceiling prefill
+rows are in runs.jsonl but excluded from the CSV by the ceiling's clock rule, 94% of the sitting's
+best probe). `comms/laptop/w1/` and `comms/laptop/w2/`: probe, compute, decision, build, gates,
+attribute, memdemo, runs.jsonl, refused.jsonl, session, and the log tarballs. Commits 491cd4c1 and
+df093152 (pack), pushed with this entry.
+
+**Open items, none of which change a number:** the `Get-MpPreference` paste (every row carries the
+attestation note), the orchestrator's acceptance of the x86 gate forms (L1-6 ruling 2), and the
+between-sitting drift of the streamed arm, which a future session could pin down by alternating
+sittings across a day; the ratios within a sitting are stable to 1-3%.
+
+**Retracted:** nothing.
