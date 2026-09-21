@@ -826,6 +826,6 @@ from queue B on it is the median of the run's last fifth (72d17e50). The peaks a
 **Clock probes** in this sitting: 32.8-34.8 tok/s on every batch; the ceilings carry
 `degraded_clock` only because the session's reference was the 09-16 best (42.3); the reference now
 resets per sitting (6 h), so those flags are a bookkeeping artifact of the rule, and the per-depth
-closing ceilings show no drift (25.53 -> 25.64 -> 26.2 -> 26.1 at 1024; sd 0.32).
+closing ceilings show no drift (25.53 -> 25.64 -> 26.08 -> 26.32 at 1024; sd 0.32).
 
 **Retracted:** nothing.
