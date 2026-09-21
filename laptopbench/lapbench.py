@@ -1834,7 +1834,8 @@ def attribute(env: str, sets: list[str]) -> None:
 
 
 # ----------------------------------------------------------------------------- prefill diagnostic (queue F)
-def prefill(env: str, n: int, rest: int, sets: list[str], ubatches: list[int]) -> None:
+def prefill(env: str, n: int, rest: int, sets: list[str], ubatches: list[int], cap_override: str | None = None,
+            which: str = "ac") -> None:
     """Reported as unoptimized: the CPU fork has no expert-major prefill path. Deploy and ceiling at
     -p 512 -n 0, ubatch 64 and 512, interleaved, n batches, clock probe and rests as for decode."""
     if env not in ("wsl", "linux", "windows"):
@@ -1845,9 +1846,11 @@ def prefill(env: str, n: int, rest: int, sets: list[str], ubatches: list[int]) -
     sess = session_state()
     for rnd in range(1, n + 1):
         for ub in ubatches:
-            for key in ("a", "c"):
+            for key in [k for k in ("a", "c") if k in which]:
                 tier, label, R, tp, cap, extra, norep = ARMS[key]
-                lab = f"prefill_{label}_ub{ub}"
+                if cap_override:
+                    cap = cap_override
+                lab = f"prefill_{label}_ub{ub}" + (f"_cap{cap_override.replace('.', 'p')}" if cap_override else "")
                 if already_done(lab, rnd, cap):
                     say(f"skip {lab} r{rnd} (done)"); continue
                 st = check(TARGET, quick=True)
@@ -2026,6 +2029,7 @@ def main() -> None:
     ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "attribute", "prefill", "session", "pack", "report", "decide"])
     ap.add_argument("--depth", default="0", help="context depth(s) -d for arms (comma list) / sweep (one); paper protocol is 1024")
     ap.add_argument("--ubatch", default="64,512", help="prefill diagnostic ubatch sizes")
+    ap.add_argument("--cap-override", default=None, choices=list(CAP_MB), help="prefill: run the arm under this cap instead of its own")
     ap.add_argument("--gates-x86", action="store_true",
                     help="x86 forms of G2/G3: G2 passes on same-binary R=192 == R=18 (the oracle comparison is recorded, "
                          "not required); G3 passes on tok/s differing between kernel families (their PPLs differ on x86). "
@@ -2086,7 +2090,7 @@ def main() -> None:
     elif a.stage == "sweep":
         sweep(a.env, a.knob, a.n, a.rest, a.set, a.base_arm, a.resume, int(a.depth.split(",")[0] or 0))
     elif a.stage == "prefill":
-        prefill(a.env, a.n, a.rest, a.set, [int(x) for x in a.ubatch.split(",") if x])
+        prefill(a.env, a.n, a.rest, a.set, [int(x) for x in a.ubatch.split(",") if x], a.cap_override, which)
     elif a.stage == "attribute":
         attribute(a.env, a.set)
     elif a.stage == "session":
