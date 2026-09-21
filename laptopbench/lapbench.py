@@ -1179,7 +1179,9 @@ def engine_run_windows(label: str, flags: dict | None, args: str, timeout: int =
     # decode-phase residency is what the second half of the run shows (L1-6)
     if wsamples:
         half = [w for _, w in wsamples[len(wsamples) // 2:]]
-        d["wset_last_mib"] = wsamples[-1][1]
+        # decode phase = the last fifth of the run, minus the final two samples (teardown)
+        tail = [w for _, w in wsamples[int(len(wsamples) * 0.8):-2]] or [wsamples[-1][1]]
+        d["wset_last_mib"] = sorted(tail)[len(tail) // 2]
         d["wset_second_half_median_mib"] = sorted(half)[len(half) // 2]
         d["wset_samples_n"] = len(wsamples)
         step = max(1, len(wsamples) // 40)
@@ -1500,7 +1502,18 @@ def clock_probe(session: dict) -> dict:
     tps = r.get("decode_tps") or 0.0
     # The reference is the BEST probe of the session, not the first: a first probe taken while
     # the host is still settling (27.7 vs 35-40 later, w1 round 1) would make the gate toothless.
-    if tps > (session.get("clock_ref_tok_s") or 0):
+    # one sitting = one reference: a best probe older than 6 h belongs to another day's thermal and
+    # power state (42.3 on 09-16 vs 33 on 09-20 flagged every ceiling), so it is reset
+    ref_ts = session.get("clock_ref_ts")
+    stale = False
+    if ref_ts:
+        try:
+            stale = (_dt.datetime.now() - _dt.datetime.fromisoformat(ref_ts)).total_seconds() > 6 * 3600
+        except Exception:
+            stale = False
+    if stale or tps > (session.get("clock_ref_tok_s") or 0):
+        if stale:
+            session.setdefault("clock_ref_history", []).append({"ref_tok_s": session.get("clock_ref_tok_s"), "ts": ref_ts})
         session["clock_ref_tok_s"] = tps
         session["clock_ref_ts"] = now()
     session.setdefault("clock_probes", []).append({"ts": now(), "tok_s": tps})
