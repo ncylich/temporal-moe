@@ -1,25 +1,25 @@
 {
  "windows": {
   "all_pass": true,
-  "bench_sha256": "36e143792cb60dd0700a7a7cd9fdae082cdcfe0cd86ef6d2c75b50d9c24dd999",
+  "bench_sha256": "99225874a8f018698202779f48c49ed960f87068f9784a529afcc4c913e0f1b3",
   "env": "windows",
   "gated_hashes": [
-   "36e143792cb60dd0700a7a7cd9fdae082cdcfe0cd86ef6d2c75b50d9c24dd999"
+   "99225874a8f018698202779f48c49ed960f87068f9784a529afcc4c913e0f1b3"
   ],
-  "provisional": "Defender exclusions recorded by Defender event 5007 on 2026-09-15, Get-MpPreference paste pending; gates in x86 form (G2 same-binary identity, oracle recorded; G3 tok/s only) pending the orchestrator's ruling",
+  "provisional": "Defender exclusions recorded by Defender event 5007 on 2026-09-15, Get-MpPreference paste pending; gates in x86 form (Windows gate definition, ruling 2026-09-20)",
   "results": {
    "G1": {
-    "decode_tps": 5.598204,
+    "decode_tps": 7.501325,
     "device_ok": true,
-    "disk_read_mib": 1510.38916015625,
-    "fetch_read_mib": 1498.9246215820312,
+    "disk_read_mib": 1504.31640625,
+    "fetch_read_mib": 1504.1980590820312,
     "fetched_mib": 1504.2,
     "label": "g1_bytes",
     "load_mib": 199.0859375,
     "pass": true,
     "pool": {
      "R_active": 18,
-     "avg_fetch_us": 785.1,
+     "avg_fetch_us": 377.5,
      "evictions": 0,
      "fetched_mib": 1504.2,
      "fetches": 7131,
@@ -27,19 +27,19 @@
      "hook_calls": 0,
      "hook_miss": 0,
      "odirect": 1,
-     "qwait_hi_us": 14.4,
+     "qwait_hi_us": 13.8,
      "sibling": 1,
-     "split": 2,
+     "split": 1,
      "swaps": 0,
      "tensors": 135,
-     "wait_ms": 3361.4,
+     "wait_ms": 2654.1,
      "workers": 6
     },
     "rc": 0,
     "rchar_mib": 0.0,
-    "read_count": 16078,
-    "read_mib": 1698.0105590820312,
-    "rel_err": 0.0035070990679223475
+    "read_count": 8995,
+    "read_mib": 1703.2839965820312,
+    "rel_err": 1.2903323818611053e-06
    },
    "G2": {
     "args": "-f ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
@@ -51,7 +51,7 @@
      "LLAMA_TEMPORAL_REPACK": "1",
      "LLAMA_TEMPORAL_REPACK_FILE": "C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure-repacked.bin",
      "LLAMA_TEMPORAL_SPIN_US": "5000",
-     "LLAMA_TEMPORAL_SPLIT": "2",
+     "LLAMA_TEMPORAL_SPLIT": "1",
      "LLAMA_TEMPORAL_TWOPASS": "1"
     },
     "flags_R192": {
@@ -62,7 +62,7 @@
      "LLAMA_TEMPORAL_REPACK": "1",
      "LLAMA_TEMPORAL_REPACK_FILE": "C:\\tmoe\\models\\qwen3moe-rand-fine-Q4pure-repacked.bin",
      "LLAMA_TEMPORAL_SPIN_US": "5000",
-     "LLAMA_TEMPORAL_SPLIT": "2",
+     "LLAMA_TEMPORAL_SPLIT": "1",
      "LLAMA_TEMPORAL_TWOPASS": "1"
     },
     "matches_oracle": false,
@@ -72,7 +72,7 @@
     "pass_same_binary": true,
     "pool_R18": {
      "R_active": 18,
-     "avg_fetch_us": 876.9,
+     "avg_fetch_us": 462.6,
      "evictions": 0,
      "fetched_mib": 2763.5,
      "fetches": 13101,
@@ -80,12 +80,12 @@
      "hook_calls": 0,
      "hook_miss": 0,
      "odirect": 1,
-     "qwait_hi_us": 49.0,
+     "qwait_hi_us": 241.7,
      "sibling": 1,
-     "split": 2,
+     "split": 1,
      "swaps": 0,
      "tensors": 135,
-     "wait_ms": 5989.7,
+     "wait_ms": 4490.2,
      "workers": 6
     },
     "pool_R192": {
@@ -100,7 +100,7 @@
      "odirect": 1,
      "qwait_hi_us": 0.0,
      "sibling": 1,
-     "split": 2,
+     "split": 1,
      "swaps": 0,
      "tensors": 135,
      "wait_ms": 0.0,
@@ -130,7 +130,7 @@
      "odirect": 1,
      "qwait_hi_us": 0.0,
      "sibling": 1,
-     "split": 2,
+     "split": 1,
      "swaps": 0,
      "tensors": 135,
      "wait_ms": 0.0,
@@ -148,7 +148,7 @@
      "odirect": 1,
      "qwait_hi_us": 0.0,
      "sibling": 1,
-     "split": 2,
+     "split": 1,
      "swaps": 0,
      "tensors": 135,
      "wait_ms": 0.0,
@@ -157,14 +157,14 @@
     "ppl_norepack_R192": "185526.5380 +/- 4954.46146",
     "ppl_repack_R18": "185468.5410 +/- 4951.23870",
     "ppl_same": false,
-    "sd": 1.940451,
-    "tps_norepack_R192": 25.120691,
-    "tps_repack_R192": 34.462842,
+    "sd": 1.226264,
+    "tps_norepack_R192": 26.648084,
+    "tps_repack_R192": 32.446612,
     "x86_form": true
    }
   },
   "tag": "w1",
-  "ts": "2026-09-15T23:16:02",
+  "ts": "2026-09-20T17:01:44",
   "x86_form": true
  },
  "wsl": {

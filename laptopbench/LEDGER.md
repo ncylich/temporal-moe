@@ -724,3 +724,67 @@ has correctly waited (heartbeat every 10 min in overnight.log). Push: `laptop` p
 (f9c46b374) is local only.
 
 **Retracted:** nothing.
+
+### L1-6 -- Rulings recorded, depth is a dimension, the prefill residency excursion and the window trim, SPLIT=1 production; queue A-G started
+
+**Rulings (orchestrator, 2026-09-20), applied.**
+1. Clock probe: recorded per row; the 3% `degraded_clock` rule applies to arm (a) only, the interleaved
+   repeat of (a) is the drift check for streamed arms. 24 w1 rows relabelled `ok` with
+   `status_orig=degraded_clock` and the reason; no reruns.
+2. **Windows gate definition** (this is the record): G1 as written (pool `fetched_mib` vs per-process
+   block reads minus the loader's, 10%, plus the physical-disk delta); G2 = same-binary identity of
+   the R=192 and R=18 perplexities to every printed digit, with the WSL2 (gcc) oracle comparison
+   recorded but not required (clang-cl and gcc round the same AVX-512 kernels differently, L1-4);
+   G3 = tok/s differs between the repacked and plain kernel families by more than 3% and 2 sd, with
+   the PPL comparison recorded (they differ on x86, L1-2). Driver flag `--gates-x86`; gates.json
+   carries `x86_form`, `pass_same_binary`, `matches_oracle`, `pass_as_written`.
+3. Pitfall #26: the R = 24/36/48 rows (`deploy_R24/36/48`, 9 rows) are relabelled tier
+   `r_inert_control`: under TWOPASS the window is `n_expert_used`, R is inert, and identical 137.4
+   fetches/token and 799 MiB at every R are that fact, not a memory-speed curve.
+4. Pitfall #30: every w1 row so far is at depth 0 (`-d` default); `depth` is now stamped in every row
+   and is the CSV `context` column. The paper's protocol is depth 1024.
+
+**Branch `laptop` merges layer-lexicality at 3ebfa3d1** (androidbench current: CTX_DESIGNPOINT,
+pitfalls 25-30 read). **Fork push landed**: `temporal-moe-win` is on `ncylich/llama.cpp`, tip
+**43bec5f31** (port 0f2bdc0d6 + mul_mat_id guards 3d8cc14ae + commit-tracking residency 1c48d6871 +
+reserve-mode buffers 9cff55d1c + f9c46b374 + window trim 751bdc4ce/43bec5f31).
+
+**Production flag change: `LLAMA_TEMPORAL_SPLIT=1`** (L1-5: 22.8 vs 15.5 tok/s, +47%, n=3). Written into
+the driver's production set; FUSED is promoted the same way only if queue B says so
+(`production_flags.json`, applied before per-run overrides).
+
+**Depth finding (smoke, deploy, cap 4G, -n 8):** decode streams correctly at every depth (evictions
+135/token, swaps 45/token), but the depth prefill runs through the single-pass repacked path, which
+fetches on miss and never evicts (pitfall #25), so every expert it touches stays resident when decode
+starts: peak working set **2563 MiB at depth 1024, 3257 MiB at depth 4096, against 799 MiB at depth 0**
+(commit 2988 / 3680 / 1001 MiB). Reported as-is, the memory claim at the paper's depth would be 3x
+the depth-0 one.
+
+**Engine change (43bec5f31): trim to the window.** `ggml_temporal_window_fill` now evicts every
+resident expert outside the window whenever a layer holds more residents than the window
+(`n_resident > K+1`), streamed configurations only (R < E; the resident control keeps its experts).
+It cannot be tied to the window's first fill because llama-bench decodes a warmup token before the
+depth prefill and re-prefills every rep (first attempt 751bdc4ce did nothing: identical counters).
+`LLAMA_TEMPORAL_TRIM=0` disables it, value-parsed, for the A/B in queue D. Smoke at depth 1024:
+evictions 8148 vs 1083 without the trim, same fetch counts; decode 12.6 vs 16.7 tok/s over 8 tokens
+(the one-off eviction of ~7000 slices lands inside a short run; the sweep prices it at 1024 tokens).
+The prefill excursion itself is inherent: the fork has no expert-major prefill path, so the peak
+working set stays at the prefill's level; rows now carry a working-set time series with
+`wset_last_mib` (decode phase) beside `vmhwm_mib` (peak). Smoke, deploy depth 1024, -n 32: climbs to
+2473 MiB through the prefill, drops to **1067 MiB** at the first decode token and stays there. So
+at depth 1024 the memory demonstration at 2.5 GB will be refused by the prefill's commit (~3.0 GB)
+even though decode lives in 1.07 GB; that is what queue E will record.
+
+**Gates re-run on the rebuilt binary** (bench `99225874a8f0`, perplexity `503ed717a15a`, fork
+43bec5f31, clang-cl), x86 form, 17:01-17:03: G1 1504.2 MiB vs 1504.198 MiB block reads (rel. error
+1e-6), device 1504.3 MiB; G2 R=192 = R=18 = 185468.5410 +/- 4951.23870 (oracle 185548.9246 recorded,
+not matched); G3 repacked 32.45 vs plain 26.65 tok/s. `all_pass=true`; nothing was timed before it.
+
+**Queue (Scheduled Task, `overnight2.ps1`), started 17:03:** A ceiling and deploy (production flags)
+at depth 0/1024/2048/4096, n=3, interleaved, same-depth ceilings (28 batches) -> B FUSED off/on at
+depth 1024 n=3 -> C NOMADV on the resident control at depth 1024 n=3 -> D SPIN_US, THREADS, NOMADV,
+SPINNERS, EVICT_DEFER, JANITOR_NOLOCK, TRIM, FETCH_THREADS at depth 1024 -> E final session (tag w2):
+a, b, c, e at depth 1024 n=3 plus the memory demonstration -> F prefill diagnostic (w2) -> G pack.
+Driver: `--depth`, `prefill` stage, per-depth ceilings in `report`, `production_flags.json`.
+
+**Retracted:** nothing. (The 24 relabelled rows change status, not numbers.)
