@@ -1,0 +1,19 @@
+"# Trained free-set {14,15} cell and the PLE 15M arms, gate_mass=preserve. Transcribed from the run logs of analysis/ple/train_ple.py (tags below) and analysis/residency/downstream.py; the training runs saved surfaces only at eval cadence, so downstream rows score the at10M snapshot while final BPB is the 15M end-of-run eval on the audited slice. References base_free/impose_R8/CE_adapt_R8 is the 15M CE winner (sweep_lr3e5_win: BPB 0.793289, ds mean 0.5978); the distill comparator the free-set run beats is olmoe_distill15M (BPB 0.788727, ds mean 0.6017), both in layer_freeing_downstream.csv. Producers: analysis/ple/train_ple.py --free-set 14,15 (tag distill_free1415), --rank 512 [--calib-init --calib-suffix _preserve] (tags ple_r512_15M, ple_r512_calibpres_15M); downstream.py for task rows."
+row_type,cell,task,metric,base_free,impose_R8,CE_adapt_R8,cell_value,gap_closed,notes
+bpb,distill_free1415,,audited_slice_bpb,0.670290,0.839290,0.793289,0.760061,0.4689,final 15M eval; free set {14,15}; distill r32+attn32
+bpb,ple_r512_15M,,audited_slice_bpb,0.670290,0.839290,0.793289,0.810391,0.1710,zero-init PLE rank 512
+bpb,ple_r512_calibpres_15M,,audited_slice_bpb,0.670290,0.839290,0.793289,0.806114,0.1963,calibrated init from calib_table_r512_preserve.pt
+downstream_mean,distill_free1415_10M,,mean_acc_10task,0.6820,0.5723,0.5978,0.6119,0.3611,at10M snapshot
+task,distill_free1415_10M,arc_challenge,acc_norm,0.4974,0.3430,0.3720,0.3840,0.2655,
+task,distill_free1415_10M,hellaswag,acc,0.5847,0.4864,0.4859,0.5075,0.2147,
+task,distill_free1415_10M,hellaswag,acc_norm,0.7809,0.6608,0.6527,0.6861,0.2107,
+task,distill_free1415_10M,piqa,acc,0.7845,0.7242,0.7280,0.7421,0.2969,
+task,distill_free1415_10M,piqa,acc_norm,0.7971,0.7203,0.7367,0.7552,0.4544,
+task,distill_free1415_10M,winogrande,acc,0.6938,0.5691,0.5991,0.5841,0.1203,
+task,distill_free1415_10M,openbookqa,acc,0.3260,0.2600,0.2200,0.2560,-0.0606,
+task,distill_free1415_10M,openbookqa,acc_norm,0.4440,0.3740,0.3680,0.3960,0.3143,
+task,distill_free1415_10M,sciq,acc,0.9380,0.9150,0.9270,0.9400,1.0870,
+task,distill_free1415_10M,sciq,acc_norm,0.9230,0.9110,0.9150,0.9270,1.3330,
+task,distill_free1415_10M,boolq,acc,0.7012,0.6309,0.6440,0.6376,0.0953,
+task,distill_free1415_10M,lambada_openai,acc,0.7056,0.4460,0.5791,0.6140,0.6472,
+task,distill_free1415_10M,copa,acc,0.8500,0.7500,0.7800,0.8000,0.5000,

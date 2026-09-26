@@ -47,4 +47,5 @@ ax.legend(fontsize=8, loc="upper right", framealpha=0.9)
 fig.tight_layout()
 out = f"{OUTD}/vanilla_floor_curve_nocaption.png"
 fig.savefig(out, dpi=200)
+if out.endswith(".png"): fig.savefig(out[:-4] + ".pdf")
 print("wrote", out)

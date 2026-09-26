@@ -1,9 +1,24 @@
-model,routing,set_consistency,mass_consistency
-"1.4M active, coarse (6 of 64 experts)",temporal,0.33212,0.35937
-"1.4M active, coarse (6 of 64 experts)",full MoE,0.19356,0.20439
-"8.1M active, coarse (6 of 64 experts)",temporal,0.38197,0.42063
-"8.1M active, coarse (6 of 64 experts)",full MoE,0.21314,0.22773
-"14.8M active, coarse (6 of 64 experts)",temporal,0.33507,0.36719
-"14.8M active, coarse (6 of 64 experts)",full MoE,0.20245,0.21288
-"3.9M active, fine-grained (18 of 192 experts)",temporal,0.34746,0.39108
-"38.0M active, coarse (6 of 64 experts)",temporal,0.30424,0.34359
+run,budget,regime,grain,routing,set_consistency,mass_consistency
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,temporal,0.31244,0.35280
+flame38m_g3_temporal,1e18,temporal,fine 18/192,temporal,0.27227,0.31329
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,temporal,0.28328,0.31923
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,full MoE,0.19199,0.21077
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,temporal,0.55528,0.59945
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,temporal,0.57723,0.62218
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,temporal,0.80525,0.82896
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,temporal,0.79185,0.98390
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,temporal,0.37979,0.42855
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,temporal,0.32434,0.36862
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,temporal,0.30217,0.34529
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,temporal,0.34221,0.38181
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,temporal,0.28378,0.31654
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,temporal,0.27928,0.31188
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,temporal,0.28612,0.31070
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,temporal,0.28637,0.31698
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,temporal,0.29366,0.32408
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,temporal,0.30889,0.33902
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,temporal,0.32933,0.37714
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,temporal,0.37955,0.43622
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,temporal,0.39885,0.44365
+moe_coarse_1e19,1e19,full,coarse 6/64,temporal,0.16834,0.18609
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,temporal,0.23538,0.28111

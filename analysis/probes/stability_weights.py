@@ -36,6 +36,7 @@ RUNS = [
     ("moe_coarse_1e19", "moe_coarse_1e19"),
     ("temporal_coarse_1e19", "g1_tmoe_coarse_1e19"),
     ("temporal_fine_1e19",   "temporal_fine_g3_1e19"),
+    ("moe_fine_1e19",        "moe_fine_g3_1e19"),   # fine full MoE trained 2026-09-03
 ]
 
 

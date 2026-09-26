@@ -1,0 +1,15 @@
+diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
+index 51901dd0..17f9ca6e 100644
+--- a/megatron/training/arguments.py
++++ b/megatron/training/arguments.py
+@@ -1502,6 +1502,10 @@ def _add_training_args(parser):
+     group.add_argument('--cross-entropy-loss-fusion', action='store_true',
+                        help='Enabled fusion of cross entropy loss calculation.',
+                        dest='cross_entropy_loss_fusion')
++    group.add_argument('--cross-entropy-fusion-impl', type=str, default='native',
++                       choices=['native', 'te'], dest='cross_entropy_fusion_impl',
++                       help='Fused cross-entropy implementation: native (torch.compile) or te '
++                            '(Transformer Engine single-pass kernel).')
+     group.add_argument('--use-flash-attn', action='store_true',
+                        help='use FlashAttention implementation of attention. '
+                        'https://arxiv.org/abs/2205.14135')
