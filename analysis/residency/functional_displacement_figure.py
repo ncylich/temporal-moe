@@ -28,11 +28,11 @@ STYLE = {  # model key -> (label, color)
     "gpt-oss-20b": ("gpt-oss-20b (R4 = 12.5%)", "#7fb3d5"),
     "lfm25-8b-a1b": ("LFM2.5-A1B (R4 = 12.5%)", "#e67e22"),
 }
-# mean 4-benchmark damage at the tight arm vs own free, think off/low
-# (report.md grid; olmoe from instruct_genbench_vllm.csv; lfm think-on only)
-DAMAGE = {"gpt-oss-120b": 0.2, "qwen35-35b-a3b-instruct": -7.2,
-          "gemma4-26b-it": -2.5, "olmoe-0125-instruct": -14.8,
-          "gpt-oss-20b": -1.2, "lfm25-8b-a1b": -8.5}
+# mean 4-benchmark damage at the tight arm vs own free, think off/low (lfm think-on
+# only), from plot_instruct.load_damage(): the same full-set cells as Fig. 7 and Table 2
+DAMAGE = {"gpt-oss-120b": 0.38, "qwen35-35b-a3b-instruct": -4.07,
+          "gemma4-26b-it": -4.05, "olmoe-0125-instruct": -12.29,
+          "gpt-oss-20b": -0.02, "lfm25-8b-a1b": -6.88}
 
 def read(path, valcol):
     per = defaultdict(list)
