@@ -98,6 +98,7 @@ def load_damage():
               # flan filter, which cost it 11.9 points of MMLU damage on its own
               "mmlu_gptoss_relaxed": ("acc,relaxed-extract",)}
     vals = {}
+    acc = {}          # (record, arm, task, metric) -> value, read by FULL_SRC
     for r in csv.reader(open(f"{ABLATIONS}/instruct_genbench_vllm.csv")):
         if len(r) < 10 or r[0].startswith("#") or r[0] == "model":
             continue
@@ -107,6 +108,7 @@ def load_damage():
             (task in ("mbpp_chat", "mbpp_gemma") and met.startswith("pass@1"))
         if ok:
             vals[(rec, arm, task)] = float(r[7])
+        acc[(rec, arm, task, met)] = float(r[7])
     # thinking-ablation damage cells, already in points (5 models, both modes where a
     # toggle exists), MMLU relaxed where a dual re-score exists
     tcells = {}
@@ -147,11 +149,50 @@ def load_damage():
         ("OLMoE-Instruct 7B", "none"): ("olmoe_instruct_mbpp", "mbpp_chat"),
         ("LFM2.5-8B-A1B", "on"): ("lfm25_instruct_mbpp_cap32k", "mbpp_chat"),
         ("gpt-oss-20b", "low"): ("gptoss_20b_mbpp", "mbpp_chat"),
-        ("gemma4-26B-IT", "off"): ("gemma4_instruct_m8192", "mbpp_gemma"),
+        # m8192b: the replicate Table 2 (tab:adapt) reports
+        ("gemma4-26B-IT", "off"): ("gemma4_instruct_m8192b", "mbpp_gemma"),
         ("gemma4-26B-IT", "on"): ("gemma4_think_on_fulln_m8192", "mbpp_gemma"),
         ("Qwen3.5-35B", "off"): ("qwen35_instruct_mbpp", "mbpp_chat"),
         ("Qwen3.5-35B", "on"): ("qwen35_think_on_fulln_mbpp", "mbpp_chat"),
         ("gpt-oss-120b", "low"): ("gptoss_120b_mbpp", "mbpp_chat"),
+    }
+
+    # FULL-SET SOURCES. These cells are read straight from instruct_genbench_vllm.csv,
+    # bypassing think_ablation_summary.csv, whose cells for these models are 200-item
+    # GSM8K/IFEval subsets and, for gemma4/Qwen3.5 thinking off, strict flan MMLU.
+    # Every entry is a full set (GSM8K 1319, IFEval 541, HumanEval 164, MMLU 228) with
+    # relaxed MMLU, and gemma4/Qwen3.5 thinking off are exactly the records behind
+    # Table 2 (tab:adapt). Value: (task, metric, record or {arm: record}); free and
+    # constrained are always read from the same record. gpt-oss has only 200-item
+    # GSM8K/IFEval, so it stays on the summary.
+    GSM = ("gsm8k_cot_zeroshot", "exact_match,flexible-extract")
+    IFE = ("ifeval", "prompt_level_strict_acc,none")
+    MML = ("mmlu_gptoss_relaxed", "acc,relaxed-extract")
+    HEG = ("humaneval_gemma_fixed", "pass@1,channel-aware")
+    HEI = ("humaneval_instruct", "pass@1,create_test")
+    FULL_SRC = {
+        ("OLMoE-Instruct 7B", "none", "GSM8K"): GSM + ("olmoe_instruct_n1319",),
+        ("OLMoE-Instruct 7B", "none", "IFEval"): IFE + ("olmoe_instruct_full",),
+        ("LFM2.5-8B-A1B", "on", "GSM8K"): GSM + ("lfm25_instruct_n1319",),
+        ("LFM2.5-8B-A1B", "on", "IFEval"): IFE + ("lfm25_instruct_full",),
+        ("gemma4-26B-IT", "off", "GSM8K"): GSM + ("gemma4_instruct_n1319",),
+        ("gemma4-26B-IT", "off", "IFEval"): IFE + ("gemma4_instruct_full",),
+        ("gemma4-26B-IT", "off", "HumanEval"): HEG + ("gemma4_instruct_he8192",),
+        ("gemma4-26B-IT", "off", "MMLU"): MML + ("gemma4_instruct_full_dual",),
+        ("gemma4-26B-IT", "on", "GSM8K"): GSM + ("gemma4_think_on_fulln_n1319",),
+        ("gemma4-26B-IT", "on", "IFEval"): IFE + ("gemma4_think_on_fulln_full",),
+        ("gemma4-26B-IT", "on", "HumanEval"): HEG + ("gemma4_think_on_fulln_he8192",),
+        ("gemma4-26B-IT", "on", "MMLU"): MML + ("gemma4_think_on_fulln_full_dual",),
+        ("Qwen3.5-35B", "off", "GSM8K"): GSM + ("qwen35_think_off_n1319",),
+        # qwen35_base_full has no R32 arm; qwen35_base_r32 re-ran it with its own free
+        ("Qwen3.5-35B", "off", "IFEval"): IFE + ({"R8": "qwen35_base_full",
+                                                  "R32": "qwen35_base_r32"},),
+        ("Qwen3.5-35B", "off", "HumanEval"): HEI + ("qwen35_base_code_ref",),
+        ("Qwen3.5-35B", "off", "MMLU"): MML + ("qwen35_base_n_dual",),
+        ("Qwen3.5-35B", "on", "GSM8K"): GSM + ("qwen35_think_on_fulln_n1319",),
+        ("Qwen3.5-35B", "on", "IFEval"): IFE + ("qwen35_think_on_fulln_full",),
+        ("Qwen3.5-35B", "on", "HumanEval"): HEI + ("qwen35_think_on_fulln_code",),
+        ("Qwen3.5-35B", "on", "MMLU"): MML + ("qwen35_think_on_fulln_n_dual",),
     }
 
     def delta(spec, mode, arm_idx, bench):
@@ -163,6 +204,12 @@ def load_damage():
             fr, cn = wb.get(wbcells[0]), wb.get(wbcells[1 + arm_idx])
             return None if fr is None or cn is None else 10 * (cn - fr)
         arm = arms[arm_idx]
+        full = FULL_SRC.get((name, label, bench))
+        if full is not None:
+            task, met, rec = full
+            rec = rec[arm] if isinstance(rec, dict) else rec
+            fr, cn = acc.get((rec, "free", task, met)), acc.get((rec, arm, task, met))
+            return None if fr is None or cn is None else 100 * (cn - fr)
         if bench == "MBPP":
             hit = MBPP_SRC.get((name, label))
             if hit is None:
