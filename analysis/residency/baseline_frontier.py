@@ -97,11 +97,13 @@ def draw():
         ax.plot(1.0, acc(remoe), "s", color=REMOE, ms=5.5,
                 label="ReMoE, best learning rate", zorder=4)
         ax.plot(1.0, acc(base), "D", mfc="none", mec=OURS, mew=1.7, ms=5.5,
-                label="standard MoE, hard 1-swap cap", zorder=3)
+                label="Temporal MoE, base (hard 1-swap cap)", zorder=3)
+        ax.annotate(f"{acc(base):.1f}", (1.0, acc(base)), textcoords="offset points",
+                    xytext=(-32, -14) if title.startswith("gemma") else (10, -4), fontsize=8, color=OURS)
         a = acc(ours)
         ax.plot(1.0, a, "D", color=OURS, ms=5.5, zorder=6,
                 label="Temporal MoE, adapted (hard 1-swap cap)")
-        off = (-32, -11) if title.startswith("gemma") else (10, -12)
+        off = (-32, 1) if title.startswith("gemma") else (10, -12)
         ax.annotate(f"{a:.1f}", (1.0, a), textcoords="offset points",
                     xytext=off, fontsize=8, color=OURS)
         ax.set_title(title, fontsize=9.5)
