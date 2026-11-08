@@ -1,0 +1,86 @@
+\section{Length analysis details}\label{app:length}
+
+\paragraph{Data and definitions.} We pair free and constrained generations by document id, using 200 items per configuration, or 164 on HumanEval, 228 on MMLU and 150 on WritingBench. A configuration specifies the model, benchmark and thinking mode, and length includes thinking and the answer. Some records store thinking and answer lengths separately and others store the total. We recover total length by record format, following the rule in the capture code. Recovered and stored totals agree on all 3{,}800 items with both measurements (median recovered to stored ratio 1.000). A generation reaches its budget when it ends within 8 tokens of the declared limit. We use the declared limit rather than the longest observed generation, which a single overlong generation can push past the point where the others stop. For error comparisons, a generation is long if it exceeds twice its configuration's median free length, a threshold set under free routing and applied to both conditions.
+
+\paragraph{Generation lengths.} With thinking enabled, the median per-item constrained-to-free length ratio is 1.03 to 1.08, but its 95th percentile reaches 1.9 to 2.5 (Table~\ref{tab:lenpct}). The token-weighted mean of 1.05 to 1.14 understates this growth among the longest generations. Without thinking, median ratios are 1.00 except in the single MMLU configuration, and HumanEval's 95th percentile reaches 2.52. Answers can therefore lengthen too, although with thinking on, MMLU's answer ratio is 0.99 and its thinking ratio 1.06. WritingBench, the only benchmark every model runs without thinking, does not lengthen (mean ratio 0.99).
+
+\begin{table}[h]
+  \centering\footnotesize
+  \caption{Percentiles of the per-item ratio of constrained to free generation length at the tightest residency setting, pooled within each benchmark. Values above 1 mean longer constrained generations. The last column is the token-weighted mean. The thinking-off MMLU row is one configuration, not a trend.}
+  \label{tab:lenpct}
+  \vspace{4pt}
+  \begin{tabular}{@{}lrrrrrrrr@{}}
+    \toprule
+    benchmark & configs & items & P50 & P75 & P90 & P95 & P99 & mean \\
+    \midrule
+    \multicolumn{9}{@{}l}{\textit{thinking on}} \\
+    GSM8K       & 14 & 2{,}800 & 1.05 & 1.27 & 1.60 & 1.91 & 2.84 & 1.07 \\
+    IFEval      & 14 & 2{,}800 & 1.03 & 1.32 & 1.84 & 2.35 & 4.45 & 1.07 \\
+    HumanEval   & 14 & 2{,}296 & 1.08 & 1.34 & 1.76 & 2.14 & 3.76 & 1.14 \\
+    MMLU        & 14 & 3{,}192 & 1.03 & 1.36 & 1.90 & 2.48 & 4.56 & 1.05 \\
+    \midrule
+    \multicolumn{9}{@{}l}{\textit{thinking off}} \\
+    GSM8K       &  5 & 1{,}000 & 1.00 & 1.12 & 1.33 & 1.62 & 3.58 & 1.02 \\
+    IFEval      &  5 & 1{,}000 & 1.00 & 1.11 & 1.31 & 1.53 & 2.59 & 1.00 \\
+    HumanEval   &  5 &    820 & 1.00 & 1.11 & 1.66 & 2.52 & 4.11 & 1.07 \\
+    MMLU        &  1 &    228 & 1.34 & 2.48 & 4.40 & 6.05 & 9.51 & 1.52 \\
+    WritingBench&  8 & 1{,}200 & 1.00 & 1.06 & 1.19 & 1.36 & 1.87 & 0.99 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{How a generation ended.} Fig.~\ref{fig:lendecomp2} groups constrained generations by how they ended and uses a per-item threshold, twice the same item's free length.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/length_decomp_nocaption.png}
+  \caption{Constrained generations grouped by how they ended, with error rates pooled over configurations. Generations that reach the budget have no usable answer and count as wrong whether or not thinking closed. They comprise 1.0 to 1.5\% of accuracy benchmark items, too few to explain most of the loss. Completed generations longer than twice the same item's free length are wrong 1.2 to 3.7$\times$ as often as the other completed generations (dashed line), most on HumanEval, and the label gives this multiple. WritingBench shows the drop in mean critic score on its own axis, and with 16.1\% of its generations reaching the budget it is the only benchmark where truncation matters much.}
+  \label{fig:lendecomp2}
+\end{figure}
+
+\paragraph{Where the extra tokens sit.} Fig.~\ref{fig:lendecomp} splits each configuration's mean length change into the part from generations that reach the budget and the part from those that never approach it, and shows the length change of items whose correctness changes.
+
+\begin{figure}[!htb]
+  \centering
+  \begin{minipage}[t]{0.53\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/length_components_nocaption.png}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.43\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/length_flips_nocaption.png}
+  \end{minipage}
+  \caption{\textbf{Left,} mean length change from generations reaching their budget versus those that never approach it. Configurations occupy every quadrant and the components are uncorrelated ($R^2=0.00$). \textbf{Right,} mean length change among items whose correctness changes, for configurations with at least five such items. Red indicates thinking enabled and blue indicates thinking disabled. Generations that become wrong mostly lengthen, whereas items that become correct were mostly ones that ran unusually long under free routing. Without thinking, these items barely change length.}
+  \label{fig:lendecomp}
+\end{figure}
+
+\paragraph{Individual configurations.} Figure~\ref{fig:lenpct} shows thinking lengths by configuration, rather than pooled as in Table~\ref{tab:lenpct}.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/length_percentiles_nocaption.png}
+  \caption{Thinking token ratios at five percentiles for each thinking configuration, tightest residency divided by free routing. Red means longer under the constraint and blue means shorter. Labels give median free thinking lengths in tokens. Gemma4's growth is in the tail (GSM8K P95 ratio 1.86), whereas GPT-OSS-120B grows at the median. At high effort, GPT-OSS-20B's thinking becomes shorter than under free routing. Ratios in configurations whose median free thinking length is below about 100 tokens are sensitive to small token differences.}
+  \label{fig:lenpct}
+\end{figure}
+
+\paragraph{Length and errors.} Under the configuration-level threshold, long generations have 1.5 to 4.7$\times$ the error rate of shorter ones under residency and 1.8 to 7.3$\times$ under free routing, so they are already more error prone without the constraint. Increased errors within length groups account for 75\% of the rise in error rate on GSM8K, 89\% on IFEval, 94\% on MMLU and 48\% on HumanEval. Changes in the share of long generations account for the remainder. This share changes little except on HumanEval, where 10.6\% of free generations and 15.4\% of constrained generations are long. Across thinking configurations, residency turns more correct answers into errors than errors into correct answers, with little change in the number of long generations. Losses spread over generations of every length are consistent with errors from expert substitutions at individual tokens rather than a few failed generations, and with functional displacement, which orders damage across models (Fig.~\ref{fig:displacement}).
+
+\paragraph{Length and accuracy loss.} Mean free generation length is not significantly associated with accuracy loss at the tightest residency setting across models and benchmarks (Spearman $-0.18$, $p=0.63$, Fig.~\ref{fig:lennull}).
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.55\linewidth]{figures/length_vs_damage_nocaption.png}
+  \caption{Accuracy loss at the tightest residency setting against mean free generation length, using exact token counts. Colors identify models and markers identify benchmarks. A significant correlation appears only when the analysis includes short-answer configurations truncated at the budget and reconstructed rather than exact lengths.}
+  \label{fig:lennull}
+\end{figure}
+
+\paragraph{Adaptation and length.} Figure~\ref{fig:adaptlen} separates residency effects from changes in the adapted model's free generations. Panels with thinking enabled use the corresponding adapters, and panels without thinking use those from \S\ref{sec:adaptation}. Without thinking on HumanEval, Gemma4's constrained length is 31\% above the released free length before adaptation and 14\% after, while Qwen3.5's adapted free generations are 64\% longer than its released free generations.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.900\linewidth]{figures/adapt_length_nocaption.png}
+  \caption{Generation length divided by the released model's free length in each panel. The middle bar is the adapted model's free length, with the same denominator. Without thinking, released constrained lengths on HumanEval are 1.31$\times$ released free lengths for Gemma4 and 1.19$\times$ for Qwen3.5. They remain flat elsewhere, including WritingBench.}
+  \label{fig:adaptlen}
+\end{figure}
+
+
