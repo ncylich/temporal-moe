@@ -85,7 +85,7 @@ def draw():
         ax.set_ylim(40, 93)
         ax.axhline(free, color=REF, lw=1.1, ls=(0, (5, 4)), zorder=1)
         ax.text(0.21, free + 1.4, f"standard MoE, free routing {free:.1f}", ha="right",
-                fontsize=7.5, color=REF)
+                fontsize=9.5, color=REF)
         ax.axvline(1.0, color=OURS, lw=0.9, ls=(0, (4, 3)), alpha=0.5, zorder=1)
         pts = sorted((LOADS[r], acc(r)) for r in curve)
         ax.plot(*zip(*pts), "-o", color=SKLIAR, ms=4.5, lw=1.4,
@@ -99,22 +99,25 @@ def draw():
         ax.plot(1.0, acc(base), "D", mfc="none", mec=OURS, mew=1.7, ms=5.5,
                 label="Temporal MoE, base (hard 1-swap cap)", zorder=3)
         ax.annotate(f"{acc(base):.1f}", (1.0, acc(base)), textcoords="offset points",
-                    xytext=(-32, -14) if title.startswith("gemma") else (10, -4), fontsize=8, color=OURS)
+                    xytext=(-32, -14) if title.startswith("gemma") else (10, -4), fontsize=10, color=OURS)
         a = acc(ours)
         ax.plot(1.0, a, "D", color=OURS, ms=5.5, zorder=6,
                 label="Temporal MoE, adapted (hard 1-swap cap)")
-        off = (-32, 1) if title.startswith("gemma") else (10, -12)
+        off = (-42, 0) if title.startswith("gemma") else (10, -12)
         ax.annotate(f"{a:.1f}", (1.0, a), textcoords="offset points",
-                    xytext=off, fontsize=8, color=OURS)
-        ax.set_title(title, fontsize=9.5)
-        ax.set_xlabel("expert loads / token-layer (log, fewer to the right)", fontsize=8.5)
+                    xytext=off, fontsize=10, color=OURS)
+        ax.set_title(title, fontsize=11.5)
+        ax.set_xlabel("expert loads / token-layer (log, fewer to the right)", fontsize=10.5)
         ax.set_xticks([0.3, 1, 3])
         ax.set_xticklabels(["0.3", "1", "3"])
         ax.grid(alpha=0.25)
         ax.set_axisbelow(True)
-        ax.tick_params(labelsize=8)
-    axes[0].set_ylabel("GSM8K", fontsize=9)
-    axes[0].legend(fontsize=6.8, loc="lower left", bbox_to_anchor=(0.0, 0.06), framealpha=0.9)
+        ax.tick_params(labelsize=10)
+    axes[0].set_ylabel("GSM8K", fontsize=11)
+    # one key for both frontier panels, in the empty lower part of the Qwen3.5 panel
+    h, l = axes[0].get_legend_handles_labels()
+    axes[1].legend(h, l, fontsize=8.5, loc="lower left", framealpha=0.9, labelspacing=0.2,
+                   borderaxespad=0.3, borderpad=0.3)
 
     ax = axes[2]
     h = json.load(open(HIST))["hist"]
@@ -129,19 +132,19 @@ def draw():
     for i, f in zip(xs, fr):
         if f > 0.5:
             ax.annotate(f"{f:.0f}%", (i - d, f), textcoords="offset points",
-                        xytext=(0, 3), ha="center", fontsize=7.5)
+                        xytext=(0, 3), ha="center", fontsize=8.5)
     ax.annotate("100%", (1 + d, 100), textcoords="offset points", xytext=(0, 3),
-                ha="center", fontsize=7.5, color=OURS)
+                ha="center", fontsize=8.5, color=OURS)
     ax.annotate("20% need $\\geq$2, tail to 7:\neach stalls the layer\nin proportion",
-                (2.0, 40), fontsize=8, color=SKLIAR)
-    ax.set_title("transfers in one token-layer (gemma4)", fontsize=9.5)
-    ax.set_xlabel("expert transfers", fontsize=8.5)
-    ax.set_ylabel("share of token-layers (%)", fontsize=9)
+                (2.0, 40), fontsize=10, color=SKLIAR)
+    ax.set_title("transfers in one token-layer (gemma4)", fontsize=11.5)
+    ax.set_xlabel("expert transfers", fontsize=10.5)
+    ax.set_ylabel("share of token-layers (%)", fontsize=11)
     ax.set_ylim(0, 110)
     ax.set_yticks([0, 20, 40, 60, 80, 100])
     ax.set_xticks(xs)
-    ax.tick_params(labelsize=8)
-    ax.legend(fontsize=6.8, loc="upper right")
+    ax.tick_params(labelsize=10)
+    ax.legend(fontsize=8.5, loc="upper right")
     ax.grid(alpha=0.25, axis="y")
     ax.set_axisbelow(True)
 

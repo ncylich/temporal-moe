@@ -213,7 +213,7 @@ def rising_slope(cut_x):
 
 if PAPER:
     plt.rcParams.update({"font.size": 14, "axes.labelsize": 14, "legend.fontsize": 9,
-                         "xtick.labelsize": 12, "ytick.labelsize": 12})
+                         "xtick.labelsize": 13, "ytick.labelsize": 13})
 
 fig, (hi, lo) = plt.subplots(2, 1, sharex=True, figsize=(9.6, 2.85) if PAPER else (8.0, 7.4),
                              gridspec_kw={"height_ratios": [1, 1], "hspace": 0.08})
@@ -287,11 +287,12 @@ fig.supylabel("median over experts:\ncontext AUC $-$ token AUC" if PAPER else
               "median over experts:  context AUC $-$ token AUC",
               x=0.012 if PAPER else 0.035, fontsize=13)
 if PAPER:
-    fig.subplots_adjust(left=0.105, right=0.70)
+    fig.subplots_adjust(left=0.105, right=0.675)
+    hi.set_yticks([0.0, 0.1, 0.2]); lo.set_yticks([-0.3, -0.2])   # the default ticks, pinned at the larger size
 hi.text(0.012, 0.965, "context-dominated (Temporal MoE)", transform=hi.transAxes,
-        fontsize=10, color=TMP_FINE, weight="bold", va="top")
+        fontsize=11 if PAPER else 10, color=TMP_FINE, weight="bold", va="top")
 lo.text(0.012, 0.955 if PAPER else 0.08, "token-dominated (standard MoE)",
-        transform=lo.transAxes, fontsize=10, color=MOE_FINE, weight="bold",
+        transform=lo.transAxes, fontsize=11 if PAPER else 10, color=MOE_FINE, weight="bold",
         va="top" if PAPER else "baseline")
 
 hh, ll = hi.get_legend_handles_labels()
@@ -313,8 +314,8 @@ if PAPER:
            (Line2D([], [], color="0.25", marker="D", ls="none", ms=6.5), "$10^{18}$ FLOPs"),
            (Line2D([], [], color="0.25", marker="^", ls="none", ms=7.5), "$10^{19}$ FLOPs")]
     leg = fig.legend([h for h, _ in key], [l for _, l in key], loc="center left",
-                     bbox_to_anchor=(0.71, 0.5), fontsize=9.5, frameon=False,
-                     handlelength=1.8, labelspacing=0.45, handletextpad=0.7)
+                     bbox_to_anchor=(0.68, 0.5), fontsize=13, frameon=False,
+                     handlelength=1.2, labelspacing=0.3, handletextpad=0.4)
     for t in leg.get_texts():
         if t.get_text() in ("model", "compute budget"):
             t.set_fontweight("bold")

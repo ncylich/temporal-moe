@@ -70,10 +70,12 @@ def arms():
 
 
 A = arms()
+if PAPER:
+    plt.rcParams.update({"xtick.labelsize": 12, "ytick.labelsize": 12, "axes.labelsize": 11})
 fig, ax = plt.subplots(figsize=(6.0, 5.6) if PAPER else (7.6, 6.8))
 lo, hi = 0.50, 1.00
 ax.plot([lo, hi], [lo, hi], color="#999", lw=1.0, ls=":", zorder=1)
-ax.text(0.735, 0.745, "probes tie", color="#777", fontsize=9, rotation=38,
+ax.text(0.735, 0.745, "probes tie", color="#777", fontsize=10.5 if PAPER else 9, rotation=38,
         ha="center", va="center", backgroundcolor="white")
 
 def grain_of(run):
@@ -117,7 +119,7 @@ tok_f = [v[2] for v in A.values() if v[0] != "temporal"]
 gap_lo, gap_hi = max(tok_t), min(tok_f)
 ax.axvspan(gap_lo, gap_hi, color="#f2c14e", alpha=0.18, zorder=0)
 ax.text((gap_lo + gap_hi) / 2, 0.545, f"no model here\n{gap_hi - gap_lo:.3f} wide",
-        ha="center", va="bottom", fontsize=9, color="#8a6d1f")
+        ha="center", va="bottom", fontsize=10.5 if PAPER else 9, color="#8a6d1f")
 
 ax.set_xlim(lo, hi)
 ax.set_ylim(0.52, 0.86)      # headroom so the two-column legend clears the "probes tie" label
@@ -127,7 +129,7 @@ ax.grid(alpha=0.25, lw=0.6)
 h, l = ax.get_legend_handles_labels()
 order = sorted(range(len(l)), key=lambda i: (l[i].split("10^{")[1], l[i]))
 ax.legend([h[i] for i in order], [l[i] for i in order],
-          loc="upper left", fontsize=9, framealpha=0.95, ncol=2)
+          loc="upper left", fontsize=9.5 if PAPER else 9, framealpha=0.95, ncol=2)
 
 if PAPER:
     out = os.path.join(OUT, "arm_separation_nocaption.png")

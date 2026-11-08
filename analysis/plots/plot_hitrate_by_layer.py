@@ -51,10 +51,16 @@ for r in csv.DictReader(open(os.path.join(REPO, "results", "ablations",
                                           "e6_per_layer_ranking.csv"))):
     rows[r["run"]][int(r["layer"])] = float(r["hit_rate"])
 
+if PAPER:   # printed at ~1/3 scale in a half-column minipage, so the text is set large
+    plt.rcParams.update({"xtick.labelsize": 15, "ytick.labelsize": 15, "axes.labelsize": 16.5})
 fig, ax = plt.subplots(figsize=(6.4, 4.8) if PAPER else (7.8, 6.4))
 ax.axhline(RANDOM_FLOOR, color="#b03030", lw=1.2, ls="--", zorder=1)
-ax.text(2.15, RANDOM_FLOOR + 0.008, "random resident set (k/E = 0.094)",
-        color="#b03030", fontsize=9, va="bottom")
+if PAPER:   # below the floor line, where no data runs, so the larger text clears the markers
+    ax.text(2.15, RANDOM_FLOOR - 0.006, "random resident set (k/E = 0.094)",
+            color="#b03030", fontsize=13, va="top")
+else:
+    ax.text(2.15, RANDOM_FLOOR + 0.008, "random resident set (k/E = 0.094)",
+            color="#b03030", fontsize=9, va="bottom")
 
 for run in ([] if PAPER else CONTEXT):     # paper: the matched pair alone
     if run not in rows:
@@ -80,9 +86,16 @@ ax.set_ylabel("cache hit rate" if PAPER else
 ax.set_xticks(range(2, 15))
 ax.set_ylim(0.05, 0.50)
 ax.grid(alpha=0.25, lw=0.6)
-ax.legend(loc="upper left", fontsize=9, framealpha=0.95)
+if PAPER:
+    ax.legend(loc="upper left", fontsize=12.5, framealpha=0.95, borderpad=0.3,
+              handlelength=1.6, borderaxespad=0.3)
+else:
+    ax.legend(loc="upper left", fontsize=9, framealpha=0.95)
 
 if PAPER:
+    # smaller axes box so the larger labels fit inside the same cropped size as before
+    fig.subplots_adjust(left=0.17, right=0.91, bottom=0.155, top=0.885)
+    ax.set_yticks([i / 100 for i in range(5, 51, 5)])     # keep the 0.05 grid the default size used
     out = os.path.join(OUT, "hitrate_by_layer_nocaption.png")
 else:
     fig.subplots_adjust(bottom=0.32)

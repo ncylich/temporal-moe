@@ -62,8 +62,8 @@ def spearman(xs, ys):
 
 PAPER = "--no-caption" in sys.argv
 if PAPER:   # paper variant: the two correlation panels only, larger fonts
-    plt.rcParams.update({"font.size": 12.5, "axes.labelsize": 12, "xtick.labelsize": 11,
-                         "ytick.labelsize": 11, "axes.titlesize": 12.5})
+    plt.rcParams.update({"font.size": 12.5, "axes.labelsize": 12, "xtick.labelsize": 12.5,
+                         "ytick.labelsize": 12.5, "axes.titlesize": 13.5})
     fig, saxes = plt.subplots(1, 2, figsize=(10.5, 4.3))
 else:
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.6),

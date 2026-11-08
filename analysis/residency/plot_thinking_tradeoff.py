@@ -15,7 +15,7 @@ COL = {"GPT-OSS-20B": "#2ca02c", "Gemma4": "#d62728", "Qwen3.5": "#9467bd", "GPT
 def mean_loss(spec, mode, arm):
     d = [delta(spec, mode, arm, b) for b in TASKS]; d = [x for x in d if x is not None]
     return -np.mean(d)
-plt.rcParams.update({"font.size": 9})
+plt.rcParams.update({"font.size": 10})
 fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.8), sharey=True)
 PANELS = [(0, "only the active experts resident ($R=k$)"), (1, "12.5% of the experts resident")]
 rows = []
@@ -33,13 +33,14 @@ for ax, (arm, title) in zip(axes, PANELS):
     for side, x, dx, ha in ((left, 0, -0.06, "right"), (right, 1, 0.06, "left")):
         side.sort(key=lambda r: r[0])
         for k in range(1, len(side)):          # spread labels that would overlap (data units)
-            if side[k][0] - side[k - 1][0] < 0.32: side[k][0] = side[k - 1][0] + 0.32
+            if side[k][0] - side[k - 1][0] < 0.36: side[k][0] = side[k - 1][0] + 0.36
         for yl, txt, col in side:
-            ax.text(x + dx, yl, txt, ha=ha, va="center", fontsize=7.5, color=col)
-    ax.set_title(title, fontsize=9)
+            ax.text(x + dx, yl, txt, ha=ha, va="center", fontsize=8.5, color=col)
+    ax.set_title(title, fontsize=10)
     ax.set_xticks([0, 1]); ax.set_xticklabels(["thinking off /\nlow effort", "thinking on /\nhigh effort"])
-    ax.set_xlim(-0.3, 1.75); ax.grid(axis="y", ls=":", alpha=0.4)
+    ax.set_xlim(-0.3, 2.1); ax.grid(axis="y", ls=":", alpha=0.4)
 axes[0].set_ylabel("mean accuracy loss vs.\nfree routing (points)")
+axes[0].set_yticks(range(7))      # unit ticks, as at the smaller font
 axes[0].invert_yaxis()
 fig.tight_layout()
 for d in (os.path.join(REPO, "results/ablations/figures"), os.path.join(REPO, "paper/figures")):

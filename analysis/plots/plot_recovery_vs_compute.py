@@ -20,13 +20,13 @@ for t, col, lab, lw in [("tmp_f", "#0b5c1c", "Temporal MoE, fine (18 of 192)", 2
     ys = [kept(B[c], t) for c in C]
     ax.plot(C, ys, "-o", color=col, lw=lw, label=lab)
     for c, y in zip(C, ys):
-        ax.annotate(f"{y:.0f}%", (c, y), textcoords="offset points", xytext=(0, -14) if (t == "tmp_c" and c == 1e19) else (0, 7), ha="center", fontsize=8.5, color=col)
+        ax.annotate(f"{y:.0f}%", (c, y), textcoords="offset points", xytext=(0, -14) if (t == "tmp_c" and c == 1e19) else (0, 7), ha="center", fontsize=9.5, color=col)
 ax.axhline(100, ls="--", color="#888", lw=1)
-ax.text(1.2e16, 101.5, "matches the strongest standard MoE", fontsize=7.5, color="#666")
+ax.text(1.2e16, 101.5, "matches the strongest standard MoE", fontsize=9, color="#666")
 ax.set_xscale("log"); ax.set_xticks(C); ax.set_xticklabels(["$10^{16}$", "$10^{17}$", "$10^{18}$", "$10^{19}$"])
 ax.minorticks_off(); ax.set_ylim(50, 108)
 ax.set_xlabel("training compute (FLOPs)"); ax.set_ylabel("MoE gain kept (%)")
-ax.grid(ls=":", alpha=0.4); ax.legend(fontsize=7.5, loc="lower right")
+ax.grid(ls=":", alpha=0.4); ax.legend(fontsize=9, loc="lower right")
 fig.tight_layout()
 for d in (os.path.join(REPO, "results/phase0/figures"), os.path.join(REPO, "paper/figures")):
     fig.savefig(os.path.join(d, "recovery_vs_compute.pdf"), bbox_inches="tight", pad_inches=0.02)

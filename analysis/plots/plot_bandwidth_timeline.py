@@ -18,7 +18,7 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(REPO, "results", "phase0", "figures",
                    "bandwidth_timeline_nocaption.png" if PAPER else "bandwidth_timeline.png")
 
-FS = 15 if PAPER else 11.5
+FS = 17 if PAPER else 11.5
 LIGHT, EDGE, DARK, GREY = "#cfe3f5", "#4a7fb5", "#0d3b66", "#666666"
 
 fig, ax = plt.subplots(figsize=(9.0, 2.2) if PAPER else (10.0, 3.4))
@@ -52,7 +52,7 @@ ax.text(x0 + sw + 0.12, 0.55 + h / 2, "hidden", fontsize=FS - 2.5, color=GREY,
         va="center", style="italic")
 
 # The condition, right-aligned under the rows.
-ax.text(x0, 0.08,
+ax.text(x0, 0.02 if PAPER else 0.08,
         r"the swap is free when $(k-1)\,b/\mathrm{BW}_{\mathrm{fast}} \geq b/\mathrm{BW}_{\mathrm{slow}}$"
         r",  i.e. $k-1 \geq \mathrm{BW}_{\mathrm{fast}}/\mathrm{BW}_{\mathrm{slow}}$",
         fontsize=FS - 1, color=DARK, ha="left", va="bottom")
@@ -65,7 +65,10 @@ if not PAPER:
              "matters; fine-graining raises k at unchanged active parameters.",
              fontsize=FS - 3, color=GREY)
 
-fig.tight_layout(rect=(0, 0.05, 1, 0.93) if not PAPER else (0, 0, 1, 1))
+if PAPER:   # pin the frame tight_layout chose at FS=15 so the larger text does not shrink the drawing
+    fig.subplots_adjust(left=0.0167, right=0.9381, bottom=0.0682, top=0.9086)
+else:
+    fig.tight_layout(rect=(0, 0.05, 1, 0.93))
 fig.savefig(OUT, dpi=220)
 if PAPER: fig.savefig(OUT[:-4] + ".pdf")
 print(OUT)

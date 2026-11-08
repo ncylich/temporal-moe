@@ -158,8 +158,8 @@ def figure(rows, paper, budgets=None):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     if paper:
-        plt.rcParams.update({"font.size": 12, "axes.labelsize": 12, "xtick.labelsize": 10,
-                             "ytick.labelsize": 10.5, "legend.fontsize": 10})
+        plt.rcParams.update({"font.size": 12, "axes.labelsize": 12, "xtick.labelsize": 12,
+                             "ytick.labelsize": 12, "legend.fontsize": 10})
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.6), sharey=False)
     marks = {"1e17": ("s", ":"), "1e18": ("o", "-"), "1e19": ("^", "--")}
     if budgets:
@@ -188,6 +188,8 @@ def figure(rows, paper, budgets=None):
                                     lw=0)
         ax.set_title(title)
         ax.set_xlabel("relative depth of the perturbed layer")
+        if paper:   # keep the 0.1 tick spacing the smaller labels had
+            ax.set_xticks(np.round(np.arange(0.2, 1.01, 0.1), 1))
         ax.grid(alpha=0.25); ax.set_axisbelow(True)
     axes[0].set_ylabel("BPB increase, one perturbed layer")
     handles, labels = {}, []
@@ -197,7 +199,7 @@ def figure(rows, paper, budgets=None):
                 handles[l] = h; labels.append(l)
     order = sorted(labels, key=lambda l: (l.startswith("Temporal MoE"), l))
     fig.legend([handles[l] for l in order], order, frameon=False, loc="lower center", ncol=4,
-               fontsize=9, bbox_to_anchor=(0.5, -0.02))
+               fontsize=12 if paper else 9, bbox_to_anchor=(0.5, -0.02))
     if not paper:
         fig.suptitle("Substitution tolerance by depth: at one layer, replace one of six active experts\n"
                      "(three of eighteen) with a random other expert at its own router weight. "

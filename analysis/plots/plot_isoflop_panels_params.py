@@ -107,11 +107,11 @@ def rows(ax,c,headers):
     # two labelled rows under the axis: active/dense (dark) above, MoE total (red, italic) below
     ax.set_xticklabels([]); tb=blend(ax.transData,ax.transAxes); ta=ax.transAxes
     for a,t in c:
-        ax.text(a,-0.07,fmt(a),transform=tb,ha="center",va="top",fontsize=9,color=ACT,fontweight="bold")
-        ax.text(a,-0.20,fmt(t),transform=tb,ha="center",va="top",fontsize=9,color=TOT)
+        ax.text(a,-0.07,fmt(a),transform=tb,ha="center",va="top",fontsize=10.5,color=ACT,fontweight="bold")
+        ax.text(a,-0.20,fmt(t),transform=tb,ha="center",va="top",fontsize=10.5,color=TOT)
     if headers:
-        ax.text(-0.03,-0.07,"active / dense",transform=ta,ha="right",va="top",fontsize=8.5,color=ACT,fontweight="bold")
-        ax.text(-0.03,-0.20,"MoE total",transform=ta,ha="right",va="top",fontsize=8.5,color=TOT)
+        ax.text(-0.03,-0.07,"active / dense",transform=ta,ha="right",va="top",fontsize=10,color=ACT,fontweight="bold")
+        ax.text(-0.03,-0.20,"MoE total",transform=ta,ha="right",va="top",fontsize=10,color=TOT)
 def twin(ax,c,headers):
     ax.set_xticklabels([fmt(a) for a,_ in c],fontsize=9,color=ACT,fontweight="bold")
     top=ax.twiny(); top.set_xscale("log"); top.set_xlim(ax.get_xlim()); top.set_xticks([a for a,_ in c])
@@ -128,21 +128,23 @@ def bars(ax):
     b=ax.bar(range(5),[p[1] for p in P19],color=[p[2] for p in P19],width=0.66,edgecolor="k",linewidth=[1.6 if l=="Temporal MoE\nfine" else 0.6 for l in labels])
     for bb,(l,v,_) in zip(b,P19): ax.text(bb.get_x()+bb.get_width()/2,v+0.002,f"{v:.3f}",ha="center",fontsize=9,fontweight="bold")
     ax.set_ylim(1.0,1.19); ax.grid(True,axis="y",ls=":",alpha=0.4)
-    ax.set_xticks(range(5)); ax.set_xticklabels([l.replace("Temporal","Temp.").replace("standard","std.").replace(" MoE\n","\nMoE\n") for l in labels],fontsize=7.5)
+    ax.set_xticks(range(5)); ax.set_xticklabels([l.replace("Temporal","Temp.").replace("standard","std.").replace(" MoE\n","\nMoE\n") for l in labels],fontsize=9)
     ax.set_title("$10^{19}$ FLOPs")
-    ax.text(0.98,0.97,"265M active / dense",transform=ax.transAxes,ha="right",va="top",fontsize=9,color=ACT,fontweight="bold")
-    ax.text(0.98,0.88,"1.26B MoE total",transform=ax.transAxes,ha="right",va="top",fontsize=9,color=TOT)
+    ax.text(0.98,0.97,"265M active / dense",transform=ax.transAxes,ha="right",va="top",fontsize=10.5,color=ACT,fontweight="bold")
+    ax.text(0.98,0.855,"1.26B MoE total",transform=ax.transAxes,ha="right",va="top",fontsize=10.5,color=TOT,bbox=dict(fc="white",ec="none",pad=0.4))   # white box: the 1.15 grid line runs under it
 def make(kind,name):
-    plt.rcParams.update({"font.size":9.5,"axes.titlesize":11,"axes.labelsize":10})
-    fig,ax=plt.subplots(2,2,figsize=(7.0,5.0))
+    plt.rcParams.update({"font.size":11,"axes.titlesize":12,"axes.labelsize":11.5})
+    fig,ax=plt.subplots(2,2,figsize=(9.75,5.0))   # wider: the old one-row legend set the cropped width
     for (i,j),bud in zip([(0,0),(0,1),(1,0)],["1e16","1e17","1e18"]):
         c=series(ax[i][j],bud)
         (rows if kind=="rows" else twin)(ax[i][j],c,headers=(j==0))
         if j==0: ax[i][j].set_ylabel("test BPB")
     bars(ax[1][1])
     h=[Line2D([0],[0],color=c,lw=3.2 if k=="tmp_f" else 2.6) for k,c,_ in STYLE]
-    lg=fig.legend(h,LEG,ncol=5,loc="upper center",fontsize=9.6,frameon=False,bbox_to_anchor=(0.5,1.008),columnspacing=0.9,handlelength=1.5); lg.get_texts()[-1].set_fontweight("bold")
-    fig.tight_layout(rect=[0.06,0,1,0.925]); fig.subplots_adjust(wspace=0.16,hspace=0.75 if kind=="rows" else 0.85)
+    # two rows (coarse column, fine column) so the key can be set larger; column-major fill
+    blank=Line2D([],[],ls="none")
+    lg=fig.legend([h[0],blank,h[1],h[3],h[2],h[4]],[LEG[0],"",LEG[1],LEG[3],LEG[2],LEG[4]],ncol=3,loc="upper center",fontsize=11.5,frameon=False,bbox_to_anchor=(0.5,1.008),columnspacing=1.6,handlelength=1.5,labelspacing=0.3); lg.get_texts()[-1].set_fontweight("bold")
+    fig.tight_layout(rect=[0.06,0,1,0.905]); fig.subplots_adjust(wspace=0.18,hspace=0.75 if kind=="rows" else 0.85)
     for d in (f"{REPO}/results/phase0/figures", f"{REPO}/paper/figures"):
         fig.savefig(f"{d}/{name}.png",dpi=200,bbox_inches="tight",pad_inches=0.03); fig.savefig(f"{d}/{name}.pdf",bbox_inches="tight",pad_inches=0.03); print("wrote",d,name)
     plt.close(fig)
