@@ -269,3 +269,21 @@ Other observations:
   on real text; the swap rate measured on real test text (step 2, step 7) is also 1.0.
 - Not comparable to the 2026-08-24 random-weight rows: different model (1.26 B vs 11 B
   geometry), unrooted, unpinned governor.
+
+## Step 2, continued: host F16 loss on the first 512 test samples
+
+Command (host, F16 GGUF, flash attention off, F32 KV, 8 threads, trained routing):
+`LLAMA_TEMPORAL_ROUTE=trained gguf_logits nll fine_1e19-f16.gguf rows512.i32 512 2048 nll_host_f16_512.f32 threads=8`.
+Paused at row 240 for step 6 and resumed on rows 240..511 (`rows_240_512.i32`). Rows 0..239
+ran on the host build before engine fix `759d43c5`, rows 240..511 after; the fix only changes
+which rows the last layer routes when some outputs are skipped, and `nll` requests every
+output, so both builds route identically here.
+
+| | samples | tokens | loss (nats/token) | bits per byte |
+|---|---|---|---|---|
+| PyTorch reference, temporal min_logit | 512 | 1,048,576 | 3.19202 | 1.07187 |
+| engine, host F16, trained routing | 512 | 1,048,576 | 3.19221 | 1.07193 |
+
+Difference +0.00018 nats, paired SE over samples 0.00013. RESULTS.md measured F16 rounding at
++0.00009 (plain attention) to +0.00039 (flash attention) under top-k. Check passes. Swap rate
+over the run: 1.0000 per layer per token (7,237,907 swaps, part 2).
