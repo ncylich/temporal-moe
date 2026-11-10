@@ -2,11 +2,14 @@
 //
 //   gguf_logits logits   model.gguf tokens.i32 n_tokens out.f32 [fa]  -> float32 [n_tokens, n_vocab]
 //   gguf_logits tokenize model.gguf text.txt out.i32               -> int32 ids (no BOS, specials parsed)
+//   gguf_logits nll model.gguf rows.i32 n_rows seq out.f32 [fa] [kvf16] [threads=N]
+//                                                                  -> float32 [n_rows, seq] per-token NLL
 //
 // CPU only (n_gpu_layers = 0), one decode call over the whole sequence, so every position goes
 // through the stock top-k router. Build line is in README.md.
 #include "llama.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -41,6 +44,68 @@ int main(int argc, char ** argv) {
         fwrite(ids.data(), sizeof(llama_token), n, f);
         fclose(f);
         fprintf(stderr, "tokenized %zu bytes -> %d tokens\n", text.size(), n);
+        return 0;
+    }
+
+    if (mode == "nll") {
+        // gguf_logits nll model.gguf rows.i32 n_rows seq out.f32 [fa] [kvf16] [threads=N]
+        // rows.i32 holds n_rows x (seq+1) ids. Each row is one sequence starting at position 0
+        // (the KV cache is cleared between rows); writes float32 [n_rows, seq] per-token
+        // negative log-likelihoods of ids[1..seq] given the prefix.
+        if (argc < 7) { fprintf(stderr, "nll mode: rows.i32 n_rows seq out.f32\n"); return 2; }
+        const int n_rows = atoi(argv[4]);
+        const int seq = atoi(argv[5]);
+        bool fa = false, kvf16 = false; int nth = 8;
+        for (int i = 7; i < argc; i++) {
+            const std::string o = argv[i];
+            if (o == "fa") fa = true;
+            else if (o == "kvf16") kvf16 = true;
+            else if (o.rfind("threads=", 0) == 0) nth = atoi(o.c_str() + 8);
+        }
+        std::vector<llama_token> rows((size_t) n_rows * (seq + 1));
+        FILE * f = fopen(argv[3], "rb");
+        if (!f || fread(rows.data(), sizeof(llama_token), rows.size(), f) != rows.size()) { fprintf(stderr, "row read failed\n"); return 1; }
+        fclose(f);
+        llama_context_params cp = llama_context_default_params();
+        cp.n_ctx = seq; cp.n_batch = seq; cp.n_ubatch = seq;
+        cp.offload_kqv = false; cp.op_offload = false;
+        cp.type_k = kvf16 ? GGML_TYPE_F16 : GGML_TYPE_F32;
+        cp.type_v = kvf16 ? GGML_TYPE_F16 : GGML_TYPE_F32;
+        cp.flash_attn_type = fa ? LLAMA_FLASH_ATTN_TYPE_ENABLED : LLAMA_FLASH_ATTN_TYPE_DISABLED;
+        cp.n_threads = cp.n_threads_batch = nth;
+        llama_context * ctx = llama_init_from_model(model, cp);
+        if (!ctx) { fprintf(stderr, "context init failed\n"); return 1; }
+        llama_batch batch = llama_batch_init(seq, 0, 1);
+        FILE * o = fopen(argv[6], "wb");
+        std::vector<float> nll(seq);
+        double tot = 0.0;
+        for (int r = 0; r < n_rows; r++) {
+            llama_memory_clear(llama_get_memory(ctx), true);
+            const llama_token * ids = rows.data() + (size_t) r * (seq + 1);
+            for (int i = 0; i < seq; i++) {
+                batch.token[i] = ids[i]; batch.pos[i] = i; batch.n_seq_id[i] = 1;
+                batch.seq_id[i][0] = 0; batch.logits[i] = 1;
+            }
+            batch.n_tokens = seq;
+            if (llama_decode(ctx, batch) != 0) { fprintf(stderr, "decode failed\n"); return 1; }
+            double rs = 0.0;
+            for (int i = 0; i < seq; i++) {
+                const float * lg = llama_get_logits_ith(ctx, i);
+                float mx = lg[0];
+                for (int v = 1; v < n_vocab; v++) mx = lg[v] > mx ? lg[v] : mx;
+                double se = 0.0;
+                for (int v = 0; v < n_vocab; v++) se += std::exp((double) lg[v] - mx);
+                nll[i] = (float) (std::log(se) + mx - lg[ids[i + 1]]);
+                rs += nll[i];
+            }
+            fwrite(nll.data(), sizeof(float), seq, o); fflush(o);
+            tot += rs;
+            fprintf(stderr, "row %d/%d nll %.5f running %.5f\n", r + 1, n_rows, rs / seq, tot / ((double) (r + 1) * seq));
+        }
+        fclose(o);
+        llama_batch_free(batch);
+        llama_free(ctx);
+        llama_model_free(model);
         return 0;
     }
 
