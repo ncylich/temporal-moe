@@ -100,7 +100,7 @@ FIELDS = ["ts", "phase", "model", "R", "ctx", "rep", "decode_tps", "stddev_tps",
           "arm", "peak_rss_mb", "swaps_per_layer_token", "route_layer_tokens", "rooted",
           "min_max_freq7", "soc_temp_c"]
 
-REST_S = 60   # minimum rest between arms regardless of cool-gate outcome; heat that
+REST_S = int(os.environ.get("REST_S", "60"))   # minimum rest between arms regardless of cool-gate outcome; heat that
               # doesn't yet show as a clock drop can still be building (BENCHMARK_GATES
               # M4/M5: back-to-back hot batches read 20-30% low even when each individual
               # arm's pre-check looked clean).

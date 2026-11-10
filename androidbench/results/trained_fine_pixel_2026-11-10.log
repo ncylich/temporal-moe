@@ -1,0 +1,53 @@
+[01:56:09] ctx_sweep trained_fine deploy R=18 ctx=0: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[01:56:17]   -> decode=66.067336 +/-3.353985 peak_rss=509MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=5005 cold_fills=52 swaps=4953 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=17043 fetched_mib=1404.3 evictions=16341 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=802.9
+[01:56:17]   resting 60s before next arm
+[01:57:53] ctx_sweep trained_fine resident_trained R=192 ctx=0: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[01:57:57]   -> decode=151.329379 +/-8.099458 peak_rss=767MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=5005 cold_fills=52 swaps=4953 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[01:57:57]   resting 60s before next arm
+[01:59:34] ctx_sweep trained_fine resident_topk R=192 ctx=0: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[01:59:38]   -> decode=149.035542 +/-8.52158 peak_rss=767MB swap=0MB route=NONE pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[01:59:38]   resting 60s before next arm
+[02:00:59] ctx_sweep trained_fine deploy R=18 ctx=1024: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:01:17]   -> decode=32.911093 +/-0.33643 peak_rss=762MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=18317 cold_fills=26 swaps=18290 swaps_per_layer_token=0.9999 pool=temporal-pool: fetches=20547 fetched_mib=1693.0 evictions=19845 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=870.1
+[02:01:17]   resting 60s before next arm
+[02:02:53] ctx_sweep trained_fine resident_trained R=192 ctx=1024: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:03:05]   -> decode=48.557728 +/-0.051443 peak_rss=887MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=18317 cold_fills=26 swaps=18290 swaps_per_layer_token=0.9999 pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[02:03:05]   resting 60s before next arm
+[02:04:41] ctx_sweep trained_fine resident_topk R=192 ctx=1024: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:04:53]   -> decode=48.109184 +/-0.072725 peak_rss=887MB swap=0MB route=NONE pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[02:04:53]   resting 60s before next arm
+[02:06:14] ctx_sweep trained_fine deploy R=18 ctx=2048: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:06:41]   -> decode=22.778965 +/-0.225497 peak_rss=892MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=31629 cold_fills=26 swaps=31602 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=21219 fetched_mib=1748.4 evictions=20517 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=935.3
+[02:06:41]   resting 60s before next arm
+[02:08:17] ctx_sweep trained_fine resident_trained R=192 ctx=2048: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:08:38]   -> decode=30.003357 +/-0.262665 peak_rss=976MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=31629 cold_fills=26 swaps=31602 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[02:08:38]   resting 60s before next arm
+[02:10:14] ctx_sweep trained_fine resident_topk R=192 ctx=2048: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:10:34]   -> decode=29.309058 +/-0.277573 peak_rss=976MB swap=0MB route=NONE pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[02:10:34]   resting 60s before next arm
+[02:11:55] ctx_sweep_speed_only_beyond_training_ctx trained_fine deploy R=18 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:12:45]   -> decode=13.630108 +/-0.70037 peak_rss=1095MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=58253 cold_fills=26 swaps=58226 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=21621 fetched_mib=1781.5 evictions=20919 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=1177.9  !! VOID
+[02:12:45]   resting 60s before next arm
+[02:13:45]   attempt 1 was void -- resting an extra 120s before retry (3 retries left)
+[02:16:06] ctx_sweep_speed_only_beyond_training_ctx trained_fine deploy R=18 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:16:55]   -> decode=13.663543 +/-0.698583 peak_rss=1095MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=58253 cold_fills=26 swaps=58226 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=21621 fetched_mib=1781.5 evictions=20919 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=1149.0  !! VOID
+[02:16:55]   resting 60s before next arm
+[02:17:55]   attempt 2 was void -- resting an extra 240s before retry (2 retries left)
+[02:22:16] ctx_sweep_speed_only_beyond_training_ctx trained_fine deploy R=18 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:23:05]   -> decode=14.078916 +/-0.235692 peak_rss=1096MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=58253 cold_fills=26 swaps=58226 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=21621 fetched_mib=1781.5 evictions=20919 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=1152.0
+[02:23:05]   resting 60s before next arm
+[02:24:41] ctx_sweep_speed_only_beyond_training_ctx trained_fine resident_trained R=192 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:25:23]   -> decode=15.928582 +/-0.967518 peak_rss=1154MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=58253 cold_fills=26 swaps=58226 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0  !! VOID
+[02:25:23]   resting 60s before next arm
+[02:26:23]   attempt 1 was void -- resting an extra 120s before retry (3 retries left)
+[02:28:59] ctx_sweep_speed_only_beyond_training_ctx trained_fine resident_trained R=192 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:29:41]   -> decode=16.560801 +/-0.537382 peak_rss=1154MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=58253 cold_fills=26 swaps=58226 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0  !! VOID
+[02:29:41]   resting 60s before next arm
+[02:30:41]   attempt 2 was void -- resting an extra 240s before retry (2 retries left)
+[02:35:17] ctx_sweep_speed_only_beyond_training_ctx trained_fine resident_trained R=192 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:35:59]   -> decode=16.723989 +/-0.08589 peak_rss=1154MB swap=0MB route=temporal-route: trained min_logit, layers=13 layer_tokens=58253 cold_fills=26 swaps=58226 swaps_per_layer_token=1.0000 pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[02:35:59]   resting 60s before next arm
+[02:37:35] ctx_sweep_speed_only_beyond_training_ctx trained_fine resident_topk R=192 ctx=4096: cool-gate PASSED {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000}
+[02:38:16]   -> decode=16.563424 +/-0.202075 peak_rss=1153MB swap=0MB route=NONE pool=temporal-pool: fetches=0 fetched_mib=0.0 evictions=0 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=0.0
+[02:38:16]   resting 60s before next arm
+[02:39:16] DONE. Results in results/trained_fine_pixel_2026-11-10.csv
