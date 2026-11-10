@@ -1,7 +1,7 @@
 From c1c21baa2e98d13c04a2f6ba8d117b088ffa9629 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Tue, 10 Nov 2026 01:39:11 -0800
-Subject: [PATCH] temporal-MoE: trained routing (resident window, min_logit
+Subject: [PATCH 1/2] temporal-MoE: trained routing (resident window, min_logit
  eviction) from the router logits
 
 ggml_temporal_route implements the training-time rule of temporal_router.py: cold fill with

@@ -74,7 +74,7 @@ MODELS = {
                          K=18, E=192, L_moe=13, bytes=744281312,
                          sha256="c34d3445064a9b14cadacee1de9ec74d568995f078de6da0d8aef767b412c8ff",
                          local=os.path.expanduser("~/Documents/temporal-moe-serving/fine_1e19/fine_1e19-q4_0.gguf"),
-                         bench="llama-bench-trained", build="c1c21baa"),
+                         bench="llama-bench-trained", build="759d43c5"),
 }
 
 # Arms for models that carry a trained router (all three use the same weights):

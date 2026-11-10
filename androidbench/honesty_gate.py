@@ -95,7 +95,7 @@ def gate2():
     def ppl(env, mmap=False):
         mm = "" if mmap else "--no-mmap"
         out = sh(f"cd {DEV} && echo 1000 > /proc/self/oom_score_adj; {env} {ROUTE} ./{PPL} -m {MODEL} "
-                 f"-f ppl_input.txt --chunks 2 -c 512 -t 6 {mm} -ot \"_exps=CPU\" 2>&1 | tail -5",
+                 f"-f ppl_input.txt --chunks 2 -c 512 -b 512 -t 6 {mm} -ot \"_exps=CPU\" 2>&1 | tail -5",
                  timeout=3600)
         m = re.search(r"Final estimate: PPL = ([0-9.]+ \+/- [0-9.]+)", out)
         return m.group(1) if m else "NOT FOUND"

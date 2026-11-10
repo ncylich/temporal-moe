@@ -43,7 +43,7 @@ SIDE  = "qwen3moe-rand-fine-Q4pure-repacked.bin"
 K     = 18
 NOROOT = False
 BIN   = "llama-perplexity"
-BATCH = ""
+BATCH = "-b 512"   # n_batch = n_ctx: one sequence per batch (trained routing refuses mixed batches)
 MODELS = {
     "rand_fine":    dict(gguf=MODEL, side=SIDE, K=18, E=192, bin="llama-perplexity", route=""),
     "trained_fine": dict(gguf="fine_1e19-q4_0.gguf", side="fine_1e19-q4_0-repacked.bin", K=18, E=192,
