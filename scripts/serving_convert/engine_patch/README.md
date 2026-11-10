@@ -1,6 +1,6 @@
 # Engine patch: trained temporal routing
 
-`0001-*.patch` adds the training-time routing rule to the device engine (`ncylich/llama.cpp`).
+`0001-*.patch` and `0002-*.patch` add the training-time routing rule to the device engine (`ncylich/llama.cpp`).
 It applies to branch `temporal-moe-win` at commit `43bec5f3` (which builds on `temporal-moe`
 @ `61f6d1b4`), so one change serves the phone (Android build) and the Windows laptop.
 
@@ -8,11 +8,15 @@ It applies to branch `temporal-moe-win` at commit `43bec5f3` (which builds on `t
 cd llama.cpp
 git fetch <remote> temporal-moe-win
 git checkout -b temporal-moe-trained-routing 43bec5f3
-git am /path/to/temporal-moe/scripts/serving_convert/engine_patch/0001-*.patch
+git am /path/to/temporal-moe/scripts/serving_convert/engine_patch/000*.patch
 ```
 
 Checked: applied with `git am` to a fresh clone at `43bec5f3`, the result has the same tree
-(`4327c734`) as the branch it was exported from.
+(`b69151b6`) as the branch it was exported from (engine commit `759d43c5`).
+
+`0002` fixes a bug `0001` had: glm4moe drops rows that need no logits before the last layer's
+FFN, so the last layer's window skipped those tokens. Under trained routing every layer now
+routes every token. Builds made before `0002` are wrong for prefills and llama-perplexity.
 
 ## What it does
 

@@ -1,0 +1,56 @@
+From 759d43c54fda786c50f374964296233537d0c3e8 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Tue, 10 Nov 2026 01:50:10 -0800
+Subject: [PATCH 2/2] temporal-MoE: under trained routing, glm4moe's last layer
+ routes every token
+
+The engine drops rows that need no logits before the last layer's FFN. With trained routing
+that skipped those tokens in the last layer's resident window, so after a prefill (or in
+llama-perplexity, which scores half of each chunk) layer 13's window had not followed the
+training rule. Under trained routing the rows are dropped after the layer loop instead.
+---
+ src/models/glm4-moe.cpp | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/models/glm4-moe.cpp b/src/models/glm4-moe.cpp
+index d60e47dd..dea30f6c 100644
+--- a/src/models/glm4-moe.cpp
++++ b/src/models/glm4-moe.cpp
+@@ -1,4 +1,5 @@
+ #include "models.h"
++#include "ggml-cpu.h"   // ggml_temporal_route_trained
+ 
+ void llama_model_glm4_moe::load_arch_hparams(llama_model_loader & ml) {
+     ml.get_key(LLM_KV_EXPERT_FEED_FORWARD_LENGTH,     hparams.n_ff_exp);
+@@ -155,6 +156,7 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+     auto * inp_attn = build_attn_inp_kv();
+ 
+     ggml_tensor * inp_out_ids = build_inp_out_ids();
++    static const bool tm_trained = ggml_temporal_route_trained() != 0;
+ 
+     // Only process up to last layer (skip final NextN layer)
+     // Final layer tensors are loaded but not processed in forward pass
+@@ -207,7 +209,9 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+                     model.layers[il].wo, NULL, model.layers[il].wo_s,
+                     Qcur, Kcur, Vcur, nullptr, nullptr, nullptr, 1.0f/sqrtf(float(n_embd_head)), il);
+         }
+-        if (il == n_layer - 1 && inp_out_ids) {
++        // Trained temporal routing advances every layer's resident window on EVERY token, so
++        // the last layer must route all tokens too; the unused rows are dropped after the loop.
++        if (il == n_layer - 1 && inp_out_ids && !tm_trained) {
+             cur   = ggml_get_rows(ctx0, cur, inp_out_ids);
+             inpSA = ggml_get_rows(ctx0, inpSA, inp_out_ids);
+         }
+@@ -265,6 +269,9 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+         inpL = cur;
+     }
+     cur = inpL;
++    if (tm_trained && inp_out_ids) {
++        cur = ggml_get_rows(ctx0, cur, inp_out_ids);
++    }
+     cur = build_norm(cur, model.output_norm, NULL, LLM_NORM_RMS, -1);
+ 
+     cb(cur, "result_norm", -1);
+-- 
+2.50.0
+

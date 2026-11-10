@@ -142,3 +142,65 @@ DRY RUN OK
 ```
 
 Pass.
+
+## Step 5: phone setup and gates (2026-11-10, device time 23:4x to 00:3x)
+
+Device: Pixel 10a `5C111JEA320125`, unrooted this boot (step 1 note), on AC power, 93% battery.
+Everything runs as the `shell` user under `/data/local/tmp/tmoe`.
+
+Setup:
+
+- Pushed `llama-bench-trained`, `llama-perplexity-trained` (engine branch, Android build) and
+  `gguf_logits-trained` (the check tool, statically linked against the same build).
+- Pushed `fine_1e19-q4_0.gguf`; on-device sha256
+  `c34d3445064a9b14cadacee1de9ec74d568995f078de6da0d8aef767b412c8ff` (matches step 1).
+- Side-file `fine_1e19-q4_0-repacked.bin` built on the device:
+  `LLAMA_TEMPORAL_REPACK_DUMP=fine_1e19-q4_0-repacked.bin ./llama-bench-trained -m fine_1e19-q4_0.gguf`.
+  All 39 expert tensors repacked (q4_0_4x8). The tool then exits with
+  `repack-dump: layer 0 missing slot 0`: its optional fused [gate|up|down] region assumes every
+  layer has experts, and layer 0 here is dense. Only `LLAMA_TEMPORAL_FUSED` reads that region;
+  it is off in every arm. The repacked-vs-plain gate below checks the mirror region.
+
+Bug found and fixed during this step (engine commit `759d43c5`):
+the first gate runs reported `layer_tokens=12813`, not a multiple of 13. A window dump showed
+layer 13 saw 513 tokens where layers 1 to 12 saw 1025. glm4moe drops the rows that need no
+logits before the last layer's FFN, so layer 13's window skipped those tokens. That breaks
+the training rule in llama-perplexity (it scores half of each chunk) and after any prompt
+prefill. The host check in step 2 was not affected because `gguf_logits nll` requests every
+logit. Fix: under trained routing the rows are dropped after the layer loop. After the fix,
+`layer_tokens=13325` = 13 x 1025.
+
+Retracted: the first run of honesty gate 2 (PPL 301.2826, both arms) and the first
+streamed-vs-resident gate (301.0689, both arms). Both passed, but on the binary with the
+layer-13 bug. All gates below are reruns on `759d43c5`.
+
+A second harness fault, caught by the engine's own check: llama-perplexity packs four
+512-token sequences into one 2048-token batch, and trained routing refuses mixed-sequence
+batches (`decode: trained temporal routing needs one sequence per batch`). Both PPL gates
+now pass `-b 512`.
+
+| gate | command | result | status |
+|---|---|---|---|
+| bytes are real | `python3 honesty_gate.py --model trained_fine` (gate 1: R=0, O_DIRECT, 16 decode tokens) | pool fetched 1071 MiB; diskstats delta 1122 MiB minus 93 MiB load = 1029 MiB; 3.9% apart (limit 10%) | pass |
+| pool numerics | same, gate 2: LLAMA_NO_REPACK, pool off (mmap) vs pool on R=18, trained routing | 301.3581 +/- 22.06006 both | pass (bit-identical) |
+| streamed vs resident, window path | `python3 gate_ppl.py --model trained_fine --resident 192 --batch1 --noroot` | R=192: 301.2954 +/- 21.91304; R=18: 301.2954 +/- 21.91304; 13,286 swaps each; R=18 arm 40,965 evictions | pass (bit-identical) |
+| repacked vs plain kernels | `python3 gate_ppl.py --model trained_fine --plain --noroot` (R=192, no two-pass) | repacked 300.2781, plain 301.3581, \|ln ratio\| = 0.00359 nats (limit 0.01, set before running) | pass |
+
+Notes:
+
+- PPL is about 300 because `ppl_input.txt` is shuffled word salad. It is an identity oracle,
+  not a quality number.
+- `--batch1` (-b 1 -ub 1) makes every one of the 1025 tokens per chunk a one-token decode, so
+  every token went through `ggml_temporal_window_fill` and the two-pass split.
+- Under TWOPASS the R=192 arm still evicts the expert the router drops (39,858 evictions);
+  TWOPASS ignores R >= K (pitfall #26). So this gate compares two streamed configurations
+  whose difference is the memory cap. Streamed against truly resident is covered by honesty
+  gate 2 (pool off) and, for timing, by arm `resident_trained`.
+- Measured swap rate in every gate: swaps_per_layer_token = 1.0000 (0.9990 where warmup
+  tokens are counted).
+- The batch-1 two-pass PPL (301.2954) and the batched resident PPL (300.2781) differ by
+  0.0034 nats in ln PPL: different accumulation order in the two-pass split, flipping
+  near-ties in a path-dependent router. Same size as the kernel-family difference.
+
+Step 3 redone after the fix: `git format-patch 43bec5f3..HEAD` now gives two patches; `git am`
+on a fresh clone at 43bec5f3 reproduces tree `b69151b6` of engine commit `759d43c5`. Pass.
