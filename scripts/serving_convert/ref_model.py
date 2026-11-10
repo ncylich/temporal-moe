@@ -157,10 +157,10 @@ def main():
                              reduction="none").view(chunk.shape[0], -1)
         losses.append(ce.cpu())
         done = torch.cat(losses)
+        if a.save_losses:                # rewrite every batch so a killed run keeps its data
+            np.save(a.save_losses, done.numpy())
         print(f"[{len(done)}/{len(toks)}] loss {done.mean():.5f}  {time.time()-t0:.0f}s", flush=True)
     per = torch.cat(losses)
-    if a.save_losses:
-        np.save(a.save_losses, per.numpy())
     mean = per.mean().item()
     se = per.mean(1).std().item() / math.sqrt(len(per)) if len(per) > 1 else float("nan")
     print(f"routing={a.routing} evict={a.evict} k={a.topk} samples={len(per)} tokens={per.numel()}")

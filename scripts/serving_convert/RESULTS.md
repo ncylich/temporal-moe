@@ -9,7 +9,7 @@ nats per token; bits per byte (bpb) = loss / 2.9780, lower is better.
 | step | check | result | status |
 |---|---|---|---|
 | 1 | key list with shapes; layouts recorded | 126 tensors, 1.2652 B parameters, [fine_1e19.keys.txt](fine_1e19.keys.txt) | pass |
-| 2 | reference test bpb within about 0.002 of the logged 1.06553 | 1.07187 on the first 512 of 20480 test samples, +0.00634, standard error 0.00533 | not resolved at this sample size |
+| 2 | reference test bpb within about 0.002 of the logged 1.06553 | 1.06977 on the first 936 of 20480 test samples, +0.00424, standard error about 0.0039 | not resolved at this sample size |
 | 3 | engine logits match the reference on the same ids | F32 GGUF: zero difference to 4 decimals on 512 tokens; on 4 x 2048 tokens loss differs by 0.00005 nats, max-abs logit difference 0.63 from top-k near-ties | pass, with the caveat below |
 | 3 | tokenizers give identical ids | 131,133 ids from 571,615 bytes of test text, identical | pass |
 | 4 | Q4_0 size and tensor types | 744,281,312 bytes; all 39 routed expert tensors Q4_0; router F16 | pass |
@@ -45,16 +45,23 @@ counts it logs match the 22 counts in `train.log` exactly, and the first 512 row
 |---|---|---|---|---|
 | logged by Megatron (bf16, GPU) | 20480 | 3.17316 | 1.06553 | |
 | reference, temporal, `evict=min_logit` | first 512 | 3.19202 | 1.07187 | +0.00634 (SE 0.00533) |
+| same | 512 to 935 | 3.17826 | 1.06725 | +0.00172 |
+| same, pooled | first 936 | 3.18579 | 1.06977 | +0.00424 (SE about 0.0039) |
 
-The difference is 1.2 standard errors, so the reference is consistent with the log but the
-check as written (0.002 bpb) is not met and cannot be at 512 samples. Per-sample mean loss has
+The second row comes from a run over samples 512 to 2047 that was terminated at 424 of 1536
+while other jobs were loading the machine. Its per-sample losses were not saved, only the
+running mean in the log, so the pooled standard error uses the per-sample spread of the first
+512. `ref_model.py` now rewrites `--save-losses` after every batch.
+
+The pooled difference is 1.1 standard errors, so the reference is consistent with the log but
+the check as written (0.002 bpb) is not met and cannot be at this sample size. Per-sample mean loss has
 a standard deviation of 0.359 nats, so resolving 0.002 bpb needs about 3,600 samples at one
 standard error, and an exact comparison needs all 20480. The reference runs at 2.4 s per sample
 on this CPU, so the full split is about 13.6 hours here or a few minutes on a GPU pod.
 
 Two paired comparisons on the first 32 samples show how much a wrong routing rule would move
-the number. Each shift is about the size of the 512-sample standard error (0.016 nats), so
-this run could not have excluded either mistake. The table shows sensitivity, not correctness.
+the number. Each shift is under two pooled standard errors (0.012 nats), so these runs could
+not have excluded either mistake. The table shows sensitivity, not correctness.
 
 | change from the reference | loss shift (nats) | SE |
 |---|---|---|
@@ -122,8 +129,8 @@ layers to Q4_0; how much of the loss comes from those was not measured.
 ## Not done
 
 - The full 20480-sample test score for step 2.
-- The coarse checkpoint (`g1_tmoe_coarse_1e19`). The scripts take its widths from the shapes
-  but none of them has been run on it.
+- The coarse checkpoint (`g1_tmoe_coarse_1e19`). The author chose the fine model, so it is not
+  needed. The scripts take its widths from the shapes but none of them has been run on it.
 - Anything on the phone or laptop, and the engine's resident-window routing. Every engine number
   above uses the stock top-k router, which the model was not trained with.
 
@@ -136,7 +143,7 @@ layers to Q4_0; how much of the loss comes from those was not measured.
    nats, so the device quality number depends on getting this right. `ref_model.py` returns the
    per-layer resident masks (`return_masks=True`) to check the engine's window against.
 2. Score the engine with that routing on these test samples and compare with the reference's
-   3.19202 on the first 512.
+   3.19202 on the first 512 (per-token losses were kept for those).
 3. On a Metal build with the model on GPU, the fork fails to compile
    `kernel_mul_mm_id_map0_ne20_18` for 18 used experts. It does not affect the phone or the
    Windows laptop but will affect any Mac run.
