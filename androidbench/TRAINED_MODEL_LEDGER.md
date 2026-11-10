@@ -287,3 +287,26 @@ output, so both builds route identically here.
 Difference +0.00018 nats, paired SE over samples 0.00013. RESULTS.md measured F16 rounding at
 +0.00009 (plain attention) to +0.00039 (flash attention) under top-k. Check passes. Swap rate
 over the run: 1.0000 per layer per token (7,237,907 swaps, part 2).
+
+## Step 7: Q4_0 quality on the phone
+
+Same 512 test samples (2048 tokens each, 1,048,576 tokens), trained routing, flash attention
+on, F16 KV, Q4_0 GGUF (sha256 in step 1).
+
+- Host: `LLAMA_TEMPORAL_ROUTE=trained gguf_logits nll fine_1e19-q4_0.gguf rows512.i32 512 2048 nll_host_q4_512.f32 fa kvf16 threads=8`
+- Phone (unrooted, 4 threads): `gguf_logits-trained nll fine_1e19-q4_0.gguf rows512.i32 512 2048 nll_phone_q4_512.f32 fa kvf16 threads=4`.
+  Run log `nll_phone_q4_512.log`; router report: `layers=13 layer_tokens=13631488 cold_fills=6656 swaps=13624366 swaps_per_layer_token=1.0000`.
+
+Bits per byte = loss / 2.9780 (same divisor as step 2).
+
+| | samples | tokens | loss (nats/token) | bits per byte | vs reference (paired SE) |
+|---|---|---|---|---|---|
+| PyTorch reference, temporal min_logit | 512 | 1,048,576 | 3.19202 | 1.07187 | |
+| engine, host F16 | 512 | 1,048,576 | 3.19221 | 1.07193 | +0.00018 (0.00013) |
+| engine, host Q4_0 | 512 | 1,048,576 | 3.21330 | 1.07902 | +0.02127 (0.00032) |
+| engine, phone Q4_0 | 512 | 1,048,576 | 3.21334 | 1.07903 | +0.02131 (0.00032) |
+
+Phone minus host Q4_0: +0.00004 nats, paired SE 0.00013, so the phone build matches the host
+build. Per-token values differ (max 3.50 nats on one token) because the ARM and x86/Apple
+kernels round differently and the router then takes different swaps on near ties, as in
+step 2. Q4_0 costs +0.0211 nats over F16, the same cost RESULTS.md measured under top-k.
