@@ -1,0 +1,359 @@
+From c1c21baa2e98d13c04a2f6ba8d117b088ffa9629 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Tue, 10 Nov 2026 01:39:11 -0800
+Subject: [PATCH] temporal-MoE: trained routing (resident window, min_logit
+ eviction) from the router logits
+
+ggml_temporal_route implements the training-time rule of temporal_router.py: cold fill with
+the top-K router logits of a sequence's first token, then on every token admit the best
+non-resident expert iff its logit beats the worst resident's, evicting the lowest-logit
+resident. It runs for any batch size, so prefill and decode share one window. The newest
+admission sits in slot K-1, which the two-pass split waits on.
+
+LLAMA_TEMPORAL_ROUTE=trained enables it; it is the default under LLAMA_TEMPORAL_TWOPASS.
+LLAMA_TEMPORAL_ROUTE=random keeps the earlier random one-swap policy. In trained mode
+ggml_temporal_window_fill only moves residency to match the router's window.
+llama_context resets the window at position 0 and refuses multi-sequence batches.
+LLAMA_TEMPORAL_ROUTE_DUMP writes every token's window for checking against the reference.
+
+Also lets the branch build on macOS for host checks: guards two trace lines in mul_mat_id,
+adds no-op stubs for window_fill and wait_src_expert, maps mincore/posix_fadvise.
+---
+ ggml/include/ggml-cpu.h      |  11 +++
+ ggml/src/ggml-cpu/ggml-cpu.c | 161 ++++++++++++++++++++++++++++++++++-
+ src/llama-context.cpp        |  15 ++++
+ src/llama-graph.cpp          |  12 ++-
+ src/llama-model-loader.cpp   |  10 +++
+ 5 files changed, 205 insertions(+), 4 deletions(-)
+
+diff --git a/ggml/include/ggml-cpu.h b/ggml/include/ggml-cpu.h
+index d573ca14..f3e72dc3 100644
+--- a/ggml/include/ggml-cpu.h
++++ b/ggml/include/ggml-cpu.h
+@@ -157,6 +157,17 @@ extern "C" {
+ 
+     // two-pass enforce: ggml custom-op callback filling selected_experts [K, n_tokens]
+     // with the layer's resident window (new expert pinned to slot K-1); userdata = layer.
++    // trained routing (the training-time resident-window rule, evict = min_logit).
++    // ggml_temporal_route: custom op, src[0] = router logits [E, n_tokens] F32 -> ids [K, n_tokens]
++    // (window, most recent admission in slot K-1); userdata = layer. One sequence per batch.
++    // ggml_temporal_route_trained: 1 when LLAMA_TEMPORAL_ROUTE=trained, or TWOPASS set without ROUTE=random.
++    // ggml_temporal_route_reset: cold-start every layer (called at sequence position 0).
++    // ggml_temporal_route_last: last token's admitted / evicted expert of layer L and its window.
++    GGML_BACKEND_API void ggml_temporal_route(struct ggml_tensor * dst, int ith, int nth, void * userdata);
++    GGML_BACKEND_API int  ggml_temporal_route_trained(void);
++    GGML_BACKEND_API void ggml_temporal_route_reset(void);
++    GGML_BACKEND_API int  ggml_temporal_route_last(int L, int * admitted, int * evicted, const int ** window);
++
+     GGML_BACKEND_API void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void * userdata);
+ 
+     // two-pass wait barrier: a ggml custom-op that blocks until the newly-swapped expert
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 8e8d7574..6482f794 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -1486,6 +1486,119 @@ UseGgmlGemm2:;
+ //   LLAMA_TEMPORAL_SIBLING_PREFETCH=0 disable form-2 overlap (default on)
+ //   LLAMA_TEMPORAL_ODIRECT=1      O_DIRECT fetches (bypass page cache by construction)
+ //   unset LLAMA_TEMPORAL_R        pool inactive (registration is harmless).
++// ---- trained routing: the training-time resident-window rule ------------------------------
++// Same rule as temporal/temporal_router.py compute_resident_mask(k, evict="min_logit"), which
++// the 1e19 runs trained with:
++//   cold fill (first token of a sequence): the K experts with the highest router logits;
++//   every later token: the best non-resident expert is admitted iff its logit is strictly
++//   above the worst resident's, and the lowest-logit resident is evicted. 0 or 1 swap per
++//   layer per token. Gate weights are computed downstream over the resident set (softmax
++//   over all experts, gathered, renormalised = softmax over the resident logits).
++// The window keeps the most recently admitted expert in slot K-1 so the two-pass FFN split
++// can wait on it alone. State is per layer and per process, so a batch must hold ONE sequence;
++// llama_context resets it at position 0 (ggml_temporal_route_reset).
++//   LLAMA_TEMPORAL_ROUTE=trained   this rule (also the default whenever LLAMA_TEMPORAL_TWOPASS is set)
++//   LLAMA_TEMPORAL_ROUTE=random    the earlier random 1-swap policy (two-pass only)
++//   LLAMA_TEMPORAL_ROUTE_DUMP=path append every token's window per layer: int32 layer, int32 K ids
++#define GGML_TR_MAXLAYER 128
++#define GGML_TR_MAXK     512
++#define GGML_TR_MAXE     8192
++static int      g_tr_win[GGML_TR_MAXLAYER][GGML_TR_MAXK];
++static uint8_t  g_tr_in[GGML_TR_MAXLAYER][GGML_TR_MAXE];
++static int      g_tr_k[GGML_TR_MAXLAYER];      // 0 = cold (next token fills)
++static int      g_tr_last_in[GGML_TR_MAXLAYER];   // last token: admitted expert, -1 none, -2 cold fill
++static int      g_tr_last_out[GGML_TR_MAXLAYER];  // last token: evicted expert, -1 none
++static uint64_t g_tr_steps[GGML_TR_MAXLAYER], g_tr_nswaps[GGML_TR_MAXLAYER], g_tr_ncold[GGML_TR_MAXLAYER];
++static FILE *   g_tr_dump = NULL;
++
++static void ggml_tr_report(void) {
++    uint64_t st = 0, sw = 0, co = 0; int nl = 0;
++    for (int L = 0; L < GGML_TR_MAXLAYER; L++) {
++        if (!g_tr_steps[L]) continue;
++        st += g_tr_steps[L]; sw += g_tr_nswaps[L]; co += g_tr_ncold[L]; nl++;
++    }
++    fprintf(stderr, "temporal-route: trained min_logit, layers=%d layer_tokens=%llu cold_fills=%llu swaps=%llu "
++            "swaps_per_layer_token=%.4f\n", nl, (unsigned long long) st, (unsigned long long) co,
++            (unsigned long long) sw, (st > co) ? (double) sw / (double) (st - co) : 0.0);
++    if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump = NULL; }
++}
++
++int ggml_temporal_route_trained(void) {
++    static int mode = -1;
++    if (mode < 0) {
++        const char * r = getenv("LLAMA_TEMPORAL_ROUTE");
++        if (r && strcmp(r, "trained") == 0)     mode = 1;
++        else if (r && strcmp(r, "random") == 0) mode = 0;
++        else if (r && r[0]) { fprintf(stderr, "temporal-route: FATAL unknown LLAMA_TEMPORAL_ROUTE=%s\n", r); abort(); }
++        else mode = getenv("LLAMA_TEMPORAL_TWOPASS") ? 1 : 0;
++        if (mode) {
++            const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP");
++            if (d && d[0]) { g_tr_dump = fopen(d, "wb"); if (!g_tr_dump) { fprintf(stderr, "temporal-route: FATAL cannot open %s\n", d); abort(); } }
++            atexit(ggml_tr_report);
++        }
++    }
++    return mode;
++}
++
++void ggml_temporal_route_reset(void) {
++    memset(g_tr_k, 0, sizeof(g_tr_k));
++}
++
++int ggml_temporal_route_last(int L, int * admitted, int * evicted, const int ** window) {
++    if (L < 0 || L >= GGML_TR_MAXLAYER) return 0;
++    if (admitted) *admitted = g_tr_last_in[L];
++    if (evicted)  *evicted  = g_tr_last_out[L];
++    if (window)   *window   = g_tr_win[L];
++    return g_tr_k[L];
++}
++
++// custom op: src[0] = router logits [E, n_tokens] (F32); dst = ids [K, n_tokens] (I32)
++void ggml_temporal_route(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    (void) nth;
++    if (ith != 0) return;
++    const struct ggml_tensor * lg = dst->src[0];
++    const int L = (int)(intptr_t) userdata;
++    const int K = (int) dst->ne[0];
++    const int n_tokens = (int) dst->ne[1];
++    const int E = (int) lg->ne[0];
++    GGML_ASSERT(lg->type == GGML_TYPE_F32 && lg->ne[1] == n_tokens);
++    GGML_ASSERT(L >= 0 && L < GGML_TR_MAXLAYER && K <= GGML_TR_MAXK && E <= GGML_TR_MAXE && K < E);
++    int * win = g_tr_win[L];
++    uint8_t * in = g_tr_in[L];
++    int32_t * out = (int32_t *) dst->data;
++    for (int t = 0; t < n_tokens; t++) {
++        const float * x = (const float *) ((const char *) lg->data + (size_t) t * lg->nb[1]);
++        g_tr_steps[L]++;
++        if (g_tr_k[L] != K) {                          // cold fill: top-K, highest first
++            memset(in, 0, (size_t) E);
++            for (int j = 0; j < K; j++) {
++                int b = -1;
++                for (int e = 0; e < E; e++) if (!in[e] && (b < 0 || x[e] > x[b])) b = e;
++                win[j] = b; in[b] = 1;
++            }
++            g_tr_k[L] = K;
++            g_tr_last_in[L] = -2; g_tr_last_out[L] = -1;
++            g_tr_ncold[L]++;
++        } else {
++            int nom = -1, ws = 0;
++            for (int e = 0; e < E; e++) if (!in[e] && (nom < 0 || x[e] > x[nom])) nom = e;
++            for (int j = 1; j < K; j++) if (x[win[j]] < x[win[ws]]) ws = j;
++            if (x[nom] > x[win[ws]]) {                 // swap: evict the lowest-logit resident
++                const int ev = win[ws];
++                in[ev] = 0;
++                if (ws != K - 1) win[ws] = win[K - 1];  // previous newcomer fills the gap
++                win[K - 1] = nom; in[nom] = 1;          // newcomer pinned to slot K-1
++                g_tr_last_in[L] = nom; g_tr_last_out[L] = ev;
++                g_tr_nswaps[L]++;
++            } else {
++                g_tr_last_in[L] = -1; g_tr_last_out[L] = -1;
++            }
++        }
++        for (int j = 0; j < K; j++) out[(size_t) t * K + j] = win[j];
++        if (g_tr_dump) { int32_t l32 = L; fwrite(&l32, 4, 1, g_tr_dump); fwrite(win, 4, (size_t) K, g_tr_dump); }
++    }
++}
++
+ #if defined(__linux__) || defined(_WIN32)
+ #if defined(__linux__)
+ #include <sys/mman.h>
+@@ -2851,7 +2964,16 @@ void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void
+     const int K = (int) dst->ne[0];
+     const int n_tokens = (int) dst->ne[1];
+     int32_t * out = (int32_t *) dst->data;
+-    if (g_tm_R < 0 || L < 0 || L >= GGML_TM_MAXLAYER) {   // pool off: identity window
++    // trained routing: the window was already chosen by ggml_temporal_route (src[0], the ids);
++    // this op only moves residency to match it and passes the ids through.
++    const bool trained = ggml_temporal_route_trained() != 0;
++    if (trained) {
++        const struct ggml_tensor * ids = dst->src[0];
++        GGML_ASSERT(ids && ids->type == GGML_TYPE_I32 && ids->ne[0] == K && ids->ne[1] == n_tokens);
++        memcpy(out, ids->data, (size_t) K * n_tokens * sizeof(int32_t));
++        if (g_tm_R < 0 || L < 0 || L >= GGML_TM_MAXLAYER) return;
++    }
++    if (!trained && (g_tm_R < 0 || L < 0 || L >= GGML_TM_MAXLAYER)) {   // pool off: identity window
+         for (int t = 0; t < n_tokens; t++) for (int j = 0; j < K; j++) out[t*K+j] = j;
+         return;
+     }
+@@ -2864,7 +2986,27 @@ void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void
+         else if (g_tm_pool[i].slot == 2) ti_d = i;
+     }
+     tm_mutex_lock(&g_tm_mtx);
+-    if (g_tm_ewin_k[L] == 0) {                            // init: window {0..K-1}, all fetched
++    if (trained) {
++        int adm = -1, ev = -1; const int * w = NULL;
++        ggml_temporal_route_last(L, &adm, &ev, &w);
++        if (ev >= 0) {                                    // the swap the router just made
++            if (ti_g>=0) ggml_tm_evict(&g_tm_pool[ti_g], ev);
++            if (ti_u>=0) ggml_tm_evict(&g_tm_pool[ti_u], ev);
++            if (ti_d>=0) ggml_tm_evict(&g_tm_pool[ti_d], ev);
++            tm_add64(&g_tm_swaps, 1);
++        }
++        if (g_tm_ewin_k[L] == K) { for (int j = 0; j < K; j++) g_tm_ein[L][g_tm_ewin[L][j]] = 0; }
++        else                     { memset(g_tm_ein[L], 0, sizeof(g_tm_ein[L])); }
++        for (int j = 0; j < K; j++) {                     // window resident (no-op when already so)
++            const int e = w[j];
++            g_tm_ewin[L][j] = e; g_tm_ein[L][e] = 1;
++            if (g_tm_fused) { ggml_tm_submit_fused(L, e); } else {
++            if (ti_g>=0) ggml_tm_submit2(ti_g, e, 0);
++            if (ti_u>=0) ggml_tm_submit2(ti_u, e, 0);
++            if (ti_d>=0) ggml_tm_submit2(ti_d, e, 0); }
++        }
++        g_tm_ewin_k[L] = K;
++    } else if (g_tm_ewin_k[L] == 0) {                     // init: window {0..K-1}, all fetched
+         g_tm_ernd[L] = 0x9E3779B97F4A7C15ull ^ (0x100000001b3ull * (uint64_t)(L + 1));
+         for (int j = 0; j < K; j++) { g_tm_ewin[L][j] = j; g_tm_ein[L][j] = 1;
+             if (g_tm_fused) { ggml_tm_submit_fused(L, j); } else {
+@@ -2910,7 +3052,7 @@ void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void
+         }
+     }
+     tm_mutex_unlock(&g_tm_mtx);
+-    for (int t = 0; t < n_tokens; t++) for (int j = 0; j < K; j++) out[t*K+j] = g_tm_ewin[L][j];
++    if (!trained) { for (int t = 0; t < n_tokens; t++) for (int j = 0; j < K; j++) out[t*K+j] = g_tm_ewin[L][j]; }
+ }
+ 
+ // called from the ith==0 section of mul_mat_id, before the barrier
+@@ -3202,6 +3344,14 @@ void ggml_temporal_wait_new(struct ggml_tensor * dst, int ith, int nth, void * u
+     }
+ }
+ #else
++// no slot pool on this platform: the window op only passes the router's ids through
++void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    (void) nth; (void) userdata;
++    if (ith != 0) return;
++    const struct ggml_tensor * src = dst->src[0];
++    GGML_ASSERT(ggml_temporal_route_trained() && src && src->type == GGML_TYPE_I32);
++    memcpy(dst->data, src->data, ggml_nbytes(dst));
++}
+ void ggml_temporal_pool_register(void * data, size_t nbytes, int n_experts, int fd, size_t file_off,
+                                  const char * name) {
+     (void) data; (void) nbytes; (void) n_experts; (void) fd; (void) file_off; (void) name;
+@@ -3209,6 +3359,7 @@ void ggml_temporal_pool_register(void * data, size_t nbytes, int n_experts, int
+ void ggml_temporal_wait_new(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
+     (void) dst; (void) ith; (void) nth; (void) userdata;
+ }
++void   ggml_tm_wait_src_expert(const struct ggml_tensor * src0, int e, int ith) { (void) src0; (void) e; (void) ith; }
+ int    ggml_tm_trace_on(void)  { return 0; }
+ double ggml_tm_trace_now(void) { return 0.0; }
+ void   ggml_tm_trace_gemv(double ts, double dur, int ith, int layer, int expert) {
+@@ -3496,7 +3647,9 @@ static void ggml_compute_forward_mul_mat_id(
+ 
+         atomic_int * current_chunk_ctr = (atomic_int *)(atomic_current_chunk + cur_a);
+ 
++#if defined(__linux__) || defined(_WIN32)
+         const double _gemv_t0 = tm_now();
++#endif
+         while (current_chunk < nchunk0 * nchunk1) {
+             const int64_t ith0 = current_chunk % nchunk0;
+             const int64_t ith1 = current_chunk / nchunk0;
+@@ -3519,11 +3672,13 @@ static void ggml_compute_forward_mul_mat_id(
+ 
+             current_chunk = atomic_fetch_add_explicit(current_chunk_ctr, 1, memory_order_relaxed);
+         }
++#if defined(__linux__) || defined(_WIN32)
+         if (g_tm_trace_on) {
+             int _lay = tm_entry ? tm_entry->layer_id : -1;
+             if (_lay < 0 && src0->name[0]) sscanf(src0->name, "blk.%d.", &_lay);  // baseline: pool off
+             tm_ev(_gemv_t0, tm_now() - _gemv_t0, ith, 0 /*GEMV*/, _lay, cur_a);
+         }
++#endif
+     }
+ }
+ 
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index d8e52ee0..e16d79ad 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -10,6 +10,7 @@
+ #include "llama-mmap.h"
+ #include "llama-model.h"
+ #include "llama-ext.h"
++#include "ggml-cpu.h"   // ggml_temporal_route_* (trained temporal routing state)
+ #include "llama.h"
+ 
+ #include <cinttypes>
+@@ -1807,6 +1808,20 @@ int llama_context::decode(const llama_batch & batch_inp) {
+ 
+         ggml_status status;
+ 
++        // trained temporal routing keeps one resident window per layer: cold-start it at the
++        // first position of a sequence, and refuse batches that mix sequences.
++        if (ggml_temporal_route_trained()) {
++            if (ubatch.n_tokens > 0 && ubatch.pos[0] == 0) {
++                ggml_temporal_route_reset();
++            }
++            for (uint32_t i = 0; i < ubatch.n_tokens; ++i) {
++                if (ubatch.n_seq_id[i] != 1 || ubatch.seq_id[i][0] != ubatch.seq_id[0][0]) {
++                    LLAMA_LOG_ERROR("%s: trained temporal routing needs one sequence per batch\n", __func__);
++                    return -1;
++                }
++            }
++        }
++
+         const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status);
+ 
+         if (!res) {
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 59244d17..26ca1641 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1925,9 +1925,19 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     static const bool tm_twopass = getenv("LLAMA_TEMPORAL_TWOPASS") != nullptr;
+     const bool tm_tp_here = tm_twopass && n_tokens == 1 && il >= 0
+         && gate_exps && down_exps && !gate_up_exps && type_op == LLM_FFN_SILU;
++    // trained routing: the training-time resident window chosen from the router logits, for
++    // every batch size (prefill included), so the window state stays continuous into decode.
++    static const bool tm_trained = ggml_temporal_route_trained() != 0;
++    if (tm_trained && il >= 0 && selected_experts_in == nullptr && hparams.n_expert_groups <= 1) {
++        ggml_tensor * lg = logits->type == GGML_TYPE_F32 ? logits : ggml_cast(ctx0, logits, GGML_TYPE_F32);
++        selected_experts = ggml_custom_4d(ctx0, GGML_TYPE_I32, n_expert_used, n_tokens, 1, 1,
++                &lg, 1, ggml_temporal_route, 1, (void *)(intptr_t) il);
++        cb(selected_experts, "ffn_moe_route", il);
++    }
+     if (tm_tp_here) {
++        ggml_tensor * src = tm_trained ? selected_experts : cur;
+         selected_experts = ggml_custom_4d(ctx0, GGML_TYPE_I32, n_expert_used, n_tokens, 1, 1,
+-                &cur, 1, ggml_temporal_window_fill, 1, (void *)(intptr_t) il);
++                &src, 1, ggml_temporal_window_fill, 1, (void *)(intptr_t) il);
+         cb(selected_experts, "ffn_moe_window", il);
+     }
+ 
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+index 6db6bf62..74c086b5 100644
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@ -14,6 +14,16 @@
+ #include <io.h>      // _open/_dup: CRT descriptors for the temporal pool's side-file
+ #include <fcntl.h>
+ #define tm_dup _dup
++#elif defined(__APPLE__)
++// host build only (no residency control on macOS): the Linux-only page-cache calls below
++// compile to no-ops so the trained-routing check can run on a Mac.
++#include <sys/mman.h>
++#include <unistd.h>
++#ifndef POSIX_FADV_DONTNEED
++#define POSIX_FADV_DONTNEED 4
++static inline int posix_fadvise(int, off_t, off_t, int) { return 0; }
++#endif
++#define mincore(a, l, v) mincore((a), (l), (char *) (v))
+ #endif
+ 
+ #include <algorithm>
+-- 
+2.50.0
+
