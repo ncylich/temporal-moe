@@ -204,3 +204,109 @@ Notes:
 
 Step 3 redone after the fix: `git format-patch 43bec5f3..HEAD` now gives two patches; `git am`
 on a fresh clone at 43bec5f3 reproduces tree `b69151b6` of engine commit `759d43c5`. Pass.
+
+## Step 6: decode speed and peak memory on the Pixel 10a (2026-11-10, 01:55 to 02:39 host time)
+
+Command: `python3 run_ctx_designpoint.py --model trained_fine --ctx 0 1024 2048 4096 --noroot
+--out results/trained_fine_pixel_2026-11-10.csv` (log next to it). Binary `llama-bench-trained`
+(engine 759d43c5), `-t 4 -p 0 -n 128 -r 3 -mmp 0 -ot "_exps=CPU"`, `-d <ctx>`; production fetch
+flags (repacked kernel + side-file, O_DIRECT, MADV_FREE, SPLIT 2, 6 fetch threads, SPIN_US
+5000). Arms: (a) `deploy` R=18, TWOPASS, trained routing; (b) `resident_trained` R=192, no
+TWOPASS, trained routing; (c) `resident_topk` R=192, stock top-k (a different routing function
+from the one the model was trained with).
+
+Run conditions: unrooted, governor `sched_pixel` (not pinned), AC power. Cool gate: soc_therm
+<= 33 C and every `scaling_max_freq` at rating, three samples 10 s apart; 60 s rest between
+arms. Void if policy-7 `scaling_max_freq` dipped below 3.105 GHz during the arm, any swap
+> 100 MB, no decode row, no evictions on deploy, or no router line on a trained arm. Host:
+my own jobs stopped (the F16 scoring run was paused at row 240 for this); macOS daemons
+(installd, BTLEServer) were busy and outside my control.
+
+16 rows, 4 void. All four voids are at ctx 4096 (two deploy, two resident_trained), each for
+policy-7 `scaling_max_freq` falling to 2.914 GHz mid-run; the driver rested longer and retried,
+and the third attempt of each was clean. Void rows stay in the CSV.
+
+| arm | ctx | decode tok/s (sd, 3 reps x 128) | / arm (b) | / arm (c) | VmHWM MB | swaps / layer / token | evictions |
+|---|---|---|---|---|---|---|---|
+| (a) deploy | 0 | 66.07 (3.35) | 0.437 | 0.443 | 509 | 1.0000 | 16,341 |
+| (b) resident_trained | 0 | 151.33 (8.10) | 1 | 1.015 | 767 | 1.0000 | 0 |
+| (c) resident_topk | 0 | 149.04 (8.52) | 0.985 | 1 | 767 | n/a | 0 |
+| (a) deploy | 1024 | 32.91 (0.34) | 0.678 | 0.684 | 762 | 0.9999 | 19,845 |
+| (b) resident_trained | 1024 | 48.56 (0.05) | 1 | 1.009 | 887 | 0.9999 | 0 |
+| (c) resident_topk | 1024 | 48.11 (0.07) | 0.991 | 1 | 887 | n/a | 0 |
+| (a) deploy | 2048 | 22.78 (0.23) | 0.759 | 0.777 | 892 | 1.0000 | 20,517 |
+| (b) resident_trained | 2048 | 30.00 (0.26) | 1 | 1.024 | 976 | 1.0000 | 0 |
+| (c) resident_topk | 2048 | 29.31 (0.28) | 0.977 | 1 | 976 | n/a | 0 |
+| (a) deploy | 4096, speed only | 14.08 (0.24) | 0.842 | 0.850 | 1,096 | 1.0000 | 20,919 |
+| (b) resident_trained | 4096, speed only | 16.72 (0.09) | 1 | 1.010 | 1,154 | 1.0000 | 0 |
+| (c) resident_topk | 4096, speed only | 16.56 (0.20) | 0.990 | 1 | 1,153 | n/a | 0 |
+
+ctx 4096 exceeds the 2,048-token training context: speed only, no quality claim.
+
+What the peak-memory column does and does not show. VmHWM is the process peak over the whole
+run, and for the deploy arm it is set by things other than the 18-expert window:
+
+- MADV_FREE (production flag) leaves evicted pages counted in RSS until the kernel reclaims
+  them. Separate memory-only runs (`_mem.sh`, deploy, 256 decode tokens, RSS sampled every
+  0.25 s): ctx 0 with MADV_FREE VmHWM 452 MB, without it 214 MB (decode-phase RSS 203 MB,
+  197 MB anonymous).
+- At depth > 0 the `-d` prefill goes through the batched path, which fetches every expert a
+  prompt token selects and does not evict until the next decode token trims. ctx 2048 without
+  MADV_FREE: VmHWM 881 MB during the prefill, decode-phase RSS median 443 MB.
+- So the decode working set of the deploy arm is about 203 MB at ctx 0 and 443 MB at ctx 2048
+  (KV cache and compute buffers included), against 767 and 976 MB fully resident. The VmHWM
+  column above is what a user would see as peak, and it includes the prefill.
+
+Other observations:
+
+- Swap rate is 1.0 per MoE layer per token in every trained arm: the trained router admits one
+  expert per layer on every token. 13 x 3 slices = 39 expert-slice fetches per token.
+- llama-bench prefills the depth once and restores the KV state for each rep; the router window
+  is not part of that state, so reps 2 and 3 start from rep 1's final window. With one swap per
+  token either way this does not change the fetch count; it does mean those reps' windows are
+  not the ones the training rule would give for that KV. Speed only.
+- Decode tokens in llama-bench are not natural text, so the window walk here is not the walk
+  on real text; the swap rate measured on real test text (step 2, step 7) is also 1.0.
+- Not comparable to the 2026-08-24 random-weight rows: different model (1.26 B vs 11 B
+  geometry), unrooted, unpinned governor.
+
+## Step 2, continued: host F16 loss on the first 512 test samples
+
+Command (host, F16 GGUF, flash attention off, F32 KV, 8 threads, trained routing):
+`LLAMA_TEMPORAL_ROUTE=trained gguf_logits nll fine_1e19-f16.gguf rows512.i32 512 2048 nll_host_f16_512.f32 threads=8`.
+Paused at row 240 for step 6 and resumed on rows 240..511 (`rows_240_512.i32`). Rows 0..239
+ran on the host build before engine fix `759d43c5`, rows 240..511 after; the fix only changes
+which rows the last layer routes when some outputs are skipped, and `nll` requests every
+output, so both builds route identically here.
+
+| | samples | tokens | loss (nats/token) | bits per byte |
+|---|---|---|---|---|
+| PyTorch reference, temporal min_logit | 512 | 1,048,576 | 3.19202 | 1.07187 |
+| engine, host F16, trained routing | 512 | 1,048,576 | 3.19221 | 1.07193 |
+
+Difference +0.00018 nats, paired SE over samples 0.00013. RESULTS.md measured F16 rounding at
++0.00009 (plain attention) to +0.00039 (flash attention) under top-k. Check passes. Swap rate
+over the run: 1.0000 per layer per token (7,237,907 swaps, part 2).
+
+## Step 7: Q4_0 quality on the phone
+
+Same 512 test samples (2048 tokens each, 1,048,576 tokens), trained routing, flash attention
+on, F16 KV, Q4_0 GGUF (sha256 in step 1).
+
+- Host: `LLAMA_TEMPORAL_ROUTE=trained gguf_logits nll fine_1e19-q4_0.gguf rows512.i32 512 2048 nll_host_q4_512.f32 fa kvf16 threads=8`
+- Phone (unrooted, 4 threads): `gguf_logits-trained nll fine_1e19-q4_0.gguf rows512.i32 512 2048 nll_phone_q4_512.f32 fa kvf16 threads=4`.
+  Run log `nll_phone_q4_512.log`; router report: `layers=13 layer_tokens=13631488 cold_fills=6656 swaps=13624366 swaps_per_layer_token=1.0000`.
+
+Bits per byte = loss / 2.9780 (same divisor as step 2).
+
+| | samples | tokens | loss (nats/token) | bits per byte | vs reference (paired SE) |
+|---|---|---|---|---|---|
+| PyTorch reference, temporal min_logit | 512 | 1,048,576 | 3.19202 | 1.07187 | |
+| engine, host F16 | 512 | 1,048,576 | 3.19221 | 1.07193 | +0.00018 (0.00013) |
+| engine, host Q4_0 | 512 | 1,048,576 | 3.21330 | 1.07902 | +0.02127 (0.00032) |
+| engine, phone Q4_0 | 512 | 1,048,576 | 3.21334 | 1.07903 | +0.02131 (0.00032) |
+
+Phone minus host Q4_0: +0.00004 nats, paired SE 0.00013, so the phone build matches the host
+build. Per-token values differ (max 3.50 nats on one token) because the ARM and x86/Apple
+kernels round differently and the router then takes different swaps on near ties, as in
+step 2. Q4_0 costs +0.0211 nats over F16, the same cost RESULTS.md measured under top-k.
