@@ -5,13 +5,32 @@ Gate 1 (bytes are real): R=0 decode, fetched_bytes (pool's own count) must match
 /proc/<pid>/io read_bytes to within ~10% (O_DIRECT: every fetch is a device read).
 Gate 2 (numerics unchanged): PPL over 2 chunks must equal the fully-resident value
 185405.9848 to 4 dp (the same oracle used for every prior configuration).
+
+    ./honesty_gate.py                       # random-weight fine model (legacy)
+    ./honesty_gate.py --model trained_fine  # trained fine 1e19, trained routing on every arm
+
+Load and expert byte counts come from the local copy of the GGUF (`local`), not constants.
 """
-import subprocess, re, time, threading
+import os, subprocess, re, sys, time, threading
 
 DEV = "/data/local/tmp/tmoe"
 MODEL = "qwen3moe-rand-fine-Q4pure.gguf"
 ENV = ("LLAMA_NO_REPACK=1 LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_R=0 "
        "LLAMA_TEMPORAL_FETCH_THREADS=8")
+BENCH, PPL, ROUTE, LOCAL = "llama-bench-temporal", "llama-perplexity", "", None
+MODELS = {
+    "trained_fine": dict(gguf="fine_1e19-q4_0.gguf", bench="llama-bench-trained",
+                         ppl="llama-perplexity-trained", route="LLAMA_TEMPORAL_ROUTE=trained",
+                         local=os.path.expanduser("~/Documents/temporal-moe-serving/fine_1e19/fine_1e19-q4_0.gguf")),
+}
+
+
+def gguf_bytes(path):
+    """(file bytes, routed-expert bytes) of a local GGUF."""
+    sys.path.insert(0, os.path.expanduser("~/Documents/llama.cpp-trained-routing/gguf-py"))
+    from gguf import GGUFReader
+    r = GGUFReader(path)
+    return os.path.getsize(path), sum(int(t.n_bytes) for t in r.tensors if "_exps" in t.name)
 
 def sh(cmd, timeout=3600):
     return subprocess.run(["adb", "shell", cmd], capture_output=True, text=True,
@@ -43,7 +62,7 @@ def gate1():
     # ~tens of MB; the model load (~6.7 GiB buffered) is part of the delta and is
     # subtracted below.
     s0 = sectors()
-    out = sh(f"cd {DEV} && echo 1000 > /proc/self/oom_score_adj; {ENV} ./llama-bench-temporal -m {MODEL} -t 6 -p 0 -n 16 -r 1 "
+    out = sh(f"cd {DEV} && echo 1000 > /proc/self/oom_score_adj; {ENV} {ROUTE} ./{BENCH} -m {MODEL} -t 6 -p 0 -n 16 -r 1 "
              f"-mmp 0 -ot \"_exps=CPU\" -o csv 2>&1", timeout=1800)
     s1 = sectors()
     read = (s1 - s0) * 512 / 1048576 if s0 >= 0 and s1 >= 0 else -1.0
@@ -52,8 +71,12 @@ def gate1():
     if m: fetched = float(m.group(1))
     # LAZY LOAD: the loader reads only non-expert weights (experts fetched on use),
     # so the load contribution is file size minus total expert bytes.
-    model_mib  = 5941846016 / 1048576
-    expert_mib = 221184 * 192 * 135 / 1048576   # slice x n_expert x n_expert_tensors
+    if LOCAL:
+        fb, eb = gguf_bytes(LOCAL)
+        model_mib, expert_mib = fb / 1048576, eb / 1048576
+    else:
+        model_mib  = 5941846016 / 1048576
+        expert_mib = 221184 * 192 * 135 / 1048576   # slice x n_expert x n_expert_tensors
     load_mib   = model_mib - expert_mib
     fetch_read = read - load_mib
     ok = fetched > 0 and abs(fetch_read - fetched) / fetched < 0.10
@@ -71,7 +94,7 @@ def gate2():
     print("gate 2: PPL bit-identity, pool-off vs pool-on (self-baselining)", flush=True)
     def ppl(env, mmap=False):
         mm = "" if mmap else "--no-mmap"
-        out = sh(f"cd {DEV} && echo 1000 > /proc/self/oom_score_adj; {env} ./llama-perplexity -m {MODEL} "
+        out = sh(f"cd {DEV} && echo 1000 > /proc/self/oom_score_adj; {env} {ROUTE} ./{PPL} -m {MODEL} "
                  f"-f ppl_input.txt --chunks 2 -c 512 -t 6 {mm} -ot \"_exps=CPU\" 2>&1 | tail -5",
                  timeout=3600)
         m = re.search(r"Final estimate: PPL = ([0-9.]+ \+/- [0-9.]+)", out)
@@ -84,6 +107,9 @@ def gate2():
     return ok
 
 if __name__ == "__main__":
+    if "--model" in sys.argv:
+        mm = MODELS[sys.argv[sys.argv.index("--model") + 1]]
+        MODEL, BENCH, PPL, ROUTE, LOCAL = mm["gguf"], mm["bench"], mm["ppl"], mm["route"], mm["local"]
     g1 = gate1()
     g2 = gate2()
     print(f"honesty gates: {'ALL PASS' if g1 and g2 else 'FAILURE'}", flush=True)

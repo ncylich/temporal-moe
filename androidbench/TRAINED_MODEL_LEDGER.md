@@ -93,3 +93,52 @@ python scripts/serving_convert/check_engine_routing.py --weights fine_1e19.safet
 - Swap rate: both the reference and the engine swap on every non-cold token
   (swaps_per_layer_token = 1.0000 in all four rows). The trained router never settles on a
   window equal to its current top-18, so each layer admits exactly one expert per token.
+
+Pending at the time of writing: the F16 score on the first 512 rows (1,048,576 tokens) against
+the reference's 3.19202. Running on the host in the background; result is recorded below
+under "Step 2, continued".
+
+## Step 3: engine patch exported (2026-11-10)
+
+- Engine commit `c1c21baa` on local branch `temporal-moe-trained-routing` (parent `43bec5f3`).
+- `git format-patch 43bec5f3..HEAD -o scripts/serving_convert/engine_patch/` gives one patch,
+  plus a README naming the base commit.
+- Check: fresh `git clone` of the engine checkout, `git checkout 43bec5f3`, `git am` the patch:
+  applies cleanly, resulting tree `4327c734` equals the exported branch's tree. Pass.
+- temporal-moe commit `25f3efca` pushed as `trained-model-pixel`
+  (`git push origin HEAD:refs/heads/trained-model-pixel`). Nothing pushed to `ncylich/llama.cpp`.
+
+## Step 4: phone drivers generalized (2026-11-10)
+
+- `run_ctx_designpoint.py`: model `trained_fine` (GGUF, side-file, K 18, E 192, 13 MoE
+  layers, bytes, sha256, binary `llama-bench-trained`, build filter `c1c21baa`). The CSV row
+  filter now uses the model's build commit instead of the hard-coded `0badc06a`. Named arms
+  `deploy` (R=18, TWOPASS, trained routing), `resident_trained` (R=192, no TWOPASS, trained
+  routing) and `resident_topk` (R=192, stock top-k); all share the production fetch and
+  repacked-kernel flags. New columns: `arm`, `peak_rss_mb` (VmHWM, polled every 0.5 s),
+  `swaps_per_layer_token` and `route_layer_tokens` (from the engine's `temporal-route:` line),
+  `rooted`, `min_max_freq7`, `soc_temp_c`. `--noroot` runs without `su`: the cool gate becomes
+  soc_therm <= 33 C with every policy's `scaling_max_freq` at its rating for three samples
+  10 s apart, and an arm is void if policy 7's `scaling_max_freq` drops below rating during the
+  run. Contexts above 2048 are labelled `ctx_sweep_speed_only_beyond_training_ctx`. Running
+  without `--model` gives the legacy phases unchanged.
+- `gate_ppl.py`: `--model trained_fine`, `--batch1` (-b 1 -ub 1 so every token takes the
+  window path), `--plain` (repacked vs plain kernels, tolerance |ln PPL difference| < 0.01 nats,
+  fixed before running).
+- `honesty_gate.py`: `--model trained_fine`; model and expert byte counts read from the local
+  GGUF (709.8 MiB file, 617.0 MiB routed experts) instead of constants.
+
+Check: `python3 run_ctx_designpoint.py --model trained_fine --dry-run`
+
+```
+model trained_fine: fine_1e19-q4_0.gguf (device /data/local/tmp/tmoe), side-file fine_1e19-q4_0-repacked.bin, bench llama-bench-trained, build filter c1c21baa
+local /Users/noahcylich/Documents/temporal-moe-serving/fine_1e19/fine_1e19-q4_0.gguf
+  bytes 744,281,312 sha256 c34d3445064a9b14cadacee1de9ec74d568995f078de6da0d8aef767b412c8ff
+  glm4moe: 14 layers, 1 dense, 13 MoE, 192 experts, 18 active
+  arm deploy            R= 18 LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained
+  arm resident_trained  R=192 LLAMA_TEMPORAL_ROUTE=trained
+  arm resident_topk     R=192 (stock top-k)
+DRY RUN OK
+```
+
+Pass.

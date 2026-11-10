@@ -18,6 +18,18 @@ take the lazy-expert-load path and start in seconds.
     ./gate_ppl.py sqpoll         # pread vs io_uring+SQPOLL (Pixel, rooted)
     ./gate_ppl.py --resident 192 --noroot   # resident vs streamed, no su wrapper
 
+Trained model (fine 1e19, trained routing, see TRAINED_MODEL_LEDGER.md):
+
+    ./gate_ppl.py --model trained_fine --resident 192 --batch1 --noroot
+    ./gate_ppl.py --model trained_fine --plain --noroot
+
+`--model` picks the GGUF, side-file, K and binary from MODELS. `--batch1` runs perplexity
+with -b 1 -ub 1, so every token is a one-token decode and goes through the two-pass window
+path (a larger batch takes the prefill path, which the window op never sees). `--plain`
+compares repacked against plain (LLAMA_NO_REPACK) expert kernels, both fully resident with
+trained routing: kernel families accumulate in a different order, so this one is a
+tolerance gate (|ln PPL difference| < 0.01 nats), not bit identity.
+
 `--resident E` runs arm A at R=E (fully resident, no streaming at all) against arm B
 at R=K. That is the STRONGEST form of the gate -- it catches a missing residency
 barrier and an eviction leak in one shot -- and it needs a device on which the model
@@ -30,6 +42,14 @@ MODEL = "qwen3moe-rand-fine-Q4pure.gguf"
 SIDE  = "qwen3moe-rand-fine-Q4pure-repacked.bin"
 K     = 18
 NOROOT = False
+BIN   = "llama-perplexity"
+BATCH = ""
+MODELS = {
+    "rand_fine":    dict(gguf=MODEL, side=SIDE, K=18, E=192, bin="llama-perplexity", route=""),
+    "trained_fine": dict(gguf="fine_1e19-q4_0.gguf", side="fine_1e19-q4_0-repacked.bin", K=18, E=192,
+                         bin="llama-perplexity-trained", route="LLAMA_TEMPORAL_ROUTE=trained"),
+}
+ROUTE = ""
 
 # NOTE: TWOPASS is parsed as `getenv(...) != nullptr`, so TWOPASS=0 ENABLES it.
 # The single-pass policy must OMIT the variable, hence POLICY is spliced in, not set to 0.
@@ -45,12 +65,13 @@ def sh(cmd, timeout=3600):
     return r.stdout.replace("\r", "") + r.stderr.replace("\r", "")
 
 
-def arm(label, env):
+def arm(label, env, policy=None, prod=None):
     s = "#!/system/bin/sh\n" + f"cd {DEV}\n" + "echo 1000 > /proc/self/oom_score_adj\n"
-    for kv in (PROD + " " + POLICY + " " + env).split():
+    pol = POLICY if policy is None else policy
+    for kv in ((PROD if prod is None else prod) + " " + pol + " " + ROUTE + " " + env).split():
         s += f"export {kv}\n"
-    s += ("./llama-perplexity -m " + MODEL + " -f ppl_input.txt --chunks 2 -c 512 "
-          "-t 4 --no-mmap -ot _exps=CPU\n")
+    s += (f"./{BIN} -m " + MODEL + " -f ppl_input.txt --chunks 2 -c 512 "
+          f"-t 4 --no-mmap -ot _exps=CPU {BATCH} 2>&1\n")
     with open("/tmp/_gate_ppl.sh", "w") as f:
         f.write(s)
     subprocess.run(["adb", "push", "/tmp/_gate_ppl.sh", f"{DEV}/_gate_ppl.sh"],
@@ -58,6 +79,9 @@ def arm(label, env):
     cmd = (f"sh {DEV}/_gate_ppl.sh" if NOROOT else f"su -c 'sh {DEV}/_gate_ppl.sh'")
     out = sh(cmd, timeout=5400)
     m = re.search(r"Final estimate: PPL = ([0-9.]+ \+/- [0-9.]+)", out)
+    rt = re.search(r"temporal-route: .*", out)
+    if rt:
+        print(f"   {rt.group(0)}", flush=True)
     ppl = m.group(1) if m else "NOT FOUND"
     pool = ""
     mm = re.search(r"temporal-pool: fetches=.*", out)
@@ -74,6 +98,26 @@ def arm(label, env):
 if __name__ == "__main__":
     argv = sys.argv[1:]
     NOROOT = "--noroot" in argv
+    if "--model" in argv:
+        mm = MODELS[argv[argv.index("--model") + 1]]
+        MODEL, SIDE, K, BIN, ROUTE = mm["gguf"], mm["side"], mm["K"], mm["bin"], mm["route"]
+        PROD = PROD.replace("qwen3moe-rand-fine-Q4pure-repacked.bin", SIDE)
+    if "--batch1" in argv:
+        BATCH = "-b 1 -ub 1"
+    if "--plain" in argv:
+        # both fully resident (R=E), no two-pass; only the expert kernel family differs
+        E = mm["E"] if "--model" in argv else 192
+        a = arm("A repacked R=E", f"LLAMA_TEMPORAL_R={E}", policy="")
+        b = arm("B plain R=E", f"LLAMA_TEMPORAL_R={E}", policy="",
+                prod="LLAMA_NO_REPACK=1 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6")
+        import math
+        try:
+            d = abs(math.log(float(a.split()[0])) - math.log(float(b.split()[0])))
+        except ValueError:
+            print("GATE FAIL (no PPL)"); sys.exit(1)
+        print(f"|ln PPL_repacked - ln PPL_plain| = {d:.5f} nats (gate < 0.01)")
+        print("GATE PASS" if d < 0.01 else "GATE FAIL")
+        sys.exit(0 if d < 0.01 else 1)
     if "--policy" in argv and argv[argv.index("--policy") + 1] == "enforce":
         POLICY = "LLAMA_TEMPORAL_ENFORCE=1"      # single-pass enforced swap
     if "--resident" in argv:

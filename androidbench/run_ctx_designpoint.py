@@ -40,7 +40,7 @@ Pitfall #30.
 
 Caller must ensure >=80% battery on AC; this script does not gate on it.
 """
-import csv, json, re, subprocess, sys, time
+import argparse, csv, hashlib, json, os, re, subprocess, sys, time
 
 DEV = "/data/local/tmp/tmoe"
 POLICIES = ["/sys/devices/system/cpu/cpufreq/policy0",
@@ -67,13 +67,38 @@ MODELS = {
                            side=None, K=80, E=80),
     "e100n_ceiling": dict(gguf="qwen3moe-rand-e100n-Q4pure.gguf",
                            side=None, K=100, E=100),
+    # The trained fine 1e19 Temporal MoE (scripts/serving_convert, TRAINED_MODEL_LEDGER.md):
+    # glm4moe, 14 layers (layer 0 dense, 13 MoE), 192 experts, 18 active, Q4_0 --pure.
+    # Its arms are named, not inferred from R: see TRAINED_ARMS.
+    "trained_fine": dict(gguf="fine_1e19-q4_0.gguf", side="fine_1e19-q4_0-repacked.bin",
+                         K=18, E=192, L_moe=13, bytes=744281312,
+                         sha256="c34d3445064a9b14cadacee1de9ec74d568995f078de6da0d8aef767b412c8ff",
+                         local=os.path.expanduser("~/Documents/temporal-moe-serving/fine_1e19/fine_1e19-q4_0.gguf"),
+                         bench="llama-bench-trained", build="c1c21baa"),
 }
+
+# Arms for models that carry a trained router (all three use the same weights):
+#   deploy           R=K, experts streamed, two-pass split, trained routing (the deployment)
+#   resident_trained R=E, all experts resident, no two-pass (as `ceilplain`), same trained routing
+#   resident_topk    R=E, all experts resident, stock engine top-k: a DIFFERENT routing function
+# All three share the production fetch/kernel flags (repacked kernel), so only residency and
+# routing differ. TWOPASS is parsed as getenv != NULL: arms without it must OMIT it.
+TRAINED_ARMS = {
+    "deploy":           ("K", "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained"),
+    "resident_trained": ("E", "LLAMA_TEMPORAL_ROUTE=trained"),
+    "resident_topk":    ("E", ""),
+}
+BENCH_BIN = "llama-bench-temporal"     # legacy random-weight runs
+BUILD_COMMIT = "0badc06a"              # build commit the legacy binary prints in its CSV rows
+NOROOT = False                         # set by --noroot: no su, no governor pin
 
 OUT_CSV = "run_TWOPASS_verified.csv"
 FIELDS = ["ts", "phase", "model", "R", "ctx", "rep", "decode_tps", "stddev_tps",
           "prefill_tps", "fetches", "evictions", "fetched_mib", "avg_fetch_us",
           "peak_swap_mb", "clk0", "clk4", "clk7", "mean_clk0", "mean_clk4", "mean_clk7",
-          "throttled", "void", "no_turnover", "swaps", "cmd"]
+          "throttled", "void", "no_turnover", "swaps", "cmd",
+          "arm", "peak_rss_mb", "swaps_per_layer_token", "route_layer_tokens", "rooted",
+          "min_max_freq7", "soc_temp_c"]
 
 REST_S = 60   # minimum rest between arms regardless of cool-gate outcome; heat that
               # doesn't yet show as a clock drop can still be building (BENCHMARK_GATES
@@ -128,7 +153,35 @@ def mean_clock_khz(before, after):
 
 
 def repin_governor():
+    if NOROOT:
+        return
     sh("su -c 'for p in " + " ".join(POLICIES) + "; do echo performance > $p/scaling_governor; done'")
+
+
+def soc_temp():
+    m = re.search(r"mValue=([0-9.]+), mType=-1, mName=soc_therm", sh("dumpsys thermalservice"))
+    return float(m.group(1)) if m else None
+
+
+def max_freqs():
+    out = sh("for p in 0 4 7; do cat /sys/devices/system/cpu/cpufreq/policy$p/scaling_max_freq; done")
+    v = [int(x) for x in out.split() if x.isdigit()]
+    return dict(zip([0, 4, 7], v)) if len(v) == 3 else {}
+
+
+def wait_cool_noroot(timeout_s=1800, sustain_checks=3, sustain_gap_s=10, max_c=33.0):
+    """Unrooted cool gate: the governor cannot be pinned, so idle clocks say nothing. Wait
+    until soc_therm <= max_c and every policy's scaling_max_freq is at its rating (no thermal
+    cap), for `sustain_checks` consecutive samples."""
+    t0, streak = time.time(), 0
+    while time.time() - t0 < timeout_s:
+        t, mf = soc_temp(), max_freqs()
+        ok = t is not None and t <= max_c and mf and all(mf[k] >= RATED[k] for k in RATED)
+        streak = streak + 1 if ok else 0
+        if streak >= sustain_checks:
+            return {"soc_temp": t, **mf}
+        time.sleep(sustain_gap_s)
+    return None
 
 
 def wait_cool(timeout_s=1800, sustain_checks=3, sustain_gap_s=5, repin_every_s=120):
@@ -162,8 +215,10 @@ def log(m):
     print(f"[{time.strftime('%H:%M:%S')}] {m}", flush=True)
 
 
-def run_arm(phase, model_key, R, ctx, ngen=128, reps=3):
+def run_arm(phase, model_key, R, ctx, ngen=128, reps=3, arm=None):
     m = MODELS[model_key]
+    if arm is not None:
+        return run_trained_arm(phase, model_key, arm, ctx, ngen=ngen, reps=reps)
     env = (f"LLAMA_TEMPORAL_REPACK=1 "
            f"LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 "
            f"LLAMA_TEMPORAL_R={R} LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 "
@@ -239,7 +294,7 @@ def run_arm(phase, model_key, R, ctx, ngen=128, reps=3):
     dec = sd = pp = None
     for line in out.splitlines():
         f_ = line.split(",")
-        if len(f_) > 30 and f_[0].strip('"') == "0badc06a":
+        if len(f_) > 30 and f_[0].strip('"') == BUILD_COMMIT:
             try:
                 is_gen = f_[-4].strip('"') != "0"
                 if is_gen:
@@ -286,14 +341,135 @@ def run_arm(phase, model_key, R, ctx, ngen=128, reps=3):
     return row
 
 
-def run_arm_retrying(phase, model_key, R, ctx, ngen=128, reps=3, max_extra_rest=3):
+def run_trained_arm(phase, model_key, arm, ctx, ngen=128, reps=3):
+    """One arm of a trained-router model (TRAINED_ARMS). Same protocol as run_arm (cool gate,
+    reps, void rules) plus peak resident memory (VmHWM) and the router's measured swap rate."""
+    m = MODELS[model_key]
+    rk, extra = TRAINED_ARMS[arm]
+    R = m[rk]
+    env = (f"LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE={m['side']} "
+           f"LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 "
+           f"LLAMA_TEMPORAL_R={R} LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 "
+           f"LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_FETCHPROF=1 {extra}").split()
+    streamed = R < m["E"]
+    if not streamed:
+        sh("am kill-all 2>/dev/null")
+        time.sleep(15)
+    c = wait_cool_noroot() if NOROOT else wait_cool()
+    if c is None:
+        log(f"{phase} {model_key} {arm} ctx={ctx}: !! COOL-GATE TIMED OUT -- SKIPPING this arm")
+        return None
+    log(f"{phase} {model_key} {arm} R={R} ctx={ctx}: cool-gate PASSED {c}")
+    tis_before = tis_snapshot()
+    s = "#!/system/bin/sh\n" + f"cd {DEV}\n" + "echo 1000 > /proc/self/oom_score_adj\n"
+    for kv in env:
+        s += f"export {kv}\n"
+    depth_flag = f"-d {ctx} " if ctx else ""
+    s += (f"./{m['bench']} -m {m['gguf']} -t 4 -p 0 -n {ngen} {depth_flag}"
+          f"-r {reps} -mmp 0 -ot \"_exps=CPU\" -o csv &\n"
+          "P=$!\nMAXSW=0\nHWM=0\nMF7=99999999\n"
+          "while kill -0 $P 2>/dev/null; do\n"
+          "  SW=$(grep VmSwap /proc/$P/status 2>/dev/null | tr -dc 0-9)\n"
+          "  [ -n \"$SW\" ] && [ \"$SW\" -gt \"$MAXSW\" ] && MAXSW=$SW\n"
+          "  H=$(grep VmHWM /proc/$P/status 2>/dev/null | tr -dc 0-9)\n"
+          "  [ -n \"$H\" ] && HWM=$H\n"
+          "  F=$(cat /sys/devices/system/cpu/cpufreq/policy7/scaling_max_freq)\n"
+          "  [ \"$F\" -lt \"$MF7\" ] && MF7=$F\n"
+          "  sleep 0.5\n"
+          "done\nwait $P\necho PEAKSWAP_KB=$MAXSW\necho PEAKHWM_KB=$HWM\necho MINMAXF7=$MF7\n")
+    with open("/tmp/_run_trained.sh", "w") as f:
+        f.write(s)
+    subprocess.run(["adb", "push", "/tmp/_run_trained.sh", f"{DEV}/_run_trained.sh"], capture_output=True)
+    out = sh((f"sh {DEV}/_run_trained.sh 2>&1" if NOROOT else f"su -c 'sh {DEV}/_run_trained.sh'"), timeout=3600)
+    tis_after = tis_snapshot()
+    mean_clk = mean_clock_khz(tis_before, tis_after)
+    g = lambda pat, conv=int: (conv(re.search(pat, out).group(1)) if re.search(pat, out) else None)
+    mf7 = g(r"MINMAXF7=(\d+)")
+    if NOROOT:
+        # no governor pin: mean clock over all cores says little; void on a thermal cap instead
+        throttled = mf7 is None or mf7 < RATED[7]
+    else:
+        throttled = any(mean_clk.get(p) is not None and mean_clk[p] < RATED[p] * 0.97 for p in RATED)
+    dec = sd = None
+    for line in out.splitlines():
+        f_ = line.split(",")
+        if len(f_) > 30 and f_[0].strip('"') == m["build"] and f_[-4].strip('"') != "0":
+            try:
+                dec, sd = float(f_[-2].strip('"')), float(f_[-1].strip('"'))
+            except ValueError:
+                pass
+    pool = re.search(r"temporal-pool: fetches=(\d+) fetched_mib=([\d.]+) evictions=(\d+) "
+                     r".*avg_fetch_us=([\d.]+)", out)
+    route = re.search(r"temporal-route: .*layer_tokens=(\d+) cold_fills=(\d+) swaps=(\d+) "
+                      r"swaps_per_layer_token=([\d.]+)", out)
+    sw_mb = (g(r"PEAKSWAP_KB=(\d+)") or 0) // 1024
+    hwm_mb = (g(r"PEAKHWM_KB=(\d+)") or 0) / 1024
+    ev = int(pool.group(3)) if pool else -1
+    no_turnover = streamed and ev <= 0
+    if no_turnover:
+        log(f"  !! NO EVICTIONS on the deploy arm (evictions={ev}) -- VOID")
+    void = sw_mb > 100 or throttled or dec is None or no_turnover or (arm != "resident_topk" and route is None)
+    row = dict(ts=time.strftime("%Y-%m-%dT%H:%M:%S"), phase=phase, model=model_key, R=R, ctx=ctx,
+               rep=reps, decode_tps=dec, stddev_tps=sd, prefill_tps=None,
+               fetches=pool.group(1) if pool else "", evictions=pool.group(3) if pool else "",
+               fetched_mib=pool.group(2) if pool else "", avg_fetch_us=pool.group(4) if pool else "",
+               peak_swap_mb=sw_mb, clk0=c.get(0), clk4=c.get(4), clk7=c.get(7),
+               mean_clk0=mean_clk.get(0), mean_clk4=mean_clk.get(4), mean_clk7=mean_clk.get(7),
+               throttled=throttled, void=void, no_turnover=no_turnover,
+               swaps=route.group(3) if route else "", cmd=" ".join(env) + f" d={ctx}",
+               arm=arm, peak_rss_mb=round(hwm_mb, 1),
+               swaps_per_layer_token=route.group(4) if route else "",
+               route_layer_tokens=route.group(1) if route else "", rooted=not NOROOT,
+               min_max_freq7=mf7, soc_temp_c=c.get("soc_temp"))
+    write_row(row)
+    log(f"  -> decode={dec} +/-{sd} peak_rss={hwm_mb:.0f}MB swap={sw_mb}MB "
+        f"route={route.group(0) if route else 'NONE'} pool={pool.group(0)[:120] if pool else 'NONE'}"
+        + ("  !! VOID" if void else ""))
+    if dec is None:
+        log("  !! NO DECODE ROW -- tail:\n   " + "\n   ".join(out.splitlines()[-15:]))
+    log(f"  resting {REST_S}s before next arm")
+    time.sleep(REST_S)
+    return row
+
+
+def gguf_geometry(path):
+    """(n_layer, n_dense, n_expert, n_expert_used) read from the GGUF header."""
+    sys.path.insert(0, os.path.expanduser("~/Documents/llama.cpp-trained-routing/gguf-py"))
+    from gguf import GGUFReader
+    r = GGUFReader(path)
+    arch = bytes(r.fields["general.architecture"].parts[-1]).decode()
+    v = lambda k: int(r.fields[f"{arch}.{k}"].parts[-1][0])
+    return arch, v("block_count"), v("leading_dense_block_count"), v("expert_count"), v("expert_used_count")
+
+
+def dry_run(model_key):
+    m = MODELS[model_key]
+    print(f"model {model_key}: {m['gguf']} (device {DEV}), side-file {m['side']}, bench {m['bench']}, "
+          f"build filter {m['build']}")
+    h = hashlib.sha256()
+    with open(m["local"], "rb") as f:
+        for blk in iter(lambda: f.read(1 << 24), b""):
+            h.update(blk)
+    size = os.path.getsize(m["local"])
+    arch, nl, nd, ne, nu = gguf_geometry(m["local"])
+    ok = h.hexdigest() == m["sha256"] and size == m["bytes"] and nl - nd == m["L_moe"] \
+        and ne == m["E"] and nu == m["K"]
+    print(f"local {m['local']}\n  bytes {size:,} sha256 {h.hexdigest()}\n"
+          f"  {arch}: {nl} layers, {nd} dense, {nl - nd} MoE, {ne} experts, {nu} active")
+    for arm, (rk, extra) in TRAINED_ARMS.items():
+        print(f"  arm {arm:17s} R={m[rk]:3d} {extra or '(stock top-k)'}")
+    print("DRY RUN " + ("OK" if ok else "MISMATCH"))
+    return ok
+
+
+def run_arm_retrying(phase, model_key, R, ctx, ngen=128, reps=3, max_extra_rest=3, arm=None):
     """run_arm, but if an attempt comes back void (swap or mid-run throttle), rest longer
     and retry rather than silently losing that data point. Every attempt is still written
     to the CSV (void=True included) for a full audit trail; the loop just keeps trying
     for a clean one so morning's dataset is as complete as possible."""
     extra_rest = 0
     for attempt in range(1, max_extra_rest + 2):
-        row = run_arm(phase, model_key, R, ctx, ngen=ngen, reps=reps)
+        row = run_arm(phase, model_key, R, ctx, ngen=ngen, reps=reps, arm=arm)
         if row is None:
             return None   # cool-gate never sustained -- see run_arm's own log for why
         if not row["void"]:
@@ -345,5 +521,30 @@ def main():
         "unaffected by pitfall #8 since a fully-resident model is not supposed to evict.")
 
 
+def main_trained(a):
+    for ctx in a.ctx:
+        label = "ctx_sweep" if ctx <= 2048 else "ctx_sweep_speed_only_beyond_training_ctx"
+        for arm in a.arms:
+            run_arm_retrying(label, a.model, None, ctx, ngen=a.ngen, reps=a.reps, arm=arm)
+    log("DONE. Results in " + OUT_CSV)
+
+
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", help="a MODELS key with a trained router (e.g. trained_fine); "
+                    "omit to run the legacy random-weight phases")
+    ap.add_argument("--arms", nargs="+", default=list(TRAINED_ARMS))
+    ap.add_argument("--ctx", nargs="+", type=int, default=[0, 1024, 2048, 4096])
+    ap.add_argument("--ngen", type=int, default=128)
+    ap.add_argument("--reps", type=int, default=3)
+    ap.add_argument("--out", default=OUT_CSV)
+    ap.add_argument("--noroot", action="store_true", help="no su, no governor pin, thermal cool gate")
+    ap.add_argument("--dry-run", action="store_true")
+    a = ap.parse_args()
+    NOROOT, OUT_CSV = a.noroot, a.out
+    if a.model is None:
+        main()
+    elif a.dry_run:
+        sys.exit(0 if dry_run(a.model) else 1)
+    else:
+        main_trained(a)
