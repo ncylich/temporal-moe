@@ -1394,3 +1394,29 @@ swaps_per_layer_token=1.0000`, and the NLL file is complete (4,194,304 bytes = 5
 the swap rate of the 512-row run itself is therefore not recorded.
 
 **Retracted:** nothing.
+
+### L3-8 -- Phase 7, pack and push; open items
+
+`python lapbench.py pack --env windows --model trained_fine --tag L3 --provisional "..."` (18:50): the 41
+L3 rows appended to `results/ablations/serving_benchmarks_laptop.csv` (model column
+`fine_1e19-q4_0.gguf`, tier `deploy` / `resident_trained` / `resident_topk`, context = ctx, every row
+carrying the provisional note); `comms/laptop/L3/`: build, gates, runs.jsonl, session, memdemo,
+report, quality and smoke JSON, and `logs_L3.tar.gz` (every engine run's stdout/stderr, the session's
+scripts from `C:\tmoe\tools\trained`, and its side logs). The WSL compile log was left out of the
+tarball (an upstream source file name in it matches the repo's vendor-name filter). Data commit
+`31ca67f4`, then this entry; both pushed to `laptop-trained-model`.
+
+**Open items, none of which change a number:**
+
+1. `Get-MpPreference` from an elevated shell: still not pasted. Defender's own log still records both
+   exclusions (event 5007); every row carries the provisional note, as in L1.
+2. The memory claim by commit cap on Windows (L3-3, L3-4): this model's weight buffer is below the
+   fork's 1 GiB reserve-mode threshold, so a job-object cap cannot show deploy's saving here; the
+   working-set columns do. Lowering that threshold (one constant in
+   `ggml_backend_cpu_buffer_type_alloc_buffer`) would make the cap meaningful but is an engine change
+   beyond the shipped patch, so it was not made.
+3. The 512-row quality run's route line was not captured (L3-7); its swap rate rests on the one-row
+   test and on every other trained run in this session (all 1.0000).
+4. Deploy equals the resident model at ctx 4096 (L3-6); not attributed (no trace runs this session).
+
+**Retracted:** nothing.
