@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decode benchmark driver for the trained 1.26B model on one GPU.
 
-Protocol (the 11B workstation protocol): batch 1, flash attention on, the context is filled
+Protocol (the 11B workstation protocol, except flash attention, see --fa): batch 1, the context is filled
 token by token (-b 1 -ub 1 -d <ctx>), then 100 tokens are generated and timed; four trials,
 the first discarded. One llama-bench process per (arm, context); peak VRAM is the maximum of
 nvidia-smi memory.used on that GPU during the process, polled every 0.2 s.
@@ -38,6 +38,8 @@ def main():
     ap.add_argument("--n", type=int, default=100)
     ap.add_argument("--reps", type=int, default=4)
     ap.add_argument("--env", nargs="*", default=[], help="extra KEY=VALUE for every arm")
+    ap.add_argument("--fa", type=int, default=0, help="flash attention; the CUDA kernels have no head size 16, so 1 puts attention on the CPU")
+    ap.add_argument("--threads", type=int, default=8)
     ap.add_argument("--note", default="")
     a = ap.parse_args()
     arms = list(ARMS) if a.arms == ["all"] else a.arms
@@ -47,7 +49,7 @@ def main():
             env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(a.gpu), **env_add)
             for kv in a.env:
                 k, v = kv.split("=", 1); env[k] = v
-            cmd = [os.path.join(a.bin, "llama-bench"), "-m", a.model, "-ngl", "99", "-fa", "1", "-ub", "1", "-b", "1",
+            cmd = [os.path.join(a.bin, "llama-bench"), "-m", a.model, "-ngl", "99", "-fa", str(a.fa), "-t", str(a.threads), "-ub", "1", "-b", "1",
                    "-p", "0", "-n", str(a.n), "-d", str(ctx), "-r", str(a.reps), "-o", "json"] + extra
             idle = gpu_used(a.gpu)
             peak = [idle]; stop = threading.Event()
