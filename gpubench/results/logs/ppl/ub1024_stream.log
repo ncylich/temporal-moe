@@ -1,0 +1,15 @@
+0.00.591.545 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --no-mmap for better performance
+[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=18 + CPU pool
+[temporal-prefill] EXPERT-MAJOR STREAMING (default): n_tokens=2 k=18 active=18/192 ring=96 slots (12 batches x 8), be=84KB
+0.01.296.337 I 
+0.01.296.476 I system_info: n_threads = 8 (n_threads_batch = 8) / 96 | CUDA : ARCHS = 860 | USE_GRAPHS = 1 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.01.296.491 I perplexity: tokenizing the input ..
+0.01.340.083 I perplexity: tokenization took 43.586 ms
+0.01.340.128 I perplexity: calculating perplexity over 8 chunks, n_ctx=1024, batch_size=1024, n_seq=1
+0.01.622.493 I perplexity: 0.28 seconds per pass - ETA 0.03 minutes
+[1]19.0296,[2]21.5911,[3]19.6122,[4]19.0668,[5]18.4086,[6]17.8178,[7]17.5468,[8]16.7862,
+0.03.208.230 I Final estimate: PPL = 16.7862 +/- 0.71507
+
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=106522 cold_fills=117 swaps=106393 swaps_per_layer_token=0.9999
+temporal-route-cuda: slot swap-ins decided on single-token steps=0
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
