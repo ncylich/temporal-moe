@@ -1420,3 +1420,23 @@ tarball (an upstream source file name in it matches the repo's vendor-name filte
 4. Deploy equals the resident model at ctx 4096 (L3-6); not attributed (no trace runs this session).
 
 **Retracted:** nothing.
+
+### L3-9 -- The `Get-MpPreference` paste: both exclusions confirmed; the provisional item from L1 is closed
+
+Mohsen ran `Get-MpPreference | Select-Object -ExpandProperty ExclusionPath` in an elevated PowerShell
+on 2026-11-10 after the session. The list contains both benchmark paths:
+
+```
+C:\tmoe
+C:\Users\mohsen\AppData\Local\wsl\{8193fb13-76e8-49c9-965b-4daa7b3aaff0}
+```
+
+(13 further exclusions on the machine, for unrelated development folders, are omitted here; none is
+under `C:\tmoe` or the WSL disk, and none touches the benchmark.) The second path is the
+Ubuntu-24.04 distro's BasePath (L3-1). This is the direct reading that L1-3 onward and every L3
+row waited for: Defender real-time scanning excluded `C:\tmoe` and the WSL disk throughout. The
+rows keep their stamped provisional note as recorded; this entry closes that item for the L1, L2
+and L3 rows. The orchestrator's acceptance of the x86 gate forms (L1-6 ruling 2) is the other L1
+item; L3 used those forms.
+
+**Retracted:** nothing.
