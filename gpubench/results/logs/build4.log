@@ -1,0 +1,46 @@
+engine tree a235a715
+[ 94%] Building CXX object common/CMakeFiles/llama-common.dir/preset.cpp.o
+[ 94%] Building CXX object common/CMakeFiles/llama-common.dir/ngram-map.cpp.o
+[ 94%] Building CXX object common/CMakeFiles/llama-common.dir/sampling.cpp.o
+[ 94%] Building CXX object common/CMakeFiles/llama-common.dir/reasoning-budget.cpp.o
+[ 94%] Building CXX object common/CMakeFiles/llama-common.dir/speculative.cpp.o
+[ 96%] Linking CXX shared library ../bin/libllama-common.so
+gmake[3]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 98%] Built target llama-common
+Consolidate compiler generated dependencies of target llama-bench-impl
+gmake[3]: Warning: File 'tools/llama-bench/CMakeFiles/llama-bench-impl.dir/compiler_depend.make' has modification time 1.4 s in the future
+[ 98%] Building CXX object tools/llama-bench/CMakeFiles/llama-bench-impl.dir/llama-bench.cpp.o
+[ 98%] Linking CXX shared library ../../bin/libllama-bench-impl.so
+gmake[3]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 98%] Built target llama-bench-impl
+Consolidate compiler generated dependencies of target llama-bench
+gmake[3]: Warning: File 'tools/llama-bench/CMakeFiles/llama-bench.dir/compiler_depend.make' has modification time 1.5 s in the future
+[ 98%] Linking CXX executable ../../bin/llama-bench
+gmake[3]: warning:  Clock skew detected.  Your build may be incomplete.
+[100%] Built target llama-bench
+[  0%] Built target cpp-httplib
+Consolidate compiler generated dependencies of target llama-common-base
+[  3%] Built target ggml-base
+[  3%] Built target llama-common-base
+[  7%] Built target ggml-cpu
+[ 44%] Built target ggml-cuda
+[ 44%] Built target ggml
+[ 89%] Built target llama
+Consolidate compiler generated dependencies of target llama-common
+[ 98%] Built target llama-common
+Consolidate compiler generated dependencies of target llama-perplexity-impl
+gmake[3]: Warning: File 'tools/perplexity/CMakeFiles/llama-perplexity-impl.dir/compiler_depend.make' has modification time 1.1 s in the future
+[ 98%] Building CXX object tools/perplexity/CMakeFiles/llama-perplexity-impl.dir/perplexity.cpp.o
+[ 98%] Linking CXX shared library ../../bin/libllama-perplexity-impl.so
+gmake[3]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 98%] Built target llama-perplexity-impl
+Consolidate compiler generated dependencies of target llama-perplexity
+gmake[3]: Warning: File 'tools/perplexity/CMakeFiles/llama-perplexity.dir/compiler_depend.make' has modification time 1.2 s in the future
+[ 98%] Linking CXX executable ../../bin/llama-perplexity
+gmake[3]: warning:  Clock skew detected.  Your build may be incomplete.
+[100%] Built target llama-perplexity
+4acafc2cb63876fb8d318d2a4ff55f3f9e35fdc942756952ff240fedad0c9038  build/bin/llama-bench
+65c1178ea298247702696acf844aade4ab2ec7b2891f7284a0845c49b9605bde  build/bin/llama-perplexity
+349492399b2049ea498f040042736d613e118bbaf4d8867ff35c5ee2ce88c8b1  build/bin/libllama.so
+11d74f4a6604f15ed6c872d75c6c1d26c20f2ff949e5e0e5a357fef56cdf79cb  build/bin/libggml-cuda.so
+BUILD_DONE

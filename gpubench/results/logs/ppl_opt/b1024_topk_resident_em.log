@@ -1,0 +1,10 @@
+[temporal-prefill] EXPERT-MAJOR STREAMING (default): n_tokens=2 k=18 active=18/192 ring=96 slots (12 batches x 8), be=84KB
+0.00.901.042 I 
+0.00.901.187 I system_info: n_threads = 8 (n_threads_batch = 8) / 96 | CUDA : ARCHS = 860 | USE_GRAPHS = 1 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.00.901.205 I perplexity: tokenizing the input ..
+0.00.940.529 I perplexity: tokenization took 39.319 ms
+0.00.940.573 I perplexity: calculating perplexity over 8 chunks, n_ctx=1024, batch_size=1024, n_seq=1
+0.01.227.074 I perplexity: 0.29 seconds per pass - ETA 0.03 minutes
+[1]19.0488,[2]21.6093,[3]19.6665,[4]19.2345,[5]18.6115,[6]18.0106,[7]17.8693,[8]17.0814,
+0.02.860.401 I Final estimate: PPL = 17.0814 +/- 0.72882
+

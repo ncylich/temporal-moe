@@ -2,7 +2,8 @@
 
 `0001-*.patch` runs the training-time routing rule as a CUDA kernel and lets the streamed
 R-slot path follow it. `0002-*.patch` prints the number of slot swap-ins at exit for any router
-(`temporal-cuda: ...`). They apply on top of three things, in this order:
+(`temporal-cuda: ...`). `0003` to `0005` add switches that are off by default (last section).
+They apply on top of three things, in this order:
 
 1. `ncylich/llama.cpp` branch `temporal-moe-win` at commit `43bec5f3`
 2. `../engine_patch/0001-*.patch` and `0002-*.patch` (`git am`; tree `b69151b6`)
@@ -40,3 +41,15 @@ cmake --build build --target llama-bench llama-perplexity -j
 - `TEMPORAL_ROUTE_HOST=1` leaves the op to the CPU backend (cross-check only; it splits the graph).
 
 Checks and numbers: `gpubench/TRAINED_MODEL_LEDGER.md`.
+
+## Opt-in switches (patches 0003 to 0005)
+
+Measured in ledger entry G1-7. All pass the batch-1 perplexity gate. Only the last one helps.
+
+| switch | what it does | streamed decode at 1k |
+|---|---|---|
+| `TEMPORAL_UNIFIED_FUSE=1` | keeps the fused gate/up/GLU kernel on the streamed path | no gain |
+| `TEMPORAL_UNIFIED_LEAN=1` or `2` | one copy kernel for the three projections (copy stream, or compute stream) | slower |
+| `TEMPORAL_ROUTE_SLOTS=1` | the routing kernel keeps the VRAM slots, no residency kernel | +0.5% |
+| `TEMPORAL_ROUTE_SLOTS=2` | the same, and the copies start at the router | +2% (0.85 to 0.87 speed kept) |
+| `TEMPORAL_SHEXP_FIRST=1` | orders glm4moe's shared expert before the routed experts | no gain |

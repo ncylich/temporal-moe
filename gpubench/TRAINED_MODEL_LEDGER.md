@@ -258,7 +258,9 @@ six kept trials per arm (trials 2 to 4 of each pass).
 - Spread between the passes: at most 1.3 points in the ratio and 2.7% in one arm's tok/s.
 - Pass 2 other arms (1k / 2k / 4k / 8k / 16k): no bytes moved 563.6 / 511.1 / 403.7 / 290.8 /
   179.6; all in VRAM with stock top-k 623.5 / 550.4 / 436.9 / 306.1 / 185.1.
-- Split of the gap, as the paper does for 11B: kernel overhead (no bytes moved minus all in VRAM)
+- **Superseded by G1-7**, which shows the "no bytes moved" arm still pays for launching the
+  copy kernels, so the split below puts too much under kernel overhead and too little under
+  transfer. Left as first written. Split of the gap, as the paper does for 11B: kernel overhead (no bytes moved minus all in VRAM)
   0.25 to 0.29 ms per token at every context; exposed transfer (streamed minus no bytes moved)
   between -0.00 and +0.04 ms, inside the pass-to-pass noise. The 11B figures were 0.68 ms and
   0.38 ms on a 5.0 ms token. Per MoE layer the kernel overhead is about 21 us here and about 15 us
@@ -307,3 +309,168 @@ This is arithmetic on the measured rows, not a measurement.
   near-ties (gaps of 5e-5 to 1.2e-3 logits at the 12 independent first divergences). The loss on
   those rows moves by 0.0002 nats (3.14432 against 3.14409). One swap per layer per token
   (1.0000) in every run.
+
+## G1-6 -- The other 11B tests, repeated on this model (engine tree `a7c18140`, 09:15-09:21 UTC)
+
+All under the trained router unless marked, `-fa 0 -t 8`, four trials with the first discarded.
+Rows: `gpubench/results/decode_swapn.jsonl`, `decode_ub2048.jsonl`, `prefill.jsonl`; console log
+`gpubench/results/logs/runall.log`.
+
+**What was not repeated and why.** The router-early row (11B row d) routes on the pre-attention
+input; a trained model would have to be trained that way, so it has no honest counterpart here. The
+coarse model has not been converted. A single 16,384-token micro-batch could not be created in any
+arm (`failed to create context`): without flash attention the attention scores for one
+micro-batch need 16384 x 16384 x 50 heads x 4 bytes = 53.7 GB, more than the card. Those three
+rows are void.
+
+**Pinned swaps per layer** (`TEMPORAL_SWAP_N=n`, the 11B floor curve; timing only, output wrong by
+construction, sources cycled so every copy is cold), 1k context:
+
+| swaps per layer | 0 | 1 | 2 | 4 | 8 |
+|---|---|---|---|---|---|
+| tok/s | 590.6 | 555.7 | 517.8 | 453.5 | 365.0 |
+| ms per token | 1.693 | 1.799 | 1.931 | 2.205 | 2.740 |
+
+From 0 to 8 swaps the token grows by 1.047 ms, 0.131 ms per swap per layer over 13 layers, which
+is 10.1 us for the 259,200 bytes of one swap: an effective 25.7 GB/s (the 11B curve gave 29.4).
+
+**Decode after a batched context fill** (`-ub 2048 -b 2048 -d <ctx>`, the 11B context sweep). The
+first generated token then finds stale slots and reloads the window (the multi-swap fallback).
+
+| ctx | streamed / all in VRAM tok/s | kept | peak VRAM streamed / all |
+|---|---|---|---|
+| 1024 | 574.9 / 676.3 | 0.850 | 946 / 1466 MiB |
+| 2048 | 507.2 / 593.3 | 0.855 | 1946 / 2466 MiB |
+| 4096 | 407.2 / 462.8 | 0.880 | 3248 / 3768 MiB |
+| 8192 | 290.6 / 318.9 | 0.911 | 5856 / 6376 MiB |
+| 16384 | 180.2 / 190.2 | 0.947 | 11070 / 11590 MiB |
+
+Same ratios as the token-by-token fill. The VRAM peaks are dominated by the non-flash attention
+buffers of the 2,048-token micro-batches; the 520 MiB difference is the experts.
+
+**Prefill** (`llama-bench -p <ctx> -n 0 -ub <ub> -b <ub>`). A = all in VRAM, stock batched
+`mul_mat_id`; D = all in VRAM through the expert-major kernel, nothing uploaded; C = streamed
+expert-major (R=18 slots plus the 96-slot ring).
+
+| test | ctx | micro-batch | A ms (tok/s) | D ms | C ms (tok/s) | C / A time | peak VRAM A / C |
+|---|---|---|---|---|---|---|---|
+| single micro-batch | 1024 | 1024 | 94 (10,875) | 190 | 192 (5,340) | 2.04 | 1372 / 850 MiB |
+| single micro-batch | 4096 | 4096 | 690 (5,934) | 815 | 826 (4,960) | 1.20 | 6126 / 5604 MiB |
+| single micro-batch | 16384 | 16384 | void | void | void | | |
+| matched micro-batch | 16384 | 1024 | 4677 (3,503) | | 6146 (2,666) | 1.31 | 6588 / 6066 MiB |
+| matched micro-batch | 16384 | 2048 | 4848 (3,380) | | 5805 (2,823) | 1.20 | 11472 / 10950 MiB |
+| matched micro-batch | 16384 | 4096 | 5307 (3,087) | | 5967 (2,746) | 1.12 | 21242 / 20722 MiB |
+| context sweep | 1024 | 2048 | 95 (10,724) | | 193 (5,318) | 2.02 | 1372 / 850 MiB |
+| context sweep | 2048 | 2048 | 233 (8,792) | | 347 (5,896) | 1.49 | 2348 / 1826 MiB |
+| context sweep | 4096 | 2048 | 554 (7,399) | | 790 (5,184) | 1.43 | 3652 / 3130 MiB |
+| context sweep | 8192 | 2048 | 1538 (5,328) | | 2039 (4,019) | 1.33 | 6258 / 5736 MiB |
+
+- C against D is 1.01 at both sizes where D was run, so streaming itself is free in prefill, as at
+  11B. The cost is the expert-major kernel against the stock one (D / A = 2.0 at 1k, 1.18 at 4k):
+  it issues one small matmul per active expert, and with 192-wide experts those are overhead-bound.
+- The gap closes with context because attention, which is the same in both, takes over.
+- Best micro-batch at 16k is 1024 for A and 2048 for C.
+
+**Prefill perplexity** (`-b 1024 -ub 1024`, same input as G1-3, engine tree `a235a715`):
+
+| router | A, stock kernel | D, expert-major, all in VRAM | C, streamed |
+|---|---|---|---|
+| trained | 16.8267 | 16.7862 | 16.7862 (twice) |
+| stock top-k | 17.0846 | 17.0814 | 17.0814 (`TEMPORAL_PREFILL_FULLMOE=1`) |
+
+C equals D in every digit under both routers, so the streamed prefill computes exactly what the
+same kernel computes with everything in VRAM. The kernel itself differs from the stock one by
+0.02% under top-k (the 11B figure) and 0.24% under trained routing, where a rounding-sized change
+can flip a near-tie and the window then stays different. This closes the open point of G1-3.
+
+**Free top-k floor perplexity** (batch 1): `TEMPORAL_UNIFIED_NOFORCE1=1` with the stock router
+gives 17.1077 +/- 0.72986, identical to the stock all-in-VRAM engine, with 1,240,557 experts
+fetched. This closes the open point of G1-5.
+
+## G1-7 -- Where the time goes, and what was tried to recover it (09:24-09:43 UTC)
+
+CUDA patches 0003 to 0005 add opt-in switches; engine trees `2ce47549` (0001 to 0004) and
+`a235a715` (0001 to 0005). All rows at 1k context, `gpubench/results/decode_opt.jsonl`; baseline
+in the same sessions 671 to 675 tok/s (1.482 to 1.490 ms). Every streamed variant below that moves
+bytes was put through the batch-1 perplexity gate and gives 16.8819 +/- 0.72000
+(`gpubench/results/logs/ppl_opt/`).
+
+**Correction to G1-4 and G1-5.** Those entries read the "no bytes moved" arm
+(`TEMPORAL_SWAP_PROB=0`) as kernel overhead and concluded that transfer was free. That arm still
+launches the three copy kernels per layer (they return early) and adds a memset node per layer.
+Taking the copy kernels out altogether gives a different split. Caught when two changes that
+remove kernels (fusion kept, residency folded into the routing kernel) barely moved the streamed
+number.
+
+| configuration (1k) | tok/s | ms per token | over all-in-VRAM |
+|---|---|---|---|
+| all in VRAM | 673 | 1.486 | |
+| slots, fused, routing kernel keeps the slots, no copy kernels (output wrong) | 654.4 | 1.528 | +0.04 |
+| same, gate/up unfused | 633.1, 636.1 | 1.579, 1.572 | +0.09 |
+| default machinery (residency kernel, unfused), no copy kernels (output wrong) | 619.9 | 1.613 | +0.13 |
+| default, copy kernels launched but zero swaps (`TEMPORAL_SWAP_N=0`) | 590.6 | 1.693 | +0.21 |
+| default streamed | 568 to 574 | 1.743 to 1.760 | +0.26 to +0.27 |
+
+So, per token at 1k: about 0.13 ms is the slot machinery (0.05 lost fusion, 0.035 the residency
+kernel, 0.04 the rest), about 0.08 ms is launching and joining three copy kernels on a second
+stream, and about 0.06 ms is waiting for bytes. Transfer in the wide sense (everything the copies
+cost) is about 0.14 ms, a little over half the gap. The physical part is small but not hideable:
+one swap is 259,200 bytes and takes about 10 us at the measured 25.7 GB/s, and between the router
+and the expert matmul of the same layer there are only a few microsecond-sized kernels. At 11B the
+expert matmuls themselves were long enough to hide 71% of it.
+
+**What was tried.**
+
+| change | switch | streamed tok/s at 1k | effect |
+|---|---|---|---|
+| none | | 568.3, 573.8 | |
+| keep gate/up fusion | `TEMPORAL_UNIFIED_FUSE=1` | 561.5 | none or worse: the fused kernel needs two of the three copies before it can start |
+| one copy kernel, one event | `TEMPORAL_UNIFIED_LEAN=1` | 541.2 | worse (the 11B ledger saw the same) |
+| one copy kernel on the compute stream | `TEMPORAL_UNIFIED_LEAN=2` | 545.7 | worse |
+| routing kernel keeps the slots, no residency kernel | `TEMPORAL_ROUTE_SLOTS=1` | 572.4 | +0.5% |
+| all three of the above | | 573.6 to 579.7 (grids 32 to 1024) | +1% |
+| copies start at the router | `TEMPORAL_ROUTE_SLOTS=2` | 585.4, 585.4 | **+2%** |
+| the same plus shared expert ordered first | `+ TEMPORAL_SHEXP_FIRST=1` | 585.7 | nothing more |
+| the same plus fusion | | 581.3 to 583.5 | nothing more |
+| copy grid 16 to 512 blocks | `TEMPORAL_COPY_BLOCKS` | 568 to 583 | 128 to 256 best |
+
+`TEMPORAL_ROUTE_SLOTS=2` is the only change that helps beyond noise. It drops the residency kernel
+and gives the copies the gate-weight operations to overlap with.
+
+**Third pass, default and `TEMPORAL_ROUTE_SLOTS=2` side by side** (engine tree `a235a715`, tags
+`G1-dec3`, `G1-dec3-slots2`, same protocol):
+
+| ctx | all in VRAM | streamed, default | kept | streamed, `ROUTE_SLOTS=2` | kept |
+|---|---|---|---|---|---|
+| 1024 | 672.2 | 570.7 | 0.849 | 585.4 | 0.871 |
+| 2048 | 588.6 | 505.3 | 0.858 | 521.0 | 0.885 |
+| 4096 | 463.9 | 407.4 | 0.878 | 415.0 | 0.895 |
+| 8192 | 316.5 | 289.6 | 0.915 | 294.2 | 0.930 |
+| 16384 | 188.9 | 180.1 | 0.953 | 180.1 | 0.953 |
+
+**Default configuration pooled over the three passes** (nine kept trials per arm):
+
+| ctx | streamed / all in VRAM tok/s | kept | per pass |
+|---|---|---|---|
+| 1024 | 567.2 / 672.8 | **0.843** | 0.845, 0.835, 0.849 |
+| 2048 | 503.4 / 586.5 | **0.858** | 0.852, 0.865, 0.859 |
+| 4096 | 406.8 / 461.7 | **0.881** | 0.889, 0.876, 0.878 |
+| 8192 | 287.7 / 316.0 | **0.911** | 0.903, 0.914, 0.915 |
+| 16384 | 179.1 / 188.5 | **0.950** | 0.951, 0.945, 0.954 |
+
+**Where the limit is.** With no copy kernels at all the streamed path would keep 0.97 at 1k
+(1.528 against 1.486 ms). With the bytes fully exposed at the measured bandwidth and nothing else
+(13 x 10 us) it would keep about 0.90. It keeps 0.84 by default and 0.87 with the one switch that
+helps. The remaining 3 points are the cost of running copy kernels on a second stream inside the
+captured graph; nothing tried here removed it. Not tried: predicting the next expert during
+attention and loading it into a spare slot, which is the only way to give the copy a long window on
+a model this small without changing the architecture.
+
+**Not verified.** `ROUTE_SLOTS=2` has the batch-1 perplexity gate and one timing pass; it was not
+run after a batched context fill, and the default configuration is the one with three passes.
+
+## G1-8 -- Pod and cost
+
+Pod `bcnqix1ewwwjr3` ran 08:16 to 09:44 UTC on 2026-11-11, 1.47 h at $0.59/h, about $0.87, and
+was then stopped (not yet terminated; its 80 GB volume holds the build and the models). No second
+pod could be rented.
