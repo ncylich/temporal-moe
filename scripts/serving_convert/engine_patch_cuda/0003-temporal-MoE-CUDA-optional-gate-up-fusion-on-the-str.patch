@@ -1,0 +1,60 @@
+From d560667c346decb889028548967f03b14f17a727 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 11 Nov 2026 01:07:36 -0800
+Subject: [PATCH 3/4] temporal-MoE CUDA: optional gate/up fusion on the
+ streamed path (TEMPORAL_UNIFIED_FUSE=1)
+
+Unified mode turned the fused gate/up/GLU kernel off because the fused call site bypasses
+the id remap. With TEMPORAL_UNIFIED_FUSE=1 the fused call site runs the remap for gate and
+up itself (residency scan, swap copies, waits) and passes slot ids to the fused kernel.
+Off by default; bias-free experts only.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 65145b84..ae4dfa27 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -1590,8 +1590,13 @@ static bool ggml_cuda_should_fuse_mul_mat(const ggml_tensor * ffn_up,
+     // remap lives), so gate/up would get unremapped [0,n_expert) ids on the R-slot tensor -> OOB.
+     // Disable fusion when unified so every expert GEMM goes through the remap hook.
+     // (P3d diagnosis: TEMPORAL_NOFUSE=1 disables fusion WITHOUT unified, to isolate the lost-fusion cost.)
++    // TEMPORAL_UNIFIED_FUSE=1 keeps the bias-free gate/up/GLU fusion: the fused call site remaps the ids
++    // itself (below, "unified + fused"). Everything else under unified stays unfused.
+     if (ggml_cuda_temporal_unified()) {
+-        return false;
++        static int fuse=[](){const char*s=getenv("TEMPORAL_UNIFIED_FUSE");return s?atoi(s):0;}();
++        if (!fuse || ffn_up_bias || ffn_gate_bias || ffn_up_scale || ffn_gate_scale || ggml_cuda_temporal_router_early()) {
++            return false;
++        }
+     }
+     { static int nf=[](){const char*s=getenv("TEMPORAL_NOFUSE");return s?atoi(s):0;}(); if(nf) return false; }
+     const bool has_bias = ffn_up_bias != nullptr || ffn_gate_bias != nullptr;
+@@ -3819,6 +3824,23 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph
+             const ggml_tensor * src1 = up->src[1];
+             const ggml_tensor * ids  = up->src[2];
+ 
++            // unified + fused: the fused kernel reads gate and up slots by id, so do here what the
++            // mul_mat_id hook does for the unfused ops. Gate first (it runs the residency scan and issues
++            // the three swap copies, then waits its own), then up (waits its own copy).
++            ggml_tensor tu_ids_tensor;
++            if (op == GGML_OP_MUL_MAT_ID && ggml_cuda_temporal_unified() && ids != nullptr && ids->type == GGML_TYPE_I32) {
++                const int stride1 = (int) (ids->nb[1] / sizeof(int32_t));
++                int32_t * shared = nullptr;
++                if (ggml_cuda_temporal_unified_remap(gate->src[0]->data, (const int32_t *) ids->data, &shared,
++                        (int) ids->ne[0], (int) ids->ne[1], stride1, cuda_ctx->stream()) == 1) {
++                    ggml_cuda_temporal_unified_remap(up->src[0]->data, (const int32_t *) ids->data, &shared,
++                        (int) ids->ne[0], (int) ids->ne[1], stride1, cuda_ctx->stream());
++                    tu_ids_tensor      = *ids;
++                    tu_ids_tensor.data = shared;
++                    ids                = &tu_ids_tensor;
++                }
++            }
++
+             if (ggml_cuda_should_fuse_mul_mat_vec_f(up)) {
+                 ggml_cuda_mm_fusion_args_host fusion_data{};
+                 fusion_data.gate   = gate->src[0];
+-- 
+2.50.0
+

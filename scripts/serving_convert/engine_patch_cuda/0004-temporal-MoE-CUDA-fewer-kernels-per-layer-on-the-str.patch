@@ -1,0 +1,187 @@
+From b26cb1e342a87880ca153717973935c68d9596b3 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 11 Nov 2026 01:08:30 -0800
+Subject: [PATCH 4/4] temporal-MoE CUDA: fewer kernels per layer on the
+ streamed path (options, off by default)
+
+TEMPORAL_UNIFIED_LEAN=1: one copy kernel for gate, up and down on the copy stream and one
+event. =2: that kernel on the compute stream, no events.
+TEMPORAL_ROUTE_SLOTS=1 (trained routing, single-token steps): k_route also keeps the VRAM
+slots (the newcomer takes the evicted expert's slot) and writes the swap list and slot ids,
+so k_residency is not launched. After a batch or at a cold fill it reloads the whole window.
+---
+ ggml/src/ggml-cuda/temporal.cu | 78 +++++++++++++++++++++++++++++++---
+ 1 file changed, 71 insertions(+), 7 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index beac6119..dcd2cafc 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -38,6 +38,11 @@ static int tu_force1() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOFORCE
+ // expert GEMMs (compute stream), each GEMM gated on its own tensor's copy. DEFAULT ON (correctness-safe:
+ // full swap budget, just overlapped); set TEMPORAL_UNIFIED_NOOVERLAP=1 to disable for debugging.
+ static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVERLAP")) return 0; const char*s=getenv("TEMPORAL_UNIFIED_OVERLAP"); return s?atoi(s):1; }(); return v; }
++// TEMPORAL_UNIFIED_LEAN: 1 = one copy kernel for gate/up/down on the copy stream, one event that all three
++// GEMMs wait; 2 = that kernel on the compute stream right after the residency scan, no events at all.
++static int tu_lean() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_LEAN");return s?atoi(s):0;}(); return v; }
++static int tr_slots();
++int ggml_cuda_temporal_route_op_on();
+ static int tu_nocopy() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_NOCOPY");return s?atoi(s):0;}(); return v; }  // decomposition: skip swap-copy (wrong output)
+ // Swap-rate EMULATION. The real mechanism swaps <=1 expert/layer/token; the trained models' measured
+ // mean_swap_rate (probe_replay e1) is p in [0,1] (shipped policy ~1.0). Emulate a global rate p on this
+@@ -206,6 +211,17 @@ __global__ void k_swapcopy(const uint8_t* __restrict__ pool_dev, uint8_t* __rest
+     int ns = *nswp; if (ns<=0) return;
+     swapcopy_one(pool_dev, slotbuf, be, ns, swp_e, swp_s);
+ }
++// all three projections of the recorded swaps in ONE kernel (TEMPORAL_UNIFIED_LEAN): for small slices the
++// launches and events of three pipelined copies cost more than the bytes.
++__global__ void k_swapcopy3(const uint8_t* __restrict__ p0, uint8_t* __restrict__ s0, size_t be0,
++                            const uint8_t* __restrict__ p1, uint8_t* __restrict__ s1, size_t be1,
++                            const uint8_t* __restrict__ p2, uint8_t* __restrict__ s2, size_t be2,
++                            const int* __restrict__ swp_e, const int* __restrict__ swp_s, const int* __restrict__ nswp) {
++    int ns = *nswp; if (ns<=0) return;
++    swapcopy_one(p0, s0, be0, ns, swp_e, swp_s);
++    swapcopy_one(p1, s1, be1, ns, swp_e, swp_s);
++    swapcopy_one(p2, s2, be2, ns, swp_e, swp_s);
++}
+ // remap ids[k] -> loc[ids[k]] (device residency table).
+ __global__ void k_remap_loc(const int32_t* __restrict__ ids_in, int32_t* __restrict__ ids_out,
+                             const int* __restrict__ loc, int n_used, int n_tokens, int stride1) {
+@@ -244,6 +260,7 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+     if (do_issue) {
+         // on-device residency scan -> records swaps; the slot indices are shared across gate/up/down, so
+         // once residency has run we can issue ALL THREE tensors' swap-copies.
++        if (!(tr_slots() && ggml_cuda_temporal_route_op_on() && n_tokens == 1))   // else k_route already did this layer
+         k_residency<<<1,256,(size_t)L.E*sizeof(int),stream>>>(ids_in, n_used, stride1, n_tokens,
+                                       L.d_slot, L.d_loc, L.d_sel, L.E, L.R,
+                                       (emulate ? 1 : (tu_force1() && ggml_cuda_temporal_route_trained()) ? 2 : tu_force1()),
+@@ -253,7 +270,16 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+         if (emulate && !layer_swaps) cudaMemsetAsync(L.d_nswp, 0, sizeof(int), stream);
+         // FLOOR emulation: override the swap list to pin exactly swap_n copies on this layer.
+         if (swap_n >= 0) k_force_nswap<<<1, (swap_n>0?swap_n:1), 0, stream>>>(L.d_swp_e, L.d_swp_s, L.d_nswp, swap_n, L.E, L.R);
+-        if (overlap) {
++        if (tu_lean() == 2) {
++            k_swapcopy3<<<tu_copy_blocks(),256,0,stream>>>(L.pool_dev[0], L.slot[0], L.be[0], L.pool_dev[1], L.slot[1], L.be[1],
++                                                         L.pool_dev[2], L.slot[2], L.be[2], L.d_swp_e, L.d_swp_s, L.d_nswp);
++        } else if (tu_lean() == 1) {
++            cudaEventRecord(L.fork, stream);
++            cudaStreamWaitEvent(g_copy, L.fork, 0);
++            k_swapcopy3<<<tu_copy_blocks(),256,0,g_copy>>>(L.pool_dev[0], L.slot[0], L.be[0], L.pool_dev[1], L.slot[1], L.be[1],
++                                                         L.pool_dev[2], L.slot[2], L.be[2], L.d_swp_e, L.d_swp_s, L.d_nswp);
++            cudaEventRecord(L.ev[0], g_copy);
++        } else if (overlap) {
+             // fork a copy stream from compute after residency, then queue the gate/up/down swap-copies on
+             // it. fork + per-op join are ordinary events inside the captured region -> graph-capturable.
+             cudaEventRecord(L.fork, stream);
+@@ -265,7 +291,11 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+         }
+     }
+     // WAIT: the prime does NOT wait (lets the copy overlap attention); every real op waits its own copy.
+-    if (overlap) {
++    if (tu_lean() == 2) {
++        // copies already ran on this stream
++    } else if (tu_lean() == 1) {
++        if (which == 0) cudaStreamWaitEvent(stream, L.ev[0], 0);   // one wait covers gate, up and down
++    } else if (overlap) {
+         if (!is_prime) cudaStreamWaitEvent(stream, L.ev[which], 0);   // this op waits its own copy (pipelined)
+     } else if (!tu_nocopy()) {
+         k_swapcopy<<<tu_copy_blocks(),256,0,stream>>>(L.pool_dev[which], L.slot[which], L.be[which], L.d_swp_e, L.d_swp_s, L.d_nswp);
+@@ -316,15 +346,21 @@ cudaStream_t ggml_cuda_temporal_copy_stream() {
+ static int *g_tr_k = nullptr, *g_tr_win = nullptr;       // [TR_MAXLAYER], [TR_MAXLAYER*K]
+ static unsigned long long *g_tr_cnt = nullptr;           // [TR_MAXLAYER*3]: steps, swaps, cold fills
+ static int g_tr_K = 0;
++static int *g_tr_vslot = nullptr, *g_tr_vvalid = nullptr; // [TR_MAXLAYER*K], [TR_MAXLAYER] (TEMPORAL_ROUTE_SLOTS)
++static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");return s?atoi(s):0;}();
++                        return v && ggml_cuda_temporal_unified(); }
+ static FILE * g_tr_dump = nullptr;
+ 
+ int ggml_cuda_temporal_route_trained() {
+     static int v=[](){const char*s=getenv("LLAMA_TEMPORAL_ROUTE"); return s && strcmp(s,"trained")==0;}();
+     return v;
+ }
+-bool ggml_cuda_temporal_route_op(const ggml_tensor * t) {
++int ggml_cuda_temporal_route_op_on() {                  // trained routing runs as the CUDA kernel
+     static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
+-    return ggml_cuda_temporal_route_trained() && !host && strncmp(t->name, "ffn_moe_route", 13) == 0
++    return ggml_cuda_temporal_route_trained() && !host;
++}
++bool ggml_cuda_temporal_route_op(const ggml_tensor * t) {
++    return ggml_cuda_temporal_route_op_on() && strncmp(t->name, "ffn_moe_route", 13) == 0
+         && t->type == GGML_TYPE_I32 && t->src[0] && t->src[0]->type == GGML_TYPE_F32;
+ }
+ 
+@@ -333,12 +369,17 @@ static __device__ inline unsigned long long tr_key(float v) {   // float -> orde
+     return (unsigned long long)(u ^ ((u >> 31) ? 0xFFFFFFFFu : 0x80000000u));
+ }
+ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_tokens, int E, int K,
+-                        int* kst, int* win, unsigned long long* cnt, int32_t* __restrict__ out) {
++                        int* kst, int* win, unsigned long long* cnt, int32_t* __restrict__ out,
++                        // TEMPORAL_ROUTE_SLOTS (streamed, single token): this kernel also keeps the VRAM slots,
++                        // replacing k_residency. vslot[j] = slot holding window position j; null = off.
++                        int* vslot, int* vvalid, int* swp_e, int* swp_s, int* nswp, int32_t* remap,
++                        unsigned long long* ncopy) {
+     extern __shared__ int sh[];                           // [0,E) logits, [E,2E) resident flag
+     float* x = (float*) sh; int* in = sh + E;
+     __shared__ unsigned long long s_nom, s_wst; __shared__ int s_cold;
+     const int tid = threadIdx.x, nt = blockDim.x;
+-    if (tid==0) s_cold = (*kst != K);
++    __shared__ int s_ns;
++    if (tid==0) { s_cold = (*kst != K); s_ns = (vslot && n_tokens==1 && !s_cold && *vvalid) ? 0 : -1; }   // -1: reload all
+     for (int e=tid; e<E; e+=nt) in[e]=0;
+     __syncthreads();
+     if (!s_cold) for (int j=tid; j<K; j+=nt) in[win[j]]=1;
+@@ -368,6 +409,11 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+                     in[win[ws]]=0;
+                     if (ws != K-1) win[ws]=win[K-1];
+                     win[K-1]=nom; in[nom]=1; cnt[1]++;
++                    if (s_ns == 0) {                      // slots follow: the newcomer takes the evicted slot
++                        const int sl = vslot[ws];
++                        if (ws != K-1) vslot[ws]=vslot[K-1];
++                        vslot[K-1]=sl; swp_e[0]=nom; swp_s[0]=sl; s_ns=1;
++                    }
+                 }
+             }
+         }
+@@ -375,6 +421,14 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+         for (int j=tid; j<K; j+=nt) out[(size_t)t*K+j]=win[j];
+         __syncthreads();
+     }
++    if (!vslot) return;
++    if (n_tokens != 1) { if (tid==0) *vvalid=0; return; }     // a batch ran through the prefill ring: slots stale
++    if (s_ns < 0) {                                           // first token / after a batch: load the whole window
++        for (int j=tid; j<K; j+=nt) { vslot[j]=j; swp_e[j]=win[j]; swp_s[j]=j; }
++    }
++    __syncthreads();
++    for (int j=tid; j<K; j+=nt) remap[j]=vslot[j];
++    if (tid==0) { const int ns = s_ns < 0 ? K : s_ns; *nswp=ns; *ncopy+=ns; *vvalid=1; }
+ }
+ 
+ static void tr_report() {
+@@ -402,13 +456,23 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+         CUDA_CHECK(cudaMalloc(&g_tr_win, (size_t)TR_MAXLAYER*K*sizeof(int)));
+         CUDA_CHECK(cudaMalloc(&g_tr_cnt, TR_MAXLAYER*3*sizeof(unsigned long long)));
+         CUDA_CHECK(cudaMemset(g_tr_cnt, 0, TR_MAXLAYER*3*sizeof(unsigned long long)));
++        CUDA_CHECK(cudaMalloc(&g_tr_vslot, (size_t)TR_MAXLAYER*K*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g_tr_vvalid, TR_MAXLAYER*sizeof(int))); CUDA_CHECK(cudaMemset(g_tr_vvalid, 0, TR_MAXLAYER*sizeof(int)));
+         const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP");
+         if (d && d[0]) { g_tr_dump = fopen(d, "wb"); GGML_ASSERT(g_tr_dump); }
+         atexit(tr_report);
+     }
+     GGML_ASSERT(K == g_tr_K);
++    TU * T = (tr_slots() && L < (int) g_L.size() && g_L[L].ready) ? &g_L[L] : nullptr;
++    const bool sl = T != nullptr;
++    if (sl && T->remap_words < K) {                      // the buffer the expert GEMMs read their slot ids from
++        if (T->remap_ids) cudaFree(T->remap_ids);
++        CUDA_CHECK(cudaMalloc(&T->remap_ids, K*sizeof(int32_t))); T->remap_words = K;
++    }
+     k_route<<<1, 256, (size_t)2*E*sizeof(int), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K,
+-            g_tr_k + L, g_tr_win + (size_t)L*K, g_tr_cnt + (size_t)L*3, (int32_t *) dst->data);
++            g_tr_k + L, g_tr_win + (size_t)L*K, g_tr_cnt + (size_t)L*3, (int32_t *) dst->data,
++            sl ? g_tr_vslot + (size_t)L*K : nullptr, g_tr_vvalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
++            sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr);
+     CUDA_CHECK(cudaGetLastError());
+     if (g_tr_dump) {
+         std::vector<int32_t> h((size_t)K*n_tokens);
+-- 
+2.50.0
+

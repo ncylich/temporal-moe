@@ -1,7 +1,7 @@
 From 0a87af3299f418b7df5448d3adb1d3801888be0b Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 11 Nov 2026 01:02:45 -0800
-Subject: [PATCH 2/2] temporal-MoE CUDA: report slot swap-ins at exit for any
+Subject: [PATCH 2/4] temporal-MoE CUDA: report slot swap-ins at exit for any
  router
 
 The count of experts k_residency loaded was printed only under trained routing. The
