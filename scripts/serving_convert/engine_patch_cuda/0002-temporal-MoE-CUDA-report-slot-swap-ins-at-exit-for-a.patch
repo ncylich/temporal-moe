@@ -1,0 +1,62 @@
+From 0a87af3299f418b7df5448d3adb1d3801888be0b Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 11 Nov 2026 01:02:45 -0800
+Subject: [PATCH 2/2] temporal-MoE CUDA: report slot swap-ins at exit for any
+ router
+
+The count of experts k_residency loaded was printed only under trained routing. The
+free top-k floor (stock router, R slots, every miss fetched) needs it too, so the line
+moves to its own exit handler registered with the first slot tensor.
+---
+ ggml/src/ggml-cuda/temporal.cu | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index 8bb2837b..beac6119 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -60,6 +60,15 @@ int ggml_cuda_temporal_router_early(){ static int v=[](){const char*s=getenv("TE
+ // overlap it (see below). PCIe-bandwidth-bound, so a handful of blocks saturate the link. TEMPORAL_COPY_BLOCKS=n.
+ static int tu_copy_blocks(){ static int v=[](){const char*s=getenv("TEMPORAL_COPY_BLOCKS");return s?atoi(s):256;}(); return v; }
+ 
++// exit line for the streamed path, any router: how many experts k_residency loaded into slots
++static void tu_report() {
++    unsigned long long cp=0; int nl=0;
++    cudaDeviceSynchronize();
++    for (auto & L : g_L) if (L.d_ncopy) { unsigned long long v=0;
++        if (cudaMemcpy(&v, L.d_ncopy, sizeof(v), cudaMemcpyDeviceToHost)==cudaSuccess) { cp+=v; nl++; } }
++    fprintf(stderr, "temporal-cuda: layers=%d slot swap-ins decided on single-token steps=%llu\n", nl, cp);
++}
++
+ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host, size_t bytes_per_expert,
+                                  int n_expert, int R, int layer, int which) {
+     if ((int)g_L.size() <= layer) g_L.resize(layer+1);
+@@ -89,7 +98,8 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host,
+         L.ready=1;
+     }
+     g_tptr[rslot_data]=std::make_pair(layer,which);
+-    static int announced=0; if(!announced++) fprintf(stderr,"[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=%d + CPU pool\n", R);
++    static int announced=0; if(!announced) atexit(tu_report);
++    if(!announced++) fprintf(stderr,"[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=%d + CPU pool\n", R);
+ }
+ 
+ // Residency scan (single block, blockDim threads): mark selected, evict resident-not-selected, record
+@@ -374,14 +384,10 @@ static void tr_report() {
+     if (cudaMemcpy(c.data(), g_tr_cnt, c.size()*sizeof(unsigned long long), cudaMemcpyDeviceToHost) != cudaSuccess) {
+         fprintf(stderr, "temporal-route-cuda: counters unreadable at exit\n"); return;
+     }
+-    unsigned long long st=0, sw=0, co=0, cp=0; int nl=0;
++    unsigned long long st=0, sw=0, co=0; int nl=0;
+     for (int L=0; L<TR_MAXLAYER; ++L) if (c[L*3]) { st+=c[L*3]; sw+=c[L*3+1]; co+=c[L*3+2]; nl++; }
+     fprintf(stderr, "temporal-route-cuda: trained min_logit, layers=%d layer_tokens=%llu cold_fills=%llu swaps=%llu "
+             "swaps_per_layer_token=%.4f\n", nl, st, co, sw, st>co ? (double)sw/(double)(st-co) : 0.0);
+-    bool any=false;
+-    for (auto & L : g_L) if (L.d_ncopy) { unsigned long long v=0;
+-        if (cudaMemcpy(&v, L.d_ncopy, sizeof(v), cudaMemcpyDeviceToHost)==cudaSuccess) { cp+=v; any=true; } }
+-    if (any) fprintf(stderr, "temporal-route-cuda: slot swap-ins decided on single-token steps=%llu\n", cp);
+     if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
+ }
+ 
+-- 
+2.50.0
+

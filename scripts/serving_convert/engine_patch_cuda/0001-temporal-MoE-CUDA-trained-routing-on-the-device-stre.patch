@@ -1,8 +1,8 @@
 From e334c17ba9bfbdbbbe5f7a989e2644b89edd2d97 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 11 Nov 2026 00:17:31 -0800
-Subject: [PATCH] temporal-MoE CUDA: trained routing on the device, streamed
- slots follow the router's window
+Subject: [PATCH 1/2] temporal-MoE CUDA: trained routing on the device,
+ streamed slots follow the router's window
 
 k_route is the CUDA twin of ggml_temporal_route: per-layer window state on the device, router
 logits in, window ids out, same rule and tie-breaking (cold fill top-K, then admit the best

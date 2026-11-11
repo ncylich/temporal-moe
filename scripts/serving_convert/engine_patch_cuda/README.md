@@ -1,7 +1,8 @@
 # Engine patch: trained temporal routing on the CUDA streaming path
 
 `0001-*.patch` runs the training-time routing rule as a CUDA kernel and lets the streamed
-R-slot path follow it. It applies on top of three things, in this order:
+R-slot path follow it. `0002-*.patch` prints the number of slot swap-ins at exit for any router
+(`temporal-cuda: ...`). They apply on top of three things, in this order:
 
 1. `ncylich/llama.cpp` branch `temporal-moe-win` at commit `43bec5f3`
 2. `../engine_patch/0001-*.patch` and `0002-*.patch` (`git am`; tree `b69151b6`)
@@ -32,8 +33,8 @@ cmake --build build --target llama-bench llama-perplexity -j
 - Expert-major prefill: the index-based residency mask is skipped, the ids already are each
   token's window.
 - `llama_context` resets the device window at sequence position 0.
-- At exit: `temporal-route-cuda: ... swaps_per_layer_token=<x>`, and for the streamed path the
-  number of slot swap-ins `k_residency` decided.
+- At exit: `temporal-route-cuda: ... swaps_per_layer_token=<x>`, and for the streamed path
+  `temporal-cuda: ... slot swap-ins ...=<n>`, the experts `k_residency` loaded.
 - `LLAMA_TEMPORAL_ROUTE_DUMP=<file>` writes the device windows (same record format as the CPU).
   It synchronises after every route op, so single-token batches need `GGML_CUDA_DISABLE_GRAPHS=1`.
 - `TEMPORAL_ROUTE_HOST=1` leaves the op to the CPU backend (cross-check only; it splits the graph).
