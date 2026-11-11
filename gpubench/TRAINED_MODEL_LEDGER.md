@@ -216,8 +216,10 @@ context).
 | 8192 | 315.6 (3.169 ms) | 305.4 | 288.8 (3.462 ms) | 285.1 (3.508 ms) | 0.903 | 1392 / 854 MiB |
 | 16384 | 188.2 (5.315 ms) | 184.8 | 179.4 (5.574 ms) | 178.9 (5.589 ms) | 0.951 | 1772 / 1234 MiB |
 
-- Route line in every trained arm: `swaps_per_layer_token=1.0000` (for example at 1k:
-  `layers=13 layer_tokens=17225 cold_fills=...`).
+- Route line in every trained arm: `swaps_per_layer_token=1.0000` (pass 2 at 1k:
+  `layers=13 layer_tokens=18525 cold_fills=26 swaps=18498 swaps_per_layer_token=0.9999`; 18,525 =
+  13 layers x (1 warmup token + 1,024 context tokens + 4 x 100 generated), so llama-bench fills the
+  context once and generates from it four times).
 - The stock top-k baseline is slower than the trained-routing baseline at every context (0.93 to
   0.98 of it), so the routing rule costs nothing; the stock arm pays for a full argsort.
 - "No bytes moved" is the 11B row b: `TEMPORAL_SWAP_PROB=0`, slots and residency kernel active,
@@ -234,3 +236,74 @@ pod, trials less steady than above, so indicative only): baseline with fusion of
 (`TEMPORAL_NOFUSE=1`) 634 against 660 tok/s in the same session, so about 0.06 ms of the overhead
 is the lost gate/up fusion; copy grid 8 or 32 blocks no better than the default 256; no-overlap
 slower; CUDA graphs off 398 and 343 tok/s.
+
+## G1-5 -- Decode, second pass and pooled result (engine tree `a7c18140`, tag `G1-dec2`)
+
+Same command and protocol as G1-4 plus the `floor` arm. The engine was rebuilt between the passes
+with CUDA patch 0002, which only adds an exit line (`temporal-cuda: ... slot swap-ins ...`); sha256
+`llama-bench` `d67ca915...`, `libggml-cuda.so` `b7ec270a...`. Run 09:06-09:25 UTC with nothing else
+on the pod.
+
+tok/s, streamed R=18 / all 192 in VRAM, both under the trained router. "Pooled" is the mean of the
+six kept trials per arm (trials 2 to 4 of each pass).
+
+| ctx | pass 1 | pass 2 | pooled | pooled ms per token, all / no bytes moved / streamed | peak VRAM streamed / all |
+|---|---|---|---|---|---|
+| 1024 | 573.0 / 677.9 = 0.845 | 557.9 / 668.3 = 0.835 | 565.5 / 673.1 = **0.840** | 1.486 / 1.768 / 1.768 | 526 / 1064 MiB |
+| 2048 | 502.3 / 589.7 = 0.852 | 502.7 / 581.2 = 0.865 | 502.5 / 585.5 = **0.858** | 1.708 / 1.959 / 1.990 | 574 / 1112 MiB |
+| 4096 | 407.9 / 458.8 = 0.889 | 405.1 / 462.4 = 0.876 | 406.5 / 460.6 = **0.882** | 2.171 / 2.461 / 2.460 | 666 / 1204 MiB |
+| 8192 | 285.1 / 315.6 = 0.903 | 288.5 / 315.9 = 0.914 | 286.8 / 315.7 = **0.908** | 3.168 / 3.451 / 3.487 | 854 / 1392 MiB |
+| 16384 | 178.9 / 188.2 = 0.951 | 178.2 / 188.5 = 0.945 | 178.6 / 188.3 = **0.948** | 5.311 / 5.571 / 5.599 | 1234 / 1772 MiB |
+
+- Spread between the passes: at most 1.3 points in the ratio and 2.7% in one arm's tok/s.
+- Pass 2 other arms (1k / 2k / 4k / 8k / 16k): no bytes moved 563.6 / 511.1 / 403.7 / 290.8 /
+  179.6; all in VRAM with stock top-k 623.5 / 550.4 / 436.9 / 306.1 / 185.1.
+- Split of the gap, as the paper does for 11B: kernel overhead (no bytes moved minus all in VRAM)
+  0.25 to 0.29 ms per token at every context; exposed transfer (streamed minus no bytes moved)
+  between -0.00 and +0.04 ms, inside the pass-to-pass noise. The 11B figures were 0.68 ms and
+  0.38 ms on a 5.0 ms token. Per MoE layer the kernel overhead is about 21 us here and about 15 us
+  at 11B, so the fixed cost did not shrink with the model; the token did (1.49 ms against 5.0 ms),
+  and the ratio stays near 0.84 only because the transfer term is gone.
+- Streamed swap-ins against the router: at 1k the router made 18,498 swaps over 18,525
+  layer-tokens and the slots took 18,814 swap-ins (the extra 316 are the two cold fills, 13 layers
+  each, that need more than one).
+- Memory: the saving is 538 MiB at every context (617 MiB of routed experts in VRAM against 58 MiB
+  of slots); the nvidia-smi totals include the CUDA context and the KV cache, so the ratio of
+  totals is 2.0x at 1k and falls with context. The streamed arm also holds a 617 MiB pinned copy of
+  the expert pool in host RAM.
+
+**Free top-k at the streamed memory (the 11B "vanilla offload" row, here with the real router).**
+Arm `floor`: stock top-k router, R=18 slots, every selected expert that is not resident is
+fetched (`TEMPORAL_UNIFIED=1 TEMPORAL_UNIFIED_NOFORCE1=1 -ncmoe 14`). No emulation is needed for
+this model: the router's own misses drive it. 268.8 / 253.4 / 227.2 / 184.4 / 134.8 tok/s at 1k
+to 16k, which is 0.40 / 0.44 / 0.49 / 0.58 / 0.72 of the trained all-in-VRAM baseline and 0.43 /
+0.46 / 0.52 / 0.60 / 0.73 of the stock top-k all-in-VRAM one. At 1k it fetched 233,025 experts
+over 18,525 layer-tokens, 12.6 per layer per token, against 1.0 under the trained rule. Its
+perplexity has not been compared with the stock all-in-VRAM engine yet (open).
+
+**Bound on the flash-attention caveat (G1-2).** The time that depends on context is the same in
+both arms: from 1k to 2k both grow by 0.222 ms (pooled). Extrapolating both to no
+context-dependent time at all gives 1.264 ms all in VRAM and 1.546 ms streamed, a ratio of 0.82.
+So a faster attention kernel could move the 1k figure down from 0.84, but not below about 0.82.
+This is arithmetic on the measured rows, not a measurement.
+
+### What App. D can state, in plain terms
+
+- Card and host: one RTX A6000 (49 GB) on a rented pod in the EU-SE-1 data center, Xeon Gold
+  6342 host, CUDA 12.4. It is not the machine of the 11B runs.
+- Model and engine: `fine_1e19-q4_0.gguf` (Q4_0), llama.cpp fork at `43bec5f3` plus the patch
+  files in this repo, batch 1, trained router in every arm that is compared.
+- Flash attention is off (`-fa 0`) because the CUDA flash-attention kernels do not support this
+  model's head size of 16; with it on, attention runs on the CPU and every configuration, the
+  stock one included, drops to about 20 tok/s. The 11B runs had it on.
+- Protocol: context filled token by token, then 100 generated tokens timed, four trials, first
+  discarded; two such passes, pooled.
+- Perplexity at batch 1 is identical streamed and all in VRAM (16.8819 +/- 0.72000 on 8 chunks of
+  1,024 tokens, every running estimate equal).
+- Routing check against PyTorch on the GPU: 24,804 of 106,496 layer-token windows equal. The
+  routing kernel writes exactly what the CPU routing code writes from the same logits, and the CPU
+  build matches PyTorch on 106,496 of 106,496; the GPU forward pass itself differs from the CPU one
+  by about 3e-3 in output logits under stock routing, and the windows leave the reference only at
+  near-ties (gaps of 5e-5 to 1.2e-3 logits at the 12 independent first divergences). The loss on
+  those rows moves by 0.0002 nats (3.14432 against 3.14409). One swap per layer per token
+  (1.0000) in every run.
