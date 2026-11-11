@@ -1,0 +1,429 @@
+{
+ "not_ok": [],
+ "refused": [],
+ "rows": [
+  {
+   "arm": "a",
+   "beyond_training_ctx": false,
+   "cap": "DEP",
+   "cap_mb": 1336,
+   "clock_probes": [
+    91.210412,
+    94.094927,
+    93.831194
+   ],
+   "decode_wset_mib": 219.26041666666666,
+   "depth": 0,
+   "evictions_per_token": 43.248046875,
+   "fetches_per_token": 43.93359375,
+   "label": "deploy_R18",
+   "n": 3,
+   "peak_commit_mib": 780.75390625,
+   "peak_wset_mib": 269.828125,
+   "per_batch": [
+    100.813488,
+    99.370273,
+    100.245294
+   ],
+   "ratio_b": 0.6835532984642467,
+   "ratio_c": 0.691850072396006,
+   "sd": 0.593611892317048,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "deploy",
+   "tok_s": 100.14301833333333
+  },
+  {
+   "arm": "a",
+   "beyond_training_ctx": false,
+   "cap": "TIGHT",
+   "cap_mb": 800,
+   "clock_probes": [
+    93.791486
+   ],
+   "decode_wset_mib": 219.234375,
+   "depth": 0,
+   "evictions_per_token": 43.248046875,
+   "fetches_per_token": 43.93359375,
+   "label": "deploy_R18_capTIGHT",
+   "n": 1,
+   "peak_commit_mib": 780.6484375,
+   "peak_wset_mib": 269.70703125,
+   "per_batch": [
+    99.320122
+   ],
+   "ratio_b": 0.6779363966341877,
+   "ratio_c": 0.6861649942221483,
+   "sd": 0.0,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "deploy",
+   "tok_s": 99.320122
+  },
+  {
+   "arm": "c",
+   "beyond_training_ctx": false,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    93.327869,
+    94.164436,
+    92.636098
+   ],
+   "decode_wset_mib": 750.8671875,
+   "depth": 0,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_topk",
+   "n": 3,
+   "peak_commit_mib": 827.84765625,
+   "peak_wset_mib": 774.21875,
+   "per_batch": [
+    144.9508,
+    143.60603,
+    145.683285
+   ],
+   "ratio_b": 0.988007844093987,
+   "ratio_c": 1.0,
+   "sd": 0.8602279389886551,
+   "swaps_per_layer_token": null,
+   "tier": "resident_topk",
+   "tok_s": 144.746705
+  },
+  {
+   "arm": "b",
+   "beyond_training_ctx": false,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    92.675008,
+    93.727876,
+    92.649723,
+    94.008157
+   ],
+   "decode_wset_mib": 750.9306640625,
+   "depth": 0,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_trained",
+   "n": 4,
+   "peak_commit_mib": 826.92578125,
+   "peak_wset_mib": 774.14453125,
+   "per_batch": [
+    147.095092,
+    147.053578,
+    145.788228,
+    146.077498
+   ],
+   "ratio_b": 1.0,
+   "ratio_c": 1.012137713255718,
+   "sd": 0.5800126290288817,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "resident_trained",
+   "tok_s": 146.503599
+  },
+  {
+   "arm": "a",
+   "beyond_training_ctx": false,
+   "cap": "DEP",
+   "cap_mb": 1336,
+   "clock_probes": [
+    93.017372,
+    93.821774,
+    93.140822
+   ],
+   "decode_wset_mib": 364.5065104166667,
+   "depth": 1024,
+   "evictions_per_token": 43.9658203125,
+   "fetches_per_token": 44.6513671875,
+   "label": "deploy_R18_d1024",
+   "n": 3,
+   "peak_commit_mib": 895.90234375,
+   "peak_wset_mib": 766.453125,
+   "per_batch": [
+    34.211855,
+    34.34863,
+    34.168438
+   ],
+   "ratio_b": 0.8973615892862271,
+   "ratio_c": 0.8941799330497407,
+   "sd": 0.07678367403006621,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "deploy",
+   "tok_s": 34.242974333333336
+  },
+  {
+   "arm": "c",
+   "beyond_training_ctx": false,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    93.422015,
+    94.06165,
+    93.566871
+   ],
+   "decode_wset_mib": 894.8111979166666,
+   "depth": 1024,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_topk_d1024",
+   "n": 3,
+   "peak_commit_mib": 998.05078125,
+   "peak_wset_mib": 894.84765625,
+   "per_batch": [
+    38.218659,
+    38.124442,
+    38.543086
+   ],
+   "ratio_b": 1.0035581834470775,
+   "ratio_c": 1.0,
+   "sd": 0.17931738471647307,
+   "swaps_per_layer_token": null,
+   "tier": "resident_topk",
+   "tok_s": 38.29539566666667
+  },
+  {
+   "arm": "b",
+   "beyond_training_ctx": false,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    92.76573,
+    93.804813,
+    93.817216,
+    94.185757
+   ],
+   "decode_wset_mib": 894.962890625,
+   "depth": 1024,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_trained_d1024",
+   "n": 4,
+   "peak_commit_mib": 995.046875,
+   "peak_wset_mib": 895.1015625,
+   "per_batch": [
+    38.387655,
+    38.255466,
+    38.206049,
+    37.789297
+   ],
+   "ratio_b": 1.0,
+   "ratio_c": 0.9964544323331055,
+   "sd": 0.22387563136078056,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "resident_trained",
+   "tok_s": 38.159616750000005
+  },
+  {
+   "arm": "a",
+   "beyond_training_ctx": false,
+   "cap": "DEP",
+   "cap_mb": 1336,
+   "clock_probes": [
+    92.894735,
+    93.94791,
+    93.524605
+   ],
+   "decode_wset_mib": 453.8125,
+   "depth": 2048,
+   "evictions_per_token": 44.49609375,
+   "fetches_per_token": 45.181640625,
+   "label": "deploy_R18_d2048",
+   "n": 3,
+   "peak_commit_mib": 1028.6328125,
+   "peak_wset_mib": 898.91796875,
+   "per_batch": [
+    21.734207,
+    22.106626,
+    22.013036
+   ],
+   "ratio_b": 0.9601080780537171,
+   "ratio_c": 0.9541220315436089,
+   "sd": 0.1581843547896626,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "deploy",
+   "tok_s": 21.951289666666668
+  },
+  {
+   "arm": "c",
+   "beyond_training_ctx": false,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    93.891018,
+    93.307908,
+    92.955267
+   ],
+   "decode_wset_mib": 983.7317708333334,
+   "depth": 2048,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_topk_d2048",
+   "n": 3,
+   "peak_commit_mib": 1085.6875,
+   "peak_wset_mib": 983.859375,
+   "per_batch": [
+    23.48195,
+    22.679712,
+    22.858722
+   ],
+   "ratio_b": 1.0062738793489798,
+   "ratio_c": 1.0,
+   "sd": 0.3438416186961029,
+   "swaps_per_layer_token": null,
+   "tier": "resident_topk",
+   "tok_s": 23.006794666666668
+  },
+  {
+   "arm": "b",
+   "beyond_training_ctx": false,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    92.615991,
+    93.664254,
+    93.247712,
+    93.630868
+   ],
+   "decode_wset_mib": 983.8447265625,
+   "depth": 2048,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_trained_d2048",
+   "n": 4,
+   "peak_commit_mib": 1084.18359375,
+   "peak_wset_mib": 984.0234375,
+   "per_batch": [
+    23.284995,
+    22.76795,
+    22.879749,
+    22.520717
+   ],
+   "ratio_b": 1.0,
+   "ratio_c": 0.993765236803087,
+   "sd": 0.2759311353783531,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "resident_trained",
+   "tok_s": 22.86335275
+  },
+  {
+   "arm": "a",
+   "beyond_training_ctx": true,
+   "cap": "DEP",
+   "cap_mb": 1336,
+   "clock_probes": [
+    93.339157,
+    93.867414,
+    93.524507
+   ],
+   "decode_wset_mib": 631.2786458333334,
+   "depth": 4096,
+   "evictions_per_token": 44.9150390625,
+   "fetches_per_token": 45.6005859375,
+   "label": "deploy_R18_d4096",
+   "n": 3,
+   "peak_commit_mib": 1237.52734375,
+   "peak_wset_mib": 1110.44921875,
+   "per_batch": [
+    12.793682,
+    13.050446,
+    13.002186
+   ],
+   "ratio_b": 1.0046814321004323,
+   "ratio_c": 1.0003588757814417,
+   "sd": 0.1114204735385538,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "deploy",
+   "tok_s": 12.948771333333333
+  },
+  {
+   "arm": "c",
+   "beyond_training_ctx": true,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    93.856933,
+    93.443588,
+    92.524735
+   ],
+   "decode_wset_mib": 1161.0078125,
+   "depth": 4096,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_topk_d4096",
+   "n": 3,
+   "peak_commit_mib": 1259.0,
+   "peak_wset_mib": 1161.12109375,
+   "per_batch": [
+    13.103627,
+    12.8114,
+    12.917351
+   ],
+   "ratio_b": 1.0043210056147238,
+   "ratio_c": 1.0,
+   "sd": 0.12079412334215549,
+   "swaps_per_layer_token": null,
+   "tier": "resident_topk",
+   "tok_s": 12.944126000000002
+  },
+  {
+   "arm": "b",
+   "beyond_training_ctx": true,
+   "cap": "RES",
+   "cap_mb": 1360,
+   "clock_probes": [
+    94.055931,
+    93.787005,
+    93.288953,
+    93.660591
+   ],
+   "decode_wset_mib": 1161.0166015625,
+   "depth": 4096,
+   "evictions_per_token": 0.0,
+   "fetches_per_token": 0.0,
+   "label": "resident_trained_d4096",
+   "n": 4,
+   "peak_commit_mib": 1258.85546875,
+   "peak_wset_mib": 1161.14453125,
+   "per_batch": [
+    12.980679,
+    12.919411,
+    12.908376,
+    12.745274
+   ],
+   "ratio_b": 1.0,
+   "ratio_c": 0.9956975851440257,
+   "sd": 0.08712230413906652,
+   "swaps_per_layer_token": [
+    1.0,
+    1.0
+   ],
+   "tier": "resident_trained",
+   "tok_s": 12.888435
+  }
+ ],
+ "tag": "L3",
+ "ts": "2026-11-10T17:51:31"
+}

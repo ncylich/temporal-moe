@@ -1,0 +1,50 @@
+[
+ {
+  "arm": "a",
+  "label": "deploy_R18",
+  "depth": 4096,
+  "rc": 0,
+  "tok_s": 8.154607,
+  "peak_wset_mib": 979,
+  "decode_wset_mib": 573,
+  "peak_commit_mib": 1237,
+  "fetches": 9255,
+  "fetched_mib": 762.6,
+  "evictions": 8553,
+  "swaps": 832,
+  "R_active": 18,
+  "route": "temporal-route: trained min_logit, layers=13 layer_tokens=54093 cold_fills=26 swaps=54067 swaps_per_layer_token=1.0000"
+ },
+ {
+  "arm": "b",
+  "label": "resident_trained",
+  "depth": 4096,
+  "rc": 0,
+  "tok_s": 9.720254,
+  "peak_wset_mib": 1161,
+  "decode_wset_mib": 1161,
+  "peak_commit_mib": 1258,
+  "fetches": 0,
+  "fetched_mib": 0.0,
+  "evictions": 0,
+  "swaps": 0,
+  "R_active": 192,
+  "route": "temporal-route: trained min_logit, layers=13 layer_tokens=54093 cold_fills=26 swaps=54067 swaps_per_layer_token=1.0000"
+ },
+ {
+  "arm": "c",
+  "label": "resident_topk",
+  "depth": 4096,
+  "rc": 0,
+  "tok_s": 9.896052,
+  "peak_wset_mib": 1161,
+  "decode_wset_mib": 1161,
+  "peak_commit_mib": 1259,
+  "fetches": 0,
+  "fetched_mib": 0.0,
+  "evictions": 0,
+  "swaps": 0,
+  "R_active": 192,
+  "route": null
+ }
+]

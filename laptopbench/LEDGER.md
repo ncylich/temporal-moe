@@ -1002,3 +1002,395 @@ between-sitting drift of the streamed arm, which a future session could pin down
 sittings across a day; the ratios within a sitting are stable to 1-3%.
 
 **Retracted:** nothing.
+
+---
+
+## 3. Trained fine 1e19 model (session L3)
+
+Model: `temporal_fine_g3_1e19`, iteration 4278 (Hugging Face `ncylich/temporal-moe-ckpts`), 14
+layers (layer 0 dense, 13 MoE), 192 routed experts per MoE layer, 18 active, 1.26 B parameters,
+served as `fine_1e19-q4_0.gguf` with the trained router choosing the experts
+(`LLAMA_TEMPORAL_ROUTE=trained`, engine `temporal-moe-win` @ 43bec5f3 plus
+`scripts/serving_convert/engine_patch/000{1,2}`). Prompt: `laptopbench/SESSION_PROMPT_TRAINED.md`.
+
+### L3-1 -- Phase 0, preflight (2026-11-10 15:08)
+
+Same machine as L1: i7-11370H, 16 GB (16,555,320 KB visible), Samsung `MZVLB1T0HBLR-000L2`
+(PM981a) NVMe 1 TB, Windows 11 Home build 26300. WSL2 Ubuntu-24.04, kernel
+6.18.33.2-microsoft-standard-WSL2, Python 3.12.3 in WSL, 3.11.9 on Windows.
+
+| check | command | value | status |
+|---|---|---|---|
+| power plan | `powercfg /getactivescheme`; overlay from `HKLM\...\Power\User\PowerSchemes` | Balanced `381b4222-...` with AC overlay `ded574b5-45a0-4f42-8737-46345c09c238` (Best performance) | pass |
+| AC | `BatteryStatus` (root/wmi) | PowerOnline True, 99% | pass |
+| standby / hibernate on AC | `powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE / HIBERNATEIDLE` | 0x00000000 / 0x00000000 | pass |
+| CPU load | `Win32_Processor.LoadPercentage` | 7% | pass |
+| free disk | `Get-PSDrive C` | 70.5 GB free (C:); WSL ext4 928 GB free | pass |
+| free memory | `Win32_OperatingSystem.FreePhysicalMemory` | 7.5 GB free; WSL MemTotal 11,961 MB | enough for a 0.7 GB model |
+| Defender real-time | `Get-MpComputerStatus` | enabled | -- |
+| Defender exclusions | `Get-MpPreference` (unelevated) | "N/A: Must be an administrator to view exclusions" | elevated paste requested from Mohsen, still open |
+| Defender exclusions, evidence | `Get-WinEvent` Defender/Operational id 5007 | `...Exclusions\Paths\C:\tmoe = 0x0` and `...Exclusions\Paths\C:\Users\mohsen\AppData\Local\wsl\{8193fb13-76e8-49c9-965b-4daa7b3aaff0} = 0x0` still present; no removal event | pass (provisional as in L1) |
+| WSL distro path | `HKCU\...\Lxss` BasePath | `C:\Users\mohsen\AppData\Local\wsl\{8193fb13-...}` = the excluded path | pass |
+| Windows Search | `Get-Service WSearch` | Running (C:\tmoe excluded from indexing in L1) | as L1 |
+
+Driver note: `lapbench.py`'s event-5007 fallback reads the newest 400 events; the log now holds
+2,000+ 5007 events since 2026-02-20 and the two exclusion events are older than the newest 400,
+so the fallback would fail and drop to the `C:\tmoe\DEFENDER_EXCLUSIONS.txt` attestation. Fixed
+in Phase 3 (reads up to 5,000 events).
+
+Largest memory users on the host at the start: the desktop agent app (~1 GB over three
+processes), Chrome (~0.7 GB), Defender 0.27 GB.
+
+**Retracted:** nothing.
+
+### L3-2 -- Phase 1, model and engine: Q4_0 reproduced byte for byte, engine patched and built natively
+
+**Conversion (WSL, `C:\tmoe\tools\trained\phase1_wsl.sh`, log `C:\tmoe\logs\trained\phase1_wsl.log`,
+15:09-15:18).** README steps 1, 3 and 4, with the Mac lines adapted to Linux (`g++` for `clang++`,
+`libllama.so` via `-Wl,-rpath`). Python deps in `~/tmoe/venv` (torch CPU wheel, safetensors,
+huggingface_hub, tokenizers, requests, numpy). Engine for the host tools: `~/tmoe/llama.cpp-trained`,
+branch `temporal-moe-trained-routing` = `43bec5f3` + `git am engine_patch/000{1,2}`, tree `b69151b6`
+(the patch README's tree), `cmake -DGGML_NATIVE=ON -DBUILD_SHARED_LIBS=ON`, targets `llama
+llama-quantize llama-perplexity llama-bench`.
+
+```
+python scripts/serving_convert/dcp_extract.py --run temporal_fine_g3_1e19 --iter 4278 --out $WORK/fine_1e19
+python scripts/serving_convert/to_gguf.py --llama-cpp $LLAMA --weights $WORK/fine_1e19.safetensors --topk 18 --out $WORK/fine_1e19-f16.gguf
+python scripts/serving_convert/to_gguf.py ... --ftype f32 --out $WORK/fine_1e19-f32.gguf
+llama-quantize --pure $WORK/fine_1e19-f16.gguf $WORK/fine_1e19-q4_0.gguf Q4_0
+```
+
+| file | bytes | sha256 | expected |
+|---|---|---|---|
+| fine_1e19.safetensors | 2,530,321,432 | -- | 126 tensors, 2.54 GB fetched in 40 range requests |
+| fine_1e19-f16.gguf | 2,631,311,648 | 47d771bb61157b517eed9c7f35e231cd6c18c2a4cdf17ac9431ac64a3e97738f | = phone ledger step 1 |
+| fine_1e19-f32.gguf | 5,260,738,848 | 990224067ecedf5632b15846f15e899effb49b43e0f379f54479bdc6829f424d | no reference |
+| **fine_1e19-q4_0.gguf** | **744,281,312** | **c34d3445064a9b14cadacee1de9ec74d568995f078de6da0d8aef767b412c8ff** | **size and sha256 both match** |
+
+`gguf_types.py`: 39 routed expert tensors, all Q4_0 (215.7 MB per projection x 3); router F16.
+Copied to `C:\tmoe\models\fine_1e19-q4_0.gguf`, sha256 on Windows identical. The driver's own
+GGUF reader gives `glm4moe`, 14 blocks, 1 leading dense, 13 MoE layers, 192 experts, k=18, one
+expert slice = 86,400 bytes (Q4_0 [800 x 192]), routed experts 646,963,200 bytes.
+
+**Test split (README step 2, for Phases 2 and 6).** Megatron-LM submodule checked out in the WSL
+clone at `cbaf684c` (source only, 24 MB); `test_tokens.py --n 512` fetched 278 MB of `.idx` and
+sample ranges in 3 min and wrote `test_tokens.npz` (512 x 2049 uint16, no masked positions, no
+all-zero rows). Not cross-checked against the converting session's file (no hash was published).
+
+**Windows engine (`C:\tmoe\llama.cpp`).** `git checkout -b temporal-moe-trained-routing 43bec5f3`,
+`git am engine_patch/000*.patch`: HEAD `0d0c8198`, tree `b69151b6` (= the patch README's). The
+`trained-model-pixel` branch's `engine_patch/` is identical to this branch's (`git diff` empty), so
+this branch's copy was used. Nothing pushed to the engine repo. Build via `lapbench.py build --env
+windows --model trained_fine` (same generator and flags as L1-3: VS 17 2022, `-T ClangCL`,
+`GGML_NATIVE=ON`, `/arch:AVX512` CPU variant) into `build-win-trained`, copied to
+`C:\tmoe\bin-trained\` so the L1 binaries in `C:\tmoe\bin` are untouched.
+
+| file | sha256 |
+|---|---|
+| llama-bench-temporal.exe | f4d446c54b9d7ded9c16f1c5815a9318502049c33eac02f08ad560012daa9918 |
+| llama-perplexity.exe | d6be34499186605d2b8aae8aab48543bc073b62f153e535a6e234d592555ca22 |
+| binary set (both exes + 7 DLLs) | c981d911b289ed9473ef7d85ba5ecdb8be77fdc60de97d78b8d3a623f31e100e |
+
+Finding about the identity the gates stamp: `llama-bench-temporal.exe` is a 9,728-byte launcher;
+the engine is in `llama-bench-impl.dll`, `llama.dll` and the ggml DLLs. In L1 the driver hashed the
+exe alone, so an L1 rebuild that changed only the DLLs would have kept the gated stamp. For L3 the
+gated identity is the "binary set" hash above (every DLL and both exes). Whether an L1 rebuild ever
+changed only the DLLs is not in the record; L1's gates were re-run after every engine change anyway.
+
+**Side-file**, dumped on this machine (`LLAMA_TEMPORAL_REPACK_DUMP`): all 39 expert tensors repacked
+to `q4_0_8x8` (the AVX-512 layout), then the tool exits with `repack-dump: layer 0 missing slot 0`,
+as on the phone: the optional fused region assumes every layer has experts and layer 0 is dense.
+Only `LLAMA_TEMPORAL_FUSED` reads that region and it is off in every arm; the driver accepts this
+exit for this model only and records it. 1,441,017,856 bytes (mirror region written, fused region
+allocated and unwritten), not sparse, sha256 `952e9778...1002f0`.
+
+**Retracted:** nothing.
+
+### L3-3 -- Phase 2, routing check: 106,496 of 106,496 layer-token windows equal the reference; one swap per layer per token on Windows
+
+**Against the PyTorch reference (WSL, host engine of L3-2, F32 file, plain attention, F32 KV;
+`C:\tmoe\tools\trained\phase2_route_check.sh`, log `phase2_route_check.log`, 15:19-15:23):**
+
+```
+LLAMA_TEMPORAL_ROUTE=trained LLAMA_TEMPORAL_ROUTE_DUMP=route_f32_4.bin \
+  gguf_logits nll fine_1e19-f32.gguf rows4.i32 4 2048 nll_f32_4.f32 threads=8
+python scripts/serving_convert/check_engine_routing.py --weights fine_1e19.safetensors \
+  --tokens test_tokens.npz --rows 4 --dump route_f32_4.bin --nll nll_f32_4.f32
+python scripts/serving_convert/ref_model.py --weights fine_1e19.safetensors --tokens test_tokens.npz --n 4 --routing temporal
+```
+
+| check | this laptop | phone ledger step 2 |
+|---|---|---|
+| resident sets equal to the reference | **106,496 of 106,496** layer-tokens (13 layers x 4 x 2048), 0 differ | 106,496 of 106,496 |
+| engine route line | `layers=13 layer_tokens=106496 cold_fills=52 swaps=106444 swaps_per_layer_token=1.0000` | 1.0000 |
+| reference swaps per layer-token, rows 0-3 | 1.0000 each | 1.0000 |
+| engine F32 loss, 4 x 2048 | 3.14413 | 3.14413 |
+| reference loss, same rows | 3.14412 (+0.00001) | 3.14409 (+0.00004) |
+
+The engine loss equals the phone session's to five decimals on these rows, which also says the
+test split rebuilt here (L3-2) gives the same first rows. The reference differs from the phone
+session's by 0.00003 nats (x86 vs Apple float32 accumulation in the reference forward itself).
+
+**On Windows, the binary that will be timed (`C:\tmoe\bin-trained`, uncapped, production flags,
+`-t 4 -p 0 -n 64 -r 1 -mmp 0 -ot _exps=CPU -d <ctx>`, host not quiet: the WSL check ran at the same
+time, so the tok/s column is not a result).** `C:\tmoe\tools\trained\smoke_arms.py`, results
+`laptopbench/results/trained_fine/smoke_L3*.json`.
+
+| arm | ctx | route line | fetches / fetched MiB / evictions | peak working set | peak commit | tok/s (contended) |
+|---|---|---|---|---|---|---|
+| (a) deploy R=18, TWOPASS, trained | 0 | `layers=13 layer_tokens=845 cold_fills=26 swaps=819 swaps_per_layer_token=1.0000` | 3639 / 299.8 / **2937** | 239 MiB | 781 MiB | 21.9 |
+| (b) R=192, trained | 0 | same counts, 1.0000 | 0 / 0 / 0 | 774 MiB | 814 MiB | 82.8 |
+| (c) R=192, stock top-k | 0 | none (as required) | 0 / 0 / 0 | 774 MiB | 814 MiB | 57.6 |
+| (a) | 2048 | `layer_tokens=27469 ... swaps_per_layer_token=1.0000` | 8826 / 727.2 / 8124 | 899 MiB | 1028 MiB | 8.7 |
+| (b) | 2048 | 1.0000 | 0 / 0 / 0 | 984 MiB | 1084 MiB | 8.9 |
+| (c) | 2048 | none | 0 / 0 / 0 | 984 MiB | 1085 MiB | 14.9 |
+| (a) | 4096 | `layer_tokens=54093 ... 1.0000` | 9255 / 762.6 / 8553 | 979 MiB | 1237 MiB | 8.2 |
+| (b) | 4096 | 1.0000 | 0 / 0 / 0 | 1161 MiB | 1258 MiB | 9.7 |
+| (c) | 4096 | none | 0 / 0 / 0 | 1161 MiB | 1259 MiB | 9.9 |
+
+- `layer_tokens` = 13 x (64 decode tokens + llama-bench's 1 warmup token + the depth prefill):
+  every MoE layer routes every token, prefill included (the patch 0002 behaviour).
+- `cold_fills=26` = 13 layers x 2 sequences (warmup and the measured run each start at position 0).
+- Deploy's `ENFORCE on, swaps=819` equals the router's swap count (13 x 63 non-cold decode tokens).
+- Each swap moves three 84.4 KiB slices (86,400 bytes). The pool prints `O_DIRECT bounce path
+  (off%4096=2048 dst%4096=2048 len%4096=384) -- costs a memcpy per fetch`: unlike the 216 KiB slices
+  of the 11B model, these slices are not 4 KiB multiples, so every unbuffered read goes through a
+  bounce buffer. Recorded; not changed (no tuning before the gates, and the prompt puts routing
+  correctness first).
+
+**Finding for the memory caps (Phase 3).** Peak *working set* separates deploy from the resident
+arms (239 vs 774 MiB at ctx 0), but peak *commit*, which is what a job-object cap bounds, does not
+(781 vs 814 MiB). The fork's Windows reserve mode (L1-3, `ggml_backend_cpu_buffer_type_alloc_buffer`)
+applies only to weight buffers of 1 GiB or more; this model's CPU weight buffer is ~710 MiB, so it is
+committed whole at load and the absent experts are decommitted only afterwards
+(`tm_decommit_region`). The momentary full commit sets the peak. With the patch as shipped, a
+commit cap on Windows cannot show the deploy saving for this model; peak working set can, and it is
+what Phase 5 reports.
+
+**Retracted:** nothing.
+
+### L3-4 -- Phase 3, driver: `lapbench.py --model trained_fine`, caps re-scaled from measured commit, dry runs
+
+`lapbench.py` gains `--model {rand_fine,trained_fine}` (default `rand_fine`, so every L1/L2 command
+line means what it meant). `trained_fine` switches, in one place (`apply_model`):
+
+- model `fine_1e19-q4_0.gguf`, sha256 `c34d3445...c8ff`, size 744,281,312 (both checked by `check`),
+  side-file `fine_1e19-q4_0-repacked.bin`; geometry 13 MoE layers, 192 experts, k=18, slice 86,400
+  bytes, so 39 slices (9.64 MiB) per token at one swap per layer. `check` re-reads all of it from the
+  GGUF header (`gguf_geometry`, pure Python) and refuses on any difference.
+- engine branch `temporal-moe-trained-routing`, build dir `build-win-trained`, binaries
+  `C:\tmoe\bin-trained`, results `laptopbench/results/trained_fine/` (the L1 files are untouched).
+- gated identity = sha256 over every DLL and both exes (L3-2 finding).
+- arms as the prompt letters them: (a) `deploy_R18` R=18 + TWOPASS + `LLAMA_TEMPORAL_ROUTE=trained`;
+  (b) `resident_trained` R=192, trained routing, no two-pass; (c) `resident_topk` R=192, stock top-k.
+  All share the production flags of L1 (`REPACK` + side-file, `ODIRECT`, `MADV_FREE`, `SPLIT=1`,
+  `FETCH_THREADS=6`, `SPIN_US=5000`), `-t 4 -p 0 -n 128 -r 8 -mmp 0 -ot _exps=CPU -d <ctx>`.
+- invariant 2 for this model: (a) and (b) must print the route line with 13 layers and
+  `swaps_per_layer_token` in [0.90, 1.0]; (c) must not print one. Deploy's pool bands are L1's with
+  N_LAYER=13 plus one cold fill per llama-bench rep (13 x 18 x 3), and at ctx > 0 one depth-prefill
+  fill per rep (at most 13 x 192 x 3). Checked on the nine smoke logs of L3-3 (all accepted) and on
+  three crossed negatives (stock pool given to (b), trained pool to (c), resident pool to (a): all
+  refused with the right reason).
+- the 3% clock rule applies to the resident arms (b) and (c) (ruling 2026-09-20 in this model's
+  letters); (b) closes each depth as the drift check. Clock probe `-n 512 -r 5` (~20 s here).
+- gates in L1's accepted forms with batch size 1 for perplexity (next entry), the trained memory
+  demonstration, and a report with ratios to (b) and (c) at the same context.
+- Defender event-5007 fallback reads 5,000 events (L3-1).
+
+**Caps, and how they were chosen.** A job object bounds commit, so the caps come from the peak commit
+the uncapped smoke measured (L3-3), each about 8% above that arm's largest value over ctx 0, 2048
+and 4096:
+
+| cap | MiB | from |
+|---|---|---|
+| RES (arms b, c; gates; clock probe) | 1360 | resident peak commit 1259 at ctx 4096 x 1.08 |
+| DEP (arm a) | 1336 | deploy peak commit 1237 at ctx 4096 x 1.08 |
+| TIGHT (memory demonstration, ctx 0) | 800 | between deploy's 781 and the resident arms' 814 at ctx 0 |
+
+The old 12 GB / 4 GB / 2.5 GB caps would bind nothing for this model. The new ones bind only just
+above each arm's own footprint, so a run that suddenly needed more memory (a leak, a residency
+that does not shrink) fails instead of passing. They cannot do what the L1 caps did, i.e. let deploy
+run where the resident model cannot, because on Windows this model's weight buffer is committed whole
+at load (L3-3): deploy's peak commit is 96% of the resident one. TIGHT records that 33 MiB margin
+as a fact about the allocator, not as a memory result. The memory result is the peak and the
+decode-phase working set, which separate the arms (239 vs 774 MiB at ctx 0 in the smoke).
+
+Host memory needed by `check`: 2,500 MB (was 7,500). Rest between batches: 120 s (a batch of this
+model is 30-120 s of load; L1 used 300 s for 3-6 minute batches and 180 s in its sweeps).
+
+**Dry runs** (`--dry-run`, 15:25), commands as printed:
+
+```
+python lapbench.py check --env windows --model trained_fine
+python lapbench.py gates --env windows --model trained_fine --tag L3 --gates-x86
+  g1_warm / g1_bytes  [cap RES 1360 MB] <prod> R=18 TWOPASS=1 ROUTE=trained llama-bench-temporal -t 4 -p 0 -n 64 -r 1 -mmp 0 -ot _exps=CPU
+  g2_ppl_R192         [RES] <prod> R=192 TWOPASS=1 ROUTE=trained llama-perplexity -f ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU -b 1 -ub 1
+  g2_ppl_R18          [RES] <prod> R=18  TWOPASS=1 ROUTE=trained (same args)
+  g2_ppl_R192_nopass  [RES] <prod> R=192 ROUTE=trained (same args; recorded, not gated)
+  g3_ppl_norepack_R192 [RES] LLAMA_NO_REPACK=1 R=192 ROUTE=trained (same args)
+  g3_tps_repack_R192 / g3_tps_norepack_R192 [RES] R=192 ROUTE=trained, -n 128 -r 3
+python lapbench.py arms --env windows --model trained_fine --tag L3 --arms a,b,c --depth 0,1024,2048,4096 --n 3 --rest 120
+  40 batches: per round r1..r3, per ctx: deploy_R18, resident_trained, resident_topk; then resident_trained closing per ctx
+  each batch: check (quick) -> clock probe [RES] stock -n 512 -r 5 -> warmup -n 32 -> -n 128 -r 8 -d <ctx>
+```
+
+`check` (real, 15:25): pass; AC, Best performance, standby 0, load 8%, 10.3 GB available, exclusions
+from event 5007, fork head `0d0c8198`, model sha256 matches, geometry matches, side-file present.
+
+**Retracted:** nothing.
+
+### L3-5 -- Phase 4, gates: G1 0.1%, G2 identical to every digit (streamed, two-pass resident and plain resident), G3 +36% repacked
+
+`python lapbench.py gates --env windows --model trained_fine --tag L3 --gates-x86 --provisional "Defender
+exclusions per event 5007, Get-MpPreference paste pending"`, 15:26-15:27, WSL shut down, host load 13%.
+Binary set `c981d911b289...` (L3-2), production flags, cap RES (1360 MB) read back on every run.
+Log `C:\tmoe\logs\trained\gates_L3.log`, raw stderr under `results/trained_fine/logs/L3/`,
+`results/trained_fine/gates.json`.
+
+**G1, bytes are real: PASS.** Deploy configuration (R=18, TWOPASS, trained routing), `-n 64 -r 1`,
+warm run first: pool `fetched_mib` **299.8**; process `ReadTransferCount` 393.0 MiB minus the
+loader's 92.8 MiB (file minus routed experts) = **300.2 MiB, rel. error 0.12%** (limit 10%);
+physical-disk read delta 313.6 MiB >= fetched (device_ok); 4,073 read calls.
+
+**G2, streamed vs resident, every token through the window (`-b 1 -ub 1`): PASS.**
+
+| run (`llama-perplexity --chunks 2 -c 512 -b 1 -ub 1`, trained routing) | PPL | fetches / evictions / swaps | route line |
+|---|---|---|---|
+| R=192 + TWOPASS | **301.0415 +/- 21.99944** | 35,376 / 39,858 / 13,286 | `layer_tokens=13325 cold_fills=39 swaps=13286 swaps_per_layer_token=1.0000` |
+| R=18 + TWOPASS (streamed) | **301.0415 +/- 21.99944** | 41,658 / 40,956 / 13,286 | same |
+| R=192, no two-pass (nothing fetched or evicted; arm (b)'s configuration; recorded) | **301.0415 +/- 21.99944** | 0 / 0 / 0 | same |
+
+`layer_tokens` = 13 x 1025 (two 512-token chunks plus one): every layer routed every token, as the
+phone's post-0002 gate required. The swap and eviction counts match the phone's step 5 exactly
+(13,286 swaps; 39,858 evictions at R=192 under TWOPASS, which ignores R >= K, pitfall #26; the
+phone's R=18 arm had 40,965 evictions, here 40,956). Here the plain resident configuration also gives
+the same digits; on the phone the batched resident run differed by 0.0034 in ln PPL, because it was
+batched; this one is batch 1 like the others. The phone's PPL (301.2954, ARM build) differs from
+this x86 clang-cl build's (301.0415) by kernel rounding, as L1-4 found between compilers.
+
+**G3, repacked vs plain kernels: PASS in the x86 form (L1-6 ruling 2).** R=192, no two-pass, trained
+routing: plain kernels (`LLAMA_NO_REPACK=1`) PPL **298.5371 +/- 21.67875**, repacked **301.0415**:
+|ln ratio| = **0.0084** (the phone's tolerance, 0.01, also passes; not equal digits, as on x86 in
+L1). Decode `-n 128 -r 3`: repacked **143.56** tok/s, plain **105.35** (sd <= 2.13): **+36%** for the
+repacked side-file layout (L1: +37% on the 11B model).
+
+`gates.json[windows].all_pass = true`, gated hash `c981d911b289...`. Nothing was timed before this.
+
+**Retracted:** nothing.
+
+### L3-6 -- Phase 5, benchmark (tag L3): deploy 0.68 / 0.90 / 0.96 of the resident trained model at ctx 0 / 1k / 2k, equal at 4k; peak working set 35% of resident at ctx 0
+
+```
+python lapbench.py arms --env windows --model trained_fine --tag L3 --arms a,b,c --depth 0,1024,2048,4096 \
+  --n 3 --rest 120 --resume --provisional "Defender exclusions per event 5007, Get-MpPreference paste pending"
+```
+
+Windows native, 2026-11-10 15:28-17:51, one sitting, host quiet (WSL shut down; load <= 25% at every
+batch's check), binary set `c981d911b289` (gated, L3-5), production flags (L3-4), `-t 4 -p 0 -n 128
+-r 8 -mmp 0 -ot _exps=CPU -d <ctx>`, one warmup per batch (`-n 32`), a resident clock probe before
+every batch (stock binary, `-n 512 -r 5`), 120 s rests, interleaved per round a b c at ctx 0, 1024,
+2048, 4096, three rounds, then (b) once more per ctx as the drift check. Caps DEP 1336 / RES 1360 MB
+read back on every run. **41 rows, all `ok`; no refused or degraded rows.** Clock probes
+91.2-94.2 tok/s over the 2 h 20 min (the first, 91.2, is 96.8% of the best; every other one >= 98%).
+Log `C:\tmoe\logs\trained\arms_L3.log`; rows `results/trained_fine/runs.jsonl`; table
+`results/trained_fine/report_L3.json`.
+
+| arm | ctx | tok/s, mean +/- sd over batches (per batch) | / (b) | / (c) | peak working set | decode-phase working set | peak commit | swaps / layer / token | fetches, evictions / token |
+|---|---|---|---|---|---|---|---|---|---|
+| (a) deploy | 0 | **100.14 +/- 0.59** (100.81, 99.37, 100.25) | **0.684** | 0.692 | **270 MiB** | 219 MiB | 781 | 1.0000 | 43.9, 43.2 |
+| (b) resident, trained | 0 | 146.50 +/- 0.58 (n=4) | 1 | 1.012 | 774 | 751 | 827 | 1.0000 | 0, 0 |
+| (c) resident, top-k | 0 | 144.75 +/- 0.86 | 0.988 | 1 | 774 | 751 | 828 | n/a | 0, 0 |
+| (a) deploy | 1024 | **34.24 +/- 0.08** (34.21, 34.35, 34.17) | **0.897** | 0.894 | 766 | 365 | 896 | 1.0000 | 44.7, 44.0 |
+| (b) | 1024 | 38.16 +/- 0.22 (n=4) | 1 | 0.996 | 895 | 895 | 995 | 1.0000 | 0, 0 |
+| (c) | 1024 | 38.30 +/- 0.18 | 1.004 | 1 | 895 | 895 | 998 | n/a | 0, 0 |
+| (a) deploy | 2048 | **21.95 +/- 0.16** (21.73, 22.11, 22.01) | **0.960** | 0.954 | 899 | 454 | 1029 | 1.0000 | 45.2, 44.5 |
+| (b) | 2048 | 22.86 +/- 0.28 (n=4) | 1 | 0.994 | 984 | 984 | 1084 | 1.0000 | 0, 0 |
+| (c) | 2048 | 23.01 +/- 0.34 | 1.006 | 1 | 984 | 984 | 1086 | n/a | 0, 0 |
+| (a) deploy | 4096, speed only | **12.95 +/- 0.11** (12.79, 13.05, 13.00) | **1.005** | 1.000 | 1110 | 631 | 1238 | 1.0000 | 45.6, 44.9 |
+| (b) | 4096, speed only | 12.89 +/- 0.09 (n=4) | 1 | 0.996 | 1161 | 1161 | 1259 | 1.0000 | 0, 0 |
+| (c) | 4096, speed only | 12.94 +/- 0.12 | 1.004 | 1 | 1161 | 1161 | 1259 | n/a | 0, 0 |
+
+ctx 4096 is beyond the 2,048-token training context: speed only. Peak commit is in MiB. The
+decode-phase working set is the median of the last fifth of each run (L1-6 method).
+
+**Counters.** Every (a) and (b) row printed `swaps_per_layer_token=1.0000` over 13 layers; no (c) row
+printed a route line. Deploy per 1,024 timed tokens: 13,208 swaps at ctx 0 (= 13 x 1,016: the 8 reps
+each start cold) and 13,312 at ctx > 0 (= 13 x 1,024: the depth prefill fills the window first);
+fetches 44,988-46,695, fetched 3,707-3,848 MiB per batch (one 84.4 KiB slice each), physical-disk read
+delta 3,877-4,031 MiB per batch: the bytes came from the NVMe. Fetches per token are 43.9-45.6 rather
+than 39 because each of llama-bench's 8 reps (and its warmup) restarts the window cold, and at ctx > 0
+re-prefills the depth; the bands of L3-4 account for both.
+
+**Reading.**
+
+- Routing cost: (b) and (c) are the same speed at every context (ratio 0.988-1.006): the trained
+  routing rule itself costs nothing measurable once everything is resident.
+- Deploy pays a roughly constant ~3 ms per token over the resident model at ctx 0 and 1024 (9.99 vs
+  6.83 ms; 29.2 vs 26.2 ms), which the attention time hides as the context grows: 0.684 -> 0.897 ->
+  0.960. The phone's ratios were 0.437 / 0.678 / 0.759 / 0.842 on the same model and routing.
+- ctx 4096: deploy equals the resident model within noise (12.95 +/- 0.11 vs 12.89 +/- 0.09). Not a
+  deploy-above-ceiling bug as far as the counters can tell: the deploy rows fetched 3.85 GB from the
+  disk per batch with the expected swap and eviction counts, and every 4096 row of either arm agrees
+  with its own repeats to 1-2%. The pool's `wait_ms` per token grows with context (2.2, 3.0, 3.3,
+  3.9 ms) while deploy's overhead over (b) shrinks (3.2, 3.0, 1.8, -0.4 ms), so `wait_ms` is not wall
+  time on the critical path (it is accumulated per waiting thread); why deploy's other overheads
+  vanish at 4096 is not attributed here (no trace run: the prompt puts tuning and attribution out of
+  this session's scope).
+- Memory: deploy's peak working set is 35% of the resident model's at ctx 0 (270 vs 774 MiB) and its
+  decode-phase working set 29% (219 vs 751 MiB); at ctx 1024-4096 the peak is set by the depth
+  prefill, which fetches on miss without eviction (L1-6), while the decode phase stays at 365-631 MiB
+  against 895-1161 MiB resident.
+- Same pattern of ratio vs context as the phone; this laptop's absolute speeds are 0.76-1.52x the
+  phone's (the Pixel 10a: 66.1 / 32.9 / 22.8 / 14.1 deploy, 151.3 / 48.6 / 30.0 / 16.7 resident).
+
+**Memory demonstration (ctx 0, cap TIGHT = 800 MiB, documentary, L3-4).** Arm (b) under TIGHT:
+**failed to start**, `GGML_ASSERT(ctx->mem_buffer != NULL)` while allocating a compute buffer after the
+weights were loaded; job peak 835.8 MB at the 838.9 MB limit, rc 0xC0000409, no decode. Deploy under
+TIGHT: ran, **99.32 tok/s** (n=1), peak working set 270 MiB, peak commit 781 MiB. The 33 MiB between
+the two peak commits is the allocator's (L3-3), not the expert window's; the working-set
+columns above are the memory result.
+
+**Retracted:** nothing.
+
+### L3-7 -- Phase 6, quality: Q4_0 under trained routing, 512 test samples, 3.21303 nats/token (+0.0210 over the reference; phone 3.21334)
+
+**Perplexity from the gate run (L3-5)**, `ppl_input.txt` (shuffled word salad: an identity oracle,
+not a quality number), batch 1, trained routing: streamed R=18 **301.0415 +/- 21.99944**; all 192
+experts resident (no two-pass, nothing fetched) **301.0415 +/- 21.99944**. Identical.
+
+**Loss on the first 512 test samples** (test split rebuilt here with README step 2, L3-2; 2,048 tokens
+each, 1,048,576 tokens), measured with the engine that was timed: `gguf_logits.cpp` compiled with
+clang-cl against `build-win-trained\src\Release\llama.lib` (exe sha256 `0b4bfff0...dc5d9f`, beside the
+timed DLLs in `C:\tmoe\bin-trained`), same arguments as the phone's step 7:
+
+```
+LLAMA_TEMPORAL_ROUTE=trained gguf_logits.exe nll fine_1e19-q4_0.gguf rows512.i32 512 2048 nll_win_q4_512.f32 fa kvf16 threads=8
+python C:\tmoe\tools\trained\quality_summary.py nll_win_q4_512.f32 512 2048 results/trained_fine/quality_L3.json
+```
+
+17:55-18:49 (54 min, 6.4 s per sample, host otherwise idle). Bits per byte = loss / 2.9780.
+
+| | samples | loss (nats/token) | bits per byte | this laptop minus it |
+|---|---|---|---|---|
+| PyTorch reference, temporal min_logit (RESULTS.md) | 512 | 3.19202 | 1.07187 | **+0.02101** |
+| engine, Mac host F16 (phone ledger) | 512 | 3.19221 | 1.07193 | +0.02082 |
+| engine, Mac host Q4_0 (phone ledger) | 512 | 3.21330 | 1.07902 | -0.00027 |
+| engine, Pixel 10a Q4_0 (phone ledger) | 512 | 3.21334 | 1.07903 | -0.00031 |
+| **engine, this laptop, Windows Q4_0** | 512 | **3.21303** | **1.07892** | |
+
+Standard error over samples 0.0159 (sd 0.359 per sample); the comparisons are on the same 512
+samples, so the paired error is far smaller (the phone ledger's paired SE for Q4_0 vs reference was
+0.00032), but the per-token files of the other sessions are not here, so no paired SE is computed.
+The laptop matches the Mac and phone Q4_0 builds to 0.0003 nats and carries the same Q4_0 cost over
+the reference (+0.021). Rows 0-3: 2.74108, 3.31652, 2.76271, 3.82559 (row 0 identical to a one-row
+test run beforehand). No non-finite values.
+
+What went wrong along the way: (1) the first launch through a nested PowerShell left a
+`gguf_logits.exe` process idle at 0.1 s of CPU (a second launch had raced it); it was killed and
+nothing from it is used. (2) In the run that is used, the redirected stderr and stdout files came back
+empty, so its `temporal-route:` line was not captured. The one-row test on the same binary, file
+and arguments printed `layers=13 layer_tokens=26624 cold_fills=13 swaps=26611
+swaps_per_layer_token=1.0000`, and the NLL file is complete (4,194,304 bytes = 512 x 2048 float32);
+the swap rate of the 512-row run itself is therefore not recorded.
+
+**Retracted:** nothing.

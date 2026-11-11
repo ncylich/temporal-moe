@@ -106,6 +106,23 @@ ARMS = {
 }
 CAP_MB = {"12G": 12288, "4G": 4096, "2.5G": 2560}
 
+# trained_fine (L3, SESSION_PROMPT_TRAINED.md Phase 5). Letters follow that prompt, not L1:
+#   (a) deploy: 18 resident, trained routing, streamed from the NVMe
+#   (b) the same trained routing with all 192 experts resident (nothing streams)
+#   (c) the same weights fully resident with plain top-k: a DIFFERENT routing function
+# Caps are re-scaled to this 0.7 GB model in Phase 3 (ledger L3-3 says how they were chosen).
+ROUTE_TRAINED = {"LLAMA_TEMPORAL_ROUTE": "trained"}
+# Job-object commit caps (MiB), chosen in L3-4 from the uncapped smoke of L3-3: each arm's cap is ~8% above
+# its own largest peak commit over ctx 0/2048/4096 (resident 1259, deploy 1237). TIGHT sits between
+# deploy's (781) and the resident arms' (814) peak commit at ctx 0, the only place a commit cap can
+# tell them apart on Windows for this sub-1-GiB weight buffer (L3-3): documentary, not a memory claim.
+TRAINED_CAP_MB = {"RES": 1360, "DEP": 1336, "TIGHT": 800}
+TRAINED_ARMS = {
+    "a": ("deploy", "deploy_R18", 18, True, "DEP", ROUTE_TRAINED, False),
+    "b": ("resident_trained", "resident_trained", 192, False, "RES", ROUTE_TRAINED, False),
+    "c": ("resident_topk", "resident_topk", 192, False, "RES", {}, False),
+}
+
 DRY = False
 FORCE = False
 _CMD_SEQ = 0
@@ -120,6 +137,100 @@ IS_LINUX = sys.platform.startswith("linux")
 WIN_BIN = WIN_ROOT / "bin"                             # ported binaries copied here by `build --env windows`
 WIN_SIDE = WIN_ROOT / "models" / SIDEFILE
 BUILDTOOLS = Path(r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools")
+FORK_BRANCH = "temporal-moe-win"                       # engine branch `build --env windows` accepts
+BUILD_DIR = "build-win"
+MEM_NEED_MB = 7500                                     # host memory the check requires (resident model + KV + headroom)
+MODEL_NAME = "rand_fine"
+TRAINED = False                                        # --model trained_fine: the router picks the experts
+
+# --model profiles. rand_fine is the L1/L2 campaign (11B random weights, prescribed swaps) and stays the
+# default so every earlier command line means what it meant. trained_fine is the L3 session: the
+# trained fine 1e19 model (scripts/serving_convert), the engine patch's trained routing, its own
+# results directory and binaries so nothing of the L1 campaign is overwritten. Geometry below is
+# checked against the GGUF's own header by `check` (gguf_geometry), never trusted.
+MODELS = {
+    "rand_fine": {"file": MODEL, "sha256": MODEL_SHA256, "side": SIDEFILE, "moe_layers": 45, "experts": 192, "k": 18,
+                  "slice_bytes": 221184, "bin": "bin", "branch": "temporal-moe-win", "build_dir": "build-win",
+                  "results": "results", "mem_need_mb": 7500},
+    "trained_fine": {"file": "fine_1e19-q4_0.gguf",
+                     "sha256": "c34d3445064a9b14cadacee1de9ec74d568995f078de6da0d8aef767b412c8ff",
+                     "size": 744281312, "side": "fine_1e19-q4_0-repacked.bin", "moe_layers": 13, "experts": 192, "k": 18,
+                     "slice_bytes": 86400,              # Q4_0 [800 x 192]: 800*192/32*18 (expert width 184 padded to 192)
+                     "bin": "bin-trained", "branch": "temporal-moe-trained-routing", "build_dir": "build-win-trained",
+                     "results": "results/trained_fine", "mem_need_mb": 2500},
+}
+
+
+def apply_model(name: str) -> None:
+    """Point every model-dependent global at one profile (call before anything reads them)."""
+    global MODEL, MODEL_SHA256, SIDEFILE, N_LAYER, N_EXPERT, K_ACTIVE, SLICE_BYTES, EXPERT_BYTES, EXPERT_MIB
+    global BYTES_PER_TOKEN, SLICE_MIB, WIN_BIN, WIN_SIDE, FORK_BRANCH, BUILD_DIR, RESULTS, LOGS, MEM_NEED_MB
+    global MODEL_NAME, TRAINED, ARMS, CAP_MB, PROBE_ARGS
+    p = MODELS[name]
+    MODEL_NAME, TRAINED = name, name == "trained_fine"
+    MODEL, MODEL_SHA256, SIDEFILE = p["file"], p["sha256"], p["side"]
+    N_LAYER, N_EXPERT, K_ACTIVE = p["moe_layers"], p["experts"], p["k"]
+    SLICE_BYTES = p["slice_bytes"]
+    EXPERT_BYTES = 3 * SLICE_BYTES
+    EXPERT_MIB = EXPERT_BYTES / 1048576
+    BYTES_PER_TOKEN = N_LAYER * EXPERT_BYTES
+    SLICE_MIB = SLICE_BYTES / 1048576
+    WIN_BIN = WIN_ROOT / p["bin"]
+    WIN_SIDE = WIN_ROOT / "models" / SIDEFILE
+    FORK_BRANCH, BUILD_DIR, MEM_NEED_MB = p["branch"], p["build_dir"], p["mem_need_mb"]
+    RESULTS = HERE / p["results"]
+    LOGS = RESULTS / "logs"
+    if TRAINED:
+        PROBE_ARGS = "-t 4 -p 0 -n 512 -r 5 -mmp 0"          # ~20 s at ~130 tok/s on this 0.7 GB model
+        ARMS = dict(TRAINED_ARMS)
+        CAP_MB = dict(CAP_MB); CAP_MB.update(TRAINED_CAP_MB)
+
+
+def gguf_geometry(path: Path) -> dict:
+    """Pure-Python GGUF header reader (no numpy on the Windows side): architecture, block and expert
+    counts from the KV section, and the byte size of one expert slice of every *_exps tensor."""
+    import struct
+    TYPE_SIZE = {0: (4, 1), 1: (2, 1), 2: (18, 32), 3: (20, 32), 6: (22, 32), 7: (24, 32), 8: (34, 32)}  # f32 f16 q4_0 q4_1 q5_0 q5_1 q8_0
+    with open(path, "rb") as f:
+        def rd(fmt):
+            return struct.unpack("<" + fmt, f.read(struct.calcsize("<" + fmt)))[0]
+
+        def rstr():
+            n = rd("Q"); return f.read(n).decode("utf-8", "replace")
+        scal = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "Q", 11: "q", 12: "d"}
+
+        def rval(t):
+            if t == 8:
+                return rstr()
+            if t == 9:
+                et, n = rd("I"), rd("Q")
+                return [rval(et) for _ in range(n)] if et in (8, 9) or n < 64 else (f.seek(n * struct.calcsize("<" + scal[et]), 1), f"<array {n}>")[1]
+            return rd(scal[t])
+        if f.read(4) != b"GGUF":
+            raise ValueError(f"{path} is not a GGUF")
+        rd("I"); n_t, n_kv = rd("Q"), rd("Q")
+        kv = {}
+        for _ in range(n_kv):
+            k = rstr(); kv[k] = rval(rd("I"))
+        tensors = {}
+        for _ in range(n_t):
+            name = rstr(); nd = rd("I"); dims = [rd("Q") for _ in range(nd)]; t = rd("I"); rd("Q")
+            tensors[name] = (dims, t)
+    arch = kv.get("general.architecture")
+    g = {"arch": arch, "blocks": kv.get(f"{arch}.block_count"), "experts": kv.get(f"{arch}.expert_count"),
+         "k": kv.get(f"{arch}.expert_used_count"), "leading_dense": kv.get(f"{arch}.leading_dense_block_count", 0)}
+    slices, exp_total = set(), 0
+    for name, (dims, t) in tensors.items():
+        if name.endswith("_exps.weight"):
+            bs, be = TYPE_SIZE.get(t, (None, None))
+            if bs is None:
+                slices.add(("type", t)); continue
+            per = dims[0] * dims[1] // be * bs                  # one expert = ne0 x ne1 elements
+            slices.add(per); exp_total += per * dims[2]
+    g["moe_layers"] = len({n.split(".")[1] for n in tensors if n.endswith("_exps.weight")})
+    g["slice_bytes"] = sorted(s for s in slices if isinstance(s, int))
+    g["expert_tensor_bytes"] = exp_total
+    return g
 
 
 # ----------------------------------------------------------------------------- utilities
@@ -456,8 +567,9 @@ def defender_exclusions_ok(state: dict) -> tuple[bool, str]:
         return ok, f"read:{ex}"
     # Defender's own configuration-change log (event 5007) records each added exclusion path
     # and is readable without elevation; accept it when it names both paths.
+    # 5000, not 400: by 2026-11-10 the two exclusion events were older than the newest 400 (ledger L3-1)
     r = run_ps("Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=5007} "
-               "-MaxEvents 400 -ErrorAction SilentlyContinue | ForEach-Object { ($_.Message -split \"`n\" | "
+               "-MaxEvents 5000 -ErrorAction SilentlyContinue | ForEach-Object { ($_.Message -split \"`n\" | "
                "Where-Object { $_ -match 'Exclusions.Paths' }) } | ForEach-Object { $_.Trim() }", label="mp5007")
     ev = r.out.lower()
     if all(("new value: hklm\\software\\microsoft\\windows defender\\exclusions\\paths\\" + n + " = ") in ev for n in need):
@@ -521,7 +633,7 @@ def check(env: str, quick: bool = False) -> dict:
         import psutil
         avail_mb = psutil.virtual_memory().available // 1048576
         st["mem_avail_mb"] = avail_mb
-        need_mb = 7500                                     # resident model + KV + headroom for a 12G-cap run
+        need_mb = MEM_NEED_MB                              # resident model + KV + headroom (per --model)
         if avail_mb < need_mb:
             fails.append(f"host memory: {avail_mb} MB available < {need_mb} MB needed for the resident arms (close other applications)")
     ok, how = defender_exclusions_ok(st)
@@ -549,8 +661,17 @@ def check(env: str, quick: bool = False) -> dict:
             else:
                 h = sha256_file(mp)
                 st["model_sha256_win"] = h
+                want_size = MODELS[MODEL_NAME].get("size")
+                if want_size and mp.stat().st_size != want_size:
+                    fails.append(f"model size {mp.stat().st_size} != expected {want_size}")
                 if h != MODEL_SHA256:
                     fails.append(f"model sha256 mismatch on Windows: {h}")
+                # geometry the counters and byte accounting assume, read from the file itself
+                g = gguf_geometry(mp)
+                st["gguf_geometry"] = g
+                if (g["moe_layers"], g["experts"], g["k"], g["slice_bytes"]) != (N_LAYER, N_EXPERT, K_ACTIVE, [SLICE_BYTES]):
+                    fails.append(f"GGUF geometry {g} differs from profile {MODEL_NAME}: moe_layers={N_LAYER} "
+                                 f"experts={N_EXPERT} k={K_ACTIVE} slice_bytes={SLICE_BYTES}")
         if env in ("wsl", "linux", "all"):
             r = run_wsl(f"""
 set -e
@@ -725,7 +846,7 @@ def probe(env: str) -> None:
     res = jload(RESULTS / "probe.json", {})
     for e in envs:
         if e == "wsl":
-            set_cap("12G")
+            set_cap(res_cap())
         res[e] = probe_env(e)
         res[e]["tag"] = _TAG
         res[e]["provisional"] = PROVISIONAL
@@ -775,7 +896,7 @@ def compute(env: str) -> None:
                                               "stderr_tail": r.err[-400:]}
                     say(f"  windows -t {t}: {entry['runs'][f't{t}'].get('decode_tps')} tok/s")
         else:
-            set_cap("12G")
+            set_cap(res_cap())
             b = wsl_path("bin/llama-bench-temporal")
             entry["binary"] = b
             entry["binary_note"] = f"fork tree built in {e} with GGML_NATIVE=ON, no LLAMA_TEMPORAL_* env (stock behaviour)"
@@ -874,23 +995,23 @@ def build_windows() -> None:
     r = run_win(["git", "-C", str(src), "rev-parse", "--short=8", "HEAD"], label="forkrev")
     rb = run_win(["git", "-C", str(src), "branch", "--show-current"], label="forkbranch")
     rs = run_win(["git", "-C", str(src), "status", "--porcelain"], label="forkstatus")
-    if not DRY and rb.out.strip() != "temporal-moe-win":
-        die(f"build: C:\\tmoe\\llama.cpp is on '{rb.out.strip()}', expected temporal-moe-win")
-    gen = [str(cmake), "-S", str(src), "-B", str(src / "build-win"), "-G", "Visual Studio 17 2022", "-A", "x64"]
+    if not DRY and rb.out.strip() != FORK_BRANCH:
+        die(f"build: C:\\tmoe\\llama.cpp is on '{rb.out.strip()}', expected {FORK_BRANCH}")
+    gen = [str(cmake), "-S", str(src), "-B", str(src / BUILD_DIR), "-G", "Visual Studio 17 2022", "-A", "x64"]
     if tc["clang_cl"]:
         gen += ["-T", "ClangCL"]
     gen += ["-DCMAKE_BUILD_TYPE=Release", "-DGGML_NATIVE=ON", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
             "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_SERVER=OFF"]
     r1 = run_win(gen, timeout=1800, label="cmake_configure")
-    r2 = run_win([str(cmake), "--build", str(src / "build-win"), "--config", "Release", "--target", "llama-bench",
+    r2 = run_win([str(cmake), "--build", str(src / BUILD_DIR), "--config", "Release", "--target", "llama-bench",
                   "llama-perplexity", "-j", "8"], timeout=7200, label="cmake_build")
     if DRY:
-        say(f"build (dry): would copy build-win\\bin\\Release\\llama-bench.exe -> {WIN_BIN}\\llama-bench-temporal.exe, "
+        say(f"build (dry): would copy {BUILD_DIR}\\bin\\Release\\llama-bench.exe -> {WIN_BIN}\\llama-bench-temporal.exe, "
             f"llama-perplexity.exe and *.dll, then dump {WIN_SIDE}")
         return
     if r1.rc != 0 or r2.rc != 0:
         die(f"build failed: configure rc={r1.rc} build rc={r2.rc}\n{r1.text[-800:]}\n{r2.text[-1500:]}")
-    out = src / "build-win" / "bin" / "Release"
+    out = src / BUILD_DIR / "bin" / "Release"
     WIN_BIN.mkdir(parents=True, exist_ok=True)
     shutil.copy(out / "llama-bench.exe", WIN_BIN / "llama-bench-temporal.exe")
     shutil.copy(out / "llama-perplexity.exe", WIN_BIN / "llama-perplexity.exe")
@@ -898,7 +1019,9 @@ def build_windows() -> None:
         shutil.copy(dll, WIN_BIN / dll.name)
     info = {"ts": now(), "tag": _TAG, "env": "windows", "provisional": PROVISIONAL,
             "fork_commit": r.out.strip(), "fork_branch": rb.out.strip(), "fork_dirty": len(rs.out.strip().splitlines()),
-            "bench_sha256": sha256_file(WIN_BIN / "llama-bench-temporal.exe", cache=False),
+            "bench_sha256": binary_set_hash() if TRAINED else sha256_file(WIN_BIN / "llama-bench-temporal.exe", cache=False),
+            "bench_exe_sha256": sha256_file(WIN_BIN / "llama-bench-temporal.exe", cache=False),
+            "file_sha256": {p.name: sha256_file(p, cache=False) for p in sorted(WIN_BIN.iterdir()) if p.is_file()},
             "ppl_sha256": sha256_file(WIN_BIN / "llama-perplexity.exe", cache=False),
             "toolchain": tc, "generator": "Visual Studio 17 2022" + (" -T ClangCL" if tc["clang_cl"] else " (MSVC)"),
             "cmake": subprocess.list2cmdline(gen), "dlls": sorted(p.name for p in WIN_BIN.glob("*.dll"))}
@@ -908,7 +1031,14 @@ def build_windows() -> None:
         p = subprocess.run([str(WIN_BIN / "llama-bench-temporal.exe"), "-m", str(WIN_ROOT / "models" / MODEL)],
                            env=env, capture_output=True, timeout=3600, cwd=str(WIN_ROOT))
         (log_dir() / "sidefile_dump.log").write_bytes(p.stdout + p.stderr)
-        if p.returncode != 0 or not WIN_SIDE.exists():
+        err = decode_out(p.stderr)
+        # trained_fine: layer 0 is dense, and the dump's optional fused region (read only by
+        # LLAMA_TEMPORAL_FUSED, off in every arm) stops there with "layer 0 missing slot 0" after the
+        # mirror region of every expert tensor is written (phone ledger step 5). G3 checks the mirror.
+        dense_stop = TRAINED and "missing slot 0" in err and WIN_SIDE.exists()
+        if dense_stop:
+            info["sidefile_dump_note"] = "exited at the fused region (dense layer 0); mirror region complete: " + err.strip()[-300:]
+        if (p.returncode != 0 and not dense_stop) or not WIN_SIDE.exists():
             info["sidefile_error"] = decode_out(p.stderr)[-800:]
             allb = load_build(); allb["windows"] = info; jdump(RESULTS / "build.json", allb)
             die(f"side-file dump failed rc={p.returncode}: {decode_out(p.stderr)[-800:]}")
@@ -1004,6 +1134,19 @@ def parse_pool(text: str) -> dict | None:
     d["R_active"] = int(a.group(1)) if a else None
     fp = re.search(r"temporal-fetchprof: .*", text)
     d["fetchprof"] = fp.group(0) if fp else None
+    d["route"] = parse_route(text)
+    return d
+
+
+def parse_route(text: str) -> dict | None:
+    """The engine patch's exit line under trained routing:
+    `temporal-route: layers=13 layer_tokens=N cold_fills=N swaps=N swaps_per_layer_token=x`."""
+    m = re.search(r"temporal-route:(.*)", text)
+    if not m:
+        return None
+    d = {"raw": m.group(0).strip()}
+    for k, v in re.findall(r"(\w+)=([-\d.]+)", m.group(1)):
+        d[k] = float(v) if "." in v else int(v)
     return d
 
 
@@ -1121,7 +1264,7 @@ def engine_run_windows(label: str, flags: dict | None, args: str, timeout: int =
     """One native engine invocation: psutil io_counters (GetProcessIoCounters) polled while the
     process lives for read_bytes, memory_info().peak_wset for peak RSS, device-level read bytes
     from psutil.disk_io_counters as the cross-check, optional job-object commit cap."""
-    exe = WIN_ROOT / (binary + ".exe")
+    exe = WIN_BIN / (Path(binary).name + ".exe")              # per --model bin dir (bin, bin-trained)
     model = WIN_ROOT / "models" / MODEL
     is_bench = "llama-bench" in binary
     argv = [str(exe), "-m", str(model)] + args.split() + (["-o", "csv"] if is_bench else [])
@@ -1294,7 +1437,7 @@ def gates(env: str) -> None:
     b = load_build().get(env)
     if not b and not DRY:
         die(f"gates: no build.json entry for {env}; run build --env {env} first")
-    set_cap("12G")                                        # G2 runs R=192, which needs the full model
+    set_cap(res_cap())                                        # G2 runs R=192, which needs the full model
     bench_hash = None
     if not DRY:
         bench_hash = bench_binary_hash()
@@ -1316,8 +1459,12 @@ def gates(env: str) -> None:
     # +540 MiB after drop_caches on WSL2), so the first, identical run only warms that buffered
     # part; the measured second run then sees block reads from the unbuffered fetch path alone,
     # which bypasses the cache by construction. rchar (bytes requested) is recorded too.
-    engine_run("g1_warm", arm_flags(18, False), "-t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU", timeout=1800)
-    r1 = engine_run("g1_bytes", arm_flags(18, False), "-t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU", timeout=1800)
+    # trained_fine: the deploy configuration itself (R=18, two-pass, trained routing), so the bytes
+    # counted are the router's own swaps; 64 tokens because a swap is 39 slices of 84 KiB here
+    g1_flags = arm_flags(18, True, ROUTE_TRAINED) if TRAINED else arm_flags(18, False)
+    g1_args = "-t 4 -p 0 -n 64 -r 1 -mmp 0 -ot _exps=CPU" if TRAINED else "-t 4 -p 0 -n 16 -r 1 -mmp 0 -ot _exps=CPU"
+    engine_run("g1_warm", g1_flags, g1_args, timeout=1800)
+    r1 = engine_run("g1_bytes", g1_flags, g1_args, timeout=1800)
     if not DRY:
         pool = r1.get("pool") or {}
         fetched = pool.get("fetched_mib", 0.0)
@@ -1345,24 +1492,37 @@ def gates(env: str) -> None:
             f"rchar {(r1.get('rchar') or 0) / 1048576:.0f} MiB")
 
     # ---- G2: numerics exact, R=18 vs R=192, same binary, same flags ----------------------
+    # trained_fine: batch size 1 (-b 1 -ub 1) so every token is a one-token decode through the
+    # routing window and the two-pass split (the prompt's Phase 4; trained routing also refuses a
+    # batch that mixes sequences, which llama-perplexity's default 2048-token batch does)
+    ppl_args = "--chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU" + (" -b 1 -ub 1" if TRAINED else "")
+    bin_prefix = WIN_BIN.name if WINDOWS else "bin"
+
     def ppl(label: str, flags: dict) -> tuple[str, dict]:
         ppl_in = str(REPO / "androidbench" / "ppl_input.txt") if WINDOWS else wsl_path("temporal-moe/androidbench/ppl_input.txt")
-        r = engine_run(label, flags, f"-f {ppl_in} --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU",
-                       timeout=1800, binary="bin/llama-perplexity")
+        r = engine_run(label, flags, f"-f {ppl_in} {ppl_args}", timeout=3600, binary=f"{bin_prefix}/llama-perplexity")
         if DRY:
             return "", r
         full = (log_dir() / f"{label}.stderr")
         text = r["stderr_tail"] + (full.read_text(encoding="utf-8", errors="replace") if full.exists() else "")
         m = re.search(r"Final estimate: PPL = ([0-9.]+ \+/- [0-9.]+)", text)
         return (m.group(1) if m else "NOT FOUND"), r
-    a, ra = ppl("g2_ppl_R192", arm_flags(192, True))
-    bb, rb = ppl("g2_ppl_R18", arm_flags(18, True))
+    rt = ROUTE_TRAINED if TRAINED else {}
+    a, ra = ppl("g2_ppl_R192", arm_flags(192, True, rt))
+    bb, rb = ppl("g2_ppl_R18", arm_flags(18, True, rt))
+    if TRAINED:
+        # recorded, not gated: R=192 without the two-pass split fetches and evicts nothing (arm (b)'s
+        # configuration); under TWOPASS R >= K is inert and R=192 still evicts (pitfall #26)
+        a_res, ra_res = ppl("g2_ppl_R192_nopass", arm_flags(192, False, rt))
     if not DRY:
         ok = a == bb and a != "NOT FOUND"
         g["results"]["G2"] = {"pass": ok, "ppl_R192": a, "ppl_R18": bb, "pool_R192": ra.get("pool"), "pool_R18": rb.get("pool"),
-                              "rc": [ra["rc"], rb["rc"]], "flags_R192": arm_flags(192, True), "flags_R18": arm_flags(18, True),
-                              "args": "-f ppl_input.txt --chunks 2 -c 512 -t 4 --no-mmap -ot _exps=CPU"}
-        if WINDOWS:
+                              "rc": [ra["rc"], rb["rc"]], "flags_R192": arm_flags(192, True, rt), "flags_R18": arm_flags(18, True, rt),
+                              "args": "-f ppl_input.txt " + ppl_args}
+        if TRAINED:
+            g["results"]["G2"].update({"ppl_R192_no_twopass": a_res, "pool_R192_no_twopass": ra_res.get("pool"),
+                                       "pass_same_binary": ok, "x86_form": True, "oracle": "none (no WSL oracle for this model)"})
+        if WINDOWS and not TRAINED:
             # PLAN 5.2 (2026-09-14): the Windows binary must reproduce the WSL2 x86 oracle, every digit
             oracle = (load_gates().get("wsl") or {}).get("results", {}).get("G2", {})
             o = oracle.get("ppl_R192")
@@ -1385,19 +1545,34 @@ def gates(env: str) -> None:
     # families at R=192. (NO_REPACK with TWOPASS at R<192 deadlocks in prefill: the two-pass
     # ensure path submits no fetches and only the repacked kernel submits on demand -- S2 gate
     # run 00:43-02:43, ledger L1-2. No arm uses that combination.)
-    c, rc_ = ppl("g3_ppl_norepack_R192", arm_flags(192, True, no_repack=True))
-    s1 = engine_run("g3_tps_repack_R192", arm_flags(192, False), "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU", timeout=1800)
-    s2 = engine_run("g3_tps_norepack_R192", arm_flags(192, False, no_repack=True), "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU", timeout=1800)
+    if TRAINED:
+        # both kernel families at R=192 without the two-pass split (NO_REPACK + TWOPASS deadlocks, L1-2),
+        # trained routing, batch 1; the repacked PPL of the same configuration is the comparison
+        c, rc_ = ppl("g3_ppl_norepack_R192", arm_flags(192, False, rt, no_repack=True))
+        c_rep = a_res
+    else:
+        c, rc_ = ppl("g3_ppl_norepack_R192", arm_flags(192, True, no_repack=True))
+        c_rep = bb
+    tps_args = "-t 4 -p 0 -n 128 -r 3 -mmp 0 -ot _exps=CPU" if TRAINED else "-t 4 -p 0 -n 64 -r 3 -mmp 0 -ot _exps=CPU"
+    s1 = engine_run("g3_tps_repack_R192", arm_flags(192, False, rt), tps_args, timeout=1800)
+    s2 = engine_run("g3_tps_norepack_R192", arm_flags(192, False, rt, no_repack=True), tps_args, timeout=1800)
     if not DRY:
         t1, t2 = s1.get("decode_tps") or 0, s2.get("decode_tps") or 0
         sd = max(s1.get("decode_sd") or 0, s2.get("decode_sd") or 0)
         differ = t1 > 0 and t2 > 0 and abs(t1 - t2) > max(0.03 * max(t1, t2), 2 * sd)
-        ppl_same = (c == bb and c != "NOT FOUND")
-        ok = (ppl_same and differ) if not GATES_X86 else (differ and c != "NOT FOUND" and bb != "NOT FOUND")
+        ppl_same = (c == c_rep and c != "NOT FOUND")
+        ok = (ppl_same and differ) if not GATES_X86 else (differ and c != "NOT FOUND" and c_rep != "NOT FOUND")
+        import math
+        try:
+            ln_ratio = abs(math.log(float(c.split()[0]) / float(c_rep.split()[0])))
+        except Exception:
+            ln_ratio = None
         g["results"]["G3"] = {"pass": ok, "pass_as_written": ppl_same and differ, "ppl_norepack_R192": c,
-                              "ppl_repack_R18": bb, "ppl_same": ppl_same, "tps_repack_R192": t1,
+                              "ppl_repack_R18" if not TRAINED else "ppl_repack_R192": c_rep, "ppl_same": ppl_same,
+                              "abs_ln_ppl_ratio": ln_ratio, "tps_repack_R192": t1,
                               "tps_norepack_R192": t2, "sd": sd, "differ": differ, "x86_form": GATES_X86,
                               "pool_repack": s1.get("pool"), "pool_norepack": s2.get("pool")}
+        bb = c_rep
         say(f"G3 {'PASS' if ok else 'FAIL'}: PPL norepack R=192 {c} vs repacked R=18 {bb}; "
             f"tok/s R=192 repack {t1:.2f} vs norepack {t2:.2f}")
     if DRY:
@@ -1425,9 +1600,27 @@ def bench_binary_hash() -> str:
     """sha256 of the bench binary the engine runs in TARGET, recomputed at call time."""
     if WINDOWS:
         exe = WIN_BIN / "llama-bench-temporal.exe"
-        return sha256_file(exe, cache=False) if exe.exists() else ""
+        if not exe.exists():
+            return ""
+        if TRAINED:
+            # the .exe is a ~10 KB launcher; the engine is in llama-bench-impl.dll, llama.dll and the
+            # ggml DLLs beside it, so the gated identity is the hash of the exe and every DLL (L3-3)
+            return binary_set_hash()
+        return sha256_file(exe, cache=False)
     hr = run_wsl(f"sha256sum {wsl_path('bin/llama-bench-temporal')} | cut -d' ' -f1", label="armsha", login=False)
     return hr.out.strip().splitlines()[-1] if hr.out.strip() else ""
+
+
+def res_cap() -> str:
+    """The cap resident runs (gates, clock probe) use: 12G for rand_fine, RES for trained_fine."""
+    return "RES" if TRAINED else "12G"
+
+
+def binary_set_hash() -> str:
+    """sha256 over 'name sha256' lines of the bench exe, the perplexity exe and every DLL in WIN_BIN."""
+    files = sorted([p for p in WIN_BIN.glob("*.dll")] + [WIN_BIN / "llama-bench-temporal.exe", WIN_BIN / "llama-perplexity.exe"])
+    lines = "".join(f"{p.name} {sha256_file(p, cache=False)}\n" for p in files if p.exists())
+    return hashlib.sha256(lines.encode()).hexdigest()
 
 
 def require_gated(env: str = "wsl") -> str:
@@ -1446,7 +1639,8 @@ def require_gated(env: str = "wsl") -> str:
 SLICE_MIB = SLICE_BYTES / 1048576                      # 0.2109: the pool counts fetches per SLICE (one tensor's expert)
 
 
-def expected_counters(arm: str, R: int, twopass: bool, tokens: int, swap_prob: bool = False) -> dict:
+def expected_counters(arm: str, R: int, twopass: bool, tokens: int, swap_prob: bool = False, depth: int = 0,
+                      reps: int = 8) -> dict:
     """What the pool line must show for the arm requested (PLAN 1.2, pitfall #18).
 
     Measured on this fork (smoke, 4 tokens): the counter is per slice, so one swap per layer
@@ -1455,6 +1649,17 @@ def expected_counters(arm: str, R: int, twopass: bool, tokens: int, swap_prob: b
     with SWAP_PROB=1.0 refetches every needed expert: 45 x 18 x 3 = 2430 slices per token."""
     if R >= N_EXPERT and not twopass:
         return {"fetches": (0, 0), "evictions": (0, 0), "swaps": (0, 0)}
+    if TRAINED and twopass and R < N_EXPERT:
+        # trained deploy (L3-3 smoke): 3 x 13 slices per swap, one swap per layer per token; every
+        # llama-bench rep (and its warmup sequence) restarts at position 0 with a cold fill of
+        # 13 x R x 3 slices, and at ctx > 0 each rep's depth prefill fetches on miss whatever its
+        # tokens select (at most every expert, 13 x 192 x 3), which the trim then evicts
+        per = 3 * N_LAYER
+        refill = N_LAYER * (N_EXPERT if depth else R) * 3
+        return {"fetches": (int(0.90 * per * tokens), int(1.10 * per * (tokens + 2)) + (reps + 2) * refill),
+                "evictions": (int(0.90 * per * tokens), 10 ** 12),
+                "swaps": (int(0.90 * N_LAYER * tokens), int(1.10 * N_LAYER * (tokens + 2))),
+                "mib_per_fetch": (0.95 * SLICE_MIB, 1.05 * SLICE_MIB)}
     if R >= N_EXPERT and twopass:
         # (b) resident control: every swap evicts one expert; once each expert has been evicted
         # once, a random new expert has to be refetched, so over 1024 tokens the traffic converges
@@ -1483,10 +1688,26 @@ def expected_counters(arm: str, R: int, twopass: bool, tokens: int, swap_prob: b
             "mib_per_fetch": (0.95 * SLICE_MIB, 1.05 * SLICE_MIB)}
 
 
-def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None, swap_prob: bool = False) -> tuple[bool, str]:
+def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | None, swap_prob: bool = False,
+                    depth: int = 0) -> tuple[bool, str]:
     if pool is None:
         return False, "no temporal-pool line in stderr"
-    exp = expected_counters(arm, R, twopass, tokens, swap_prob)
+    if TRAINED:
+        # the router, not a coin, picks the experts: arms (a) and (b) must print the engine patch's
+        # route line with about one swap per MoE layer per token (phone: 1.0000); arm (c) is stock
+        # top-k and must not route through the window at all
+        rt = pool.get("route")
+        if arm in ("a", "b"):
+            if not rt:
+                return False, f"arm {arm}: no temporal-route line (trained routing not active)"
+            spl = rt.get("swaps_per_layer_token", 0)
+            if not (0.90 <= spl <= 1.0001):
+                return False, f"arm {arm}: swaps_per_layer_token={spl} outside [0.90, 1.0]"
+            if rt.get("layers") != N_LAYER:
+                return False, f"arm {arm}: route layers={rt.get('layers')} != {N_LAYER}"
+        elif rt:
+            return False, f"arm {arm}: stock top-k arm printed a route line: {rt.get('raw')}"
+    exp = expected_counters(arm, R, twopass, tokens, swap_prob, depth=depth)
     for k, (lo, hi) in exp.items():
         if k == "mib_per_fetch":
             v = pool["fetched_mib"] / pool["fetches"] if pool["fetches"] else 0
@@ -1499,7 +1720,7 @@ def verify_counters(arm: str, R: int, twopass: bool, tokens: int, pool: dict | N
 
 def clock_probe(session: dict) -> dict:
     """PLAN 5.4: a resident stock llama-bench before each batch, compared with the session's first."""
-    set_cap("12G")
+    set_cap(res_cap())
     r = engine_run(f"clock_{int(time.time())}", None, PROBE_ARGS, timeout=1800)
     if DRY:
         return {"tok_s": None}
@@ -1562,7 +1783,7 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
     if DRY:
         return None
     tokens = 128 * 8
-    ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"), swap_prob="LLAMA_TEMPORAL_SWAP_PROB" in flags)
+    ok, why = verify_counters(arm, R, twopass, tokens, m.get("pool"), swap_prob="LLAMA_TEMPORAL_SWAP_PROB" in flags, depth=depth)
     row = {"tag": _TAG, "env": TARGET, "provisional": PROVISIONAL, "arm": arm, "tier": tier,
            "label": label, "R": R, "twopass": twopass, "depth": depth,
            "round": rnd, "cap": cap, "cap_mb": capinfo["cap_mb"], "memtotal_mb": capinfo["memtotal_mb"],
@@ -1587,8 +1808,8 @@ def one_batch(arm: str, tier: str, label: str, R: int, twopass: bool, cap: str, 
         ok, why = False, f"cgroup memory.max={m.get('cgroup_memory_max')} is not the requested cap {cap}"
     elif (row["vmswap_peak_mib"] or 0) > 0:
         row["status"] = "swapped"                            # pitfall #20
-    elif probes[-1]["degraded"] and arm == "a":
-        row["status"] = "degraded_clock"                     # ruling 2026-09-20: 3% rule on the ceiling only
+    elif probes[-1]["degraded"] and (arm in ("b", "c") if TRAINED else arm == "a"):
+        row["status"] = "degraded_clock"                     # ruling 2026-09-20: 3% rule on the resident arms only
     if arm == "e0" and row["status"] == "ok":
         row["status"] = "documentary"                        # plan-literal (e): recorded, never a result
     if not ok:
@@ -1636,13 +1857,14 @@ def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str]
             for a in order:
                 tier, label, R, tp, cap, extra, norep = ARMS[a]
                 schedule.append((a, tier, label + dl(d), R, tp, cap, rnd, extra, norep, d))
-    if "a" in which:
+    close = "b" if TRAINED else "a"                          # the resident arm closes the sitting (drift check)
+    if close in which:
         for d in depths:
-            schedule.append(("a", *ARMS["a"][:5], n + 1, {}, False, d))   # closing ceiling shows drift (PLAN 1.3)
-            schedule[-1] = schedule[-1][:2] + (ARMS["a"][1] + dl(d),) + schedule[-1][3:]
-    if "e" in which and 0 in depths:
+            schedule.append((close, *ARMS[close][:5], n + 1, ARMS[close][5], ARMS[close][6], d))   # closing resident arm shows drift (PLAN 1.3)
+            schedule[-1] = schedule[-1][:2] + (ARMS[close][1] + dl(d),) + schedule[-1][3:]
+    if "e" in which and 0 in depths and not TRAINED:
         schedule.append(("e0", *ARMS["e0"][:5], 1, {}, False, 0))     # plan-literal (e), documentary, once
-    if "d" in which:
+    if "d" in which and not TRAINED:
         # R above top_k is INERT under TWOPASS (pitfall #26): these are an R-inert control, not an R-curve
         for rnd in range(1, n + 1):
             for R in Rs:
@@ -1661,7 +1883,7 @@ def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str]
             say(f"rest {rest} s")
             time.sleep(rest)
     if demo:
-        memdemo(sess, overrides, rest, bench_hash, depth=max(depths))
+        memdemo(sess, overrides, rest, bench_hash, depth=0 if TRAINED else max(depths))   # L3: commit separates arms only at ctx 0
     if not DRY:
         report()
 
@@ -1669,6 +1891,9 @@ def arms(env: str, which: str, n: int, Rs: list[int], rest: int, sets: list[str]
 def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str, depth: int = 0) -> None:
     """PLAN 1.4: the ceiling must FAIL to start under 4 GB; deploy must run at 4 GB and 2.5 GB."""
     say("memory demonstration")
+    if TRAINED:
+        memdemo_trained(sess, overrides, rest, bench_hash, depth)
+        return
     d = jload(RESULTS / f"memdemo_{_TAG}.json", {"tag": _TAG, "ts": now()})
     # ceiling at 4 GB: expected to fail (OOM / allocation failure). No clock probe needed.
     capinfo = set_cap("4G")
@@ -1698,6 +1923,36 @@ def memdemo(sess: dict, overrides: dict, rest: int, bench_hash: str, depth: int 
                           "decode_tok_s": [r["decode_tok_s"] for r in rows4], "depth": depth}
         rowsa = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["arm"] == "a" and r["status"] == "ok"]
         d["ceiling_12G"] = {"n": len(rowsa), "vmhwm_mib": [r["vmhwm_mib"] for r in rowsa]}
+        jdump(RESULTS / f"memdemo_{_TAG}.json", d)
+
+
+def memdemo_trained(sess: dict, overrides: dict, rest: int, bench_hash: str, depth: int = 0) -> None:
+    """trained_fine form of PLAN 1.4 with the re-scaled caps (L3-4), ctx 0: the resident arm (b) under
+    TIGHT (800 MB, between deploy's and the resident arms' peak commit) and deploy once under TIGHT.
+    Documentary: the margin is the allocator's 33 MiB, not the expert window (L3-3)."""
+    d = jload(RESULTS / f"memdemo_{_TAG}.json", {"tag": _TAG, "ts": now(), "caps_mb": {k: CAP_MB[k] for k in ("RES", "DEP", "TIGHT")}})
+    sfx = f"_d{depth}" if depth else ""
+    tier, label, R, tp, cap, extra, norep = ARMS["b"]
+    capinfo = set_cap("TIGHT")
+    flags = arm_flags(R, tp, dict(extra, **{k: v for k, v in overrides.items() if not k.startswith("__")}), no_repack=norep)
+    m = engine_run("memdemo_resident_TIGHT" + sfx, flags, engine_args_for(overrides, depth=depth), timeout=3600)
+    if not DRY:
+        d["resident_at_TIGHT"] = {"rc": m["rc"], "decode_tok_s": m.get("decode_tps"), "vmhwm_mib": m.get("vmhwm_mib"),
+                                "peak_commit_mib": m.get("peak_commit_mib"), "job": m.get("job"), "oom": m.get("oom"),
+                                "stderr_tail": m["stderr_tail"][-600:], "cap": capinfo,
+                                "failed_to_start": (m["rc"] != 0 or not m.get("decode_tps"))}
+        say(f"resident (b) @TIGHT: rc={m['rc']} decode={m.get('decode_tps')} -> "
+            f"{'FAILED TO START (expected)' if d['resident_at_TIGHT']['failed_to_start'] else 'RAN (cap not binding)'}")
+        jdump(RESULTS / f"memdemo_{_TAG}.json", d)
+        time.sleep(min(rest, 120))
+    tier, label, R, tp, cap, extra, norep = ARMS["a"]
+    row = one_batch("a", tier, label + sfx + "_capTIGHT", R, tp, cap, 1, sess, overrides, rest, bench_hash,
+                    extra_note="memory demonstration", cap_override="TIGHT", extra_flags=extra, depth=depth)
+    if not DRY:
+        d["deploy_TIGHT"] = {k: row.get(k) for k in ("decode_tok_s", "decode_sd", "vmhwm_mib", "peak_commit_mib", "rc", "status", "pool")} if row else None
+        rows = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r["label"] == label + sfx and r["status"] == "ok"]
+        d["deploy_DEP"] = {"n": len(rows), "vmhwm_mib": [r["vmhwm_mib"] for r in rows],
+                           "peak_commit_mib": [r.get("peak_commit_mib") for r in rows], "decode_tok_s": [r["decode_tok_s"] for r in rows]}
         jdump(RESULTS / f"memdemo_{_TAG}.json", d)
 
 
@@ -1892,7 +2147,56 @@ def bound_tok_s(ceiling: float, fit: dict, n_inflight: int = 12) -> dict:
             "bound_tok_s": b, "bound_QD1_tok_s": 1.0 / max(1.0 / ceiling, fetch_qd1_s)}
 
 
+def report_trained() -> dict:
+    """L3 table: arm, context, tok/s (mean, sd over batches), ratio to arm (b) and to arm (c) at the
+    same depth, peak working set, decode-phase working set, peak commit, swaps per layer per token,
+    fetches and evictions per token. Written to report_<tag>.json as well."""
+    rows = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG and r.get("decode_tok_s")]
+    ok = [r for r in rows if r["status"] == "ok"]
+    out = {"tag": _TAG, "ts": now(), "rows": []}
+    st = lambda xs: (sum(xs) / len(xs), (sum((x - sum(xs) / len(xs)) ** 2 for x in xs) / len(xs)) ** 0.5) if xs else (None, None)
+    groups: dict = {}
+    for r in ok:
+        groups.setdefault((r["label"], r.get("depth") or 0, r["cap"]), []).append(r)
+    mean_of = lambda arm, d: st([r["decode_tok_s"] for r in ok if r["arm"] == arm and (r.get("depth") or 0) == d
+                                 and r["cap"] == ARMS[arm][4]])[0]
+    print(f"\n{'label':<30}{'ctx':>6}{'cap':>6}{'n':>3}{'tok/s':>9}{'sd':>7}{'/(b)':>7}{'/(c)':>7}{'peakWS':>8}{'decWS':>7}"
+          f"{'commit':>8}{'swaps/L/t':>10}{'fetch/t':>8}{'evict/t':>8}")
+    for (label, d, cap), rs in sorted(groups.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        m, sd = st([r["decode_tok_s"] for r in rs])
+        b, c = mean_of("b", d), mean_of("c", d)
+        tok = rs[-1]["tokens"]
+        spl = [((r["pool"] or {}).get("route") or {}).get("swaps_per_layer_token") for r in rs]
+        spl = [x for x in spl if x is not None]
+        fet = st([(r["pool"] or {}).get("fetches", 0) / tok for r in rs])[0]
+        ev = st([(r["pool"] or {}).get("evictions", 0) / tok for r in rs])[0]
+        e = {"label": label, "arm": rs[0]["arm"], "tier": rs[0]["tier"], "depth": d, "cap": cap, "cap_mb": CAP_MB.get(cap), "n": len(rs),
+             "tok_s": m, "sd": sd, "per_batch": [r["decode_tok_s"] for r in rs], "ratio_b": m / b if b else None,
+             "ratio_c": m / c if c else None, "peak_wset_mib": max(r["vmhwm_mib"] or 0 for r in rs),
+             "decode_wset_mib": st([r.get("wset_last_mib") or 0 for r in rs])[0],
+             "peak_commit_mib": max(r.get("peak_commit_mib") or 0 for r in rs), "swaps_per_layer_token": (min(spl), max(spl)) if spl else None,
+             "fetches_per_token": fet, "evictions_per_token": ev,
+             "beyond_training_ctx": d > 2048, "clock_probes": [r["clock_probe"].get("tok_s") for r in rs]}
+        out["rows"].append(e)
+        f = lambda x, w, p=2: f"{x:>{w}.{p}f}" if isinstance(x, (int, float)) else f"{'-':>{w}}"
+        print(f"{label:<30}{d:>6}{cap:>6}{len(rs):>3}{f(m, 9)}{f(sd, 7)}{f(e['ratio_b'], 7, 3)}{f(e['ratio_c'], 7, 3)}"
+              f"{f(e['peak_wset_mib'], 8, 0)}{f(e['decode_wset_mib'], 7, 0)}{f(e['peak_commit_mib'], 8, 0)}"
+              f"{(f'{spl[0]:.4f}' if spl else '-'):>10}{f(fet, 8, 1)}{f(ev, 8, 1)}" + ("  speed only, beyond 2048 training ctx" if d > 2048 else ""))
+    ref = [r for r in read_jsonl(RESULTS / "refused.jsonl") if r["tag"] == _TAG]
+    out["refused"] = [{"label": r["label"], "round": r["round"], "note": r.get("counters_note"), "status": r["status"]} for r in ref]
+    for r in ref:
+        print(f"  refused {r['label']} r{r['round']}: {r.get('counters_note')}")
+    other = [r for r in rows if r["status"] != "ok"]
+    out["not_ok"] = [{"label": r["label"], "round": r["round"], "status": r["status"]} for r in other]
+    if not DRY:
+        jdump(RESULTS / f"report_{_TAG}.json", out)
+    return out
+
+
 def report() -> None:
+    if TRAINED:
+        report_trained()
+        return
     rows = [r for r in read_jsonl(RESULTS / "runs.jsonl") if r["tag"] == _TAG]
     if not rows:
         say("report: no rows for this tag"); return
@@ -2000,7 +2304,8 @@ def pack() -> None:
     out = REPO / "comms" / "laptop" / _TAG
     out.mkdir(parents=True, exist_ok=True)
     for name in ("probe.json", "compute.json", "decision.json", "build.json", "gates.json", "runs.jsonl", "refused.jsonl",
-                 f"session_{_TAG}.json", f"memdemo_{_TAG}.json"):
+                 f"session_{_TAG}.json", f"memdemo_{_TAG}.json", f"report_{_TAG}.json", "smoke_L3.json",
+                 "smoke_L3_d4096.json", f"quality_{_TAG}.json"):
         if (RESULTS / name).exists():
             shutil.copy(RESULTS / name, out / name)
     tarp = out / f"logs_{_TAG}.tar.gz"
@@ -2012,7 +2317,15 @@ def pack() -> None:
             t.add(sdir, arcname=f"scripts/{_TAG}")
     say(f"pack: {len(rows)} rows -> {csvp}; artifacts -> {out}; logs -> {tarp}")
     envs = sorted({r.get("env", "wsl") for r in rows}) or ["wsl"]
-    msg = (f"laptopbench: {len(rows)} decode rows, tag {_TAG}, {'/'.join(envs)} on i7-11370H + PM981a"
+    if TRAINED:
+        msg = (f"laptopbench: trained fine 1e19 model on Windows, tag {_TAG}: {len(rows)} decode rows, "
+               "three arms at ctx 0/1k/2k/4k, trained routing"
+               + (f" (provisional: {PROVISIONAL})" if PROVISIONAL else "")
+               + "\n\nDeploy (18 resident, trained router, streamed from the NVMe) against the same routing with all\n"
+                 "192 experts resident and against plain top-k; gates, report and log tarball under\n"
+                 f"comms/laptop/{_TAG}/, rows in results/ablations/serving_benchmarks_laptop.csv, ledger L3.")
+    else:
+      msg = (f"laptopbench: {len(rows)} decode rows, tag {_TAG}, {'/'.join(envs)} on i7-11370H + PM981a"
            + (f" (provisional: {PROVISIONAL})" if PROVISIONAL else "")
            + f"\n\nRows in results/ablations/serving_benchmarks_laptop.csv; probe, compute, gates,\n"
              f"runs.jsonl and the log tarball under comms/laptop/{_TAG}/.")
@@ -2029,7 +2342,10 @@ def main() -> None:
     ap.add_argument("stage", choices=["check", "probe", "compute", "build", "gates", "arms", "sweep", "attribute", "prefill", "session", "pack", "report", "decide"])
     ap.add_argument("--depth", default="0", help="context depth(s) -d for arms (comma list) / sweep (one); paper protocol is 1024")
     ap.add_argument("--ubatch", default="64,512", help="prefill diagnostic ubatch sizes")
-    ap.add_argument("--cap-override", default=None, choices=list(CAP_MB), help="prefill: run the arm under this cap instead of its own")
+    ap.add_argument("--cap-override", default=None, help="prefill: run the arm under this cap instead of its own")
+    ap.add_argument("--model", default="rand_fine", choices=list(MODELS),
+                    help="rand_fine: the L1 11B random-weight campaign (default); trained_fine: the trained 1e19 model, "
+                         "trained routing, results under results/trained_fine (L3)")
     ap.add_argument("--gates-x86", action="store_true",
                     help="x86 forms of G2/G3: G2 passes on same-binary R=192 == R=18 (the oracle comparison is recorded, "
                          "not required); G3 passes on tok/s differing between kernel families (their PPLs differ on x86). "
@@ -2039,7 +2355,7 @@ def main() -> None:
     ap.add_argument("--R", default="24,36,48", help="sweep points for (d)")
     ap.add_argument("--n", type=int, default=3, help="batches per arm")
     ap.add_argument("--rest", type=int, default=300, help="seconds between batches")
-    ap.add_argument("--cap", default=None, choices=list(CAP_MB), help="apply a cap and exit (with check)")
+    ap.add_argument("--cap", default=None, help="apply a cap and exit (with check); a key of CAP_MB for the model")
     ap.add_argument("--set", action="append", default=[], help="engine env override KEY=VAL, repeatable; KEY=0 refused")
     ap.add_argument("--knob", default=None, help="NAME=v1,v2 for sweep")
     ap.add_argument("--base-arm", default="c", help="arm the sweep varies (default c)")
@@ -2051,6 +2367,12 @@ def main() -> None:
     ap.add_argument("--provisional", default="", metavar="NOTE",
                     help="stamp every row and json with provisional=NOTE (e.g. Defender exclusions attested, not read)")
     a = ap.parse_args()
+    apply_model(a.model)
+    if TRAINED and a.env != "windows" and a.stage not in ("report", "pack"):
+        die("--model trained_fine runs Windows-native only (--env windows); WSL is used for the conversion, not timing")
+    for c in (a.cap, a.cap_override):
+        if c and c not in CAP_MB:
+            die(f"unknown cap {c}; use one of {list(CAP_MB)}")
     DRY, FORCE, PROVISIONAL = a.dry_run, a.force, a.provisional
     GATES_X86 = a.gates_x86
     NATIVE = a.env == "linux"

@@ -1,0 +1,48 @@
+{
+ "windows": {
+  "bench_exe_sha256": "f4d446c54b9d7ded9c16f1c5815a9318502049c33eac02f08ad560012daa9918",
+  "bench_sha256": "c981d911b289ed9473ef7d85ba5ecdb8be77fdc60de97d78b8d3a623f31e100e",
+  "cmake": "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe\" -S C:\\tmoe\\llama.cpp -B C:\\tmoe\\llama.cpp\\build-win-trained -G \"Visual Studio 17 2022\" -A x64 -T ClangCL -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF",
+  "dlls": [
+   "ggml-base.dll",
+   "ggml-cpu.dll",
+   "ggml.dll",
+   "llama-bench-impl.dll",
+   "llama-common.dll",
+   "llama-perplexity-impl.dll",
+   "llama.dll"
+  ],
+  "env": "windows",
+  "file_sha256": {
+   "ggml-base.dll": "6a6f18b0d566978843c2db5e987d2ace8d3860dad58b189030c84027ec568ef6",
+   "ggml-cpu.dll": "e749b42417e961f440558163617e1d8abfed2a54db0498af5a89c5598f6ad18e",
+   "ggml.dll": "f0255b9db942a741d58d0acfe1a402c8d2945b080ffed0b75577c0db0bc8301c",
+   "llama-bench-impl.dll": "0d47e6a2bf1a056024cc186ac41c26d1d4afa99d4289c69afa7404f9bbdaf7ed",
+   "llama-bench-temporal.exe": "f4d446c54b9d7ded9c16f1c5815a9318502049c33eac02f08ad560012daa9918",
+   "llama-common.dll": "a5cb2c190cdfde2d6c71bf74810519f8420602355dbc160e9e65673d624c51f3",
+   "llama-perplexity-impl.dll": "e8276f6e1ef82607cd2da9bf7f20779953893a7228486af77463a48a7137e227",
+   "llama-perplexity.exe": "d6be34499186605d2b8aae8aab48543bc073b62f153e535a6e234d592555ca22",
+   "llama.dll": "b0beb39d37c579972c219ee3834632ca7ab411fa2cb6a0ed9692f2413edc89e1"
+  },
+  "fork_branch": "temporal-moe-trained-routing",
+  "fork_commit": "0d0c8198",
+  "fork_dirty": 0,
+  "generator": "Visual Studio 17 2022 -T ClangCL",
+  "ppl_sha256": "d6be34499186605d2b8aae8aab48543bc073b62f153e535a6e234d592555ca22",
+  "provisional": "",
+  "sidefile": {
+   "path": "C:\\tmoe\\models\\fine_1e19-q4_0-repacked.bin",
+   "sha256": "952e977852b7a92c143fb6d233b70d0eeaafd093b2597f60932b1312b81002f0",
+   "size": 1441017856,
+   "sparse_query": "1441017856\nThis file is NOT set as sparse"
+  },
+  "sidefile_dump_note": "exited at the fused region (dense layer 0); mirror region complete: tensor  with q4_0_8x8\nrepack-dump: blk.13.ffn_gate_exps.weight              off=709758976 nb=16588800 ne0=800 nrows=36864 OK\nrepack: repack tensor  with q4_0_8x8\nrepack-dump: blk.13.ffn_up_exps.weight                off=727171072 nb=16588800 ne0=800 nrows=36864 OK\nrepack-dump: layer 0 missing slot 0",
+  "tag": "L3",
+  "toolchain": {
+   "cl": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+   "clang_cl": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\Llvm\\x64\\bin\\clang-cl.exe",
+   "cmake": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"
+  },
+  "ts": "2026-11-10T15:18:53"
+ }
+}

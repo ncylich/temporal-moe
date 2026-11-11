@@ -1,0 +1,81 @@
+{
+ "caps_mb": {
+  "DEP": 1336,
+  "RES": 1360,
+  "TIGHT": 800
+ },
+ "deploy_DEP": {
+  "decode_tok_s": [
+   100.813488,
+   99.370273,
+   100.245294
+  ],
+  "n": 3,
+  "peak_commit_mib": [
+   780.75390625,
+   780.6640625,
+   780.640625
+  ],
+  "vmhwm_mib": [
+   269.59375,
+   269.828125,
+   269.671875
+  ]
+ },
+ "deploy_TIGHT": {
+  "decode_sd": 1.597892,
+  "decode_tok_s": 99.320122,
+  "peak_commit_mib": 780.6484375,
+  "pool": {
+   "R_active": 18,
+   "avg_fetch_us": 309.5,
+   "evictions": 44286,
+   "fetched_mib": 3706.9,
+   "fetches": 44988,
+   "fetchprof": null,
+   "hook_calls": 0,
+   "hook_miss": 0,
+   "odirect": 1,
+   "qwait_hi_us": 171.8,
+   "route": {
+    "cold_fills": 117,
+    "layer_tokens": 13325,
+    "layers": 13,
+    "raw": "temporal-route: trained min_logit, layers=13 layer_tokens=13325 cold_fills=117 swaps=13208 swaps_per_layer_token=1.0000",
+    "swaps": 13208,
+    "swaps_per_layer_token": 1.0
+   },
+   "sibling": 1,
+   "split": 1,
+   "swaps": 13208,
+   "tensors": 39,
+   "wait_ms": 2228.2,
+   "workers": 6
+  },
+  "rc": 0,
+  "status": "ok",
+  "vmhwm_mib": 269.70703125
+ },
+ "resident_at_TIGHT": {
+  "cap": {
+   "cap": "TIGHT",
+   "cap_mb": 800,
+   "mechanism": "job object JOB_OBJECT_LIMIT_PROCESS_MEMORY (commit limit)",
+   "memtotal_mb": 16167
+  },
+  "decode_tok_s": null,
+  "failed_to_start": true,
+  "job": {
+   "limit_bytes": 838860800,
+   "limit_flags": 256,
+   "peak_process_bytes": 835764224
+  },
+  "oom": false,
+  "peak_commit_mib": 797.046875,
+  "rc": 3221226505,
+  "stderr_tail": "temporal-pool: active, R=192 swap_prob=0.000 odirect=1 workers=6 sibling=1 split=1\nC:\\tmoe\\llama.cpp\\ggml\\src\\ggml.c:1623: GGML_ASSERT(ctx->mem_buffer != NULL) failed\n",
+  "vmhwm_mib": 758.57421875
+ },
+ "tag": "L3",
+ "ts": "2026-11-10T17:48:46"
+}
