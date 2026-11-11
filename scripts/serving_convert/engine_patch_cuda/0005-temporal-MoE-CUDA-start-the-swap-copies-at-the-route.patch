@@ -1,0 +1,80 @@
+From b4c08f085ec4b7427931f3a067497d3a905317ab Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 11 Nov 2026 01:30:10 -0800
+Subject: [PATCH] temporal-MoE CUDA: start the swap copies at the router
+ (TEMPORAL_ROUTE_SLOTS=2), shared expert first (TEMPORAL_SHEXP_FIRST=1)
+
+With the routing kernel keeping the slots, the swap list exists as soon as the router has
+run. ROUTE_SLOTS=2 issues the three copies there, on the copy stream, so they overlap the
+gate-weight ops; the expert GEMMs wait their events as before. TEMPORAL_SHEXP_FIRST=1 orders
+glm4moe's shared-expert nodes before the routed experts, which widens that window. Same
+operations and results in both cases. Off by default.
+---
+ ggml/src/ggml-cuda/temporal.cu | 16 ++++++++++++++++
+ src/models/glm4-moe.cpp        | 11 +++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index dcd2cafc..e82ddb12 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -241,6 +241,11 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+     // 2 of every 3 remap kernels, 96/token). Persistent (fixed-addr) buffer keeps it graph-capturable.
+     int64_t need = (int64_t)stride1 * n_tokens;
+     if (L.remap_words < need) { if (L.remap_ids) cudaFree(L.remap_ids); cudaMalloc(&L.remap_ids, need*sizeof(int32_t)); L.remap_words = need; }
++    if (tr_slots() == 2 && ggml_cuda_temporal_route_op_on() && n_tokens == 1) {   // copies were issued at the route op
++        cudaStreamWaitEvent(stream, L.ev[which], 0);
++        *ids_out_ptr = L.remap_ids;
++        return 1;
++    }
+     // swap-rate emulation: this layer does the 1-swap iff layer < round(p*nlayers); else 0 swaps.
+     const int sp1000 = tu_swap_prob_x1000();
+     const int swap_n = tu_swap_n();
+@@ -474,6 +479,17 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+             sl ? g_tr_vslot + (size_t)L*K : nullptr, g_tr_vvalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
+             sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr);
+     CUDA_CHECK(cudaGetLastError());
++    // TEMPORAL_ROUTE_SLOTS=2: the swap list exists now, so start the copies here instead of at the gate
++    // GEMM. They run on the copy stream under whatever the graph has between the router and the routed
++    // experts (gate weights, and the shared expert when the graph puts it first).
++    if (sl && tr_slots() == 2 && n_tokens == 1) {
++        cudaEventRecord(T->fork, stream);
++        cudaStreamWaitEvent(g_copy, T->fork, 0);
++        for (int w = 0; w < 3; ++w) {
++            k_swapcopy<<<tu_copy_blocks(),256,0,g_copy>>>(T->pool_dev[w], T->slot[w], T->be[w], T->d_swp_e, T->d_swp_s, T->d_nswp);
++            cudaEventRecord(T->ev[w], g_copy);
++        }
++    }
+     if (g_tr_dump) {
+         std::vector<int32_t> h((size_t)K*n_tokens);
+         CUDA_CHECK(cudaStreamSynchronize(stream));
+diff --git a/src/models/glm4-moe.cpp b/src/models/glm4-moe.cpp
+index dea30f6c..138d08ac 100644
+--- a/src/models/glm4-moe.cpp
++++ b/src/models/glm4-moe.cpp
+@@ -1,4 +1,5 @@
+ #include "models.h"
++#include <cstdlib>
+ #include "ggml-cpu.h"   // ggml_temporal_route_trained
+ 
+ void llama_model_glm4_moe::load_arch_hparams(llama_model_loader & ml) {
+@@ -256,6 +257,16 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+                     LLM_FFN_SILU, LLM_FFN_PAR, il);
+             cb(shared_out, "ffn_shexp_out", il);
+ 
++            // TEMPORAL_SHEXP_FIRST=1: put the shared expert's nodes right after the router (whose
++            // nodes build_moe_ffn already expanded) and before the routed experts. Same ops, same
++            // result; a streamed expert then has the shared expert's time to arrive.
++            {
++                static const bool shexp_first = getenv("TEMPORAL_SHEXP_FIRST") != nullptr;
++                if (shexp_first) {
++                    ggml_build_forward_expand(gf, shared_out);
++                }
++            }
++
+             // Final output: routed_output + shared_output
+             cur = ggml_add(ctx0, routed_out, shared_out);
+             cb(cur, "ffn_out", il);
+-- 
+2.50.0
+

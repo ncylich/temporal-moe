@@ -1,0 +1,14 @@
+0.00.476.429 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --no-mmap for better performance
+[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=18 + CPU pool
+0.01.031.420 I 
+0.01.031.553 I system_info: n_threads = 8 (n_threads_batch = 8) / 96 | CUDA : ARCHS = 860 | USE_GRAPHS = 1 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.01.031.570 I perplexity: tokenizing the input ..
+0.01.073.045 I perplexity: tokenization took 41.469 ms
+0.01.073.076 I perplexity: calculating perplexity over 8 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.841.865 I perplexity: 1.77 seconds per pass - ETA 0.23 minutes
+[1]18.9855,[2]21.6355,[3]19.6863,[4]19.1631,[5]18.5222,[6]17.9098,[7]17.6672,[8]16.8819,
+0.14.432.394 I Final estimate: PPL = 16.8819 +/- 0.72000
+
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=106509 cold_fills=117 swaps=106392 swaps_per_layer_token=1.0000
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=108498
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
