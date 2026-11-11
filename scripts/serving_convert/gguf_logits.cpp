@@ -5,12 +5,13 @@
 //   gguf_logits nll model.gguf rows.i32 n_rows seq out.f32 [fa] [kvf16] [threads=N]
 //                                                                  -> float32 [n_rows, seq] per-token NLL
 //
-// CPU only (n_gpu_layers = 0), one decode call over the whole sequence, so every position goes
+// CPU only (n_gpu_layers = 0) unless GGUF_LOGITS_GPU=1, one decode call over the whole sequence, so every position goes
 // through the stock top-k router. Build line is in README.md.
 #include "llama.h"
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -25,9 +26,11 @@ int main(int argc, char ** argv) {
     const std::string mode = argv[1];
     llama_backend_init();
     llama_model_params mp = llama_model_default_params();
-    mp.n_gpu_layers = 0;
+    // GGUF_LOGITS_GPU=1: offload everything to the default GPU backend (the CUDA routing check)
+    const bool gpu = getenv("GGUF_LOGITS_GPU") != nullptr;
+    mp.n_gpu_layers = gpu ? 999 : 0;
     ggml_backend_dev_t no_devices[] = { nullptr };   // keep Metal out entirely
-    mp.devices = no_devices;
+    if (!gpu) mp.devices = no_devices;
     llama_model * model = llama_model_load_from_file(argv[2], mp);
     if (!model) { fprintf(stderr, "model load failed\n"); return 1; }
     const llama_vocab * vocab = llama_model_get_vocab(model);
@@ -68,7 +71,7 @@ int main(int argc, char ** argv) {
         fclose(f);
         llama_context_params cp = llama_context_default_params();
         cp.n_ctx = seq; cp.n_batch = seq; cp.n_ubatch = seq;
-        cp.offload_kqv = false; cp.op_offload = false;
+        cp.offload_kqv = gpu; cp.op_offload = gpu;
         cp.type_k = kvf16 ? GGML_TYPE_F16 : GGML_TYPE_F32;
         cp.type_v = kvf16 ? GGML_TYPE_F16 : GGML_TYPE_F32;
         cp.flash_attn_type = fa ? LLAMA_FLASH_ATTN_TYPE_ENABLED : LLAMA_FLASH_ATTN_TYPE_DISABLED;

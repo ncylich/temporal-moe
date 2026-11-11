@@ -1,0 +1,313 @@
+From e334c17ba9bfbdbbbe5f7a989e2644b89edd2d97 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 11 Nov 2026 00:17:31 -0800
+Subject: [PATCH] temporal-MoE CUDA: trained routing on the device, streamed
+ slots follow the router's window
+
+k_route is the CUDA twin of ggml_temporal_route: per-layer window state on the device, router
+logits in, window ids out, same rule and tie-breaking (cold fill top-K, then admit the best
+non-resident iff its logit beats the worst resident, newcomer in slot K-1). The CUDA backend
+accepts the ffn_moe_route custom op, so the decode graph stays one captured CUDA graph.
+
+Under trained routing k_residency keeps its one-swap fast path and falls back to the
+multi-swap scan when more than one selected expert is missing (first token of a sequence,
+first decode token after a prefill). The expert-major prefill no longer re-masks the ids,
+since they already are each token's window. llama_context resets the device window at
+position 0. Counters and LLAMA_TEMPORAL_ROUTE_DUMP are read back from the device.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu |   8 +-
+ ggml/src/ggml-cuda/temporal.cu  | 161 ++++++++++++++++++++++++++++++--
+ ggml/src/ggml-cuda/temporal.cuh |   6 ++
+ src/llama-context.cpp           |   1 +
+ 4 files changed, 165 insertions(+), 11 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index de553752..65145b84 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -1827,7 +1827,8 @@ static void ggml_cuda_temporal_prefill_expertmajor_impl(ggml_backend_cuda_contex
+     // full-vs-temporal comparison: TEMPORAL_PREFILL_FULLMOE=1 (raw top-k = full-MoE); config-D (resident)
+     // is also full-MoE (it is the kernel-effect control vs the full-MoE ceiling).
+     static int fullmoe = [](){const char*s=getenv("TEMPORAL_PREFILL_FULLMOE");return s?atoi(s):0;}();
+-    const bool apply_mask = !resident && !fullmoe;
++    // trained routing: the ids already are each token's resident window, nothing to mask
++    const bool apply_mask = !resident && !fullmoe && !ggml_cuda_temporal_route_trained();
+     const int k = (int) n_expert_used, Rres = (int) n_expert_used;   // resident-set size == k for this model
+     std::vector<int32_t> masked((size_t)ne12*k);
+     if (!apply_mask) {
+@@ -2402,6 +2403,9 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
+         case GGML_OP_MUL_MAT_ID:
+             ggml_cuda_mul_mat_id(ctx, dst);
+             break;
++        case GGML_OP_CUSTOM:   // trained temporal routing (the only custom op supports_op accepts)
++            ggml_cuda_temporal_route(ctx.stream(), dst);
++            break;
+         case GGML_OP_OUT_PROD:
+             ggml_cuda_out_prod(ctx, dst);
+             break;
+@@ -4871,6 +4875,8 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
+     }
+ 
+     switch (op->op) {
++        case GGML_OP_CUSTOM:
++            return ggml_cuda_temporal_route_op(op);
+         case GGML_OP_UNARY:
+             switch (ggml_get_unary_op(op)) {
+                 case GGML_UNARY_OP_ABS:
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index c4daf8d5..8bb2837b 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -20,6 +20,7 @@ struct TU {
+     int *d_swp_e=nullptr, *d_swp_s=nullptr, *d_swp_p=nullptr, *d_nswp=nullptr;  // swap list (device): expert, slot, position
+     cudaEvent_t ev[3] = {nullptr,nullptr,nullptr};           // gate/up/down swap-copy done (overlap)
+     cudaEvent_t fork = nullptr;                              // fork point on compute stream
++    unsigned long long *d_ncopy = nullptr;                   // swap copies issued by k_residency (cumulative)
+     int32_t *remap_ids = nullptr; int64_t remap_words = 0;   // persistent remapped-ids buffer, shared gate/up/down
+ };
+ static std::vector<TU> g_L;
+@@ -81,6 +82,7 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host,
+         cudaMalloc(&L.d_loc,n_expert*sizeof(int)); cudaMemcpy(L.d_loc,hl.data(),n_expert*sizeof(int),cudaMemcpyHostToDevice);
+         cudaMalloc(&L.d_sel,n_expert*sizeof(int));
+         cudaMalloc(&L.d_swp_e,R*sizeof(int)); cudaMalloc(&L.d_swp_s,R*sizeof(int)); cudaMalloc(&L.d_swp_p,R*sizeof(int)); cudaMalloc(&L.d_nswp,sizeof(int));
++        cudaMalloc(&L.d_ncopy,sizeof(unsigned long long)); cudaMemset(L.d_ncopy,0,sizeof(unsigned long long));
+         for (int w=0;w<3;++w) cudaEventCreateWithFlags(&L.ev[w], cudaEventDisableTiming);
+         cudaEventCreateWithFlags(&L.fork, cudaEventDisableTiming);
+         if (!g_copy) cudaStreamCreateWithFlags(&g_copy, cudaStreamNonBlocking);
+@@ -97,7 +99,8 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host,
+ // is equivalent to restarting from 0 each time). force1 caps the swap count at 1 (the real mechanism).
+ __global__ void k_residency(const int32_t* __restrict__ ids, int n_used, int stride1, int n_tokens,
+                             int* slot, int* loc, int* sel, int E, int R, int force1,
+-                            int* swp_e, int* swp_s, int* swp_p, int* nswp, int32_t* remap_out) {
++                            int* swp_e, int* swp_s, int* swp_p, int* nswp, int32_t* remap_out,
++                            unsigned long long* ncopy) {
+     if (blockIdx.x) return;
+     extern __shared__ int sh_sel[];                       // sel[] in SHARED (was global d_sel) -> no global
+     (void)sel;                                            // round-trips across the barriers. size E*4 bytes.
+@@ -108,18 +111,22 @@ __global__ void k_residency(const int32_t* __restrict__ ids, int n_used, int str
+         int t=i/n_used, k=i%n_used; int e=ids[(size_t)t*stride1+k]; if(e>=0&&e<E) sh_sel[e]=1;
+     }
+     __syncthreads();
++    bool serial = !force1;
+     if (force1) {
+         // FAST budget=1 path (the deploy): the whole block reads loc[]/slot[] in PARALLEL (global-load
+         // latency hidden across threads) to find nominee = first selected expert not resident, and
+         // victim = first evictable slot -- via atomicMin over shared, giving the SAME lowest-index result
+         // the old serial scan produced (bit-identical). Only the single swap update stays on thread 0.
+-        __shared__ int s_nom, s_vic;
+-        if (tid==0){ s_nom=E; s_vic=R; }
++        __shared__ int s_nom, s_vic, s_cnt;
++        if (tid==0){ s_nom=E; s_vic=R; s_cnt=0; }
+         __syncthreads();
+-        for (int e=tid; e<E; e+=nt) if (sh_sel[e] && loc[e]<0) atomicMin(&s_nom, e);            // parallel find nominee
++        for (int e=tid; e<E; e+=nt) if (sh_sel[e] && loc[e]<0){ atomicMin(&s_nom, e); atomicAdd(&s_cnt, 1); } // parallel find nominee
+         for (int s=tid; s<R; s+=nt){ int re=slot[s]; if (re<0 || !sh_sel[re]) atomicMin(&s_vic, s); } // parallel find victim
+         __syncthreads();
+-        if (tid==0){
++        // force1==2 (trained routing): the ids are the router's window, so more than one miss means the
++        // slots are stale (first token of a sequence, first decode token after a prefill) -> load them all.
++        if (tid==0 && force1==2 && s_cnt>1) serial=true;
++        else if (tid==0){
+             int ns=0;
+             if (s_nom<E && s_vic<R){
+                 int old=slot[s_vic]; if(old>=0) loc[old]=-1;
+@@ -127,9 +134,10 @@ __global__ void k_residency(const int32_t* __restrict__ ids, int n_used, int str
+                 int pos=-1; for (int k=0;k<n_used;++k){ if(ids[k]==s_nom){pos=k;break;} }
+                 swp_e[0]=s_nom; swp_s[0]=s_vic; swp_p[0]=pos; ns=1;
+             }
+-            *nswp=ns;
++            *nswp=ns; *ncopy+=ns;
+         }
+-    } else if (tid==0) {                                  // budget=R fallback (rare): original serial scan
++    }
++    if (tid==0 && serial) {                               // budget=R fallback (rare): original serial scan
+         int ns=0, budget = R, sp=0;                       // sp = monotonic evictable-slot pointer
+         for (int e=0;e<E && budget>0;++e){
+             if (!sh_sel[e] || loc[e]>=0) continue;
+@@ -142,7 +150,7 @@ __global__ void k_residency(const int32_t* __restrict__ ids, int n_used, int str
+             int pos=-1; for (int k=0;k<n_used;++k){ if(ids[k]==e){pos=k;break;} }
+             swp_e[ns]=e; swp_s[ns]=victim; swp_p[ns]=pos; ns++; budget--;
+         }
+-        *nswp=ns;
++        *nswp=ns; *ncopy+=ns;
+     }
+     // FUSED remap: loc[] is now updated -> write the id->slot remap in the SAME kernel (drops the separate
+     // k_remap_loc launch + its dependency handoff). remap_out==nullptr (router-early prime) skips it.
+@@ -227,9 +235,10 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+         // on-device residency scan -> records swaps; the slot indices are shared across gate/up/down, so
+         // once residency has run we can issue ALL THREE tensors' swap-copies.
+         k_residency<<<1,256,(size_t)L.E*sizeof(int),stream>>>(ids_in, n_used, stride1, n_tokens,
+-                                      L.d_slot, L.d_loc, L.d_sel, L.E, L.R, (emulate ? 1 : tu_force1()),
++                                      L.d_slot, L.d_loc, L.d_sel, L.E, L.R,
++                                      (emulate ? 1 : (tu_force1() && ggml_cuda_temporal_route_trained()) ? 2 : tu_force1()),
+                                       L.d_swp_e, L.d_swp_s, L.d_swp_p, L.d_nswp,
+-                                      is_prime ? nullptr : L.remap_ids);   // fused remap (prime skips it)
++                                      is_prime ? nullptr : L.remap_ids, L.d_ncopy);   // fused remap (prime skips it)
+         // emulated non-swap layer: zero the swap count so every k_swapcopy early-returns (no bytes moved).
+         if (emulate && !layer_swaps) cudaMemsetAsync(L.d_nswp, 0, sizeof(int), stream);
+         // FLOOR emulation: override the swap list to pin exactly swap_n copies on this layer.
+@@ -278,3 +287,135 @@ cudaStream_t ggml_cuda_temporal_copy_stream() {
+     if (!g_copy) cudaStreamCreateWithFlags(&g_copy, cudaStreamNonBlocking);
+     return g_copy;
+ }
++
++// ===== TRAINED ROUTING on the device (LLAMA_TEMPORAL_ROUTE=trained) =====
++// CUDA twin of ggml_temporal_route (ggml-cpu.c): the training-time resident-window rule with
++// evict=min_logit. Cold fill = the K highest router logits of a sequence's first token (highest first);
++// every later token admits the best non-resident expert iff its logit is strictly above the worst
++// resident's, evicting that resident; the newcomer sits in slot K-1 and the previous newcomer fills the
++// gap. Ties break to the lowest expert index (nominee, cold fill) and the lowest window slot (worst), as
++// on the CPU. Window state lives on the device, so the op is one kernel inside the captured decode graph.
++// The streamed path needs nothing else: k_residency sees the window as the selected ids, so its nominee is
++// the admitted expert and its victim the evicted one.
++//   TEMPORAL_ROUTE_HOST=1          leave the op to the CPU backend (cross-check; splits the graph)
++//   LLAMA_TEMPORAL_ROUTE_DUMP=path every token's window: int32 layer, K int32 ids (syncs; needs
++//                                  GGML_CUDA_DISABLE_GRAPHS=1 for single-token batches)
++#include "ggml-impl.h"
++#include <cstdio>
++#define TR_MAXLAYER 128
++static int *g_tr_k = nullptr, *g_tr_win = nullptr;       // [TR_MAXLAYER], [TR_MAXLAYER*K]
++static unsigned long long *g_tr_cnt = nullptr;           // [TR_MAXLAYER*3]: steps, swaps, cold fills
++static int g_tr_K = 0;
++static FILE * g_tr_dump = nullptr;
++
++int ggml_cuda_temporal_route_trained() {
++    static int v=[](){const char*s=getenv("LLAMA_TEMPORAL_ROUTE"); return s && strcmp(s,"trained")==0;}();
++    return v;
++}
++bool ggml_cuda_temporal_route_op(const ggml_tensor * t) {
++    static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
++    return ggml_cuda_temporal_route_trained() && !host && strncmp(t->name, "ffn_moe_route", 13) == 0
++        && t->type == GGML_TYPE_I32 && t->src[0] && t->src[0]->type == GGML_TYPE_F32;
++}
++
++static __device__ inline unsigned long long tr_key(float v) {   // float -> order-preserving u32
++    unsigned u = __float_as_uint(v);
++    return (unsigned long long)(u ^ ((u >> 31) ? 0xFFFFFFFFu : 0x80000000u));
++}
++__global__ void k_route(const float* __restrict__ lg, size_t stride, int n_tokens, int E, int K,
++                        int* kst, int* win, unsigned long long* cnt, int32_t* __restrict__ out) {
++    extern __shared__ int sh[];                           // [0,E) logits, [E,2E) resident flag
++    float* x = (float*) sh; int* in = sh + E;
++    __shared__ unsigned long long s_nom, s_wst; __shared__ int s_cold;
++    const int tid = threadIdx.x, nt = blockDim.x;
++    if (tid==0) s_cold = (*kst != K);
++    for (int e=tid; e<E; e+=nt) in[e]=0;
++    __syncthreads();
++    if (!s_cold) for (int j=tid; j<K; j+=nt) in[win[j]]=1;
++    __syncthreads();
++    for (int t=0; t<n_tokens; ++t) {
++        const float* xt = lg + (size_t)t*stride;
++        for (int e=tid; e<E; e+=nt) x[e]=xt[e];
++        __syncthreads();
++        if (s_cold) {                                     // rank of e among all logits = its window slot
++            for (int e=tid; e<E; e+=nt) {
++                const float v=x[e]; int r=0;
++                for (int f=0; f<E; ++f){ const float u=x[f]; r += (u>v) || (u==v && f<e); }
++                if (r<K){ win[r]=e; in[e]=1; }
++            }
++            __syncthreads();
++            if (tid==0){ *kst=K; s_cold=0; cnt[0]++; cnt[2]++; }
++        } else {
++            if (tid==0){ s_nom=0ull; s_wst=~0ull; }
++            __syncthreads();
++            for (int e=tid; e<E; e+=nt) if (!in[e]) atomicMax(&s_nom, (tr_key(x[e])<<32) | (0xFFFFFFFFu-(unsigned)e));
++            for (int j=tid; j<K; j+=nt) atomicMin(&s_wst, (tr_key(x[win[j]])<<32) | (unsigned)j);
++            __syncthreads();
++            if (tid==0){
++                const int nom = (int)(0xFFFFFFFFu-(unsigned)(s_nom & 0xFFFFFFFFull)), ws = (int)(s_wst & 0xFFFFFFFFull);
++                cnt[0]++;
++                if (x[nom] > x[win[ws]]) {
++                    in[win[ws]]=0;
++                    if (ws != K-1) win[ws]=win[K-1];
++                    win[K-1]=nom; in[nom]=1; cnt[1]++;
++                }
++            }
++        }
++        __syncthreads();
++        for (int j=tid; j<K; j+=nt) out[(size_t)t*K+j]=win[j];
++        __syncthreads();
++    }
++}
++
++static void tr_report() {
++    if (!g_tr_cnt) return;
++    std::vector<unsigned long long> c(TR_MAXLAYER*3, 0);
++    cudaDeviceSynchronize();
++    if (cudaMemcpy(c.data(), g_tr_cnt, c.size()*sizeof(unsigned long long), cudaMemcpyDeviceToHost) != cudaSuccess) {
++        fprintf(stderr, "temporal-route-cuda: counters unreadable at exit\n"); return;
++    }
++    unsigned long long st=0, sw=0, co=0, cp=0; int nl=0;
++    for (int L=0; L<TR_MAXLAYER; ++L) if (c[L*3]) { st+=c[L*3]; sw+=c[L*3+1]; co+=c[L*3+2]; nl++; }
++    fprintf(stderr, "temporal-route-cuda: trained min_logit, layers=%d layer_tokens=%llu cold_fills=%llu swaps=%llu "
++            "swaps_per_layer_token=%.4f\n", nl, st, co, sw, st>co ? (double)sw/(double)(st-co) : 0.0);
++    bool any=false;
++    for (auto & L : g_L) if (L.d_ncopy) { unsigned long long v=0;
++        if (cudaMemcpy(&v, L.d_ncopy, sizeof(v), cudaMemcpyDeviceToHost)==cudaSuccess) { cp+=v; any=true; } }
++    if (any) fprintf(stderr, "temporal-route-cuda: slot swap-ins decided on single-token steps=%llu\n", cp);
++    if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
++}
++
++void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
++    const ggml_tensor * lg = dst->src[0];
++    ggml_custom_op_params p; memcpy(&p, dst->op_params, sizeof(p));
++    const int L = (int)(intptr_t) p.userdata, K = (int) dst->ne[0], n_tokens = (int) dst->ne[1], E = (int) lg->ne[0];
++    GGML_ASSERT(L >= 0 && L < TR_MAXLAYER && K < E && E <= 4096 && lg->ne[1] == n_tokens);
++    if (!g_tr_k) {
++        g_tr_K = K;
++        CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g_tr_win, (size_t)TR_MAXLAYER*K*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g_tr_cnt, TR_MAXLAYER*3*sizeof(unsigned long long)));
++        CUDA_CHECK(cudaMemset(g_tr_cnt, 0, TR_MAXLAYER*3*sizeof(unsigned long long)));
++        const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP");
++        if (d && d[0]) { g_tr_dump = fopen(d, "wb"); GGML_ASSERT(g_tr_dump); }
++        atexit(tr_report);
++    }
++    GGML_ASSERT(K == g_tr_K);
++    k_route<<<1, 256, (size_t)2*E*sizeof(int), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K,
++            g_tr_k + L, g_tr_win + (size_t)L*K, g_tr_cnt + (size_t)L*3, (int32_t *) dst->data);
++    CUDA_CHECK(cudaGetLastError());
++    if (g_tr_dump) {
++        std::vector<int32_t> h((size_t)K*n_tokens);
++        CUDA_CHECK(cudaStreamSynchronize(stream));
++        CUDA_CHECK(cudaMemcpy(h.data(), dst->data, h.size()*sizeof(int32_t), cudaMemcpyDeviceToHost));
++        const int32_t l32 = L;
++        for (int t=0; t<n_tokens; ++t) { fwrite(&l32, 4, 1, g_tr_dump); fwrite(h.data()+(size_t)t*K, 4, (size_t)K, g_tr_dump); }
++    }
++}
++
++// cold-start every layer's window (llama_context calls this at sequence position 0)
++void ggml_cuda_temporal_route_reset() {
++    if (!g_tr_k) return;
++    CUDA_CHECK(cudaDeviceSynchronize());
++    CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
++}
+diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
+index 75ec13c2..89bca201 100644
+--- a/ggml/src/ggml-cuda/temporal.cuh
++++ b/ggml/src/ggml-cuda/temporal.cuh
+@@ -22,3 +22,9 @@ int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const v
+                                 size_t* bytes_per_expert, int* n_expert, int* R);
+ // shared copy stream used for the swap machinery (reused for prefill weight prefetch).
+ cudaStream_t ggml_cuda_temporal_copy_stream();
++
++// ===== trained routing on the device (LLAMA_TEMPORAL_ROUTE=trained), see temporal.cu =====
++int  ggml_cuda_temporal_route_trained();
++bool ggml_cuda_temporal_route_op(const ggml_tensor * t);            // is t the ffn_moe_route custom op
++void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst);
++void ggml_cuda_temporal_route_reset();
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index e16d79ad..a9cc28f8 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -1813,6 +1813,7 @@ int llama_context::decode(const llama_batch & batch_inp) {
+         if (ggml_temporal_route_trained()) {
+             if (ubatch.n_tokens > 0 && ubatch.pos[0] == 0) {
+                 ggml_temporal_route_reset();
++                { void ggml_cuda_temporal_route_reset(); ggml_cuda_temporal_route_reset(); }   // device window
+             }
+             for (uint32_t i = 0; i < ubatch.n_tokens; ++i) {
+                 if (ubatch.n_seq_id[i] != 1 || ubatch.seq_id[i][0] != ubatch.seq_id[0][0]) {
+-- 
+2.50.0
+
