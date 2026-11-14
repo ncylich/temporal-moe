@@ -1,0 +1,149 @@
+From 2476dd186adafb47c202a17f18fb3d622f78405b Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Sat, 14 Nov 2026 15:28:55 -0800
+Subject: [PATCH] temporal-MoE CUDA: k_skliar, a dedicated kernel for one
+ decoded skliar token (C = K)
+
+The trained rule's kernel (k_route) with skliar's selection: one round of atomics gives the max and
+min of z, the best non-selected expert and the weakest cached one, and further rounds run only while
+another expert still enters. State is the previous selection (win), so the per-expert last-use array
+is neither loaded nor stored. A cold layer takes the unbiased top-K. Same selections, loads and
+perplexity as the k_route2 fast path, which TEMPORAL_CB_K2=1 keeps.
+---
+ ggml/src/ggml-cuda/temporal.cu | 113 +++++++++++++++++++++++++++++++++
+ 1 file changed, 113 insertions(+)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index dd4511b1..ffae0367 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -773,6 +773,110 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+     }
+ }
+ 
++// skliar, one decoded token, C = K: the kernel of the trained rule (k_route) with skliar's selection. The
++// cache is the previous selection (win). One round of atomics gives the max and min of z (delta, top-1),
++// the best non-selected expert and the weakest cached one; further rounds run only while another expert
++// still enters (see the fast path in k_route2, which this replaces for single tokens). A cold layer
++// (first token of a sequence) takes the unbiased top-K, as a one-token prompt does in cache_bias.py.
++__global__ void k_skliar(const float * __restrict__ lg, int E, int K, float lam, int J,
++                         int * st, int * win, long long * tnow, double * dsum, unsigned long long * dn,
++                         unsigned long long * hist, unsigned long long * cnt, int32_t * __restrict__ out, int * tokl,
++                         int * sloth, int * svalid, int * swp_e, int * swp_s, int * nswp, int32_t * remap,
++                         unsigned long long * ncopy, int nocopy) {
++    extern __shared__ int shk[];                          // [0,E) logits; [E,2E) 0 outside, 1 cached, 2 admitted now, 3 evicted now
++    float * x = (float *) shk; int * in = shk + E;
++    __shared__ unsigned long long s_a, s_b, s_c, s_d; __shared__ float s_bias;
++    __shared__ int s_go, s_cold, s_loads, s_win[TR2_MAXK];
++    const int tid = threadIdx.x, nt = blockDim.x;
++    if (tid == 0) { s_cold = (*st == 0); s_a = 0ull; s_b = ~0ull; s_c = 0ull; s_d = ~0ull; s_loads = -1; s_go = 0; }
++    for (int e = tid; e < E; e += nt) { x[e] = lg[e]; in[e] = 0; }
++    for (int j = tid; j < K; j += nt) s_win[j] = win[j];
++    __syncthreads();
++    if (!s_cold) for (int j = tid; j < K; j += nt) in[s_win[j]] = 1;
++    __syncthreads();
++    for (int e = tid; e < E; e += nt) {
++        const unsigned long long ka = tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e);
++        atomicMax(&s_a, ka); atomicMin(&s_b, tr2_hi(x[e], (unsigned) e));
++        if (!s_cold && !in[e]) atomicMax(&s_c, ka);
++    }
++    if (!s_cold) for (int j = tid; j < K; j += nt) atomicMin(&s_d, tr2_hi(x[s_win[j]], (unsigned) j));
++    __syncthreads();
++    const int step = (int) *tnow;
++    if (tid == 0) {
++        const float mx = tr2_val((unsigned) (s_a >> 32)), mn = tr2_val((unsigned) (s_b >> 32));
++        *dsum += (double) (mx - mn); *dn += 1ull;
++        s_bias = (float) ((double) lam * (*dsum / (double) *dn));
++        if (!s_cold) {
++            const int top1 = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull));
++            const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_c & 0xFFFFFFFFull)), ws = (int) (s_d & 0xFFFFFFFFull);
++            const int eo = s_win[ws];
++            const bool win_ = s_c != 0ull && x[nom] > x[eo] + s_bias;
++            const bool force = !win_ && J > 0 && s_c != 0ull && nom == top1;
++            s_loads = 0;
++            if (win_ || force) { s_win[ws] = nom; in[nom] = 2; in[eo] = 3; s_loads = 1; }
++            s_go = win_ && K > 1;
++        }
++    }
++    if (s_cold) {                                         // unbiased top-K (rank; lower index first on ties)
++        for (int e = tid; e < E; e += nt) {
++            const float v = x[e]; int r = 0;
++            for (int f = 0; f < E; ++f) { const float u = x[f]; r += (u > v) || (u == v && f < e); }
++            if (r < K) s_win[r] = e;
++        }
++    }
++    __syncthreads();
++    while (s_go) {                                        // further loads this token
++        if (tid == 0) { s_c = 0ull; s_d = ~0ull; }
++        __syncthreads();
++        for (int e = tid; e < E; e += nt) if (!in[e]) atomicMax(&s_c, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));
++        for (int j = tid; j < K; j += nt) { const int e = s_win[j]; atomicMin(&s_d, tr2_hi(x[e] + (in[e] == 1 ? s_bias : 0.0f), (unsigned) j)); }
++        __syncthreads();
++        if (tid == 0) {
++            const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_c & 0xFFFFFFFFull)), ws = (int) (s_d & 0xFFFFFFFFull);
++            const int eo = s_win[ws];
++            const bool win_ = s_c != 0ull && x[nom] > x[eo] + (in[eo] == 1 ? s_bias : 0.0f);
++            if (win_) { s_win[ws] = nom; in[nom] = 2; in[eo] = 3; s_loads++; }
++            s_go = win_ && s_loads < K;
++        }
++        __syncthreads();
++    }
++    if (tid == 0) {
++        *tnow = step + 1;
++        if (s_cold) *st = 1; else { cnt[0]++; cnt[1] += s_loads; hist[s_loads]++; }
++        if (tokl) tokl[0] = s_loads;
++    }
++    for (int j = tid; j < K; j += nt) { out[j] = s_win[j]; win[j] = s_win[j]; }
++    if (!sloth) return;
++    __syncthreads();
++    __shared__ int s_keep[TR2_MAXK], s_found[TR2_MAXK], s_sv;   // slots follow the selection, as in k_route2
++    if (tid == 0) s_sv = *svalid;
++    for (int s = tid; s < K; s += nt) s_keep[s] = 0;
++    __syncthreads();
++    if (s_sv) {
++        for (int j = tid; j < K; j += nt) {
++            const int e = s_win[j]; int found = -1;
++            for (int s = 0; s < K; ++s) if (sloth[s] == e) found = s;
++            s_found[j] = found;
++            if (found >= 0) { s_keep[found] = 1; remap[j] = found; }
++        }
++    }
++    __syncthreads();
++    if (tid == 0) {
++        int ns = 0;
++        if (!s_sv) {
++            for (int j = 0; j < K; ++j) { sloth[j] = s_win[j]; swp_e[j] = s_win[j]; swp_s[j] = j; remap[j] = j; }
++            ns = K;
++        } else {
++            int sp = 0;
++            for (int j = 0; j < K; ++j) if (s_found[j] < 0) {
++                while (s_keep[sp]) sp++;
++                sloth[sp] = s_win[j]; remap[j] = sp; swp_e[ns] = s_win[j]; swp_s[ns] = sp; ns++; s_keep[sp] = 1;
++            }
++        }
++        *nswp = nocopy ? 0 : ns; *ncopy += ns; *svalid = 1;
++    }
++}
++
+ static void tr2_report() {
+     if (!g2.ready) return;
+     const int H = g2.K + 1;
+@@ -852,6 +956,15 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+         }
+     }
+     if (g2.dump && g2.ntokl < n_tokens) { if (g2.tokl) cudaFree(g2.tokl); CUDA_CHECK(cudaMalloc(&g2.tokl, n_tokens*sizeof(int))); g2.ntokl = n_tokens; }
++    // TEMPORAL_CB_K2=1 keeps single skliar tokens on k_route2
++    static const bool sk_k2 = getenv("TEMPORAL_CB_K2") && atoi(getenv("TEMPORAL_CB_K2"));
++    if (mode == 3 && n_tokens == 1 && g2.C == K && !tr2_fullsel() && !sk_k2)
++    k_skliar<<<1, 256, (size_t) 2*E*sizeof(int), stream>>>((const float *) lg->data, E, K, g2.lam, g2.J, g2.st + L,
++            g2.win + (size_t) L*K, g2.tnow + L, g2.dsum + L, g2.dn + L, g2.hist + (size_t) L*(K+1), g2.cnt + (size_t) L*4,
++            (int32_t *) dst->data, g2.dump ? g2.tokl : nullptr, sl ? g2.sloth + (size_t) L*K : nullptr, g2.svalid + L,
++            sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr, sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr,
++            sl ? T->d_ncopy : nullptr, tr_nocopy());
++    else
+     k_route2<<<1, 256, (size_t) 4*E*sizeof(float), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K, mode,
+             g2.C, g2.lam, g2.J, tr2_fullsel(), g2.st + L, g2.win + (size_t) L*K, g2.last + (size_t) L*E, g2.tnow + L, g2.dsum + L, g2.dn + L,
+             g2.hist + (size_t) L*(K+1), g2.cnt + (size_t) L*4, (int32_t *) dst->data, g2.dump ? g2.tokl : nullptr,
+-- 
+2.50.0
+

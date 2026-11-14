@@ -60,5 +60,7 @@ for v in 1 2 3 4 5; do
   done
   RR --model $MOE --tag k2-v$v --env TEMPORAL_DECODE_K2=1 --arms ours_vram
   RR --model $MOE --tag fullsel-v$v --env TEMPORAL_CB_FULLSEL=1 --arms skliar_vram
+  RR --model $MOE --tag sk-k2-v$v --env TEMPORAL_CB_K2=1 --arms skliar_vram
+  RR --model $MOE --tag sk-k2-s1x1-v$v --env TEMPORAL_ROUTE_SLOTS=1 TEMPORAL_SHEXP_FIRST=1 TEMPORAL_CB_K2=1 --arms skliar_stream
 done
 echo "### SPEED_DONE $(date -u +%T)"
