@@ -19,7 +19,7 @@ esac
 EXTRA=()
 [[ $ARM == *_stream ]] && EXTRA=(-ncmoe "$NMOE")
 env "${ENVV[@]}" "$@" "$BIN/llama-server" -m "$MODEL" -ngl 99 -fa on -t 8 -c 8192 -np 1 -b 4096 -ub 4096 \
-    --jinja --no-cache-prompt --port "$PORT" "${EXTRA[@]}" > "$LOG" 2>&1 &
+    --jinja --no-cache-prompt -ctxcp 0 --port "$PORT" "${EXTRA[@]}" > "$LOG" 2>&1 &
 echo $! > "$LOG.pid"
 for i in $(seq 1 600); do
   if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then echo "server $ARM up on $PORT (pid $(cat "$LOG.pid"))"; exit 0; fi

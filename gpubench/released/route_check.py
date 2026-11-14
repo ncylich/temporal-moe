@@ -51,7 +51,7 @@ def main():
     i, seq, req = 0, -1, 0
     stats = {"prompt_tokens": 0, "prompt_equal": 0, "decode_tokens": 0, "decode_equal": 0,
              "loads_equal": 0, "first_mismatch": None, "sequences": 0, "layers": set()}
-    seen_layers_in_prompt = set()
+    seen_layers_in_prompt = set(); last_kind = {}; stats["prompt_chunks_continued"] = 0
     while i < n:
         L, nt = int(hdr[i, 0]), int(hdr[i, 1])
         stats["layers"].add(L)
@@ -59,10 +59,12 @@ def main():
         x = torch.from_numpy(lg[blk])                      # [nt, E]
         eng = ids[blk]
         if nt > 1:                                         # a prompt batch
-            if L in seen_layers_in_prompt or seq < 0:      # first layer seen again -> a new sequence
+            cont = last_kind.get(L) == "prompt"            # follows a prompt batch of this layer: same prompt, next chunk
+            if not cont and (L in seen_layers_in_prompt or seq < 0):   # first layer seen again -> a new sequence
                 seq += 1; req += 1; seen_layers_in_prompt = set(); stats["sequences"] += 1
                 DS.reset()
             seen_layers_in_prompt.add(L)
+            stats["prompt_chunks_continued"] += cont
             top = x.topk(a.K, dim=-1).indices.numpy()
             for t in range(nt):
                 stats["prompt_tokens"] += 1
@@ -70,8 +72,8 @@ def main():
                 stats["prompt_equal"] += ok
                 if not ok and stats["first_mismatch"] is None:
                     stats["first_mismatch"] = {"record": i + t, "layer": L, "kind": "prompt"}
-            if a.mode == "decode":
-                DS.prefill(L, x.unsqueeze(1))              # observe-only scan seeds the state
+            if a.mode == "decode":                         # observe-only scan seeds the state; a continued
+                (DS.observe_chunk if cont else DS.prefill)(L, x.unsqueeze(1))   # chunk carries it (vLLM chunked prefill)
             else:
                 CB.apply(L, x, [(req, nt, True)], True)    # unbiased warm, not counted
         else:
@@ -97,6 +99,7 @@ def main():
                 stats["loads_equal"] += (ref_loads == eng_loads)
             if not ok and stats["first_mismatch"] is None:
                 stats["first_mismatch"] = {"record": i, "layer": L, "kind": "decode", "ref": sorted(ref), "engine": sorted(got)}
+        last_kind[L] = "prompt" if nt > 1 else "decode"
         i += nt
     stats["layers"] = len(stats["layers"])
     print(json.dumps(stats))
