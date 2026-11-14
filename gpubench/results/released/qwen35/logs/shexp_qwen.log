@@ -1,0 +1,14 @@
+shexp_first=0 ours streamed: 1.09.759.695 I Final estimate: PPL = 2.1260 +/- 0.07134
+shexp_first=1 ours streamed: 1.07.463.743 I Final estimate: PPL = 2.1260 +/- 0.07134
+shexp_first=1 base: 0.31.263.157 I Final estimate: PPL = 1.7345 +/- 0.04634
+base            ctx   1024    155.40 tok/s  6.435 ms  trials ['152.60', '155.72', '155.22', '155.25']  peak 21328 MiB  
+ours_vram       ctx   1024    145.24 tok/s  6.885 ms  trials ['142.59', '145.43', '145.11', '145.19']  peak 21330 MiB  t
+skliar_vram     ctx   1024    143.30 tok/s  6.978 ms  trials ['140.65', '143.40', '143.17', '143.34']  peak 21330 MiB  t
+ours_stream     ctx   1024     82.45 tok/s  12.129 ms  trials ['78.62', '82.47', '82.49', '82.37']  peak 3628 MiB  tempo
+skliar_stream   ctx   1024     78.79 tok/s  12.693 ms  trials ['75.82', '79.12', '78.66', '78.58']  peak 3628 MiB  tempo
+skliar_stream   ctx   1024     78.77 tok/s  12.695 ms  trials ['75.49', '78.78', '78.84', '78.70']  peak 3628 MiB  tempo
+ours_stream     ctx   1024     82.92 tok/s  12.059 ms  trials ['79.04', '82.89', '82.94', '82.94']  peak 3628 MiB  tempo
+skliar_vram     ctx   1024    145.61 tok/s  6.868 ms  trials ['142.38', '145.21', '146.00', '145.62']  peak 21330 MiB  t
+ours_vram       ctx   1024    147.83 tok/s  6.765 ms  trials ['144.30', '147.72', '147.76', '148.01']  peak 21330 MiB  t
+base            ctx   1024    158.20 tok/s  6.321 ms  trials ['155.01', '158.38', '157.91', '158.32']  peak 21328 MiB  
+SHEXP_DONE

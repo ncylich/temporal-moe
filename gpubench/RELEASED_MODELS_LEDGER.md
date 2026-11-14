@@ -263,3 +263,208 @@ the GPU's NUMA node with `taskset -c 0-31,64-95`.**
 Also measured: host-to-device pinned `cudaMemcpy` on this machine reaches 17.6 GB/s for 2 MB and 22 GB/s
 for 80 MB. Copy grid: 128 blocks 79.3 / 69.2, 256 (default) 78.7 / 70.3, 1024 73.3 / 70.0 tok/s (ours /
 Skliar, unpinned, single runs); the default 256 is kept for both arms.
+
+## R1-5 -- Qwen3.5 decode timing, final protocol (engine tree `96b1c0e3` = patches 0001 to 0006, 10:13-10:33 UTC)
+
+`gpubench/released/run_released.py --prefix "taskset -c 0-31,64-95"`, all nine arms per pass, arm order
+reversed in the middle pass; three passes at 1k, two at 2k and 4k. Rows: `gpubench/results/released/qwen35/
+qwen_decode_final.jsonl` (63 rows, no failures). "Pooled" is the mean of every kept trial (trials 2 to 4
+of each pass). Loads per layer-token come from the engine's exit line (all four trials and the warm-up
+token of the last pass; the routing is deterministic, so every pass gives the same counts). The
+no-bytes-moved controls compute with stale slot contents, so their routing, and their loads, drift from
+the real arm's; they move no bytes either way, so this does not affect what they measure.
+
+### 1024 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 158.26 | 160.46 / 156.83 / 157.50 | 6.319 | 21336 | 1.000 |  |  |
+| ours_vram | 147.69 | 149.62 / 146.81 / 146.63 | 6.771 | 21338 | 0.933 | 0.9996 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_vram | 146.11 | 147.36 / 145.96 / 145.00 | 6.844 | 21338 | 0.923 | 1.0207 | 0.323 / 0.466 / 0.126 / 0.085 |
+| ours_stream | 78.46 | 78.89 / 78.19 / 78.29 | 12.746 | 3636 | 0.496 | 0.9997 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_stream | 76.29 | 76.36 / 76.22 / 76.28 | 13.109 | 3636 | 0.482 | 1.0211 | 0.323 / 0.465 / 0.126 / 0.085 |
+| ours_nobytes | 134.76 | 135.09 / 134.35 / 134.83 | 7.421 | 3636 | 0.851 | 0.9998 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nobytes | 133.44 | 133.78 / 132.99 / 133.55 | 7.494 | 3636 | 0.843 | 0.8317 | 0.393 / 0.468 / 0.084 / 0.055 |
+| ours_nocopy | 135.64 | 135.85 / 135.60 / 135.45 | 7.373 | 3636 | 0.857 | 0.9998 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nocopy | 134.06 | 133.77 / 134.41 / 133.98 | 7.460 | 3636 | 0.847 | 0.8317 | 0.393 / 0.468 / 0.084 / 0.055 |
+
+### 2048 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 156.43 | 156.48 / 156.38 | 6.393 | 22374 | 1.000 |  |  |
+| ours_vram | 146.15 | 145.75 / 146.55 | 6.842 | 22376 | 0.934 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_vram | 144.75 | 144.36 / 145.14 | 6.909 | 22376 | 0.925 | 0.9939 | 0.240 / 0.604 / 0.101 / 0.055 |
+| ours_stream | 78.27 | 78.04 / 78.49 | 12.777 | 4738 | 0.500 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_stream | 77.59 | 77.72 / 77.45 | 12.889 | 4738 | 0.496 | 0.9980 | 0.236 / 0.605 / 0.105 / 0.054 |
+| ours_nobytes | 134.07 | 133.95 / 134.19 | 7.459 | 4738 | 0.857 | 0.9997 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nobytes | 132.57 | 132.95 / 132.19 | 7.543 | 4738 | 0.847 | 0.8821 | 0.355 / 0.483 / 0.107 / 0.055 |
+| ours_nocopy | 135.27 | 134.96 / 135.58 | 7.393 | 4738 | 0.865 | 0.9999 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nocopy | 133.39 | 132.75 / 134.03 | 7.497 | 4738 | 0.853 | 0.8821 | 0.355 / 0.483 / 0.107 / 0.055 |
+
+### 4096 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 155.36 | 155.41 / 155.30 | 6.437 | 24432 | 1.000 |  |  |
+| ours_vram | 145.25 | 145.29 / 145.21 | 6.885 | 24434 | 0.935 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_vram | 143.51 | 143.27 / 143.76 | 6.968 | 24434 | 0.924 | 0.9908 | 0.257 / 0.579 / 0.109 / 0.055 |
+| ours_stream | 77.75 | 77.56 / 77.94 | 12.861 | 6924 | 0.500 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_stream | 76.64 | 76.51 / 76.76 | 13.049 | 6924 | 0.493 | 0.9914 | 0.251 / 0.586 / 0.109 / 0.054 |
+| ours_nobytes | 132.25 | 132.71 / 131.79 | 7.561 | 6924 | 0.851 | 0.9998 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nobytes | 131.02 | 131.15 / 130.88 | 7.633 | 6924 | 0.843 | 0.9204 | 0.304 / 0.541 / 0.105 / 0.050 |
+| ours_nocopy | 133.39 | 133.23 / 133.55 | 7.497 | 6924 | 0.859 | 0.9999 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nocopy | 131.55 | 131.42 / 131.69 | 7.601 | 6924 | 0.847 | 0.9266 | 0.299 / 0.546 / 0.103 / 0.052 |
+
+**Where the time goes** (ms per token, pooled; differences of rows above):
+
+| step | ours 1k | Skliar 1k | ours 2k | Skliar 2k | ours 4k | Skliar 4k |
+|---|---|---|---|---|---|---|
+| stock top-k, all in VRAM | 6.319 | 6.319 | 6.393 | 6.393 | 6.437 | 6.437 |
+| + routing op (all in VRAM) | +0.452 | +0.526 | +0.450 | +0.516 | +0.448 | +0.531 |
+| + slot machinery, no copy kernels | +0.602 | +0.615 | +0.551 | +0.588 | +0.612 | +0.633 |
+| + copy kernels launched, nothing moved | +0.048 | +0.034 | +0.066 | +0.046 | +0.065 | +0.031 |
+| + bytes moved | +5.325 | +5.615 | +5.318 | +5.346 | +5.300 | +5.416 |
+| = streamed | 12.746 | 13.109 | 12.777 | 12.889 | 12.861 | 13.049 |
+
+The bytes dominate: 40 layers times about 1.0 load of 2.0 MB is about 80 MB per token, and the measured
+cost per load is the same for both arms (1k: ours 5.325 ms / 39.99 loads = 133 us, Skliar 5.615 / 40.84 =
+137 us; 2k: 133 and 134 us), about 15 GB/s, against 17.6 GB/s for a plain 2 MB pinned `cudaMemcpy` on this
+host. Skliar's arm is slower by its slightly higher mean load at 1k (1.021 against 1.000 on its own replayed
+text) and by about 0.07 ms of routing step (top-k over the biased logits, J check, cache update).
+
+## R1-6 -- The shared expert under the copies (patch 0007, engine tree `20c50f0c`, 10:37-11:06 UTC)
+
+In 0006 the graph order per layer is router, gate weights, routed experts, then the shared expert, so the
+copies started at the router overlap only the few small gate-weight kernels. (0006's own
+`TEMPORAL_SHEXP_FIRST` for `qwen35moe` put the shared expert before the router and could not help; found by
+reading `build_moe_ffn`, which expands the routed-expert GEMMs itself, before it was ever timed.) Patch 0007
+adds `llm_graph_context::tm_after_router`, a node `build_moe_ffn` expands right after the router and the
+gate weights, and uses it for Qwen3.5's shared expert and Gemma4's dense MLP under
+`TEMPORAL_SHEXP_FIRST=1`. Same ops and same add order: batch-1 perplexity is unchanged (ours streamed
+2.1260 +/- 0.07134 with and without; stock 1.7345 +/- 0.04634).
+
+Same protocol as R1-5 with `--env TEMPORAL_SHEXP_FIRST=1` for **every** arm, three passes at 1k, two at 2k
+and 4k (the 1k controls have three passes too). Rows: `qwen_decode_shexp.jsonl` (63 rows, no failures).
+
+### 1024 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 157.30 | 155.40 / 158.20 / 158.31 | 6.357 | 21328 | 1.000 |  |  |
+| ours_vram | 146.89 | 145.24 / 147.83 / 147.60 | 6.808 | 21330 | 0.934 | 0.9996 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_vram | 144.84 | 143.30 / 145.61 / 145.60 | 6.904 | 21330 | 0.921 | 1.0207 | 0.323 / 0.466 / 0.126 / 0.085 |
+| ours_stream | 82.73 | 82.45 / 82.92 / 82.81 | 12.088 | 3628 | 0.526 | 0.9997 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_stream | 78.79 | 78.79 / 78.77 / 78.81 | 12.692 | 3628 | 0.501 | 1.0211 | 0.323 / 0.465 / 0.126 / 0.085 |
+| ours_nobytes | 135.33 | 135.99 / 134.92 / 135.09 | 7.389 | 3628 | 0.860 | 0.9998 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nobytes | 133.49 | 134.11 / 133.64 / 132.73 | 7.491 | 3628 | 0.849 | 0.8317 | 0.393 / 0.468 / 0.084 / 0.055 |
+| ours_nocopy | 136.11 | 135.77 / 136.29 / 136.28 | 7.347 | 3628 | 0.865 | 0.9998 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nocopy | 134.38 | 134.63 / 133.78 / 134.72 | 7.442 | 3628 | 0.854 | 0.8317 | 0.393 / 0.468 / 0.084 / 0.055 |
+
+### 2048 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 156.82 | 157.32 / 156.32 | 6.377 | 22358 | 1.000 |  |  |
+| ours_vram | 146.29 | 146.70 / 145.88 | 6.836 | 22360 | 0.933 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_vram | 144.84 | 144.52 / 145.15 | 6.904 | 22360 | 0.924 | 0.9939 | 0.240 / 0.604 / 0.101 / 0.055 |
+| ours_stream | 82.47 | 82.54 / 82.41 | 12.125 | 4722 | 0.526 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_stream | 80.74 | 80.97 / 80.50 | 12.386 | 4722 | 0.515 | 0.9940 | 0.236 / 0.606 / 0.106 / 0.052 |
+| ours_nobytes | 134.17 | 133.87 / 134.48 | 7.453 | 4722 | 0.856 | 0.9999 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nobytes | 133.07 | 133.07 / 133.07 | 7.515 | 4722 | 0.849 | 0.8821 | 0.355 / 0.483 / 0.107 / 0.055 |
+| ours_nocopy | 134.91 | 134.62 / 135.19 | 7.413 | 4722 | 0.860 | 0.9999 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nocopy | 133.72 | 133.45 / 133.98 | 7.479 | 4722 | 0.853 | 0.8874 | 0.354 / 0.476 / 0.116 / 0.053 |
+
+### 4096 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 155.40 | 155.99 / 154.81 | 6.435 | 24396 | 1.000 |  |  |
+| ours_vram | 145.25 | 145.51 / 145.00 | 6.885 | 24398 | 0.935 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_vram | 143.45 | 143.46 / 143.45 | 6.971 | 24398 | 0.923 | 0.9908 | 0.257 / 0.579 / 0.109 / 0.055 |
+| ours_stream | 81.90 | 81.73 / 82.07 | 12.210 | 6888 | 0.527 | 1.0000 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_stream | 79.44 | 79.56 / 79.32 | 12.588 | 6888 | 0.511 | 0.9944 | 0.252 / 0.583 / 0.110 / 0.055 |
+| ours_nobytes | 133.02 | 132.43 / 133.61 | 7.518 | 6888 | 0.856 | 0.9998 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nobytes | 130.85 | 130.27 / 131.43 | 7.642 | 6888 | 0.842 | 0.9266 | 0.299 / 0.546 / 0.103 / 0.052 |
+| ours_nocopy | 133.46 | 133.31 / 133.61 | 7.493 | 6888 | 0.859 | 0.9999 | 0.000 / 1.000 / 0.000 / 0.000 |
+| skliar_nocopy | 132.32 | 132.57 / 132.06 | 7.558 | 6888 | 0.851 | 0.9204 | 0.304 / 0.541 / 0.105 / 0.050 |
+
+Exposed transfer (streamed minus no bytes moved): ours 4.70 / 4.67 / 4.69 ms at 1k / 2k / 4k, against
+5.33 / 5.32 / 5.30 without 0007, so about 0.63 ms per token now runs under the shared expert. Skliar 5.20
+/ 4.87 / 4.95 against 5.62 / 5.35 / 5.42, about 0.45 ms hidden. Ours gains more because each of its layers
+has exactly one load to hide, while about a quarter of Skliar's layer-tokens have no load (nothing to hide)
+and its layers with two or more loads outlast the shared expert. Stock is unchanged (157.3 against 158.3
+tok/s at 1k, within pass-to-pass spread).
+
+## Results, Qwen3.5-35B-A3B (Q4_K_M, RTX A6000, batch 1, real-text replay)
+
+Headline configuration: patches 0001 to 0007, `TEMPORAL_SHEXP_FIRST=1` for every arm, `-fa 1 -t 8`,
+pinned to the GPU's NUMA node. tok/s pooled over passes (three at 1k, two at 2k and 4k); ratio to stock
+top-k with every expert in VRAM. GSM8K accuracies are the n = 1319 vLLM numbers of the paper's Section 7
+(not re-measured here).
+
+| arm | GSM8K | 1k tok/s (ms) | vs stock | 2k tok/s | vs stock | 4k tok/s | vs stock | peak VRAM at 1k | loads per layer-token (1k replay / GSM8K) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1. stock top-k, all 256 experts in VRAM | 85.9 | 157.30 (6.357) | 1.000 | 156.82 | 1.000 | 155.40 | 1.000 | 21,328 MiB | n/a |
+| 2. ours, 8 slots per layer streamed | 76.6 | **82.73** (12.088) | 0.526 | **82.47** | 0.526 | **81.90** | 0.527 | 3,628 MiB | 1.000 / 1.000 |
+| 3. Skliar C 8, lambda 0.4, 8 slots streamed | 74.5 | 78.79 (12.692) | 0.501 | 80.74 | 0.515 | 79.44 | 0.511 | 3,628 MiB | 1.021 / 1.001 |
+| 4a. arm 2's kernels, no bytes moved | | 135.33 | 0.860 | 134.17 | 0.856 | 133.02 | 0.856 | 3,628 MiB | |
+| 4b. arm 3's kernels, no bytes moved | | 133.49 | 0.849 | 133.07 | 0.849 | 130.85 | 0.842 | 3,628 MiB | |
+| ours, all experts in VRAM | | 146.89 | 0.934 | 146.29 | 0.933 | 145.25 | 0.935 | 21,330 MiB | |
+| Skliar, all experts in VRAM | | 144.84 | 0.921 | 144.84 | 0.924 | 143.45 | 0.923 | 21,330 MiB | |
+
+Ours against Skliar, streamed: 1.050x at 1k, 1.021x at 2k, 1.031x at 4k (tok/s). Without 0007 (R1-5): 78.46
+against 76.29 at 1k (1.028x), 78.27 against 77.59 at 2k (1.009x), 77.75 against 76.64 at 4k (1.015x).
+
+Loads per decode layer-token, distribution (fraction of layer-tokens with 0 / 1 / 2 / 3 or more loads):
+ours 0 / 1.000 / 0 / 0 everywhere (138 of 2.62 M GSM8K layer-tokens had none). Skliar on GSM8K (gate 2,
+engine, 200 items) 0.265 / 0.557 / 0.117 / 0.061, saved vLLM histogram 0.259 / 0.563 / 0.117 / 0.062; on the
+1k / 2k / 4k replays 0.323 / 0.465 / 0.126 / 0.085, 0.236 / 0.606 / 0.106 / 0.052, 0.252 / 0.583 / 0.110 /
+0.055.
+
+Peak VRAM is `nvidia-smi memory.used` during the process, CUDA context and KV cache included: 21,328 against
+3,628 MiB at 1k (5.9x less), 22,358 against 4,722 at 2k, 24,396 against 6,888 at 4k. The streamed arms also
+hold the expert pool twice in host RAM (the `-ncmoe` CPU buffer and a pinned copy, about 20 GB each).
+
+### Statements a reply or the paper could quote
+
+- (measured) On one RTX A6000 with Qwen3.5-35B-A3B at Q4_K_M, batch-1 decode at 1k context runs at 157.3
+  tok/s with all 256 experts per layer in VRAM (21.3 GB peak). With only 8 expert slots per layer in VRAM
+  and the pool in CPU RAM (3.6 GB peak), our one-swap rule decodes at 82.7 tok/s and Skliar et al.'s
+  cache-conditional routing (cache 8, lambda 0.4) at 78.8 tok/s.
+- (measured, with the paper's accuracies) At the same 8 experts per layer in fast memory, our rule is both
+  more accurate on GSM8K (76.6 against 74.5) and faster in the streaming engine (82.7 against 78.8 tok/s at
+  1k, 82.5 against 80.7 at 2k, 81.9 against 79.4 at 4k): it is ahead on both axes, so there is no trade-off
+  to match.
+- (measured) The speed difference is small, 2 to 5% depending on context, and the two methods load almost
+  the same number of experts (1.00 against about 1.00 per layer and token on GSM8K). Our advantage comes
+  from the load being exactly one in every layer, which overlaps better with the shared expert and costs
+  no top-k over biased logits; Skliar's loads are spread from 0 to 8 per layer.
+- (measured) Both streamed configurations run at about half the all-in-VRAM rate on this card (0.53 and
+  0.50); the cost is the PCIe transfer, about 2 MB per load, 40 loads per token, at about 15 GB/s effective
+  (4.7 to 5.2 ms of a 12.1 to 12.7 ms token), not the routing or slot kernels (about 1.0 to 1.1 ms
+  together).
+- (measured) Routing equality: on GSM8K generations, the engine's selected expert sets equal the Python
+  reference implementations' on every layer-token, for both methods and both memory placements (26,320 to
+  28,480 decode layer-tokens per configuration, weights Q4_K_M, references fed the engine's own logits).
+- (measured) Skliar's per-layer load distribution in the engine matches the vLLM histogram the accuracy
+  numbers were measured with (mean 1.001 against 1.011, total variation distance 0.006).
+- (derived) The speed ratio to the all-in-VRAM baseline depends on the host link; with the 22 GB/s that
+  large pinned copies reach on this host the transfer term would shrink by about a third.
+
+### Not done or not verified (Qwen)
+
+- The routing-equality gate used the engine's own logits; an end-to-end comparison of the engine's
+  forward pass with the vLLM/BF16 forward (where near-ties can flip) was not run.
+- Accuracy in the engine was only sanity-checked on 200 items (stock 0.890, ours 0.825, Skliar 0.780,
+  Q4_K_M); the comparison uses the paper's vLLM accuracies.
+- Peak VRAM includes the prompt-batch compute buffer (micro-batch = context length) for every arm.
+- The first decode token after the prompt reloads all 8 slots in both arms; with `llama-bench` restoring
+  the KV state between trials this happens in the discarded trial only.
+
+## R1-7 -- Pod and cost so far
+
+Pod `i65msin9gh64dw` running since 08:37 UTC, $0.69/h: about $1.8 at 11:10 UTC. The old pod
+`bcnqix1ewwwjr3` is stopped and was not resumed (its host had no free GPU). The new pod is left running for
+Gemma4 rather than stopped, because the morning showed a stopped pod may not get its GPU back; it will be
+stopped at the end.

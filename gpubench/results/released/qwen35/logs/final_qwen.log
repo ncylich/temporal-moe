@@ -1,0 +1,65 @@
+base            ctx   1024    160.46 tok/s  6.232 ms  trials ['156.87', '160.20', '160.54', '160.63']  peak 21336 MiB  
+ours_vram       ctx   1024    149.62 tok/s  6.684 ms  trials ['146.94', '150.14', '149.93', '148.79']  peak 21338 MiB  t
+skliar_vram     ctx   1024    147.36 tok/s  6.786 ms  trials ['144.32', '147.33', '147.30', '147.46']  peak 21338 MiB  t
+ours_stream     ctx   1024     78.89 tok/s  12.676 ms  trials ['75.12', '78.92', '78.84', '78.91']  peak 3636 MiB  tempo
+skliar_stream   ctx   1024     76.36 tok/s  13.096 ms  trials ['73.52', '76.47', '76.33', '76.28']  peak 3636 MiB  tempo
+ours_nobytes    ctx   1024    135.09 tok/s  7.403 ms  trials ['129.93', '134.97', '135.11', '135.19']  peak 3636 MiB  te
+skliar_nobytes  ctx   1024    133.78 tok/s  7.475 ms  trials ['130.53', '133.87', '133.85', '133.63']  peak 3636 MiB  te
+ours_nocopy     ctx   1024    135.85 tok/s  7.361 ms  trials ['132.00', '135.83', '136.16', '135.56']  peak 3636 MiB  te
+skliar_nocopy   ctx   1024    133.77 tok/s  7.475 ms  trials ['128.66', '134.10', '133.59', '133.62']  peak 3636 MiB  te
+skliar_nocopy   ctx   1024    134.41 tok/s  7.440 ms  trials ['131.00', '134.59', '134.80', '133.85']  peak 3636 MiB  te
+ours_nocopy     ctx   1024    135.60 tok/s  7.374 ms  trials ['132.10', '135.66', '135.27', '135.88']  peak 3636 MiB  te
+skliar_nobytes  ctx   1024    132.99 tok/s  7.519 ms  trials ['128.42', '133.24', '132.85', '132.89']  peak 3636 MiB  te
+ours_nobytes    ctx   1024    134.35 tok/s  7.443 ms  trials ['130.37', '133.94', '134.27', '134.83']  peak 3636 MiB  te
+skliar_stream   ctx   1024     76.22 tok/s  13.120 ms  trials ['73.22', '76.23', '76.17', '76.25']  peak 3636 MiB  tempo
+ours_stream     ctx   1024     78.19 tok/s  12.789 ms  trials ['73.97', '78.25', '78.12', '78.20']  peak 3636 MiB  tempo
+skliar_vram     ctx   1024    145.96 tok/s  6.851 ms  trials ['143.23', '145.99', '145.65', '146.24']  peak 21338 MiB  t
+ours_vram       ctx   1024    146.81 tok/s  6.811 ms  trials ['144.56', '146.52', '146.82', '147.10']  peak 21338 MiB  t
+base            ctx   1024    156.83 tok/s  6.376 ms  trials ['153.70', '156.87', '156.89', '156.74']  peak 21336 MiB  
+base            ctx   1024    157.50 tok/s  6.349 ms  trials ['154.45', '157.40', '157.61', '157.50']  peak 21336 MiB  
+ours_vram       ctx   1024    146.63 tok/s  6.820 ms  trials ['143.28', '146.69', '146.59', '146.62']  peak 21338 MiB  t
+skliar_vram     ctx   1024    145.00 tok/s  6.896 ms  trials ['142.68', '145.20', '144.34', '145.47']  peak 21338 MiB  t
+ours_stream     ctx   1024     78.29 tok/s  12.773 ms  trials ['74.22', '78.58', '78.53', '77.77']  peak 3636 MiB  tempo
+skliar_stream   ctx   1024     76.28 tok/s  13.110 ms  trials ['73.44', '76.38', '76.29', '76.17']  peak 3636 MiB  tempo
+ours_nobytes    ctx   1024    134.83 tok/s  7.417 ms  trials ['131.69', '134.65', '135.13', '134.71']  peak 3636 MiB  te
+skliar_nobytes  ctx   1024    133.55 tok/s  7.488 ms  trials ['129.46', '133.63', '133.48', '133.53']  peak 3636 MiB  te
+ours_nocopy     ctx   1024    135.45 tok/s  7.383 ms  trials ['130.14', '135.55', '134.89', '135.91']  peak 3636 MiB  te
+skliar_nocopy   ctx   1024    133.98 tok/s  7.464 ms  trials ['130.83', '134.29', '133.96', '133.71']  peak 3636 MiB  te
+PASS_1K_DONE
+base            ctx   2048    156.48 tok/s  6.390 ms  trials ['154.13', '156.91', '156.38', '156.17']  peak 22374 MiB  
+ours_vram       ctx   2048    145.75 tok/s  6.861 ms  trials ['142.85', '145.70', '145.72', '145.83']  peak 22376 MiB  t
+skliar_vram     ctx   2048    144.36 tok/s  6.927 ms  trials ['141.76', '143.58', '144.50', '145.00']  peak 22376 MiB  t
+ours_stream     ctx   2048     78.04 tok/s  12.814 ms  trials ['74.77', '78.21', '77.74', '78.17']  peak 4738 MiB  tempo
+skliar_stream   ctx   2048     77.72 tok/s  12.867 ms  trials ['72.99', '77.09', '77.55', '78.52']  peak 4738 MiB  tempo
+ours_nobytes    ctx   2048    133.95 tok/s  7.465 ms  trials ['130.03', '134.17', '133.67', '134.02']  peak 4738 MiB  te
+skliar_nobytes  ctx   2048    132.95 tok/s  7.522 ms  trials ['129.22', '133.36', '132.95', '132.54']  peak 4738 MiB  te
+ours_nocopy     ctx   2048    134.96 tok/s  7.410 ms  trials ['131.22', '135.41', '134.88', '134.58']  peak 4738 MiB  te
+skliar_nocopy   ctx   2048    132.75 tok/s  7.533 ms  trials ['128.30', '132.83', '132.75', '132.68']  peak 4738 MiB  te
+skliar_nocopy   ctx   2048    134.03 tok/s  7.461 ms  trials ['128.39', '134.03', '133.96', '134.09']  peak 4738 MiB  te
+ours_nocopy     ctx   2048    135.58 tok/s  7.376 ms  trials ['131.95', '135.70', '135.47', '135.56']  peak 4738 MiB  te
+skliar_nobytes  ctx   2048    132.19 tok/s  7.565 ms  trials ['127.29', '132.21', '132.55', '131.81']  peak 4738 MiB  te
+ours_nobytes    ctx   2048    134.19 tok/s  7.452 ms  trials ['130.59', '134.07', '134.13', '134.38']  peak 4738 MiB  te
+skliar_stream   ctx   2048     77.45 tok/s  12.911 ms  trials ['72.15', '77.27', '77.46', '77.63']  peak 4738 MiB  tempo
+ours_stream     ctx   2048     78.49 tok/s  12.740 ms  trials ['74.70', '78.53', '78.58', '78.36']  peak 4738 MiB  tempo
+skliar_vram     ctx   2048    145.14 tok/s  6.890 ms  trials ['141.85', '144.99', '145.08', '145.35']  peak 22376 MiB  t
+ours_vram       ctx   2048    146.55 tok/s  6.824 ms  trials ['143.07', '146.31', '146.72', '146.63']  peak 22376 MiB  t
+base            ctx   2048    156.38 tok/s  6.395 ms  trials ['153.91', '156.68', '156.04', '156.41']  peak 22374 MiB  
+base            ctx   4096    155.41 tok/s  6.435 ms  trials ['152.61', '155.21', '155.56', '155.44']  peak 24432 MiB  
+ours_vram       ctx   4096    145.29 tok/s  6.883 ms  trials ['141.54', '145.21', '145.34', '145.31']  peak 24434 MiB  t
+skliar_vram     ctx   4096    143.27 tok/s  6.980 ms  trials ['139.89', '143.38', '143.38', '143.04']  peak 24434 MiB  t
+ours_stream     ctx   4096     77.56 tok/s  12.893 ms  trials ['73.44', '77.70', '77.66', '77.32']  peak 6924 MiB  tempo
+skliar_stream   ctx   4096     76.51 tok/s  13.070 ms  trials ['73.46', '76.29', '76.71', '76.54']  peak 6924 MiB  tempo
+ours_nobytes    ctx   4096    132.71 tok/s  7.535 ms  trials ['129.38', '132.85', '132.66', '132.61']  peak 6924 MiB  te
+skliar_nobytes  ctx   4096    131.15 tok/s  7.625 ms  trials ['127.24', '131.21', '131.23', '131.01']  peak 6924 MiB  te
+ours_nocopy     ctx   4096    133.23 tok/s  7.506 ms  trials ['127.11', '133.22', '133.24', '133.23']  peak 6924 MiB  te
+skliar_nocopy   ctx   4096    131.42 tok/s  7.609 ms  trials ['128.84', '131.60', '131.62', '131.03']  peak 6924 MiB  te
+skliar_nocopy   ctx   4096    131.69 tok/s  7.593 ms  trials ['127.92', '131.46', '131.49', '132.12']  peak 6924 MiB  te
+ours_nocopy     ctx   4096    133.55 tok/s  7.488 ms  trials ['129.70', '133.32', '133.47', '133.87']  peak 6924 MiB  te
+skliar_nobytes  ctx   4096    130.88 tok/s  7.640 ms  trials ['125.69', '131.04', '131.24', '130.37']  peak 6924 MiB  te
+ours_nobytes    ctx   4096    131.79 tok/s  7.588 ms  trials ['125.67', '130.93', '132.66', '131.78']  peak 6924 MiB  te
+skliar_stream   ctx   4096     76.76 tok/s  13.027 ms  trials ['73.63', '76.99', '76.80', '76.49']  peak 6924 MiB  tempo
+ours_stream     ctx   4096     77.94 tok/s  12.830 ms  trials ['74.21', '78.08', '77.73', '78.01']  peak 6924 MiB  tempo
+skliar_vram     ctx   4096    143.76 tok/s  6.956 ms  trials ['140.62', '143.40', '143.88', '144.00']  peak 24434 MiB  t
+ours_vram       ctx   4096    145.21 tok/s  6.887 ms  trials ['142.14', '144.97', '145.46', '145.20']  peak 24434 MiB  t
+base            ctx   4096    155.30 tok/s  6.439 ms  trials ['151.33', '155.00', '155.24', '155.67']  peak 24432 MiB  
+FINAL_DONE
