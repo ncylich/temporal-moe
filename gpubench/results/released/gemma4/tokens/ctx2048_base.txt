@@ -1,0 +1,8 @@
+Let $c$ be the number of chickens and $w$ be the number of cows.
+The total number of animals is $c + w = 20$.
+The total number of legs is $2c + 4w = 70$.
+From the first equation, we can express $w$ as $w = 20 - c$.
+Substitute this into the second equation: $2c + 4(20 - c) = 70$.
+Simplify the equation: $2c + 80 - 4c = 70$.
+Combine the $c$ terms: $-2c + 80 = 70$.
+Subtract 80 from both sides: $-2c = 7
