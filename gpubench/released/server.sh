@@ -16,6 +16,7 @@ case $ARM in
   skliar_stream) ENVV+=(LLAMA_TEMPORAL_ROUTE=skliar TEMPORAL_CB_C=${SK_C:?} TEMPORAL_CB_LAMBDA=${SK_LAM:?} TEMPORAL_CB_J=1 TEMPORAL_UNIFIED=1) ;;
   *) echo "unknown arm $ARM" >&2; exit 1 ;;
 esac
+if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then echo "port $PORT already serves something; refusing to start"; exit 1; fi
 EXTRA=()
 [[ $ARM == *_stream ]] && EXTRA=(-ncmoe "$NMOE")
 env "${ENVV[@]}" "$@" "$BIN/llama-server" -m "$MODEL" -ngl 99 -fa on -t 8 -c 8192 -np 1 -b 4096 -ub 4096 \
