@@ -1,0 +1,112 @@
+From 56a622d6bbaf095578430d206ff73cd48aa20d68 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Sat, 14 Nov 2026 15:11:11 -0800
+Subject: [PATCH] temporal-MoE CUDA: skliar fast path finds max, min and the
+ first exchange in one round
+
+Round 0 of the swap fast path now also yields the max and min of z (delta and the top-1), so the
+separate reduction pass and its synchronisation points are gone for decoded tokens. All cached
+experts carry the same bias in round 0, so the weakest selected expert is the cached one with the
+lowest z. Same selections, loads and perplexity as before.
+---
+ ggml/src/ggml-cuda/temporal.cu | 45 +++++++++++++++++++++++-----------
+ 1 file changed, 31 insertions(+), 14 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index a3ff561a..dd4511b1 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -602,7 +602,7 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+     for (int t = 0; t < n_tokens; ++t) {
+         const float * xt = lg + (size_t) t * stride;
+         for (int e = tid; e < E; e += nt) x[e] = xt[e];
+-        if (tid == 0) { s_loads = -1; s_a = 0ull; s_b = ~0ull; }
++        if (tid == 0) { s_loads = -1; s_a = 0ull; s_b = ~0ull; s_c = 0ull; s_d = ~0ull; }
+         __syncthreads();
+         if (mode == 2) {
+             if (s_state == 0) {                                   // cold fill = top-K of this token
+@@ -632,7 +632,8 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+                 else tr2_topk(x, E, K, s_ids);                    // prompt: free routing
+             }
+         } else {                                                  // mode 3: skliar
+-            {
++            const bool fast = n_tokens == 1 && s_state != 0 && C == K && !tr2_fullsel;
++            if (!fast) {
+                 unsigned long long ra = 0ull, rb = ~0ull;            // max with lowest-index tie (= top-1), min
+                 for (int e = tid; e < E; e += nt) {
+                     const unsigned long long ka = tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e), kb = tr2_hi(x[e], (unsigned) e);
+@@ -642,7 +643,7 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+                 if (tid == 0) { s_a = ra; s_b = rb; }
+             }
+             __syncthreads();
+-            if (tid == 0) {                                       // delta: running mean of max - min (float32 difference)
++            if (tid == 0 && !fast) {                              // delta: running mean of max - min (float32 difference)
+                 const float mx = tr2_val((unsigned) (s_a >> 32)), mn = tr2_val((unsigned) (s_b >> 32));
+                 *dsum += (double) (mx - mn); *dn += 1ull;
+                 s_bias = (float) ((double) lam * (*dsum / (double) *dn));
+@@ -658,17 +659,38 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+                     if (C == K) { for (int j = tid; j < K; j += nt) s_win[j] = s_ids[j]; }   // the cache, as a list
+                     if (tid == 0) { *tnow = (s_state ? *tnow : 0) + n_tokens; s_state = 1; }
+                 }
+-            } else if (C == K && !tr2_fullsel) {
++            } else if (fast) {
+                 // The cache is the previous selection (s_win). top-K of z + bias*cached is reached by swaps:
+                 // while the best non-selected expert beats the weakest selected one (cached ones carry the
+                 // bias, experts admitted this token do not), exchange them. Admissions come in falling
+                 // order and evictions in rising order, so no expert moves twice. J = 1: if the top-1 of z
+                 // is outside and loses, it replaces the weakest selected expert and nothing else can enter.
+-                for (int e = tid; e < E; e += nt) tmp[e] = lu[e] >= 0;        // 1 cached, 2 admitted now, 3 evicted now
++                // Round 0 also finds max and min of z (delta, top-1); all cached experts carry the same
++                // bias then, so the weakest selected one is the cached expert with the lowest z.
++                for (int e = tid; e < E; e += nt) {
++                    const int c = lu[e] >= 0; tmp[e] = c;                 // 1 cached, 2 admitted now, 3 evicted now
++                    const unsigned long long ka = tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e);
++                    atomicMax(&s_a, ka); atomicMin(&s_b, tr2_hi(x[e], (unsigned) e));
++                    if (!c) atomicMax(&s_c, ka);
++                }
++                for (int j = tid; j < K; j += nt) atomicMin(&s_d, tr2_hi(x[s_win[j]], (unsigned) j));
+                 __syncthreads();
+-                const int top1 = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull));
+                 const int step = (int) *tnow;
+-                for (int it = 0; ; ++it) {
++                if (tid == 0) {
++                    const float mx = tr2_val((unsigned) (s_a >> 32)), mn = tr2_val((unsigned) (s_b >> 32));
++                    *dsum += (double) (mx - mn); *dn += 1ull;
++                    s_bias = (float) ((double) lam * (*dsum / (double) *dn));
++                    const int top1 = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull));
++                    const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_c & 0xFFFFFFFFull)), ws = (int) (s_d & 0xFFFFFFFFull);
++                    const int eo = s_win[ws];
++                    const bool win_ = s_c != 0ull && x[nom] > x[eo] + s_bias;
++                    const bool force = !win_ && J > 0 && s_c != 0ull && nom == top1;
++                    s_loads = 0;
++                    if (win_ || force) { s_win[ws] = nom; tmp[nom] = 2; tmp[eo] = 3; lu[eo] = -1; lu[nom] = step; s_loads = 1; }
++                    s_go = win_ && K > 1;
++                }
++                __syncthreads();
++                while (s_go) {                                        // further loads this token (rare)
+                     if (tid == 0) { s_c = 0ull; s_d = ~0ull; }
+                     __syncthreads();
+                     for (int e = tid; e < E; e += nt) if (!tmp[e]) atomicMax(&s_c, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));
+@@ -678,17 +700,12 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+                         const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_c & 0xFFFFFFFFull)), ws = (int) (s_d & 0xFFFFFFFFull);
+                         const int eo = s_win[ws];
+                         const bool win_ = s_c != 0ull && x[nom] > x[eo] + (tmp[eo] == 1 ? s_bias : 0.0f);
+-                        const bool force = !win_ && it == 0 && J > 0 && s_c != 0ull && nom == top1;
+-                        if (win_ || force) { s_win[ws] = nom; tmp[nom] = 2; tmp[eo] = 3; lu[eo] = -1; lu[nom] = step; if (it == 0) s_loads = 0; s_loads++; }
++                        if (win_) { s_win[ws] = nom; tmp[nom] = 2; tmp[eo] = 3; lu[eo] = -1; lu[nom] = step; s_loads++; }
+                         s_go = win_ && s_loads < K;
+                     }
+                     __syncthreads();
+-                    if (!s_go) break;
+-                }
+-                if (tid == 0) {
+-                    if (s_loads < 0) s_loads = 0;
+-                    *tnow = step + 1; cnt[0]++; cnt[1] += s_loads; hist[s_loads]++;
+                 }
++                if (tid == 0) { *tnow = step + 1; cnt[0]++; cnt[1] += s_loads; hist[s_loads]++; }
+                 for (int j = tid; j < K; j += nt) s_ids[j] = s_win[j];
+                 __syncthreads();
+             } else {
+-- 
+2.50.0
+
