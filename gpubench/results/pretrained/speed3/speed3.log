@@ -1,0 +1,196 @@
+### GPU0 CPU affinity: 32-63,96-127 23:11:14
+### gate 1: engine routing equals decode_state.py / cache_bias.py 23:11:14
+slots 0 ours: {"prompt_tokens": 6708, "prompt_equal": 6503, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 0, "first_mismatch": {"record": 16, "layer": 9, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 0 skliar: {"prompt_tokens": 6708, "prompt_equal": 6503, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 1287, "first_mismatch": {"record": 16, "layer": 9, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 0 ours_stream: {"prompt_tokens": 6708, "prompt_equal": 6508, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 0, "first_mismatch": {"record": 6, "layer": 4, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 0 skliar_stream: {"prompt_tokens": 6708, "prompt_equal": 6508, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 1287, "first_mismatch": {"record": 6, "layer": 4, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 2 ours: {"prompt_tokens": 6708, "prompt_equal": 6503, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 0, "first_mismatch": {"record": 16, "layer": 9, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 2 skliar: {"prompt_tokens": 6708, "prompt_equal": 6503, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 1287, "first_mismatch": {"record": 16, "layer": 9, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 2 ours_stream: {"prompt_tokens": 6708, "prompt_equal": 6508, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 0, "first_mismatch": {"record": 6, "layer": 4, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+slots 2 skliar_stream: {"prompt_tokens": 6708, "prompt_equal": 6508, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 1287, "first_mismatch": {"record": 6, "layer": 4, "kind": "prompt"}, "sequences": 3, "layers": 13, "prompt_chunks_continued": 0}
+### gate 3: batch-1 perplexity, streamed (each slot setting) against all in VRAM 23:12:16
+stock: Final estimate: PPL = 22.6868
+decode vram: Final estimate: PPL = 42.6913
+decode stream slots 0: Final estimate: PPL = 42.6913
+decode stream slots 1: Final estimate: PPL = 42.6913
+decode stream slots 2: Final estimate: PPL = 42.6913
+skliar vram: Final estimate: PPL = 38.9311
+skliar stream slots 0: Final estimate: PPL = 38.9311
+skliar stream slots 1: Final estimate: PPL = 38.9311
+skliar stream slots 2: Final estimate: PPL = 38.9311
+trained vram: Final estimate: PPL = 22.7367
+trained stream slots 0: Final estimate: PPL = 22.7367
+trained stream slots 1: Final estimate: PPL = 22.7367
+trained stream slots 2: Final estimate: PPL = 22.7367
+### timing 23:14:06
+base            ctx   1024    655.27 tok/s  1.526 ms  trials ['600.22', '655.24', '655.52', '655.06']  peak 1438 MiB  
+ours_vram       ctx   1024    699.54 tok/s  1.430 ms  trials ['664.52', '700.63', '697.67', '700.31']  peak 1438 MiB  temporal-route-cuda: trained min
+skliar_vram     ctx   1024    673.45 tok/s  1.485 ms  trials ['632.21', '672.80', '674.87', '672.68']  peak 1438 MiB  temporal-route2: mode=skliar lay
+trained_vram    ctx   1024    678.08 tok/s  1.475 ms  trials ['633.59', '677.56', '677.89', '678.80']  peak 1438 MiB  temporal-route-cuda: trained min
+-- slots 0 shexp_first 0 row 601
+ours_stream     ctx   1024    603.69 tok/s  1.656 ms  trials ['549.24', '602.60', '604.09', '604.37']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    569.95 tok/s  1.755 ms  trials ['529.96', '559.18', '574.95', '575.71']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    585.64 tok/s  1.708 ms  trials ['548.89', '585.29', '584.87', '586.78']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 0 shexp_first 1 row 601
+ours_stream     ctx   1024    595.74 tok/s  1.679 ms  trials ['556.11', '580.68', '603.69', '602.85']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    576.48 tok/s  1.735 ms  trials ['539.73', '575.58', '577.31', '576.56']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    584.59 tok/s  1.711 ms  trials ['548.37', '585.47', '582.69', '585.61']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 0 row 601
+ours_stream     ctx   1024    616.04 tok/s  1.623 ms  trials ['576.37', '616.85', '616.73', '614.53']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    583.81 tok/s  1.713 ms  trials ['548.19', '584.15', '584.41', '582.86']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.08 tok/s  1.675 ms  trials ['559.62', '596.43', '596.90', '597.91']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 1 row 601
+ours_stream     ctx   1024    610.92 tok/s  1.637 ms  trials ['577.87', '596.32', '618.53', '617.92']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    577.99 tok/s  1.730 ms  trials ['548.86', '567.04', '584.26', '582.67']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    589.26 tok/s  1.697 ms  trials ['558.96', '574.14', '595.73', '597.91']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 0 row 601
+ours_stream     ctx   1024    608.85 tok/s  1.642 ms  trials ['579.73', '592.66', '617.31', '616.58']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    584.21 tok/s  1.712 ms  trials ['284.73', '584.42', '583.88', '584.34']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    594.09 tok/s  1.683 ms  trials ['554.22', '595.52', '598.39', '588.34']  peak 933 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 1 row 601
+ours_stream     ctx   1024    616.03 tok/s  1.623 ms  trials ['568.47', '616.32', '614.24', '617.53']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    583.14 tok/s  1.715 ms  trials ['545.10', '583.17', '582.48', '583.78']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.19 tok/s  1.675 ms  trials ['559.96', '596.08', '598.14', '597.36']  peak 918 MiB  temporal-route-cuda: trained min_
+ours_stream     ctx   1024    585.88 tok/s  1.707 ms  trials ['548.95', '584.81', '586.60', '586.23']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    554.46 tok/s  1.804 ms  trials ['517.09', '554.70', '554.49', '554.21']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_stream     ctx   1024    586.04 tok/s  1.706 ms  trials ['547.98', '585.72', '585.89', '586.49']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    547.39 tok/s  1.827 ms  trials ['514.68', '534.80', '552.94', '554.45']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_vram       ctx   1024    671.79 tok/s  1.489 ms  trials ['608.34', '671.28', '671.74', '672.35']  peak 1438 MiB  temporal-route2: mode=decode lay
+skliar_vram     ctx   1024    644.90 tok/s  1.551 ms  trials ['607.06', '644.64', '645.34', '644.71']  peak 1438 MiB  temporal-route2: mode=skliar lay
+base            ctx   1024    656.41 tok/s  1.523 ms  trials ['621.33', '657.06', '656.28', '655.90']  peak 1438 MiB  
+ours_vram       ctx   1024    696.87 tok/s  1.435 ms  trials ['661.08', '699.67', '699.69', '691.26']  peak 1438 MiB  temporal-route-cuda: trained min
+skliar_vram     ctx   1024    670.84 tok/s  1.491 ms  trials ['630.31', '670.45', '671.35', '670.73']  peak 1438 MiB  temporal-route2: mode=skliar lay
+trained_vram    ctx   1024    676.82 tok/s  1.477 ms  trials ['636.77', '676.08', '677.76', '676.62']  peak 1438 MiB  temporal-route-cuda: trained min
+-- slots 0 shexp_first 0 row 602
+ours_stream     ctx   1024    602.55 tok/s  1.660 ms  trials ['560.09', '604.22', '602.19', '601.24']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    572.76 tok/s  1.746 ms  trials ['544.44', '561.46', '577.79', '579.02']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    586.85 tok/s  1.704 ms  trials ['549.85', '585.80', '587.62', '587.13']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 0 shexp_first 1 row 602
+ours_stream     ctx   1024    595.48 tok/s  1.679 ms  trials ['565.72', '580.61', '603.33', '602.51']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    572.43 tok/s  1.747 ms  trials ['541.98', '560.93', '577.95', '578.41']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    577.90 tok/s  1.730 ms  trials ['547.77', '563.66', '584.90', '585.13']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 0 row 602
+ours_stream     ctx   1024    616.38 tok/s  1.622 ms  trials ['563.61', '615.84', '615.79', '617.50']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    584.91 tok/s  1.710 ms  trials ['547.65', '585.41', '584.16', '585.15']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.31 tok/s  1.671 ms  trials ['555.74', '597.47', '597.99', '599.48']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 1 row 602
+ours_stream     ctx   1024    617.51 tok/s  1.619 ms  trials ['570.99', '617.67', '617.99', '616.88']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    578.14 tok/s  1.730 ms  trials ['544.64', '563.35', '585.80', '585.26']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.27 tok/s  1.671 ms  trials ['554.53', '598.59', '598.41', '597.81']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 0 row 602
+ours_stream     ctx   1024    615.41 tok/s  1.625 ms  trials ['574.48', '616.31', '615.28', '614.63']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    579.97 tok/s  1.724 ms  trials ['549.49', '569.16', '584.93', '585.82']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.47 tok/s  1.671 ms  trials ['560.99', '599.06', '597.49', '598.87']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 1 row 602
+ours_stream     ctx   1024    617.21 tok/s  1.620 ms  trials ['575.31', '617.27', '616.75', '617.62']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    584.47 tok/s  1.711 ms  trials ['543.46', '585.27', '582.98', '585.15']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.03 tok/s  1.675 ms  trials ['559.53', '596.47', '598.06', '596.58']  peak 918 MiB  temporal-route-cuda: trained min_
+ours_stream     ctx   1024    576.33 tok/s  1.735 ms  trials ['549.94', '562.63', '583.32', '583.05']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    555.93 tok/s  1.799 ms  trials ['524.14', '556.03', '555.30', '556.46']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_stream     ctx   1024    584.26 tok/s  1.712 ms  trials ['543.09', '584.29', '585.07', '583.44']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    555.42 tok/s  1.800 ms  trials ['520.18', '554.65', '556.31', '555.29']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_vram       ctx   1024    673.52 tok/s  1.485 ms  trials ['631.35', '674.05', '673.24', '673.28']  peak 1438 MiB  temporal-route2: mode=decode lay
+skliar_vram     ctx   1024    645.46 tok/s  1.549 ms  trials ['613.12', '644.31', '646.03', '646.04']  peak 1438 MiB  temporal-route2: mode=skliar lay
+base            ctx   1024    655.62 tok/s  1.525 ms  trials ['596.92', '654.68', '655.81', '656.37']  peak 1438 MiB  
+ours_vram       ctx   1024    700.01 tok/s  1.429 ms  trials ['653.55', '699.82', '700.54', '699.69']  peak 1438 MiB  temporal-route-cuda: trained min
+skliar_vram     ctx   1024    674.75 tok/s  1.482 ms  trials ['615.54', '674.89', '674.04', '675.31']  peak 1438 MiB  temporal-route2: mode=skliar lay
+trained_vram    ctx   1024    677.03 tok/s  1.477 ms  trials ['639.97', '676.90', '675.48', '678.72']  peak 1438 MiB  temporal-route-cuda: trained min
+-- slots 0 shexp_first 0 row 603
+ours_stream     ctx   1024    603.40 tok/s  1.657 ms  trials ['565.90', '603.32', '603.58', '603.32']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    567.10 tok/s  1.763 ms  trials ['537.06', '554.04', '572.63', '574.63']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    585.53 tok/s  1.708 ms  trials ['549.23', '585.32', '584.71', '586.57']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 0 shexp_first 1 row 603
+ours_stream     ctx   1024    595.84 tok/s  1.678 ms  trials ['558.00', '580.54', '603.91', '603.09']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    572.13 tok/s  1.748 ms  trials ['536.82', '573.25', '572.83', '570.30']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    586.29 tok/s  1.706 ms  trials ['546.13', '586.83', '586.13', '585.91']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 0 row 603
+ours_stream     ctx   1024    610.48 tok/s  1.638 ms  trials ['572.54', '596.69', '618.08', '616.67']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    576.01 tok/s  1.736 ms  trials ['545.38', '565.23', '581.36', '581.43']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.29 tok/s  1.671 ms  trials ['559.86', '598.53', '596.16', '600.18']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 1 row 603
+ours_stream     ctx   1024    618.08 tok/s  1.618 ms  trials ['577.31', '617.51', '618.57', '618.15']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    575.49 tok/s  1.738 ms  trials ['545.81', '562.21', '581.79', '582.48']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.96 tok/s  1.672 ms  trials ['561.58', '598.62', '594.96', '600.30']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 0 row 603
+ours_stream     ctx   1024    617.38 tok/s  1.620 ms  trials ['572.17', '617.32', '617.26', '617.55']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    581.73 tok/s  1.719 ms  trials ['545.84', '580.96', '580.63', '583.60']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    589.84 tok/s  1.695 ms  trials ['557.87', '575.15', '596.61', '597.75']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 1 row 603
+ours_stream     ctx   1024    610.50 tok/s  1.638 ms  trials ['576.94', '597.43', '617.32', '616.73']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    574.85 tok/s  1.740 ms  trials ['543.45', '561.63', '579.64', '583.27']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.60 tok/s  1.671 ms  trials ['559.23', '598.65', '597.81', '599.33']  peak 918 MiB  temporal-route-cuda: trained min_
+ours_stream     ctx   1024    578.71 tok/s  1.728 ms  trials ['546.04', '565.90', '587.33', '582.90']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    544.60 tok/s  1.836 ms  trials ['519.61', '530.45', '551.72', '551.63']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_stream     ctx   1024    585.71 tok/s  1.707 ms  trials ['548.57', '585.66', '585.20', '586.27']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    547.10 tok/s  1.828 ms  trials ['516.65', '537.78', '551.78', '551.76']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_vram       ctx   1024    672.53 tok/s  1.487 ms  trials ['630.02', '672.73', '672.68', '672.17']  peak 1438 MiB  temporal-route2: mode=decode lay
+skliar_vram     ctx   1024    645.60 tok/s  1.549 ms  trials ['609.94', '645.26', '645.57', '645.96']  peak 1438 MiB  temporal-route2: mode=skliar lay
+base            ctx   1024    656.33 tok/s  1.524 ms  trials ['613.40', '656.43', '656.17', '656.38']  peak 1438 MiB  
+ours_vram       ctx   1024    700.19 tok/s  1.428 ms  trials ['665.13', '701.43', '700.16', '698.99']  peak 1438 MiB  temporal-route-cuda: trained min
+skliar_vram     ctx   1024    673.18 tok/s  1.485 ms  trials ['617.97', '671.93', '673.37', '674.25']  peak 1438 MiB  temporal-route2: mode=skliar lay
+trained_vram    ctx   1024    677.45 tok/s  1.476 ms  trials ['620.90', '677.44', '678.35', '676.57']  peak 1438 MiB  temporal-route-cuda: trained min
+-- slots 0 shexp_first 0 row 604
+ours_stream     ctx   1024    598.62 tok/s  1.671 ms  trials ['563.09', '588.57', '604.66', '602.63']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    569.31 tok/s  1.757 ms  trials ['534.77', '567.41', '570.73', '569.79']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    584.40 tok/s  1.711 ms  trials ['547.64', '582.78', '584.11', '586.32']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 0 shexp_first 1 row 604
+ours_stream     ctx   1024    604.42 tok/s  1.654 ms  trials ['563.86', '605.22', '605.37', '602.66']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    560.49 tok/s  1.784 ms  trials ['532.32', '553.80', '564.60', '563.07']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    585.61 tok/s  1.708 ms  trials ['547.72', '585.79', '586.03', '585.02']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 0 row 604
+ours_stream     ctx   1024    609.77 tok/s  1.640 ms  trials ['575.88', '593.65', '617.99', '617.67']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    573.15 tok/s  1.745 ms  trials ['543.85', '559.88', '579.37', '580.19']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.11 tok/s  1.675 ms  trials ['556.77', '595.02', '597.21', '599.10']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 1 row 604
+ours_stream     ctx   1024    610.17 tok/s  1.639 ms  trials ['578.46', '595.61', '617.93', '616.98']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    578.71 tok/s  1.728 ms  trials ['542.10', '578.20', '579.39', '578.54']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.40 tok/s  1.671 ms  trials ['551.23', '598.60', '597.84', '598.77']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 0 row 604
+ours_stream     ctx   1024    611.55 tok/s  1.635 ms  trials ['576.81', '599.41', '617.76', '617.48']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    578.94 tok/s  1.727 ms  trials ['542.27', '577.50', '579.76', '579.58']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    596.57 tok/s  1.676 ms  trials ['559.61', '597.04', '594.92', '597.75']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 1 row 604
+ours_stream     ctx   1024    608.81 tok/s  1.643 ms  trials ['575.81', '590.32', '618.08', '618.03']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    579.24 tok/s  1.726 ms  trials ['543.24', '577.94', '580.78', '578.98']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.46 tok/s  1.674 ms  trials ['557.25', '598.01', '597.04', '597.34']  peak 918 MiB  temporal-route-cuda: trained min_
+ours_stream     ctx   1024    576.77 tok/s  1.734 ms  trials ['547.62', '561.20', '585.85', '583.27']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    543.73 tok/s  1.839 ms  trials ['515.03', '533.61', '548.93', '548.65']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_stream     ctx   1024    584.48 tok/s  1.711 ms  trials ['548.07', '584.63', '585.42', '583.40']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    549.91 tok/s  1.818 ms  trials ['511.75', '550.09', '550.27', '549.37']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_vram       ctx   1024    674.11 tok/s  1.483 ms  trials ['635.99', '673.97', '674.04', '674.32']  peak 1438 MiB  temporal-route2: mode=decode lay
+skliar_vram     ctx   1024    646.79 tok/s  1.546 ms  trials ['611.54', '646.22', '646.79', '647.35']  peak 1438 MiB  temporal-route2: mode=skliar lay
+base            ctx   1024    655.43 tok/s  1.526 ms  trials ['587.20', '655.92', '655.10', '655.25']  peak 1438 MiB  
+ours_vram       ctx   1024    699.00 tok/s  1.431 ms  trials ['661.46', '698.94', '700.32', '697.73']  peak 1438 MiB  temporal-route-cuda: trained min
+skliar_vram     ctx   1024    673.13 tok/s  1.486 ms  trials ['638.31', '673.20', '674.35', '671.83']  peak 1438 MiB  temporal-route2: mode=skliar lay
+trained_vram    ctx   1024    677.17 tok/s  1.477 ms  trials ['641.08', '677.36', '676.46', '677.69']  peak 1438 MiB  temporal-route-cuda: trained min
+-- slots 0 shexp_first 0 row 605
+ours_stream     ctx   1024    604.14 tok/s  1.655 ms  trials ['563.90', '604.22', '603.53', '604.68']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    578.00 tok/s  1.730 ms  trials ['542.93', '578.16', '578.30', '577.54']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    583.81 tok/s  1.713 ms  trials ['550.15', '584.57', '585.83', '581.03']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 0 shexp_first 1 row 605
+ours_stream     ctx   1024    603.32 tok/s  1.657 ms  trials ['565.95', '603.26', '603.27', '603.42']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    580.36 tok/s  1.723 ms  trials ['542.52', '580.67', '580.15', '580.26']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    586.43 tok/s  1.705 ms  trials ['543.53', '585.67', '587.08', '586.53']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 0 row 605
+ours_stream     ctx   1024    609.09 tok/s  1.642 ms  trials ['574.11', '592.84', '617.52', '616.91']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    587.71 tok/s  1.702 ms  trials ['549.23', '588.48', '587.80', '586.85']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.39 tok/s  1.674 ms  trials ['559.00', '599.31', '598.07', '594.79']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 1 shexp_first 1 row 605
+ours_stream     ctx   1024    616.95 tok/s  1.621 ms  trials ['578.19', '616.46', '617.28', '617.13']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    578.65 tok/s  1.728 ms  trials ['542.42', '559.47', '587.59', '588.89']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.58 tok/s  1.671 ms  trials ['558.84', '598.21', '599.80', '597.73']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 0 row 605
+ours_stream     ctx   1024    606.41 tok/s  1.649 ms  trials ['580.01', '592.52', '611.13', '615.57']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    579.34 tok/s  1.726 ms  trials ['550.22', '564.78', '585.53', '587.71']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    598.43 tok/s  1.671 ms  trials ['558.95', '599.80', '599.02', '596.47']  peak 918 MiB  temporal-route-cuda: trained min_
+-- slots 2 shexp_first 1 row 605
+ours_stream     ctx   1024    618.46 tok/s  1.617 ms  trials ['568.75', '618.21', '618.77', '618.40']  peak 918 MiB  temporal-route-cuda: trained min_
+skliar_stream   ctx   1024    588.44 tok/s  1.699 ms  trials ['550.42', '588.80', '587.72', '588.79']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_stream  ctx   1024    597.70 tok/s  1.673 ms  trials ['552.92', '597.72', '597.80', '597.60']  peak 918 MiB  temporal-route-cuda: trained min_
+ours_stream     ctx   1024    583.19 tok/s  1.715 ms  trials ['547.04', '583.87', '582.72', '582.99']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    556.81 tok/s  1.796 ms  trials ['523.14', '555.74', '557.98', '556.71']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_stream     ctx   1024    585.11 tok/s  1.709 ms  trials ['543.07', '584.65', '585.46', '585.23']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    556.78 tok/s  1.796 ms  trials ['522.12', '555.72', '557.58', '557.04']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_vram       ctx   1024    673.15 tok/s  1.486 ms  trials ['632.23', '674.10', '671.99', '673.37']  peak 1438 MiB  temporal-route2: mode=decode lay
+skliar_vram     ctx   1024    643.33 tok/s  1.554 ms  trials ['605.82', '643.34', '643.24', '643.42']  peak 1438 MiB  temporal-route2: mode=skliar lay
+### SPEED_DONE 23:21:25
