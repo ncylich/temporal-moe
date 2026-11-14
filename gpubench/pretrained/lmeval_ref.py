@@ -16,6 +16,8 @@ import os, sys, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path[:0] = [os.path.join(ROOT, "analysis", "probes"), os.path.join(ROOT, "scripts", "serving_convert")]
+import types  # noqa: E402
+sys.modules["lm_eval.models.megatron_lm"] = types.ModuleType("lm_eval.models.megatron_lm")   # needs Megatron; unused here
 import run_lmeval  # noqa: E402,F401  (shims only; its CLI call is under __main__)
 
 import torch  # noqa: E402

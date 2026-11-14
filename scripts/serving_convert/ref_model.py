@@ -115,14 +115,16 @@ class RefModel:
         last = cache_bias._cap(torch.where(sel, torch.zeros_like(lt[:, 0]), torch.full_like(lt[:, 0], neg)), self.cb_C)
         rng = lt.max(-1).values - lt.min(-1).values                                   # [B,S]
         dsum = rng[:, 0].clone()
+        acc = torch.zeros(2, dtype=torch.long, device=lt.device)                      # summed on device: no sync per token
         for t in range(1, S):
             dsum += rng[:, t]
             sel = cache_bias.select(lt[:, t], last, (dsum / (t + 1))[:, None], self.cb_lam, self.cb_J, self.topk)
             ld = (sel & ~(last > neg)).sum(-1)
             v = valid[:, t] if valid is not None else torch.ones_like(ld, dtype=torch.bool)
-            self.loads[0] += int(ld[v].sum()); self.loads[1] += int(v.sum())
+            acc[0] += ld[v].sum(); acc[1] += v.sum()
             last = cache_bias._cap(torch.where(sel, torch.full_like(last, float(t)), last), self.cb_C)
             mask[:, t] = sel
+        self.loads[0] += int(acc[0]); self.loads[1] += int(acc[1])
         return mask
 
     def moe(self, h, i, routing):
