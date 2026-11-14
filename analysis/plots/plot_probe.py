@@ -77,7 +77,7 @@ def _draw_raster(panels, k, E, L, tag, outfile):
         ax.set_ylim(-1, E); ax.set_yticks([0, (E-1)//2, E-1]); ax.grid(True, ls=":", alpha=0.3)
     axes[-1].set_xlabel("token position" if PAPER else f"token position (sequence 0, MoE layer {L})")
     if PAPER:
-        fig.suptitle(f"Experts active per token ({k} of {E})", fontsize=22); fig.supylabel("expert index", fontsize=21)
+        fig.suptitle(f"Experts active per token ({k} of {E})", fontsize=22); axes[len(axes) // 2].set_ylabel("expert index")
     else:
         fig.suptitle(f"Which experts are active at each token: {tag} (top-k = {k} of {E} experts)\n"
                      "horizontal streaks = an expert stays active across consecutive tokens (temporal locality)")
