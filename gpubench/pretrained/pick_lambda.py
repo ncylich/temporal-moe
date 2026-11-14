@@ -16,7 +16,7 @@ def read(p):
 
 
 ours = read(sys.argv[1])
-pts = sorted(read(p) for p in sys.argv[2:])
+pts = sorted(read(p) for p in sys.argv[2:] if "star" not in p)
 print(f"ours: loads {ours[1]:.4f} loss {ours[2]:.5f}")
 for lam, ld, loss in pts:
     print(f"skliar lambda {lam:.3f}: loads {ld:.4f} loss {loss:.5f}")
@@ -24,5 +24,6 @@ for (l0, a0, _), (l1, a1, _) in zip(pts, pts[1:]):
     if (a0 - ours[1]) * (a1 - ours[1]) <= 0:
         lam = l0 + (ours[1] - a0) * (l1 - l0) / (a1 - a0) if a1 != a0 else l0
         print(f"LAMBDA {lam:.4f}")
+        print(f"BRACKET {l0} {l1}")
         sys.exit(0)
 print("LAMBDA none: ours' loads are outside the swept range"); sys.exit(1)

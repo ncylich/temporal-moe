@@ -13,7 +13,8 @@ import numpy as np
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", required=True); ap.add_argument("--tokens", required=True)
+    ap.add_argument("--url", help="server for a greedy continuation; omit to use the row's own next tokens (real text)")
+    ap.add_argument("--tokens", required=True)
     ap.add_argument("--row", type=int, required=True); ap.add_argument("--ctx", type=int, nargs="+", default=[1024])
     ap.add_argument("--tag", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--n-gen", type=int, default=100)
@@ -25,6 +26,14 @@ def main():
         if len(row) < ctx:                                   # longer contexts: concatenate following rows
             row = np.concatenate([T[a.row + j] for j in range((ctx + len(row) - 1) // len(row))])
         prompt = [int(x) for x in row[:ctx]]
+        if not a.url:                                        # real text: the test row's own continuation
+            gen = [int(x) for x in row[ctx:ctx + a.n_gen]]
+            assert len(gen) == a.n_gen, len(gen)
+            for ext, part in (("ctx", prompt), ("gen", gen)):
+                with open(os.path.join(a.out, f"ctx{ctx}_{a.tag}.{ext}"), "wb") as f:
+                    f.write(struct.pack(f"<{len(part)}i", *part))
+            print(f"ctx {ctx} [{a.tag}] row {a.row}: wrote {ctx} + {a.n_gen} (real text)", flush=True)
+            continue
         body = {"prompt": prompt, "n_predict": a.n_gen, "temperature": 0.0, "cache_prompt": False,
                 "return_tokens": True, "ignore_eos": True}
         req = urllib.request.Request(a.url + "/completion", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})

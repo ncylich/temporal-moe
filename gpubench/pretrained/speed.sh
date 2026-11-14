@@ -6,9 +6,9 @@
 # the GPU's NUMA node, real text (test-split rows, own greedy continuation), four trials, first discarded.
 #   speed.sh <lambda*>
 set -uo pipefail
-LAM=$1; export SK_C=18 SK_LAM=$LAM NMOE=14 BIN=/workspace/rel/eng/llama.cpp/build/bin
-cd /workspace/rel; R=repo/gpubench; O=/workspace/rel/out; mkdir -p $O
-MOE=m/moe_fine_1e19-q4_0.gguf; TM=m/fine_1e19-q4_0.gguf; T=m/test_tokens_2048.npz
+LAM=$1; O=${OUT:-/workspace/rel/out}; export SK_C=18 SK_LAM=$LAM NMOE=14 BIN=/workspace/rel/eng/llama.cpp/build/bin
+cd /workspace/rel; R=repo/gpubench; mkdir -p $O
+MOE=${MOE_GGUF:-m/moe_fine_1e19-q4_0.gguf}; TM=m/fine_1e19-q4_0.gguf; T=m/test_tokens_2048.npz
 CPUS=$(nvidia-smi topo -m | awk '/^GPU0/{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+-[0-9]+(,[0-9]+-[0-9]+)*$/){print $i; exit}}')
 echo "### GPU0 CPU affinity: ${CPUS:-unknown} $(date -u +%T)"
 stop() { [ -f "$1.pid" ] || return 0; kill -INT "$(cat "$1.pid")" 2>/dev/null; for i in $(seq 1 60); do kill -0 "$(cat "$1.pid")" 2>/dev/null || { rm -f "$1.pid"; return 0; }; sleep 1; done; kill -9 "$(cat "$1.pid")" 2>/dev/null; rm -f "$1.pid"; }
@@ -42,6 +42,9 @@ for v in 1 2 3 4 5; do
   for m in base ours skliar trained; do
     M=$MOE; [ $m = trained ] && M=$TM
     [ -s $TD/ctx1024_$m.gen ] && continue
+    if [ "${REAL_TEXT:-0}" = 1 ]; then                    # same real continuation for every arm
+      python3 $R/pretrained/tokens_base.py --tokens $T --row $ROW --ctx $CTX --tag $m --out $TD; continue
+    fi
     bash $R/released/server.sh $m $M 8093 $O/srv_tok_$m.log || continue
     python3 $R/pretrained/tokens_base.py --url http://127.0.0.1:8093 --tokens $T --row $ROW --ctx $CTX --tag $m --out $TD
     stop $O/srv_tok_$m.log

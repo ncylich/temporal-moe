@@ -61,6 +61,9 @@ def main():
     ap.add_argument("--ftype", default="f16", choices=["f16", "f32"])
     ap.add_argument("--tokenizer", default="EleutherAI/pythia-12b")
     ap.add_argument("--name", default="temporal-moe")
+    ap.add_argument("--no-weights-norm", action="store_true",
+                    help="plain (non-temporal) checkpoints: Megatron's pre-softmax router keeps the top-k "
+                         "probabilities of the softmax over all experts without renormalising")
     a = ap.parse_args()
 
     sys.path.insert(0, os.path.join(os.path.expanduser(a.llama_cpp), "gguf-py"))
@@ -98,7 +101,7 @@ def main():
     w.add_expert_shared_count(shp // ffp)
     w.add_expert_feed_forward_length(ffp)
     w.add_expert_gating_func(gguf.ExpertGatingFuncType.SOFTMAX)
-    w.add_expert_weights_norm(True)
+    w.add_expert_weights_norm(not a.no_weights_norm)
     w.add_vocab_size(V)
 
     # --- tokenizer: byte-level BPE, GPT-2 style pre-tokenizer ---

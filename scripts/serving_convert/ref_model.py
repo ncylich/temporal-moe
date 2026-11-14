@@ -69,6 +69,7 @@ class RefModel:
         self.cb_C, self.cb_lam, self.cb_J = cb_C, cb_lam, cb_J
         self.loads = [0, 0]          # [loads, token-layers] after token 0, temporal and skliar routing
         self.valid = None            # [B,S] bool: real (unpadded) tokens, set by a batching caller
+        self.gate_norm = True        # False: gates = softmax over all experts kept for the selected ones
 
     def attention(self, x, i):
         B, S, H = x.shape
@@ -104,7 +105,9 @@ class RefModel:
             mask.scatter_(-1, logits.topk(self.topk, dim=-1).indices, True)
         else:
             raise ValueError(routing)
-        return mask, torch.softmax(logits.masked_fill(~mask, float("-inf")), dim=-1)
+        if self.gate_norm:                       # softmax over the selected (or resident) experts
+            return mask, torch.softmax(logits.masked_fill(~mask, float("-inf")), dim=-1)
+        return mask, torch.softmax(logits, dim=-1) * mask      # pre-softmax over all experts, no renormalisation
 
     def skliar(self, logits, valid=None):
         """logits [B,S,E] -> mask [B,S,E]; valid [B,S] bool limits the load count to real tokens."""
@@ -183,12 +186,15 @@ def main():
     ap.add_argument("--routing", default="temporal", choices=["temporal", "topk", "skliar"])
     ap.add_argument("--cb-C", type=int, default=18)
     ap.add_argument("--cb-lambda", type=float, default=0.5)
+    ap.add_argument("--gates", default="norm", choices=["norm", "full"],
+                    help="norm: softmax over the selected experts; full: softmax over all experts, not renormalised")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--save-logits", help="write logits of the first sequence to this .npy")
     ap.add_argument("--save-losses", help="write per-token losses [n, seq] to this .npy")
     a = ap.parse_args()
 
     model = RefModel(a.weights, a.topk, evict=a.evict, device=a.device, cb_C=a.cb_C, cb_lam=a.cb_lambda)
+    model.gate_norm = a.gates == "norm"
     toks = torch.from_numpy(np.load(a.tokens)["tokens"][a.start:a.start + a.n].astype(np.int64))
     losses, t0 = [], time.time()
     for b in range(0, len(toks), a.batch):

@@ -30,6 +30,7 @@ def main():
     ap.add_argument("--samples", type=int, default=4)
     ap.add_argument("--seq", type=int, default=2048)
     ap.add_argument("--topk", type=int, default=18)
+    ap.add_argument("--gates", default="norm", choices=["norm", "full"], help="as ref_model.py --gates")
     ap.add_argument("--control", action="store_true",
                     help="also diff the float32 reference against a float64 reference, to show "
                          "what rounding alone does through top-k near-ties")
@@ -39,6 +40,7 @@ def main():
 
     toks = np.load(a.tokens)["tokens"][:a.samples, :a.seq + 1].astype(np.int64)
     model = RefModel(a.weights, a.topk)
+    model.gate_norm = a.gates == "norm"
     tmp = tempfile.mkdtemp()
     tot_ref, tot_gg, worst, pos_max = [], [], 0.0, []
     for i, row in enumerate(toks):

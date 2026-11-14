@@ -34,10 +34,11 @@ EOD = 0          # pythia <|endoftext|>, Megatron's eod for these runs
 @register_model("refmoe")
 class RefMoE(TemplateLM):
     def __init__(self, weights, routing="topk", topk=18, cb_C=18, cb_lambda=0.5, batch=64,
-                 tokenizer="EleutherAI/pythia-12b", loads_out=None, **kw):
+                 tokenizer="EleutherAI/pythia-12b", loads_out=None, gates="norm", **kw):
         super().__init__()
         self.routing, self.bs, self.loads_out = routing, int(batch), loads_out
         self.m = RefModel(weights, int(topk), device="cuda", cb_C=int(cb_C), cb_lam=float(cb_lambda))
+        self.m.gate_norm = gates == "norm"     # "full" for the plain MoE (pre-softmax router, no renormalisation)
         self.tok = Tokenizer.from_pretrained(tokenizer)
 
     @property
