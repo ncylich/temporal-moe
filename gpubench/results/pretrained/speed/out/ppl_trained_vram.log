@@ -1,0 +1,11 @@
+0.00.637.523 I 
+0.00.637.739 I system_info: n_threads = 8 (n_threads_batch = 8) / 128 | CUDA : ARCHS = 860 | USE_GRAPHS = 1 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.00.637.762 I perplexity: tokenizing the input ..
+0.00.667.940 I perplexity: tokenization took 30.17 ms
+0.00.667.973 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.11.726.284 I perplexity: 11.06 seconds per pass - ETA 0.73 minutes
+[1]27.7584,[2]24.9425,[3]19.5888,[4]22.6354,
+0.51.946.894 I Final estimate: PPL = 22.6354 +/- 1.49895
+
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53190 swaps_per_layer_token=0.9999
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000

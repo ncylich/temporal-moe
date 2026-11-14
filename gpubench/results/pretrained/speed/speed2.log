@@ -1,0 +1,32 @@
+### GPU0 CPU affinity: 32-63,96-127 21:15:42
+### timing 21:15:42
+base            ctx   1024    636.20 tok/s  1.572 ms  trials ['598.59', '636.12', '636.29', '636.19']  peak 1438 MiB  
+ours_vram       ctx   1024    656.08 tok/s  1.524 ms  trials ['617.77', '656.01', '655.84', '656.40']  peak 1438 MiB  temporal-route2: mode=decode lay
+skliar_vram     ctx   1024    632.07 tok/s  1.582 ms  trials ['594.29', '631.59', '631.44', '633.16']  peak 1438 MiB  temporal-route2: mode=skliar lay
+ours_stream     ctx   1024    506.38 tok/s  1.975 ms  trials ['474.46', '507.08', '505.46', '506.59']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    494.76 tok/s  2.021 ms  trials ['462.04', '495.92', '495.84', '492.52']  peak 918 MiB  temporal-route2: mode=skliar laye
+ours_nobytes    ctx   1024    554.73 tok/s  1.803 ms  trials ['527.91', '543.38', '561.01', '559.79']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_nobytes  ctx   1024    540.41 tok/s  1.850 ms  trials ['510.98', '540.20', '540.50', '540.54']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_vram    ctx   1024    675.89 tok/s  1.480 ms  trials ['634.42', '676.00', '676.15', '675.52']  peak 1438 MiB  temporal-route-cuda: trained min
+trained_stream  ctx   1024    586.28 tok/s  1.706 ms  trials ['548.71', '586.50', '586.54', '585.80']  peak 918 MiB  temporal-route-cuda: trained min_
+base            ctx   1024    633.39 tok/s  1.579 ms  trials ['601.56', '633.31', '633.53', '633.32']  peak 1438 MiB  
+ours_stream     ctx   1024    503.83 tok/s  1.985 ms  trials ['472.24', '503.68', '503.45', '504.35']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    508.07 tok/s  1.968 ms  trials ['477.78', '501.23', '512.83', '510.16']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_vram    ctx   1024    677.13 tok/s  1.477 ms  trials ['638.12', '675.73', '678.59', '677.09']  peak 1438 MiB  temporal-route-cuda: trained min
+trained_stream  ctx   1024    586.91 tok/s  1.704 ms  trials ['541.28', '585.79', '586.92', '588.02']  peak 918 MiB  temporal-route-cuda: trained min_
+base            ctx   1024    633.47 tok/s  1.579 ms  trials ['597.24', '632.56', '633.38', '634.47']  peak 1438 MiB  
+ours_stream     ctx   1024    503.88 tok/s  1.985 ms  trials ['470.14', '503.03', '504.44', '504.18']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    492.13 tok/s  2.032 ms  trials ['459.48', '491.37', '492.49', '492.52']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_vram    ctx   1024    675.54 tok/s  1.480 ms  trials ['635.38', '674.74', '675.38', '676.50']  peak 1438 MiB  temporal-route-cuda: trained min
+trained_stream  ctx   1024    589.95 tok/s  1.695 ms  trials ['549.34', '588.37', '590.74', '590.75']  peak 918 MiB  temporal-route-cuda: trained min_
+base            ctx   1024    633.97 tok/s  1.577 ms  trials ['600.67', '634.38', '633.79', '633.72']  peak 1438 MiB  
+ours_stream     ctx   1024    501.67 tok/s  1.993 ms  trials ['468.37', '502.10', '501.35', '501.58']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    490.73 tok/s  2.038 ms  trials ['461.10', '490.02', '492.41', '489.77']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_vram    ctx   1024    675.73 tok/s  1.480 ms  trials ['639.48', '675.36', '676.17', '675.66']  peak 1438 MiB  temporal-route-cuda: trained min
+trained_stream  ctx   1024    587.45 tok/s  1.702 ms  trials ['551.47', '587.16', '587.70', '587.48']  peak 918 MiB  temporal-route-cuda: trained min_
+base            ctx   1024    632.53 tok/s  1.581 ms  trials ['586.55', '632.76', '632.70', '632.12']  peak 1438 MiB  
+ours_stream     ctx   1024    504.67 tok/s  1.982 ms  trials ['468.24', '503.46', '505.80', '504.73']  peak 918 MiB  temporal-route2: mode=decode laye
+skliar_stream   ctx   1024    492.89 tok/s  2.029 ms  trials ['464.15', '483.52', '498.14', '497.02']  peak 918 MiB  temporal-route2: mode=skliar laye
+trained_vram    ctx   1024    675.26 tok/s  1.481 ms  trials ['634.86', '675.84', '676.03', '673.90']  peak 1438 MiB  temporal-route-cuda: trained min
+trained_stream  ctx   1024    588.86 tok/s  1.698 ms  trials ['551.57', '589.37', '588.46', '588.76']  peak 918 MiB  temporal-route-cuda: trained min_
+### SPEED_DONE 21:17:06

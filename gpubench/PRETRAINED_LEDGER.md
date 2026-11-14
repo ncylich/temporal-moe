@@ -70,3 +70,54 @@ Test CE (nats per token; lower is better; SE over the 512 rows about 0.015):
 | trained | its own rule, R = 18 | 1.000 | 3.19208 | 1.07189 |
 
 (The trained row equals RESULTS.md's reference value on the same rows, 3.19202, to 6e-5.)
+
+## P1-3 -- Engine gates on the A6000 (pod `i65msin9gh64dw`, resumed 20:46 UTC)
+
+Engine tree 20c50f0c (the released runs' build), Q4_0 files above, GPU0 on NUMA node 1
+(CPUs 32-63,96-127; a different host from the released runs, so the pinning differs).
+
+- **Routing equality** (`route_check.py`, one 512-token prompt plus 100 greedy tokens per arm, graphs
+  off): decode tokens equal on every layer-token for ours in VRAM, ours streamed and Skliar streamed
+  (1,287 of 1,287 each); Skliar in VRAM 1,188 of 1,287. Prompt tokens 97.3 to 97.5 % equal in every
+  arm. Diagnosed on a fresh dump: all 179 differing prompt token-layers have the 18th and 19th router
+  logits exactly equal (gap 0), so engine and `torch.topk` pick different, equally valid members of a
+  tie. Skliar warms its cache from the prompt, which is where its VRAM decode differences start. The
+  released models had no exact ties; this model's Q4_0 router produces them.
+- **Streamed equals all in VRAM** (batch-1 perplexity, 4 x 1024 tokens of held-out test text): ours
+  181.5047 both, Skliar 166.1783 both, trained 22.6354 both.
+
+## P1-4 -- Decode speed (batch 1, 1k context, five held-out test rows 601-605)
+
+**Flash attention.** The first pass used the released harness's `-fa 1` and every arm, stock
+included, ran at about 68 tok/s. This model has 50 heads of size 16 and the CUDA flash-attention
+kernels have no head size 16, so attention ran on the CPU (TRAINED_MODEL_LEDGER G1-2 found the same).
+Those rows are kept as `speed_fa1_invalid.jsonl` and not used. Every row below is `-fa 0 -t 8`.
+Contexts of 2k and 4k were refused by the server: the model was trained at 2,048 positions.
+
+Mean of five rows (each the mean of trials 2 to 4); range over rows in brackets:
+
+| model | arm | tok/s | ms per token | loads per decode token-layer | peak VRAM MiB |
+|---|---|---|---|---|---|
+| plain | stock top-k, all in VRAM | 633.9 [632.5, 636.2] | 1.578 | -- | 1438 |
+| plain | ours, streamed | 504.1 [501.7, 506.4] | 1.984 | 1.000 | 918 |
+| plain | Skliar, streamed | 495.7 [490.7, 508.1] | 2.017 | 0.806 | 918 |
+| trained | own rule, all in VRAM | 675.9 [675.3, 677.1] | 1.479 | 1.000 (rule) | 1438 |
+| trained | own rule, streamed | 587.9 [586.3, 590.0] | 1.701 | 1.000 (rule) | 918 |
+
+Row 601 only: ours in VRAM 656.1, Skliar in VRAM 632.1, ours with no bytes moved 554.7, Skliar with
+no bytes moved 540.4 (loads 0.665 on that run's text).
+
+**The trained rows run a different kernel path.** `LLAMA_TEMPORAL_ROUTE=trained` is the original
+device routing of patches 0001-0005; `decode` and `skliar` are patch 0006's kernel (needed for Skliar,
+which has no other implementation). Check: the plain model on the trained path, same text files as
+ours, gives 676.8 in VRAM and 588.2 streamed, equal to the trained model. So the 17 % gap between the
+trained-model row and ours streamed is the kernel path, not the model, and speed does not depend on
+which model is loaded. Ours against Skliar is a like-for-like comparison (same 0006 kernel); the
+trained row against either is not, and the fair statement is that the trained model decodes at the
+same speed as our rule on whichever path both use.
+
+**Skliar's loads in serving are lower than in the evals** (0.81 against 1.01). Serving routes the
+prompt freely and applies the rule from the first decoded token (decode_state.py / cache_bias.py
+protocol); the evals apply it to every token. lambda* was matched on the eval protocol. Skliar is
+still the slower streamed arm, by about 0.03 ms per token, because its routing step costs about
+0.05 ms more (no-bytes rows).
