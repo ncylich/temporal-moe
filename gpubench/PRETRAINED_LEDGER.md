@@ -121,3 +121,31 @@ prompt freely and applies the rule from the first decoded token (decode_state.py
 protocol); the evals apply it to every token. lambda* was matched on the eval protocol. Skliar is
 still the slower streamed arm, by about 0.03 ms per token, because its routing step costs about
 0.05 ms more (no-bytes rows).
+
+## P1-5 -- Correction: the plain MoE was scored with the wrong gates (found 21:25 UTC)
+
+Every plain-MoE row in P1-2 (sweep, lambda*, test CE) and the Skliar lm-eval scores are **invalid**.
+`ref_model.py` and `to_gguf.py` both renormalised the gates over the selected experts. That is right
+for the temporal model (its router masks the logits before the softmax, so the softmax runs over the
+resident experts), but the plain MoE was trained with Megatron's pre-softmax router: softmax over all
+192 experts, top-18 probabilities kept as they are. Caught because the plain MoE scored 3.729 against
+the trained model's 3.192, where Megatron logged 3.158 against 3.172.
+
+Check on 8 test rows x 512 tokens (laptop): plain MoE, renormalised 3.65239; softmax over all, not
+renormalised 3.15758; trained model 3.18880. The plain MoE is back above the trained model, as in
+Megatron. Fix: `ref_model.py --gates full` / `lmeval_ref.py gates=full` for every plain-MoE arm
+(stock, ours, Skliar: the model's own gate weights on whichever experts the rule selects), and
+`to_gguf.py --no-weights-norm` for its GGUF (`moe_fine_1e19-full-q4_0.gguf`; F16 against the
+reference with full gates, 2 x 512 tokens: 2.88649 against 2.88621). The trained model's rows are
+unaffected. The Megatron "imposed R18" value (4.93) was computed with the temporal router installed,
+i.e. renormalised over the window, so it is not the same quantity as the corrected "ours" row.
+
+The speed rows in P1-4 timed the renormalising GGUF on each method's own greedy continuation. The
+gate weights do not enter the routing decision, so the loads and timings are expected to be close,
+but the text each arm replayed came from the wrong gating. They will be retimed on the corrected file,
+on the same real text for every arm (the test row's own next 100 tokens), so all arms replay identical
+tokens. Two speed questions are open for that run: (1) the 0006 kernel path streams 0.46 ms per token
+above its VRAM row against 0.22 ms on the trained path; 0006 forces `TEMPORAL_ROUTE_SLOTS=2` (copies
+issued at the router on the copy stream), the trained path defaults to copies at the expert op, so the
+first test is the trained path with `TEMPORAL_ROUTE_SLOTS=2`; (2) Skliar's serving loads (0.81)
+against its eval loads (1.01), separated by the real-text replay.
