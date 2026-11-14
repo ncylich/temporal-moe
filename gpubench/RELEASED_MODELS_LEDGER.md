@@ -663,3 +663,148 @@ every text. Skliar's depends on the text it replays: 0.80, 1.05 and 0.78 loads p
 than ours at 1k and 4k (68.0 against 62.9 and 68.2 against 62.3 tok/s with the dense MLP under the copies)
 and slower at 2k (59.0 against 62.3). One 100-token replay per context is too small a sample of a
 text-dependent load rate, which is why R1-11 times the streamed arms on several conversations.
+
+## R1-11 -- Both streamed arms on five different conversations per model (12:46-13:11 UTC)
+
+Skliar's loads, and so its speed, depend on the text (R1-10). `gpubench/released/multictx.sh` builds further
+1k chat contexts from other parts of the GSM8K test set (`serve_client.py contexts --variant v`), writes
+each method's own greedy continuation, and times stock top-k, ours streamed and Skliar streamed with the
+dense MLP / shared expert under the copies, then the two streamed arms without it; standard protocol,
+pinned, one pass per conversation. Conversations 2 and 6 could not be fitted near 1k tokens (the turns came
+to 734 tokens, below the 774 floor) and were skipped by rule, so the five are 1, 3, 4, 5, 7 for both
+models. Rows: `gpubench/results/released/{qwen35,gemma4}/*_multictx.jsonl`; `multictx_summary.py`.
+
+**Went wrong first.** The first launch ran the old checkout (the pod's `git pull` had not picked up the new
+script; caught by the session vanishing at once). The second showed variants 3 and 4 ending after the stock
+continuation: variant 2's failed context build had exited without stopping its server, the next health
+check found that stale server on the same port, and later servers could not bind. Fixed (`tokens.sh` stops
+its server on any exit, `server.sh` refuses a busy port, `multictx.sh` keeps drawing until five fit) and
+rerun from scratch; the partial rows were deleted.
+
+### Qwen3.5-35B-A3B
+
+**shexp**
+
+| conversation | stock tok/s | ours streamed | Skliar streamed | Skliar / ours | loads ours | loads Skliar |
+|---|---|---|---|---|---|---|
+| v1 | 157.93 | 82.71 | 78.16 | 0.945 | 1.0000 | 1.0708 |
+| v3 | 158.06 | 82.46 | 75.60 | 0.917 | 1.0000 | 1.1404 |
+| v4 | 158.05 | 82.79 | 81.32 | 0.982 | 1.0000 | 0.9787 |
+| v5 | 157.50 | 81.98 | 75.29 | 0.918 | 0.9998 | 1.1061 |
+| v7 | 157.75 | 82.49 | 79.41 | 0.963 | 1.0000 | 1.0254 |
+| **mean of 5** | 157.86 | 82.49 | 77.96 | 0.945 | 0.9999 | 1.0643 |
+
+**default**
+
+| conversation | stock tok/s | ours streamed | Skliar streamed | Skliar / ours | loads ours | loads Skliar |
+|---|---|---|---|---|---|---|
+| v1 |  | 78.70 | 75.11 | 0.954 | 1.0000 | 1.0708 |
+| v3 |  | 78.59 | 73.02 | 0.929 | 1.0000 | 1.1404 |
+| v4 |  | 78.27 | 78.18 | 0.999 | 1.0000 | 0.9787 |
+| v5 |  | 78.58 | 73.50 | 0.935 | 0.9998 | 1.1061 |
+| v7 |  | 77.64 | 76.75 | 0.988 | 1.0000 | 1.0254 |
+| **mean of 5** | nan | 78.36 | 75.31 | 0.961 | 0.9999 | 1.0643 |
+
+### Gemma4-26B-IT
+
+**shexp**
+
+| conversation | stock tok/s | ours streamed | Skliar streamed | Skliar / ours | loads ours | loads Skliar |
+|---|---|---|---|---|---|---|
+| v1 | 134.67 | 62.97 | 65.27 | 1.037 | 0.9981 | 0.8809 |
+| v3 | 133.35 | 62.66 | 67.19 | 1.072 | 0.9970 | 0.8187 |
+| v4 | 133.61 | 62.87 | 67.25 | 1.070 | 0.9998 | 0.8047 |
+| v5 | 133.44 | 62.77 | 63.62 | 1.014 | 0.9981 | 0.9112 |
+| v7 | 133.27 | 62.32 | 65.51 | 1.051 | 0.9981 | 0.8585 |
+| **mean of 5** | 133.67 | 62.72 | 65.77 | 1.049 | 0.9982 | 0.8548 |
+
+**default**
+
+| conversation | stock tok/s | ours streamed | Skliar streamed | Skliar / ours | loads ours | loads Skliar |
+|---|---|---|---|---|---|---|
+| v1 |  | 60.11 | 62.88 | 1.046 | 0.9981 | 0.8809 |
+| v3 |  | 60.55 | 65.47 | 1.081 | 0.9970 | 0.8187 |
+| v4 |  | 60.07 | 65.37 | 1.088 | 0.9998 | 0.8047 |
+| v5 |  | 60.15 | 61.88 | 1.029 | 0.9981 | 0.9112 |
+| v7 |  | 60.38 | 63.73 | 1.056 | 0.9981 | 0.8585 |
+| **mean of 5** | nan | 60.25 | 63.86 | 1.060 | 0.9982 | 0.8548 |
+
+(The "nan" is the stock column of the configuration without the switch, where stock was not rerun.)
+
+On Qwen3.5 ours is faster on all five conversations in both configurations (Skliar / ours 0.917 to 0.982
+with the shared expert under the copies, mean 0.945). On Gemma4 Skliar's arm is faster on all five (1.014
+to 1.072, mean 1.049). Skliar's mean loads on these replays are 1.064 (Qwen) and 0.855 (Gemma), against
+1.001 and 0.938 on sampled GSM8K generations; ours is 1.000 on every text.
+
+## Results, Gemma4-26B-IT (Q4_K_M with gate/up split, RTX A6000, batch 1, real-text replay)
+
+Headline configuration: patches 0001 to 0007 with `TEMPORAL_SHEXP_FIRST=1` for every arm, `-fa 1 -t 8`,
+pinned. Pooled over passes (three at 1k, two at 2k and 4k). GSM8K: the paper's n = 1319 vLLM numbers.
+
+| arm | GSM8K | 1k tok/s (ms) | vs stock | 2k tok/s | vs stock | 4k tok/s | vs stock | 1k, mean of 5 conversations | peak VRAM at 1k |
+|---|---|---|---|---|---|---|---|---|---|
+| 1. stock top-k, all 128 experts in VRAM | 87.8 | 133.40 (7.496) | 1.000 | 132.50 | 1.000 | 130.78 | 1.000 | 133.67 | 17,692 MiB |
+| 2. ours, 8 slots per layer streamed | 78.8 | 62.90 (15.899) | 0.471 | 62.31 | 0.470 | 62.32 | 0.477 | **62.72** | 4,738 MiB |
+| 3. Skliar C 8, lambda 0.5, 8 slots streamed | 80.7 | 68.04 (14.697) | 0.510 | 59.00 | 0.445 | 68.16 | 0.521 | **65.77** | 4,738 MiB |
+| 4a. arm 2's kernels, no bytes moved | | 118.64 | 0.889 | 117.41 | 0.886 | 116.54 | 0.891 | | |
+| 4b. arm 3's kernels, no bytes moved | | 117.67 | 0.882 | 116.58 | 0.880 | 115.58 | 0.884 | | |
+| ours, all experts in VRAM | | 127.68 | 0.957 | 126.69 | 0.956 | 125.33 | 0.958 | | |
+| Skliar, all experts in VRAM | | 126.46 | 0.948 | 125.89 | 0.950 | 124.15 | 0.949 | | |
+
+Loads per decode layer-token: ours 1.00 everywhere (0.9986 on GSM8K). Skliar: GSM8K (engine, 200 items)
+mean 0.938, fractions with 0 / 1 / 2 / 3+ loads 0.327 / 0.476 / 0.144 / 0.054 (saved vLLM histogram: mean
+0.939, fractions 0.328 / 0.474 / 0.144 / 0.055); replays 0.80 / 1.05 / 0.77 (1k / 2k / 4k) and 0.86 on average over the five
+conversations. Peak VRAM 17,692 against 4,738 MiB at 1k (3.7x less), 19,008 / 6,138 at 2k, 21,628 / 8,932
+at 4k. Stock on the checkpoint's own fused gate/up file: 133.26 / 132.17 / 131.08 tok/s (R1-10).
+
+### Statements a reply or the paper could quote (both models)
+
+- (measured) Setup: one RTX A6000 (48 GB, PCIe 4.0 x16), the released checkpoints at Q4_K_M in a
+  llama.cpp-based engine, batch 1, 100 decoded tokens of real text after a 1k-token chat context, four
+  trials with the first discarded, every arm on the same build, threads, quantization and context.
+- (measured) Qwen3.5-35B-A3B: with 8 expert slots per layer in VRAM (3.6 GB peak, against 21.3 GB for all
+  256 experts), our rule decodes at 82.7 tok/s and Skliar et al.'s cache-conditional routing (C = 8,
+  lambda = 0.4) at 78.8 tok/s; stock routing with every expert in VRAM runs at 157.3. Over five different
+  conversations: 82.5 against 78.0 tok/s, ours ahead on every one. With GSM8K at 76.6 against 74.5, ours
+  is ahead on both speed and accuracy at the same fast memory.
+- (measured) Gemma4-26B-IT: with 8 slots per layer (4.7 GB peak, against 17.7 GB), our rule decodes at
+  62.7 tok/s and Skliar's (C = 8, lambda = 0.5) at 65.8 tok/s averaged over five conversations (Skliar
+  ahead on every one, by 1 to 7%); stock runs at 133.7. Here Skliar's routing is ahead on both speed and
+  accuracy (80.7 against 78.8 on GSM8K).
+- (measured) In both models the streamed decode time is set mainly by how many experts are copied: the
+  per-copy cost is about the same for both methods (115 to 140 us per 2 MB expert on Qwen3.5, 250 to 280 us
+  per 4.3 MB expert on Gemma4, roughly 16 GB/s), and the routing and slot kernels add about 1 ms per token
+  for either. Our rule copies exactly one expert per layer and token. On Gemma4 Skliar's copies average
+  0.94 per layer and token on GSM8K text (0.86 on the timed conversations), fewer than ours, and that is
+  why it is faster there. On Qwen3.5 they average 1.00 on GSM8K text (1.06 on the timed conversations);
+  ours is faster there because of those extra loads, because its single copy per layer hides better under
+  the shared expert (0.63 against 0.45 ms per token hidden at 1k), and because its routing step is about
+  0.07 ms cheaper.
+- (measured) Gates, both models: the engine's selected expert sets equal the Python reference
+  implementations' on every layer-token checked (15,000 to 28,480 decode layer-tokens per configuration,
+  four configurations per model, references fed the engine's own logits); Skliar's load histogram in the
+  engine matches the one behind the accuracy numbers (total variation 0.006 on Qwen3.5, 0.002 on Gemma4);
+  batch-1 perplexity with the experts streamed equals perplexity with them in VRAM in every digit.
+- (derived) A fair one-line summary of BZ2a's comparison: at matched fast memory (8 experts per layer) the
+  two methods decode within about 5% of each other on both models, each about half as fast as keeping every
+  expert in VRAM on this card; ours is the faster and more accurate on Qwen3.5, Skliar's on Gemma4.
+
+### Not done or not verified
+
+- No comparison of the engine's forward pass with the BF16/vLLM forward; the routing gate checks the rule on
+  the engine's own logits.
+- Engine accuracy only sanity-checked on 200 GSM8K items per arm and model.
+- The 2k and 4k numbers use one conversation each; the five-conversation check is at 1k only.
+- The routing state carries over between `llama-bench` trials (KV state is restored, routing state is not);
+  identical for all arms, documented in R1-0.
+- Peak VRAM includes the prompt-batch compute buffer (micro-batch = context length) in every arm.
+- No configuration was tried that would favour one method only, except that ours could not use a
+  cheaper copy path and Skliar's top-k was rewritten to cost what ours does (R1-2).
+
+## R1-12 -- Pod and cost (final)
+
+Pod `i65msin9gh64dw` (one RTX A6000, US, $0.69/h) ran 08:37 to 13:12 UTC, 4.6 h, **about $3.2**, and was
+stopped (not terminated) at 13:12; its 60 GB volume keeps the build (`/workspace/rel/eng`) and the Qwen3.5
+Q4_K_M file (`/workspace/models`), and costs volume storage while stopped. The Gemma4 files and the BF16
+conversions were on the container disk and are gone with the stop (regenerable with `conv_gemma.sh` and
+`split_gate_up.py` in about 25 minutes). The old pod `bcnqix1ewwwjr3` was never resumed and is stopped.
