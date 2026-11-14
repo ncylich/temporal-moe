@@ -1,0 +1,491 @@
+From c57c7c1a8933df22915fd616c5ae5ac696d61d43 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Sat, 14 Nov 2026 00:20:05 -0800
+Subject: [PATCH] temporal-MoE CUDA: released-model routing (decode-time
+ residency and Skliar's cache), real-text replay in llama-bench
+
+LLAMA_TEMPORAL_ROUTE=decode follows analysis/residency/decode_state.py: prompt batches are routed
+freely while the rule runs observe-only over them, then one rule step per generated token.
+LLAMA_TEMPORAL_ROUTE=skliar follows analysis/residency/cache_bias.py: LRU cache of C experts per
+layer, lambda times the running mean of max-min logit added to cached experts, top-1 guarantee,
+prompt observed unbiased. Both run in one kernel (k_route2) that also keeps the K VRAM slots with
+one shared slot routine and starts the copies at the router. TEMPORAL_ROUTE_NOCOPY=1/2 are the
+timing controls. Exit line temporal-route2 with the loads histogram; LLAMA_TEMPORAL_ROUTE_DUMP2
+writes logits and ids for the routing check. llama-bench replays real tokens from
+TEMPORAL_BENCH_CTX/GEN. qwen35moe: TEMPORAL_SHEXP_FIRST=1 orders the shared expert first.
+---
+ ggml/src/ggml-cpu/ggml-cpu.c      |   3 +
+ ggml/src/ggml-cuda/temporal.cu    | 303 +++++++++++++++++++++++++++++-
+ src/models/qwen35moe.cpp          |  22 ++-
+ tools/llama-bench/llama-bench.cpp |  29 +++
+ 4 files changed, 352 insertions(+), 5 deletions(-)
+
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 6482f794..7cf2b279 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -1528,6 +1528,8 @@ int ggml_temporal_route_trained(void) {
+     if (mode < 0) {
+         const char * r = getenv("LLAMA_TEMPORAL_ROUTE");
+         if (r && strcmp(r, "trained") == 0)     mode = 1;
++        else if (r && strcmp(r, "decode") == 0) mode = 2;   // released models, CUDA only (temporal.cu k_route2)
++        else if (r && strcmp(r, "skliar") == 0) mode = 3;   // released models, CUDA only (temporal.cu k_route2)
+         else if (r && strcmp(r, "random") == 0) mode = 0;
+         else if (r && r[0]) { fprintf(stderr, "temporal-route: FATAL unknown LLAMA_TEMPORAL_ROUTE=%s\n", r); abort(); }
+         else mode = getenv("LLAMA_TEMPORAL_TWOPASS") ? 1 : 0;
+@@ -1556,6 +1558,7 @@ int ggml_temporal_route_last(int L, int * admitted, int * evicted, const int **
+ void ggml_temporal_route(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
+     (void) nth;
+     if (ith != 0) return;
++    if (ggml_temporal_route_trained() != 1) { fprintf(stderr, "temporal-route: FATAL LLAMA_TEMPORAL_ROUTE=decode/skliar run on the CUDA backend only\n"); abort(); }
+     const struct ggml_tensor * lg = dst->src[0];
+     const int L = (int)(intptr_t) userdata;
+     const int K = (int) dst->ne[0];
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index e82ddb12..a9438fa4 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -242,7 +242,7 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+     int64_t need = (int64_t)stride1 * n_tokens;
+     if (L.remap_words < need) { if (L.remap_ids) cudaFree(L.remap_ids); cudaMalloc(&L.remap_ids, need*sizeof(int32_t)); L.remap_words = need; }
+     if (tr_slots() == 2 && ggml_cuda_temporal_route_op_on() && n_tokens == 1) {   // copies were issued at the route op
+-        cudaStreamWaitEvent(stream, L.ev[which], 0);
++        if (!(ggml_cuda_temporal_route_mode() >= 2 && tr_nocopy() == 2)) cudaStreamWaitEvent(stream, L.ev[which], 0);
+         *ids_out_ptr = L.remap_ids;
+         return 1;
+     }
+@@ -352,14 +352,28 @@ static int *g_tr_k = nullptr, *g_tr_win = nullptr;       // [TR_MAXLAYER], [TR_M
+ static unsigned long long *g_tr_cnt = nullptr;           // [TR_MAXLAYER*3]: steps, swaps, cold fills
+ static int g_tr_K = 0;
+ static int *g_tr_vslot = nullptr, *g_tr_vvalid = nullptr; // [TR_MAXLAYER*K], [TR_MAXLAYER] (TEMPORAL_ROUTE_SLOTS)
+-static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");return s?atoi(s):0;}();
++int ggml_cuda_temporal_route_mode();
++// released-model modes (decode, skliar) always keep the slots in the routing kernel and start the copies there
++static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");int x=s?atoi(s):0;
++                            return ggml_cuda_temporal_route_mode()>=2 ? 2 : x;}();
+                         return v && ggml_cuda_temporal_unified(); }
++// TEMPORAL_ROUTE_NOCOPY (released-model modes, timing controls, output wrong): 1 = copy kernels launched
++// with an empty swap list (no bytes moved); 2 = no copy kernels, no events, nothing waited on.
++static int tr_nocopy() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_NOCOPY");return s?atoi(s):0;}(); return v; }
+ static FILE * g_tr_dump = nullptr;
++static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int n_tokens, int E);
++static void tr2_reset();
+ 
+-int ggml_cuda_temporal_route_trained() {
+-    static int v=[](){const char*s=getenv("LLAMA_TEMPORAL_ROUTE"); return s && strcmp(s,"trained")==0;}();
++// LLAMA_TEMPORAL_ROUTE: trained = 1 (the 1.26B model's training rule, prefill included);
++// decode = 2 (released models, analysis/residency/decode_state.py: prompt free, observe-only scan, one rule
++// step per generated token); skliar = 3 (analysis/residency/cache_bias.py: LRU cache of C per layer, bias
++// lambda on cached logits, top-J guarantee, prompt observed unbiased).
++int ggml_cuda_temporal_route_mode() {
++    static int v=[](){const char*s=getenv("LLAMA_TEMPORAL_ROUTE"); if(!s) return 0;
++        return strcmp(s,"trained")==0 ? 1 : strcmp(s,"decode")==0 ? 2 : strcmp(s,"skliar")==0 ? 3 : 0;}();
+     return v;
+ }
++int ggml_cuda_temporal_route_trained() { return ggml_cuda_temporal_route_mode() != 0; }
+ int ggml_cuda_temporal_route_op_on() {                  // trained routing runs as the CUDA kernel
+     static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
+     return ggml_cuda_temporal_route_trained() && !host;
+@@ -450,11 +464,291 @@ static void tr_report() {
+     if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
+ }
+ 
++// ===== RELEASED-MODEL ROUTING (LLAMA_TEMPORAL_ROUTE=decode | skliar) =====
++// Both modes take the router logits [E, n_tokens] and write the selected ids [K, n_tokens], keep their state
++// per layer on the device, and (streamed, single token) keep the K VRAM slots in the same kernel with the same
++// slot routine, so the two streamed arms differ only in which experts they select.
++//
++// decode (analysis/residency/decode_state.py): a batch of more than one token is a prompt. It is routed
++//   freely (stock top-K of the logits) while the rule runs observe-only over it: cold fill with the top-K of
++//   the sequence's first token, then on every token admit the best non-resident expert iff its logit is
++//   strictly above the worst resident's, evicting that resident (min_logit). A single-token batch is one rule
++//   step and is routed inside the resident set (R = K, so the set is the selection). Ties: lowest expert index
++//   (nominee, worst resident, cold fill), as torch.max / argmin / topk on the reference's CPU path.
++// skliar (analysis/residency/cache_bias.py, Skliar et al. arXiv:2412.00099): per layer an LRU cache of C
++//   experts (last-use time, -1 = not cached) and delta = running mean over every token seen of
++//   max(z) - min(z). A prompt batch (or the first token of a sequence) is routed freely and warms the cache:
++//   last-use = the token's index in the batch for each of its top-K, then keep the C most recent (ties: higher
++//   expert index), and the step counter becomes (previous) + n_tokens. A decode token: z' = z + lambda*delta on
++//   cached experts; select top-K of z'; if the top-1 of z is not selected it replaces the selected expert with
++//   the lowest z' (J = 1); loads = selected experts not cached; then last-use = step for the selection, step+1,
++//   keep the C most recent. Gate weights come from the stock graph (softmax of z gathered at the ids,
++//   renormalised), which equals the reference's softmax over the selected logits.
++// Exit line `temporal-route2: ...` with loads per decode layer-token and their histogram;
++// TEMPORAL_ROUTE_HIST=<json> writes {"hist","loads","rows"} like cache_bias.stats();
++// LLAMA_TEMPORAL_ROUTE_DUMP2=<file> writes, per layer and token: int32 layer, n_tokens, t, loads (-1 if not a
++// counted decode step), K int32 ids, E float32 logits (syncs after every op: needs GGML_CUDA_DISABLE_GRAPHS=1).
++#define TR2_MAXK 64
++struct TR2 {
++    int E = 0, K = 0, C = 0, J = 1; float lam = 0.f; int ready = 0;
++    int *st = nullptr, *win = nullptr, *last = nullptr, *sloth = nullptr, *svalid = nullptr, *tokl = nullptr; int ntokl = 0;
++    long long *tnow = nullptr; double *dsum = nullptr; unsigned long long *dn = nullptr, *hist = nullptr, *cnt = nullptr;
++    FILE * dump = nullptr;
++};
++static TR2 g2;
++
++static __device__ inline float tr2_val(unsigned k) {   // inverse of tr_key
++    return __uint_as_float((k & 0x80000000u) ? (k ^ 0x80000000u) : ~k);
++}
++static __device__ inline unsigned long long tr2_hi(float v, unsigned lo) { return (tr_key(v) << 32) | (unsigned long long) lo; }
++
++// rank of v[e] among all experts (greater first, lower index first on ties); the K best go to outk[rank]
++static __device__ void tr2_topk(const float * v, int E, int K, int * outk) {
++    for (int e = threadIdx.x; e < E; e += blockDim.x) {
++        const float a = v[e]; int r = 0;
++        for (int f = 0; f < E && r < K; ++f) { const float b = v[f]; r += (b > a) || (b == a && f < e); }
++        if (r < K) outk[r] = e;
++    }
++    __syncthreads();
++}
++// keep the C most recently used cached experts (last-use in lu[], -1 = not cached; ties: higher index kept)
++static __device__ void tr2_cap(int * lu, int * tmp, int E, int C) {
++    for (int e = threadIdx.x; e < E; e += blockDim.x) {
++        int r = 0; const int a = lu[e];
++        if (a >= 0) for (int f = 0; f < E; ++f) { const int b = lu[f]; r += (b >= 0) && (b > a || (b == a && f > e)); }
++        tmp[e] = r;
++    }
++    __syncthreads();
++    for (int e = threadIdx.x; e < E; e += blockDim.x) if (lu[e] >= 0 && tmp[e] >= C) lu[e] = -1;
++    __syncthreads();
++}
++
++__global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tokens, int E, int K, int mode,
++                         int C, float lam, int J,
++                         int * st, int * win, int * last, long long * tnow, double * dsum, unsigned long long * dn,
++                         unsigned long long * hist, unsigned long long * cnt, int32_t * __restrict__ out, int * tokl,
++                         int * sloth, int * svalid, int * swp_e, int * swp_s, int * nswp, int32_t * remap,
++                         unsigned long long * ncopy, int nocopy) {
++    extern __shared__ float sh2[];
++    float * x = sh2; float * z = sh2 + E; int * lu = (int *) (sh2 + 2*E); int * tmp = lu + E;
++    __shared__ int s_ids[TR2_MAXK], s_win[TR2_MAXK], s_state, s_loads;
++    __shared__ unsigned long long s_a, s_b; __shared__ float s_bias;
++    const int tid = threadIdx.x, nt = blockDim.x;
++    if (tid == 0) s_state = *st;
++    for (int j = tid; j < K; j += nt) s_win[j] = win[j];
++    if (mode == 3) for (int e = tid; e < E; e += nt) lu[e] = last[e];
++    __syncthreads();
++    for (int t = 0; t < n_tokens; ++t) {
++        const float * xt = lg + (size_t) t * stride;
++        for (int e = tid; e < E; e += nt) x[e] = xt[e];
++        if (tid == 0) { s_loads = -1; s_a = 0ull; s_b = ~0ull; }
++        __syncthreads();
++        if (mode == 2) {
++            if (s_state == 0) {                                   // cold fill = top-K of this token
++                tr2_topk(x, E, K, s_ids);
++                if (tid == 0) { for (int j = 0; j < K; ++j) s_win[j] = s_ids[j]; s_state = 1; if (n_tokens == 1) cnt[3]++; }
++            } else {
++                for (int e = tid; e < E; e += nt) tmp[e] = 0;
++                __syncthreads();
++                for (int j = tid; j < K; j += nt) tmp[s_win[j]] = 1;
++                __syncthreads();
++                for (int e = tid; e < E; e += nt) {
++                    if (!tmp[e]) atomicMax(&s_a, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));   // best non-resident
++                    else         atomicMin(&s_b, tr2_hi(x[e], (unsigned) e));                 // worst resident
++                }
++                __syncthreads();
++                if (tid == 0) {
++                    const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull)), ws = (int) (s_b & 0xFFFFFFFFull);
++                    int sw = 0;
++                    if (x[nom] > x[ws]) { for (int j = 0; j < K; ++j) if (s_win[j] == ws) { s_win[j] = nom; break; } sw = 1; }
++                    if (n_tokens == 1) { s_loads = sw; cnt[0]++; cnt[1] += sw; hist[sw]++; }
++                }
++                __syncthreads();
++                if (n_tokens == 1) { if (tid == 0) for (int j = 0; j < K; ++j) s_ids[j] = s_win[j]; }
++                else tr2_topk(x, E, K, s_ids);                    // prompt: free routing
++            }
++        } else {                                                  // mode 3: skliar
++            for (int e = tid; e < E; e += nt) { atomicMax(&s_a, tr_key(x[e])); atomicMin(&s_b, tr_key(x[e])); }
++            __syncthreads();
++            if (tid == 0) {                                       // delta: running mean of max - min (float32 difference)
++                const float mx = tr2_val((unsigned) s_a), mn = tr2_val((unsigned) s_b);
++                *dsum += (double) (mx - mn); *dn += 1ull;
++                s_bias = (float) ((double) lam * (*dsum / (double) *dn));
++            }
++            __syncthreads();
++            if (n_tokens > 1 || s_state == 0) {                   // prompt / first token: free, warms the cache
++                if (t == 0) { for (int e = tid; e < E; e += nt) lu[e] = -1; __syncthreads(); }
++                tr2_topk(x, E, K, s_ids);
++                for (int j = tid; j < K; j += nt) lu[s_ids[j]] = t;
++                __syncthreads();
++                if (t == n_tokens - 1) { tr2_cap(lu, tmp, E, C); if (tid == 0) { *tnow = (s_state ? *tnow : 0) + n_tokens; s_state = 1; } }
++            } else {
++                for (int e = tid; e < E; e += nt) z[e] = x[e] + (lu[e] >= 0 ? s_bias : 0.0f);
++                __syncthreads();
++                tr2_topk(z, E, K, s_ids);
++                if (tid == 0) s_a = 0ull;
++                __syncthreads();
++                if (J > 0) for (int e = tid; e < E; e += nt) atomicMax(&s_a, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));
++                __syncthreads();
++                if (tid == 0) {
++                    if (J > 0) {
++                        const int top1 = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull));
++                        int in = 0, wj = 0;
++                        for (int j = 0; j < K; ++j) { in |= s_ids[j] == top1; if (z[s_ids[j]] < z[s_ids[wj]]) wj = j; }
++                        if (!in) s_ids[wj] = top1;
++                    }
++                    int ld = 0; for (int j = 0; j < K; ++j) ld += lu[s_ids[j]] < 0;
++                    const int step = (int) *tnow;
++                    for (int j = 0; j < K; ++j) lu[s_ids[j]] = step;
++                    *tnow = step + 1;
++                    s_loads = ld; cnt[0]++; cnt[1] += ld; hist[ld]++;
++                }
++                __syncthreads();
++                tr2_cap(lu, tmp, E, C);
++            }
++        }
++        __syncthreads();
++        for (int j = tid; j < K; j += nt) out[(size_t) t*K + j] = s_ids[j];
++        if (tokl && tid == 0) tokl[t] = s_loads;
++        __syncthreads();
++    }
++    if (n_tokens > 1 && tid == 0) cnt[2] += n_tokens;
++    for (int j = tid; j < K; j += nt) win[j] = s_win[j];
++    if (mode == 3) for (int e = tid; e < E; e += nt) last[e] = lu[e];
++    if (tid == 0) *st = s_state;
++    if (!sloth) return;
++    if (n_tokens != 1) { if (tid == 0) *svalid = 0; return; }   // a batch ran through the prefill ring: slots stale
++    __syncthreads();
++    if (tid == 0) {                                             // slots follow the selection (same routine, both modes)
++        int ns = 0;
++        if (!*svalid) {
++            for (int j = 0; j < K; ++j) { sloth[j] = s_ids[j]; swp_e[j] = s_ids[j]; swp_s[j] = j; remap[j] = j; }
++            ns = K;
++        } else {
++            int keep[TR2_MAXK], hold[TR2_MAXK], miss[TR2_MAXK], nm = 0;
++            for (int s = 0; s < K; ++s) { hold[s] = sloth[s]; keep[s] = 0; }
++            for (int j = 0; j < K; ++j) {
++                int found = -1;
++                for (int s = 0; s < K; ++s) if (hold[s] == s_ids[j]) { found = s; break; }
++                if (found >= 0) { keep[found] = 1; remap[j] = found; } else miss[nm++] = j;
++            }
++            int sp = 0;
++            for (int m = 0; m < nm; ++m) {
++                while (keep[sp]) sp++;                          // lowest free slot: its expert is not selected
++                const int j = miss[m];
++                sloth[sp] = s_ids[j]; remap[j] = sp; swp_e[ns] = s_ids[j]; swp_s[ns] = sp; ns++; keep[sp] = 1;
++            }
++        }
++        *nswp = nocopy ? 0 : ns; *ncopy += ns; *svalid = 1;
++    }
++}
++
++static void tr2_report() {
++    if (!g2.ready) return;
++    const int H = g2.K + 1;
++    std::vector<unsigned long long> h((size_t) TR_MAXLAYER*H), c((size_t) TR_MAXLAYER*4);
++    cudaDeviceSynchronize();
++    cudaMemcpy(h.data(), g2.hist, h.size()*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
++    cudaMemcpy(c.data(), g2.cnt, c.size()*sizeof(unsigned long long), cudaMemcpyDeviceToHost);
++    std::vector<unsigned long long> ht(H, 0); unsigned long long rows = 0, loads = 0, pre = 0, cold = 0; int nl = 0;
++    for (int L = 0; L < TR_MAXLAYER; ++L) {
++        if (!c[L*4] && !c[L*4+2]) continue;
++        nl++; rows += c[L*4]; loads += c[L*4+1]; pre += c[L*4+2]; cold += c[L*4+3];
++        for (int i = 0; i < H; ++i) ht[i] += h[(size_t) L*H + i];
++    }
++    const int mode = ggml_cuda_temporal_route_mode();
++    fprintf(stderr, "temporal-route2: mode=%s layers=%d decode_layer_tokens=%llu loads=%llu loads_per_layer_token=%.4f "
++            "prompt_layer_tokens=%llu cold_decode=%llu C=%d lambda=%.3f J=%d hist=[", mode == 2 ? "decode" : "skliar", nl,
++            rows, loads, rows ? (double) loads / (double) rows : 0.0, pre, cold, g2.C, g2.lam, g2.J);
++    for (int i = 0; i < H; ++i) fprintf(stderr, "%s%llu", i ? "," : "", ht[i]);
++    fprintf(stderr, "]\n");
++    const char * hp = getenv("TEMPORAL_ROUTE_HIST");
++    if (hp && hp[0]) { FILE * f = fopen(hp, "w"); if (f) {
++        fprintf(f, "{\"hist\": ["); for (int i = 0; i < 64; ++i) fprintf(f, "%s%llu", i ? ", " : "", i < H ? ht[i] : 0ull);
++        fprintf(f, "], \"loads\": %llu, \"rows\": %llu, \"mode\": \"%s\"}\n", loads, rows, mode == 2 ? "decode" : "skliar"); fclose(f); } }
++    if (g2.dump) { fclose(g2.dump); g2.dump = nullptr; }
++}
++
++static void tr2_reset() {
++    if (!g2.ready) return;
++    CUDA_CHECK(cudaDeviceSynchronize());
++    CUDA_CHECK(cudaMemset(g2.st, 0, TR_MAXLAYER*sizeof(int)));
++    CUDA_CHECK(cudaMemset(g2.tnow, 0, TR_MAXLAYER*sizeof(long long)));
++}
++
++static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int n_tokens, int E) {
++    const ggml_tensor * lg = dst->src[0];
++    const int mode = ggml_cuda_temporal_route_mode();
++    if (!g2.ready) {
++        GGML_ASSERT(K <= TR2_MAXK && E <= 2048);
++        g2.E = E; g2.K = K;
++        if (mode == 3) {
++            const char * c = getenv("TEMPORAL_CB_C"), * l = getenv("TEMPORAL_CB_LAMBDA"), * j = getenv("TEMPORAL_CB_J"), * k = getenv("TEMPORAL_CB_K");
++            if (!c || !l) { fprintf(stderr, "temporal-route2: FATAL skliar needs TEMPORAL_CB_C and TEMPORAL_CB_LAMBDA\n"); abort(); }
++            g2.C = atoi(c); g2.lam = (float) atof(l); g2.J = j ? atoi(j) : 1;
++            GGML_ASSERT(g2.C >= K && g2.C <= E && (g2.J == 0 || g2.J == 1) && (!k || atoi(k) == K));
++        }
++        CUDA_CHECK(cudaMalloc(&g2.st, TR_MAXLAYER*sizeof(int)));         CUDA_CHECK(cudaMemset(g2.st, 0, TR_MAXLAYER*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g2.win, (size_t) TR_MAXLAYER*K*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g2.last, (size_t) TR_MAXLAYER*E*sizeof(int))); CUDA_CHECK(cudaMemset(g2.last, 0xFF, (size_t) TR_MAXLAYER*E*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g2.tnow, TR_MAXLAYER*sizeof(long long)));  CUDA_CHECK(cudaMemset(g2.tnow, 0, TR_MAXLAYER*sizeof(long long)));
++        CUDA_CHECK(cudaMalloc(&g2.dsum, TR_MAXLAYER*sizeof(double)));     CUDA_CHECK(cudaMemset(g2.dsum, 0, TR_MAXLAYER*sizeof(double)));
++        CUDA_CHECK(cudaMalloc(&g2.dn, TR_MAXLAYER*sizeof(unsigned long long))); CUDA_CHECK(cudaMemset(g2.dn, 0, TR_MAXLAYER*sizeof(unsigned long long)));
++        CUDA_CHECK(cudaMalloc(&g2.hist, (size_t) TR_MAXLAYER*(K+1)*sizeof(unsigned long long))); CUDA_CHECK(cudaMemset(g2.hist, 0, (size_t) TR_MAXLAYER*(K+1)*sizeof(unsigned long long)));
++        CUDA_CHECK(cudaMalloc(&g2.cnt, TR_MAXLAYER*4*sizeof(unsigned long long))); CUDA_CHECK(cudaMemset(g2.cnt, 0, TR_MAXLAYER*4*sizeof(unsigned long long)));
++        CUDA_CHECK(cudaMalloc(&g2.sloth, (size_t) TR_MAXLAYER*K*sizeof(int)));
++        CUDA_CHECK(cudaMalloc(&g2.svalid, TR_MAXLAYER*sizeof(int)));      CUDA_CHECK(cudaMemset(g2.svalid, 0, TR_MAXLAYER*sizeof(int)));
++        const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP2");
++        if (d && d[0]) { g2.dump = fopen(d, "wb"); GGML_ASSERT(g2.dump); }
++        g2.ready = 1;
++        atexit(tr2_report);
++        fprintf(stderr, "[temporal-route2] mode=%s K=%d E=%d C=%d lambda=%.3f J=%d nocopy=%d\n", mode == 2 ? "decode" : "skliar",
++                K, E, g2.C, g2.lam, g2.J, tr_nocopy());
++    }
++    GGML_ASSERT(K == g2.K && E == g2.E);
++    TU * T = (tr_slots() && L < (int) g_L.size() && g_L[L].ready) ? &g_L[L] : nullptr;
++    const bool sl = T != nullptr;
++    if (sl) {
++        GGML_ASSERT(T->R == K && T->E == E && (mode == 2 || g2.C == K));   // the cache is the slots
++        if (T->remap_words < K) {
++            if (T->remap_ids) cudaFree(T->remap_ids);
++            CUDA_CHECK(cudaMalloc(&T->remap_ids, K*sizeof(int32_t))); T->remap_words = K;
++        }
++    }
++    if (g2.dump && g2.ntokl < n_tokens) { if (g2.tokl) cudaFree(g2.tokl); CUDA_CHECK(cudaMalloc(&g2.tokl, n_tokens*sizeof(int))); g2.ntokl = n_tokens; }
++    k_route2<<<1, 256, (size_t) 4*E*sizeof(float), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K, mode,
++            g2.C, g2.lam, g2.J, g2.st + L, g2.win + (size_t) L*K, g2.last + (size_t) L*E, g2.tnow + L, g2.dsum + L, g2.dn + L,
++            g2.hist + (size_t) L*(K+1), g2.cnt + (size_t) L*4, (int32_t *) dst->data, g2.dump ? g2.tokl : nullptr,
++            sl ? g2.sloth + (size_t) L*K : nullptr, g2.svalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
++            sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr, tr_nocopy());
++    CUDA_CHECK(cudaGetLastError());
++    if (sl && n_tokens == 1 && tr_nocopy() != 2) {             // copies start at the router (as TEMPORAL_ROUTE_SLOTS=2)
++        cudaEventRecord(T->fork, stream);
++        cudaStreamWaitEvent(g_copy, T->fork, 0);
++        for (int w = 0; w < 3; ++w) {
++            k_swapcopy<<<tu_copy_blocks(),256,0,g_copy>>>(T->pool_dev[w], T->slot[w], T->be[w], T->d_swp_e, T->d_swp_s, T->d_nswp);
++            cudaEventRecord(T->ev[w], g_copy);
++        }
++    }
++    if (g2.dump) {
++        std::vector<int32_t> ids((size_t) K*n_tokens), tl(n_tokens); std::vector<float> x((size_t) E*n_tokens);
++        CUDA_CHECK(cudaStreamSynchronize(stream));
++        CUDA_CHECK(cudaMemcpy(ids.data(), dst->data, ids.size()*sizeof(int32_t), cudaMemcpyDeviceToHost));
++        CUDA_CHECK(cudaMemcpy(tl.data(), g2.tokl, n_tokens*sizeof(int), cudaMemcpyDeviceToHost));
++        CUDA_CHECK(cudaMemcpy2D(x.data(), E*sizeof(float), lg->data, lg->nb[1], E*sizeof(float), n_tokens, cudaMemcpyDeviceToHost));
++        for (int t = 0; t < n_tokens; ++t) {
++            const int32_t hdr[4] = { L, n_tokens, t, tl[t] };
++            fwrite(hdr, 4, 4, g2.dump); fwrite(ids.data() + (size_t) t*K, 4, (size_t) K, g2.dump); fwrite(x.data() + (size_t) t*E, 4, (size_t) E, g2.dump);
++        }
++    }
++}
++
+ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+     const ggml_tensor * lg = dst->src[0];
+     ggml_custom_op_params p; memcpy(&p, dst->op_params, sizeof(p));
+     const int L = (int)(intptr_t) p.userdata, K = (int) dst->ne[0], n_tokens = (int) dst->ne[1], E = (int) lg->ne[0];
+     GGML_ASSERT(L >= 0 && L < TR_MAXLAYER && K < E && E <= 4096 && lg->ne[1] == n_tokens);
++    if (ggml_cuda_temporal_route_mode() >= 2) { tr2_route(stream, dst, L, K, n_tokens, E); return; }
+     if (!g_tr_k) {
+         g_tr_K = K;
+         CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
+@@ -501,6 +795,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+ 
+ // cold-start every layer's window (llama_context calls this at sequence position 0)
+ void ggml_cuda_temporal_route_reset() {
++    tr2_reset();
+     if (!g_tr_k) return;
+     CUDA_CHECK(cudaDeviceSynchronize());
+     CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
+diff --git a/src/models/qwen35moe.cpp b/src/models/qwen35moe.cpp
+index 7b0876cb..bca3a6c5 100644
+--- a/src/models/qwen35moe.cpp
++++ b/src/models/qwen35moe.cpp
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ #include "models.h"
+ #include "llama-memory-recurrent.h"
+ 
+@@ -497,6 +498,22 @@ ggml_tensor * llama_model_qwen35moe::graph::build_layer_ffn(ggml_tensor * cur, c
+     // Check if this is an MoE layer
+     GGML_ASSERT(model.layers[il].ffn_gate_inp != nullptr);
+ 
++    // TEMPORAL_SHEXP_FIRST=1: put the shared expert into the graph before the routed experts, so streamed
++    // expert copies started at the router run under it. Same ops, same sum; only the node order changes.
++    static const bool shexp_first = getenv("TEMPORAL_SHEXP_FIRST") && atoi(getenv("TEMPORAL_SHEXP_FIRST"));
++    ggml_tensor * shexp_early = nullptr;
++    if (shexp_first && model.layers[il].ffn_up_shexp != nullptr) {
++        shexp_early = build_ffn(cur,
++                model.layers[il].ffn_up_shexp, NULL, model.layers[il].ffn_up_shexp_s,
++                model.layers[il].ffn_gate_shexp, NULL, model.layers[il].ffn_gate_shexp_s,
++                model.layers[il].ffn_down_shexp, NULL, model.layers[il].ffn_down_shexp_s,
++                NULL,
++                LLM_FFN_SILU, LLM_FFN_PAR, il);
++        ggml_tensor * g = ggml_sigmoid(ctx0, build_lora_mm(model.layers[il].ffn_gate_inp_shexp, cur));
++        shexp_early = ggml_mul(ctx0, shexp_early, g);
++        ggml_build_forward_expand(gf, shexp_early);
++    }
++
+     ggml_tensor * moe_out =
+         build_moe_ffn(cur,
+             model.layers[il].ffn_gate_inp,
+@@ -515,7 +532,10 @@ ggml_tensor * llama_model_qwen35moe::graph::build_layer_ffn(ggml_tensor * cur, c
+     cb(moe_out, "ffn_moe_out", il);
+ 
+     // Add shared experts if present - following Qwen3Next reference implementation
+-    if (model.layers[il].ffn_up_shexp != nullptr) {
++    if (shexp_early != nullptr) {
++        cur = ggml_add(ctx0, moe_out, shexp_early);
++        cb(cur, "ffn_out", il);
++    } else if (model.layers[il].ffn_up_shexp != nullptr) {
+         ggml_tensor * ffn_shexp =
+             build_ffn(cur,
+                 model.layers[il].ffn_up_shexp, NULL, model.layers[il].ffn_up_shexp_s,
+diff --git a/tools/llama-bench/llama-bench.cpp b/tools/llama-bench/llama-bench.cpp
+index 1ccfbc5f..f94dfcd0 100644
+--- a/tools/llama-bench/llama-bench.cpp
++++ b/tools/llama-bench/llama-bench.cpp
+@@ -2115,6 +2115,27 @@ struct ctx_state {
+     std::vector<uint8_t> buf; // the llama_context state buffer
+ };
+ 
++// TEMPORAL_BENCH_CTX / TEMPORAL_BENCH_GEN = files of int32 token ids: the context is filled with the first
++// n tokens of CTX instead of random tokens, and generation step i feeds GEN[i] (teacher-forced replay of a
++// real continuation) instead of a random token, so routing sees real text. Unset: stock behaviour.
++static const std::vector<llama_token> & tb_tokens(const char * env) {
++    static std::vector<llama_token> c, g; static bool rc = false, rg = false;
++    const bool is_ctx = strcmp(env, "TEMPORAL_BENCH_CTX") == 0;
++    std::vector<llama_token> & v = is_ctx ? c : g; bool & r = is_ctx ? rc : rg;
++    if (!r) {
++        r = true;
++        const char * p = getenv(env);
++        if (p && p[0]) {
++            FILE * f = fopen(p, "rb");
++            if (!f) { fprintf(stderr, "%s: cannot open %s\n", env, p); exit(1); }
++            int32_t x; while (fread(&x, 4, 1, f) == 1) v.push_back(x);
++            fclose(f);
++            fprintf(stderr, "llama-bench: %s = %s (%zu tokens)\n", env, p, v.size());
++        }
++    }
++    return v;
++}
++
+ static bool test_prompt(llama_context * ctx, int n_prompt, int n_batch, int n_threads) {
+     llama_set_n_threads(ctx, n_threads, n_threads);
+ 
+@@ -2132,6 +2153,11 @@ static bool test_prompt(llama_context * ctx, int n_prompt, int n_batch, int n_th
+         for (int i = 1; i < n_tokens; i++) {
+             tokens[i] = std::rand() % n_vocab;
+         }
++        const auto & tbc = tb_tokens("TEMPORAL_BENCH_CTX");
++        if (!tbc.empty()) {
++            if ((int) tbc.size() < n_prompt) { fprintf(stderr, "TEMPORAL_BENCH_CTX has %zu tokens, need %d\n", tbc.size(), n_prompt); exit(1); }
++            for (int i = 0; i < n_tokens; i++) tokens[i] = tbc[n_processed + i];
++        }
+         int res = llama_decode(ctx, llama_batch_get_one(tokens.data(), n_tokens));
+         if (res != 0) {
+             fprintf(stderr, "%s: failed to decode prompt batch, res = %d\n", __func__, res);
+@@ -2152,8 +2178,11 @@ static bool test_gen(llama_context * ctx, int n_gen, int n_threads) {
+     const int32_t       n_vocab = llama_vocab_n_tokens(vocab);
+ 
+     llama_token token = llama_vocab_get_add_bos(vocab) ? llama_vocab_bos(vocab) : std::rand() % n_vocab;
++    const auto & tbg = tb_tokens("TEMPORAL_BENCH_GEN");
++    if (!tbg.empty() && (int) tbg.size() < n_gen) { fprintf(stderr, "TEMPORAL_BENCH_GEN has %zu tokens, need %d\n", tbg.size(), n_gen); exit(1); }
+ 
+     for (int i = 0; i < n_gen; i++) {
++        if (!tbg.empty()) token = tbg[i];
+         int res = llama_decode(ctx, llama_batch_get_one(&token, 1));
+         if (res != 0) {
+             fprintf(stderr, "%s: failed to decode generation batch, res = %d\n", __func__, res);
+-- 
+2.50.0
+
