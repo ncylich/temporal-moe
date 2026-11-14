@@ -1,0 +1,44 @@
+From 0680827ac4500e444e8e7660402d8773f51540c6 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Sat, 14 Nov 2026 13:39:36 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_ROUTE_SLOTS is honoured in decode
+ and skliar modes
+
+Patch 0006 forced TEMPORAL_ROUTE_SLOTS=2 (copies started at the router on the copy stream) for the
+decode and skliar modes. On the 1.26B model that costs about 0.25 ms per token against the trained
+mode's default (slots and copies at the expert op). An explicit TEMPORAL_ROUTE_SLOTS now overrides the
+default of 2 in those modes, so each method can be timed at its best setting. Default unchanged.
+---
+ ggml/src/ggml-cuda/temporal.cu | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index 9ff1beb5..398b2dcb 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -355,9 +355,10 @@ static unsigned long long *g_tr_cnt = nullptr;           // [TR_MAXLAYER*3]: ste
+ static int g_tr_K = 0;
+ static int *g_tr_vslot = nullptr, *g_tr_vvalid = nullptr; // [TR_MAXLAYER*K], [TR_MAXLAYER] (TEMPORAL_ROUTE_SLOTS)
+ int ggml_cuda_temporal_route_mode();
+-// released-model modes (decode, skliar) always keep the slots in the routing kernel and start the copies there
+-static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");int x=s?atoi(s):0;
+-                            return ggml_cuda_temporal_route_mode()>=2 ? 2 : x;}();
++// decode and skliar modes default to 2 (slots kept by the routing kernel, copies started there); an explicit
++// TEMPORAL_ROUTE_SLOTS (0 = slots and copies at the expert op, as the trained mode's default) overrides it
++static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");
++                            return s ? atoi(s) : (ggml_cuda_temporal_route_mode()>=2 ? 2 : 0);}();
+                         return v && ggml_cuda_temporal_unified(); }
+ // TEMPORAL_ROUTE_NOCOPY (released-model modes, timing controls, output wrong): 1 = copy kernels launched
+ // with an empty swap list (no bytes moved); 2 = no copy kernels, no events, nothing waited on.
+@@ -784,7 +785,7 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+             sl ? g2.sloth + (size_t) L*K : nullptr, g2.svalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
+             sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr, tr_nocopy());
+     CUDA_CHECK(cudaGetLastError());
+-    if (sl && n_tokens == 1 && tr_nocopy() != 2) {             // copies start at the router (as TEMPORAL_ROUTE_SLOTS=2)
++    if (sl && tr_slots() == 2 && n_tokens == 1 && tr_nocopy() != 2) {   // copies start at the router; =1 leaves them to the expert op
+         cudaEventRecord(T->fork, stream);
+         cudaStreamWaitEvent(g_copy, T->fork, 0);
+         for (int w = 0; w < 3; ++w) {
+-- 
+2.50.0
+
