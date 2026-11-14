@@ -40,7 +40,7 @@ grep -hE "^routing|loads per|^loss" $O/ce_*.log
 
 echo "### lm-eval, 10 tasks $(date -u +%H:%M)"
 lme() { # name weights routing [lambda]
-  [ -s $O/lme_$1/done ] && return
+  [ -e $O/lme_$1/done ] && return
   mkdir -p $O/lme_$1
   python3 gpubench/pretrained/lmeval_ref.py --model refmoe \
     --model_args weights=$2,routing=$3,cb_lambda=${4:-0.5},batch=64,loads_out=$O/lme_$1/loads.jsonl \
