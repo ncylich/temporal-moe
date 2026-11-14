@@ -34,7 +34,7 @@ import torch.nn.functional as F
 from safetensors.torch import load_file
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-from temporal.temporal_router import compute_resident_mask  # noqa: E402
+from temporal.temporal_router import compute_resident_mask, compute_resident_mask_accel  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "analysis", "residency"))
 import cache_bias  # noqa: E402
 
@@ -90,7 +90,9 @@ class RefModel:
     def route(self, logits, routing):
         """logits [B,S,E] -> (mask [B,S,E] bool, gates [B,S,E])."""
         if routing == "temporal":
-            m = compute_resident_mask(logits.transpose(0, 1).cpu(), self.topk, self.evict)
+            lg = logits.transpose(0, 1).contiguous()
+            m = (compute_resident_mask_accel(lg.float(), self.topk, self.evict) if lg.is_cuda      # bit-exact GPU scan
+                 else compute_resident_mask(lg, self.topk, self.evict))
             mask = m.transpose(0, 1).to(logits.device)
             ld = (mask[:, 1:] & ~mask[:, :-1]).sum(-1)                               # experts entering the window
             v = self.valid[:, 1:] if self.valid is not None else torch.ones_like(ld, dtype=torch.bool)

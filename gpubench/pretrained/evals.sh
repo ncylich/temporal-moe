@@ -46,6 +46,7 @@ lme() { # name weights routing [lambda]
     --model_args weights=$2,routing=$3,cb_lambda=${4:-0.5},batch=64,loads_out=$O/lme_$1/loads.jsonl \
     --tasks $TASKS --num_fewshot 0 --seed 42 --output_path $O/lme_$1 > $O/lme_$1.log 2>&1 && touch $O/lme_$1/done
 }
-lme moe_skliar $MOE skliar $LAM & lme moe_topk $MOE topk & lme moe_ours $MOE temporal & lme tmoe_trained $TMOE temporal & wait
+# one at a time: four batch-64 processes do not fit in 48 GB
+lme moe_skliar $MOE skliar $LAM; lme moe_topk $MOE topk; lme moe_ours $MOE temporal; lme tmoe_trained $TMOE temporal
 for n in moe_topk moe_ours moe_skliar tmoe_trained; do echo "== $n"; grep -E "^\|" $O/lme_$n.log | head -40; done
 echo "### ALL DONE $(date -u +%H:%M)"
