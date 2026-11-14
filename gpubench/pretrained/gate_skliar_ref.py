@@ -22,7 +22,7 @@ def main():
     ap.add_argument("--weights", required=True); ap.add_argument("--tokens", required=True)
     ap.add_argument("--n", type=int, default=4); ap.add_argument("--seq", type=int, default=256)
     ap.add_argument("--lam", type=float, default=0.5); ap.add_argument("--C", type=int, default=18)
-    ap.add_argument("--device", default="cpu")
+    ap.add_argument("--device", default="cpu"); ap.add_argument("--prefill", type=int, default=0)
     a = ap.parse_args()
     m = RefModel(a.weights, 18, device=a.device, cb_C=a.C, cb_lam=a.lam)
     seen = []                                                   # (layer, logits [B,S,E], mask)
@@ -36,6 +36,8 @@ def main():
         return mask, gates
     m.route = spy
     toks = torch.from_numpy(np.load(a.tokens)["tokens"][:a.n, :a.seq].astype(np.int64)).to(a.device)
+    P = a.prefill or 1
+    m.prefill = torch.full((a.n,), a.prefill, device=a.device) if a.prefill else None
     m.forward(toks, "skliar")
     cache_bias.CFG.update(C=a.C, lam=a.lam, J=1, k=18)
     bad = 0; rows = 0
@@ -43,8 +45,9 @@ def main():
         for b in range(lg.shape[0]):
             cache_bias.STATE.clear(); cache_bias.DELTA.clear()
             key = f"r{b}"
-            cache_bias.apply(L, lg[b, :1], [(key, 1, True)], True)          # token 0: prefill (unbiased, warms the cache)
-            for t in range(1, lg.shape[1]):
+            pre = cache_bias.apply(L, lg[b, :P], [(key, P, True)], True)    # prompt: one prefill batch (unbiased, warms the cache)
+            bad += int(not torch.equal(lg[b, :P].topk(18).indices.sort().values, mk[b, :P].nonzero()[:, 1].view(P, 18)))
+            for t in range(P, lg.shape[1]):
                 out = cache_bias.apply(L, lg[b, t:t + 1], [(key, 1, False)], True)
                 sel = out[0] > float("-inf")
                 rows += 1
@@ -53,16 +56,31 @@ def main():
     sw, tk, _ = cache_bias.stats()
     print(f"layers {len(seen)} token-layers {rows} mismatches {bad}")
     print(f"loads: ref {m.loads[0]}/{m.loads[1]}  cache_bias {sw}/{tk}")
+    sk_loads = list(m.loads)
     # our rule: the GPU scan used on CUDA equals the CPU reference scan on these same logits
     from temporal.temporal_router import compute_resident_mask, compute_resident_mask_accel
     tbad = 0
+    if a.prefill:                                  # our rule with a free prompt equals decode_state.py prefill + steps
+        import decode_state as DS
+        DS.DEC.update(on=True, R=18, swaps=1)
+        seen.clear(); layer[0] = 0; m.loads = [0, 0]
+        m.forward(toks, "temporal")
+        dbad = 0
+        for L, lg, mk in seen:
+            DS.reset()
+            DS.prefill(L, lg[:, :P].transpose(0, 1))
+            dbad += int(not torch.equal(lg[:, :P].topk(18).indices.sort().values, mk[:, :P].nonzero()[:, 2].view(-1, P, 18)))
+            for t in range(P, lg.shape[1]):
+                dbad += int(not torch.equal(DS.step(L, lg[:, t]), mk[:, t]))
+        print(f"temporal with free prefill vs decode_state: {dbad} mismatching steps; loads {m.loads}")
+        tbad += dbad
     if a.device == "cuda":
         for L, lg, _ in seen:
             x = lg.transpose(0, 1).contiguous()
             tbad += int(not torch.equal(compute_resident_mask(x, 18, "min_logit"),
                                         compute_resident_mask_accel(x.cuda(), 18, "min_logit").cpu()))
         print(f"temporal GPU scan vs CPU scan: {tbad} of {len(seen)} layers differ")
-    print("GATE PASS" if tbad == 0 and bad == 0 and m.loads[0] == sw and m.loads[1] == tk else "GATE FAIL")
+    print("GATE PASS" if tbad == 0 and bad == 0 and sk_loads == [sw, tk] else "GATE FAIL")
 
 
 if __name__ == "__main__":

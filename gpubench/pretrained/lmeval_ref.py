@@ -34,11 +34,12 @@ EOD = 0          # pythia <|endoftext|>, Megatron's eod for these runs
 @register_model("refmoe")
 class RefMoE(TemplateLM):
     def __init__(self, weights, routing="topk", topk=18, cb_C=18, cb_lambda=0.5, batch=64,
-                 tokenizer="EleutherAI/pythia-12b", loads_out=None, gates="norm", **kw):
+                 tokenizer="EleutherAI/pythia-12b", loads_out=None, gates="norm", prefill="rule", **kw):
         super().__init__()
         self.routing, self.bs, self.loads_out = routing, int(batch), loads_out
         self.m = RefModel(weights, int(topk), device="cuda", cb_C=int(cb_C), cb_lam=float(cb_lambda))
         self.m.gate_norm = gates == "norm"     # "full" for the plain MoE (pre-softmax router, no renormalisation)
+        self.free_prefill = prefill == "free"  # the request's context routes by stock top-k; the rule scores the continuation
         self.tok = Tokenizer.from_pretrained(tokenizer)
 
     @property
@@ -64,6 +65,7 @@ class RefMoE(TemplateLM):
             for j, (_, ids, _) in enumerate(chunk):
                 inp[j, :len(ids) - 1] = torch.tensor(ids[:-1]); valid[j, :len(ids) - 1] = True
             self.m.valid = valid.cuda()
+            self.m.prefill = (torch.tensor([len(ids) - n for _, ids, n in chunk]).cuda() if self.free_prefill else None)
             logp = F.log_softmax(self.m.forward(inp.cuda(), self.routing).float(), -1)
             for j, (i, ids, n) in enumerate(chunk):
                 T = len(ids) - 1

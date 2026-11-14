@@ -69,6 +69,7 @@ class RefModel:
         self.cb_C, self.cb_lam, self.cb_J = cb_C, cb_lam, cb_J
         self.loads = [0, 0]          # [loads, token-layers] after token 0, temporal and skliar routing
         self.valid = None            # [B,S] bool: real (unpadded) tokens, set by a batching caller
+        self.prefill = None          # [B] long: tokens before this index are the prompt (free routing; temporal/skliar)
         self.gate_norm = True        # False: gates = softmax over all experts kept for the selected ones
 
     def attention(self, x, i):
@@ -97,6 +98,11 @@ class RefModel:
             mask = m.transpose(0, 1).to(logits.device)
             ld = (mask[:, 1:] & ~mask[:, :-1]).sum(-1)                               # experts entering the window
             v = self.valid[:, 1:] if self.valid is not None else torch.ones_like(ld, dtype=torch.bool)
+            if self.prefill is not None:         # decode_state.py: the prompt routes freely (stock top-k) while the
+                free = torch.arange(logits.shape[1], device=logits.device)[None] < self.prefill[:, None]   # scan observes
+                tk = torch.zeros_like(mask).scatter_(-1, logits.topk(self.topk, dim=-1).indices, True)
+                mask = torch.where(free[..., None], tk, mask)
+                v = v & ~free[:, 1:]             # loads are counted on decoded tokens only
             self.loads[0] += int(ld[v].sum()); self.loads[1] += int(v.sum())
         elif routing == "skliar":
             mask = self.skliar(logits, self.valid)
@@ -123,9 +129,11 @@ class RefModel:
         acc = torch.zeros(2, dtype=torch.long, device=lt.device)                      # summed on device: no sync per token
         for t in range(1, S):
             dsum += rng[:, t]
-            sel = cache_bias.select(lt[:, t], last, (dsum / (t + 1))[:, None], self.cb_lam, self.cb_J, self.topk)
+            dec = (t >= self.prefill) if self.prefill is not None else torch.ones(B, dtype=torch.bool, device=lt.device)
+            # prompt tokens (cache_bias prefill): unbiased top-k, LRU warmed, delta updated, loads not counted
+            sel = cache_bias.select(lt[:, t], last, (dsum / (t + 1) * dec)[:, None], self.cb_lam, self.cb_J, self.topk)
             ld = (sel & ~(last > neg)).sum(-1)
-            v = valid[:, t] if valid is not None else torch.ones_like(ld, dtype=torch.bool)
+            v = (valid[:, t] if valid is not None else torch.ones_like(ld, dtype=torch.bool)) & dec
             acc[0] += ld[v].sum(); acc[1] += v.sum()
             last = cache_bias._cap(torch.where(sel, torch.full_like(last, float(t)), last), self.cb_C)
             mask[:, t] = sel
@@ -186,6 +194,9 @@ def main():
     ap.add_argument("--routing", default="temporal", choices=["temporal", "topk", "skliar"])
     ap.add_argument("--cb-C", type=int, default=18)
     ap.add_argument("--cb-lambda", type=float, default=0.5)
+    ap.add_argument("--prefill", type=int, default=0, help="first N tokens are a prompt: routed by stock top-k, "
+                    "the rule applies from token N (serving protocol for models without temporal training)")
+    ap.add_argument("--score-from", type=int, default=0, help="report the loss on tokens from this index on")
     ap.add_argument("--gates", default="norm", choices=["norm", "full"],
                     help="norm: softmax over the selected experts; full: softmax over all experts, not renormalised")
     ap.add_argument("--device", default="cpu")
@@ -199,12 +210,13 @@ def main():
     losses, t0 = [], time.time()
     for b in range(0, len(toks), a.batch):
         chunk = toks[b:b + a.batch, :a.seq + 1].to(a.device)
+        model.prefill = torch.full((chunk.shape[0],), a.prefill, device=a.device) if a.prefill else None
         logits = model.forward(chunk[:, :-1], a.routing)
         if b == 0 and a.save_logits:
             np.save(a.save_logits, logits[0].cpu().numpy())
         ce = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), chunk[:, 1:].reshape(-1),
                              reduction="none").view(chunk.shape[0], -1)
-        losses.append(ce.cpu())
+        losses.append(ce[:, a.score_from:].cpu())
         done = torch.cat(losses)
         print(f"[{len(done)}/{len(toks)}] loss {done.mean():.5f}  {time.time()-t0:.0f}s", flush=True)
     per = torch.cat(losses)
@@ -212,7 +224,8 @@ def main():
         np.save(a.save_losses, per.numpy())
     mean = per.mean().item()
     se = per.mean(1).std().item() / math.sqrt(len(per)) if len(per) > 1 else float("nan")
-    print(f"routing={a.routing} evict={a.evict} k={a.topk} samples={len(per)} tokens={per.numel()}")
+    print(f"routing={a.routing} evict={a.evict} k={a.topk} samples={len(per)} tokens={per.numel()} "
+          f"gates={a.gates} prefill={a.prefill} score_from={a.score_from}")
     if a.routing != "topk":
         print(f"{a.routing} C={a.cb_C} lambda={a.cb_lambda} loads per token-layer {model.loads[0] / max(model.loads[1], 1):.4f}")
     print(f"loss {mean:.5f} nats/token (SE over samples {se:.5f})  "
