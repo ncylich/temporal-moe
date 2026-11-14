@@ -468,3 +468,77 @@ Pod `i65msin9gh64dw` running since 08:37 UTC, $0.69/h: about $1.8 at 11:10 UTC. 
 `bcnqix1ewwwjr3` is stopped and was not resumed (its host had no free GPU). The new pod is left running for
 Gemma4 rather than stopped, because the morning showed a stopped pod may not get its GPU back; it will be
 stopped at the end.
+
+## R1-8 -- Gemma4-26B-IT: download, conversion, quantization (11:06-11:28 UTC)
+
+`google/gemma-4-26B-A4B-it` (public, not gated; 49 GB). 30 layers, all with a routed MoE block (128
+experts, top-8, expert width 704) next to a dense GELU MLP (width 2112), hidden size 2816, sliding-window
+attention with head size 256 and global attention with head size 512 (the CUDA flash-attention kernels
+have head size 512, so `-fa 1` as for Qwen; on and off measured the same speed in a smoke test).
+
+**Went wrong, and how it was handled.**
+1. The converter failed with `KeyError: 'global_head_dim'`. transformers 5.23 (installed for the tokenizer)
+   rebuilds Gemma4's config without that key, while the engine's July converter reads it. The converter
+   already falls back to the raw `config.json` when `AutoConfig` fails; `gpubench/released/
+   convert_rawconfig.py` makes only that call fail (a first version also broke the tokenizer's
+   `AutoConfig` call and was narrowed).
+2. The checkpoint stores gate and up projections fused, and the converter writes
+   `blk.N.ffn_gate_up_exps` [2816, 1408, 128]; the streamed slot path needs separate gate, up and down
+   tensors. `gpubench/released/split_gate_up.py` rewrites the BF16 GGUF with each fused tensor split into
+   `ffn_gate_exps` (first 704 rows, as `build_moe_ffn`'s merged path reads them) and `ffn_up_exps`; rows are
+   independent, so quantizing the split file gives the same quantized rows. **All arms use the split file.**
+   So that this cannot weaken the baseline, stock top-k is also timed on the fused file (R1-10).
+3. The first fused-file quantization ran out of container disk (200 GB) and failed; rerun after deleting the
+   safetensors.
+
+Files: `gemma4-q4km.gguf` (split, 16,796,019,744 bytes) and `gemma4-q4km-fused.gguf` (16,796,017,664
+bytes). Q4_K_M puts gate and up in Q4_K (1.06 MiB per expert each) and, because 704 is not a multiple of
+256, the down projection falls back from Q6_K to Q8_0 (2.01 MiB per expert): **one load is about 4.3 MB**,
+twice Qwen's, with 30 layers instead of 40. Per-expert down scales (`ffn_down_exps.scale`, [128]) stay in
+VRAM and are gathered by expert id, so the slot remap does not touch them.
+
+## R1-9 -- Gemma4 gates (11:28-11:57 UTC, `gates.sh ... 128 8 0.5 30 200`, outputs in `gpubench/results/released/gemma4/gates/`)
+
+**Gate 1, routing equality (pass, all four configurations).** Same procedure as R1-3, Q4_K_M weights, the
+references fed the engine's own logits.
+
+| configuration | prompt layer-tokens equal | decode layer-tokens equal | loads equal |
+|---|---|---|---|
+| ours, all in VRAM | 6,870 / 6,870 | 17,130 / 17,130 | |
+| ours, streamed | 6,870 / 6,870 | 18,150 / 18,150 | |
+| Skliar, all in VRAM | 6,870 / 6,870 | 19,260 / 19,260 | 19,260 / 19,260 |
+| Skliar, streamed | 6,870 / 6,870 | 15,000 / 15,000 | 15,000 / 15,000 |
+
+**Gate 2, Skliar's loads on GSM8K against `results/ablations/skliar_c8_lam05_hist.json` (pass).** 200 items,
+same sampling as for Qwen.
+
+| loads in a layer-token | engine (1,610,100 layer-tokens) | saved (9,204,210) |
+|---|---|---|
+| 0 | 0.3265 | 0.3275 |
+| 1 | 0.4756 | 0.4736 |
+| 2 | 0.1442 | 0.1443 |
+| 3 | 0.0426 | 0.0437 |
+| 4 | 0.0094 | 0.0094 |
+| 5 | 0.0015 | 0.0014 |
+| 6 or more | 0.0001 | 0.0001 |
+| **mean** | **0.9379** | **0.9389** |
+
+Total variation distance 0.0021. The task brief's "about 20% of token-layers needing two or more" is
+19.8% here and 19.9% in the saved histogram. Ours on the same items: 1,553,340 layer-tokens, mean 0.9986
+(2,181 with no load).
+
+Sanity check only: GSM8K flexible-extract on the 200 engine generations, stock 182/200 (0.910), ours
+163/200 (0.815), Skliar 161/200 (0.805). The vLLM numbers on 1319 items are 0.878 / 0.788 / 0.807: on these
+200 items the order of ours and Skliar is reversed, inside the n = 200 standard error of about 0.03.
+
+**Gate 3, batch-1 perplexity, streamed against all in VRAM (pass, identical).**
+
+| routing | all in VRAM | streamed | running estimates |
+|---|---|---|---|
+| ours | 73.2257 +/- 9.74357 | 73.2257 +/- 9.74357 | [1]100.8822 [2]62.2031 [3]92.5127 [4]73.2257 in both |
+| Skliar | 77.8332 +/- 10.62048 | 77.8332 +/- 10.62048 | [1]55.6226 [2]31.6268 [3]66.9017 [4]77.8332 in both |
+| stock top-k | 20.7269 +/- 2.39479 | | |
+
+(The text is GSM8K questions and solutions without the chat template, and at batch 1 every token after a
+chunk's first is under the constraint, which an instruction-tuned model handles badly; this is an identity
+check, not a quality measurement.)
