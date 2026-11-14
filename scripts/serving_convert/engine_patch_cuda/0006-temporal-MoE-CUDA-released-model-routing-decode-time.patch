@@ -1,4 +1,4 @@
-From eef4567fbdefd7312dcc5dd4e9a14df874b2168d Mon Sep 17 00:00:00 2001
+From 9e08f23fd27016e5b117ab66a985dc3a0444ef5b Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Sat, 14 Nov 2026 00:20:05 -0800
 Subject: [PATCH] temporal-MoE CUDA: released-model routing (decode-time
@@ -15,10 +15,10 @@ writes logits and ids for the routing check. llama-bench replays real tokens fro
 TEMPORAL_BENCH_CTX/GEN. qwen35moe: TEMPORAL_SHEXP_FIRST=1 orders the shared expert first.
 ---
  ggml/src/ggml-cpu/ggml-cpu.c      |   3 +
- ggml/src/ggml-cuda/temporal.cu    | 305 +++++++++++++++++++++++++++++-
- src/models/qwen35moe.cpp          |  22 ++-
+ ggml/src/ggml-cuda/temporal.cu    | 328 +++++++++++++++++++++++++++++-
+ src/models/qwen35moe.cpp          |  22 +-
  tools/llama-bench/llama-bench.cpp |  29 +++
- 4 files changed, 354 insertions(+), 5 deletions(-)
+ 4 files changed, 377 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
 index 6482f794..7cf2b279 100644
@@ -42,7 +42,7 @@ index 6482f794..7cf2b279 100644
      const int L = (int)(intptr_t) userdata;
      const int K = (int) dst->ne[0];
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index e82ddb12..70e709e8 100644
+index e82ddb12..e566ecd8 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -43,6 +43,8 @@ static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVER
@@ -95,7 +95,7 @@ index e82ddb12..70e709e8 100644
  int ggml_cuda_temporal_route_op_on() {                  // trained routing runs as the CUDA kernel
      static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
      return ggml_cuda_temporal_route_trained() && !host;
-@@ -450,11 +466,291 @@ static void tr_report() {
+@@ -450,11 +466,314 @@ static void tr_report() {
      if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
  }
  
@@ -137,6 +137,21 @@ index e82ddb12..70e709e8 100644
 +}
 +static __device__ inline unsigned long long tr2_hi(float v, unsigned lo) { return (tr_key(v) << 32) | (unsigned long long) lo; }
 +
++// block-wide max of a and min of b (64-bit keys), warp shuffles then one pass over the warps; all threads
++// get the result. Needs blockDim.x a multiple of 32, at most 1024.
++static __device__ void tr2_reduce(unsigned long long & a, unsigned long long & b) {
++    __shared__ unsigned long long wa[32], wb[32];
++    for (int o = 16; o > 0; o >>= 1) {
++        const unsigned long long oa = __shfl_xor_sync(0xFFFFFFFFu, a, o), ob = __shfl_xor_sync(0xFFFFFFFFu, b, o);
++        a = oa > a ? oa : a; b = ob < b ? ob : b;
++    }
++    const int w = threadIdx.x >> 5, nw = blockDim.x >> 5;
++    if ((threadIdx.x & 31) == 0) { wa[w] = a; wb[w] = b; }
++    __syncthreads();
++    a = wa[0]; b = wb[0];
++    for (int i = 1; i < nw; ++i) { a = wa[i] > a ? wa[i] : a; b = wb[i] < b ? wb[i] : b; }
++    __syncthreads();
++}
 +// rank of v[e] among all experts (greater first, lower index first on ties); the K best go to outk[rank]
 +static __device__ void tr2_topk(const float * v, int E, int K, int * outk) {
 +    for (int e = threadIdx.x; e < E; e += blockDim.x) {
@@ -187,10 +202,13 @@ index e82ddb12..70e709e8 100644
 +                __syncthreads();
 +                for (int j = tid; j < K; j += nt) tmp[s_win[j]] = 1;
 +                __syncthreads();
++                unsigned long long ra = 0ull, rb = ~0ull;
 +                for (int e = tid; e < E; e += nt) {
-+                    if (!tmp[e]) atomicMax(&s_a, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));   // best non-resident
-+                    else         atomicMin(&s_b, tr2_hi(x[e], (unsigned) e));                 // worst resident
++                    if (!tmp[e]) { const unsigned long long k = tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e); ra = k > ra ? k : ra; }  // best non-resident
++                    else         { const unsigned long long k = tr2_hi(x[e], (unsigned) e); rb = k < rb ? k : rb; }                 // worst resident
 +                }
++                tr2_reduce(ra, rb);
++                if (tid == 0) { s_a = ra; s_b = rb; }
 +                __syncthreads();
 +                if (tid == 0) {
 +                    const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull)), ws = (int) (s_b & 0xFFFFFFFFull);
@@ -203,10 +221,18 @@ index e82ddb12..70e709e8 100644
 +                else tr2_topk(x, E, K, s_ids);                    // prompt: free routing
 +            }
 +        } else {                                                  // mode 3: skliar
-+            for (int e = tid; e < E; e += nt) { atomicMax(&s_a, tr_key(x[e])); atomicMin(&s_b, tr_key(x[e])); }
++            {
++                unsigned long long ra = 0ull, rb = ~0ull;            // max with lowest-index tie (= top-1), min
++                for (int e = tid; e < E; e += nt) {
++                    const unsigned long long ka = tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e), kb = tr2_hi(x[e], (unsigned) e);
++                    ra = ka > ra ? ka : ra; rb = kb < rb ? kb : rb;
++                }
++                tr2_reduce(ra, rb);
++                if (tid == 0) { s_a = ra; s_b = rb; }
++            }
 +            __syncthreads();
 +            if (tid == 0) {                                       // delta: running mean of max - min (float32 difference)
-+                const float mx = tr2_val((unsigned) s_a), mn = tr2_val((unsigned) s_b);
++                const float mx = tr2_val((unsigned) (s_a >> 32)), mn = tr2_val((unsigned) (s_b >> 32));
 +                *dsum += (double) (mx - mn); *dn += 1ull;
 +                s_bias = (float) ((double) lam * (*dsum / (double) *dn));
 +            }
@@ -220,11 +246,7 @@ index e82ddb12..70e709e8 100644
 +            } else {
 +                for (int e = tid; e < E; e += nt) z[e] = x[e] + (lu[e] >= 0 ? s_bias : 0.0f);
 +                __syncthreads();
-+                tr2_topk(z, E, K, s_ids);
-+                if (tid == 0) s_a = 0ull;
-+                __syncthreads();
-+                if (J > 0) for (int e = tid; e < E; e += nt) atomicMax(&s_a, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));
-+                __syncthreads();
++                tr2_topk(z, E, K, s_ids);                         // s_a still holds the top-1 of z (from the delta pass)
 +                if (tid == 0) {
 +                    if (J > 0) {
 +                        const int top1 = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull));
@@ -239,7 +261,8 @@ index e82ddb12..70e709e8 100644
 +                    s_loads = ld; cnt[0]++; cnt[1] += ld; hist[ld]++;
 +                }
 +                __syncthreads();
-+                tr2_cap(lu, tmp, E, C);
++                if (C == K) { const int step = (int) *tnow - 1; for (int e = tid; e < E; e += nt) if (lu[e] != step) lu[e] = -1; __syncthreads(); }
++                else tr2_cap(lu, tmp, E, C);
 +            }
 +        }
 +        __syncthreads();
@@ -387,7 +410,7 @@ index e82ddb12..70e709e8 100644
      if (!g_tr_k) {
          g_tr_K = K;
          CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
-@@ -501,6 +797,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+@@ -501,6 +820,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
  
  // cold-start every layer's window (llama_context calls this at sequence position 0)
  void ggml_cuda_temporal_route_reset() {
