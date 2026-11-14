@@ -1,4 +1,4 @@
-From 9e08f23fd27016e5b117ab66a985dc3a0444ef5b Mon Sep 17 00:00:00 2001
+From 0e8a1beea1bf2c28356330635018db0ff81697ac Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Sat, 14 Nov 2026 00:20:05 -0800
 Subject: [PATCH] temporal-MoE CUDA: released-model routing (decode-time
@@ -15,10 +15,10 @@ writes logits and ids for the routing check. llama-bench replays real tokens fro
 TEMPORAL_BENCH_CTX/GEN. qwen35moe: TEMPORAL_SHEXP_FIRST=1 orders the shared expert first.
 ---
  ggml/src/ggml-cpu/ggml-cpu.c      |   3 +
- ggml/src/ggml-cuda/temporal.cu    | 328 +++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu    | 360 +++++++++++++++++++++++++++++-
  src/models/qwen35moe.cpp          |  22 +-
  tools/llama-bench/llama-bench.cpp |  29 +++
- 4 files changed, 377 insertions(+), 5 deletions(-)
+ 4 files changed, 409 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
 index 6482f794..7cf2b279 100644
@@ -42,7 +42,7 @@ index 6482f794..7cf2b279 100644
      const int L = (int)(intptr_t) userdata;
      const int K = (int) dst->ne[0];
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index e82ddb12..e566ecd8 100644
+index e82ddb12..23d7bf60 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -43,6 +43,8 @@ static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVER
@@ -95,7 +95,7 @@ index e82ddb12..e566ecd8 100644
  int ggml_cuda_temporal_route_op_on() {                  // trained routing runs as the CUDA kernel
      static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
      return ggml_cuda_temporal_route_trained() && !host;
-@@ -450,11 +466,314 @@ static void tr_report() {
+@@ -450,11 +466,346 @@ static void tr_report() {
      if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
  }
  
@@ -153,10 +153,42 @@ index e82ddb12..e566ecd8 100644
 +    __syncthreads();
 +}
 +// rank of v[e] among all experts (greater first, lower index first on ties); the K best go to outk[rank]
++// E <= 256: one warp, up to 8 values per lane in registers, K rounds of warp argmax (the scheme of the stock
++// fused top-k MoE kernel). Larger E: rank count with no early exit (every lane reads the same float4, a
++// broadcast, and the loop pipelines; E % 4 == 0).
 +static __device__ void tr2_topk(const float * v, int E, int K, int * outk) {
++    if (E <= 256) {
++        if (threadIdx.x < 32) {
++            const int lane = threadIdx.x;
++            unsigned long long key[8];
++#pragma unroll
++            for (int i = 0; i < 8; ++i) { const int e = lane + 32*i; key[i] = e < E ? tr2_hi(v[e], 0xFFFFFFFFu - (unsigned) e) : 0ull; }
++            for (int k = 0; k < K; ++k) {
++                unsigned long long best = 0ull;
++#pragma unroll
++                for (int i = 0; i < 8; ++i) best = key[i] > best ? key[i] : best;
++                unsigned long long m = best;
++#pragma unroll
++                for (int o = 16; o > 0; o >>= 1) { const unsigned long long t = __shfl_xor_sync(0xFFFFFFFFu, m, o); m = t > m ? t : m; }
++                if (lane == 0) outk[k] = (int) (0xFFFFFFFFu - (unsigned) (m & 0xFFFFFFFFull));
++#pragma unroll
++                for (int i = 0; i < 8; ++i) if (key[i] == m) key[i] = 0ull;   // keys are unique (index inside)
++            }
++        }
++        __syncthreads();
++        return;
++    }
++    const float4 * v4 = (const float4 *) v;
 +    for (int e = threadIdx.x; e < E; e += blockDim.x) {
 +        const float a = v[e]; int r = 0;
-+        for (int f = 0; f < E && r < K; ++f) { const float b = v[f]; r += (b > a) || (b == a && f < e); }
++#pragma unroll 8
++        for (int f4 = 0; f4 < (E >> 2); ++f4) {
++            const float4 b = v4[f4]; const int f = f4 << 2;
++            r += (b.x > a) | ((b.x == a) & (f     < e));
++            r += (b.y > a) | ((b.y == a) & (f + 1 < e));
++            r += (b.z > a) | ((b.z == a) & (f + 2 < e));
++            r += (b.w > a) | ((b.w == a) & (f + 3 < e));
++        }
 +        if (r < K) outk[r] = e;
 +    }
 +    __syncthreads();
@@ -338,7 +370,7 @@ index e82ddb12..e566ecd8 100644
 +    const ggml_tensor * lg = dst->src[0];
 +    const int mode = ggml_cuda_temporal_route_mode();
 +    if (!g2.ready) {
-+        GGML_ASSERT(K <= TR2_MAXK && E <= 2048);
++        GGML_ASSERT(K <= TR2_MAXK && E <= 2048 && E % 4 == 0);
 +        g2.E = E; g2.K = K;
 +        if (mode == 3) {
 +            const char * c = getenv("TEMPORAL_CB_C"), * l = getenv("TEMPORAL_CB_LAMBDA"), * j = getenv("TEMPORAL_CB_J"), * k = getenv("TEMPORAL_CB_K");
@@ -410,7 +442,7 @@ index e82ddb12..e566ecd8 100644
      if (!g_tr_k) {
          g_tr_K = K;
          CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
-@@ -501,6 +820,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+@@ -501,6 +852,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
  
  // cold-start every layer's window (llama_context calls this at sequence position 0)
  void ggml_cuda_temporal_route_reset() {
