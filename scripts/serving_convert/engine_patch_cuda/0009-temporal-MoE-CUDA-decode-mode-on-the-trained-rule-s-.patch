@@ -1,0 +1,260 @@
+From eebaedc22f4123b5f0b3a97216cdc9591624a4f7 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Sat, 14 Nov 2026 14:47:42 -0800
+Subject: [PATCH] temporal-MoE CUDA: decode mode on the trained rule's kernel;
+ swap fast path for skliar
+
+decode mode (our rule on a model without temporal training) now runs on k_route, the trained rule's
+kernel: a prompt batch is routed by stock top-k while the window only observes, decoded tokens take
+one rule step. On equal logits the worst resident is the lowest expert index, as in the reference
+scan. TEMPORAL_DECODE_K2=1 keeps it on k_route2. LLAMA_TEMPORAL_ROUTE_DUMP2 works on both.
+
+skliar with C = K: the cache is the previous selection, so the biased top-K is reached by exchanging
+the best non-selected expert with the weakest selected one until it no longer wins (one atomic
+max/min round per load) instead of a full top-K per token. TEMPORAL_CB_FULLSEL=1 keeps the full
+selection. The slot bookkeeping of k_route2 finds each selected expert's slot in parallel.
+---
+ ggml/src/ggml-cuda/temporal.cu | 123 +++++++++++++++++++++++++++------
+ 1 file changed, 100 insertions(+), 23 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index 398b2dcb..a3ff561a 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -352,7 +352,8 @@ cudaStream_t ggml_cuda_temporal_copy_stream() {
+ #define TR_MAXLAYER 128
+ static int *g_tr_k = nullptr, *g_tr_win = nullptr;       // [TR_MAXLAYER], [TR_MAXLAYER*K]
+ static unsigned long long *g_tr_cnt = nullptr;           // [TR_MAXLAYER*3]: steps, swaps, cold fills
+-static int g_tr_K = 0;
++static int g_tr_K = 0, g_tr_E = 0;
++static FILE * g_tr_dump2 = nullptr;
+ static int *g_tr_vslot = nullptr, *g_tr_vvalid = nullptr; // [TR_MAXLAYER*K], [TR_MAXLAYER] (TEMPORAL_ROUTE_SLOTS)
+ int ggml_cuda_temporal_route_mode();
+ // decode and skliar modes default to 2 (slots kept by the routing kernel, copies started there); an explicit
+@@ -395,7 +396,7 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+                         // TEMPORAL_ROUTE_SLOTS (streamed, single token): this kernel also keeps the VRAM slots,
+                         // replacing k_residency. vslot[j] = slot holding window position j; null = off.
+                         int* vslot, int* vvalid, int* swp_e, int* swp_s, int* nswp, int32_t* remap,
+-                        unsigned long long* ncopy) {
++                        unsigned long long* ncopy, int free_prefill) {
+     extern __shared__ int sh[];                           // [0,E) logits, [E,2E) resident flag
+     float* x = (float*) sh; int* in = sh + E;
+     __shared__ unsigned long long s_nom, s_wst; __shared__ int s_cold;
+@@ -422,10 +423,12 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+             if (tid==0){ s_nom=0ull; s_wst=~0ull; }
+             __syncthreads();
+             for (int e=tid; e<E; e+=nt) if (!in[e]) atomicMax(&s_nom, (tr_key(x[e])<<32) | (0xFFFFFFFFu-(unsigned)e));
+-            for (int j=tid; j<K; j+=nt) atomicMin(&s_wst, (tr_key(x[win[j]])<<32) | (unsigned)j);
++            // worst resident; on equal logits the lowest window position, or in decode mode the lowest expert
++            // index (the reference scan's argmin), with the position kept in the low byte (K <= 256)
++            for (int j=tid; j<K; j+=nt) atomicMin(&s_wst, (tr_key(x[win[j]])<<32) | (free_prefill ? (((unsigned)win[j])<<8) | (unsigned)j : (unsigned)j));
+             __syncthreads();
+             if (tid==0){
+-                const int nom = (int)(0xFFFFFFFFu-(unsigned)(s_nom & 0xFFFFFFFFull)), ws = (int)(s_wst & 0xFFFFFFFFull);
++                const int nom = (int)(0xFFFFFFFFu-(unsigned)(s_nom & 0xFFFFFFFFull)), ws = (int)(s_wst & (free_prefill ? 0xFFull : 0xFFFFFFFFull));
+                 cnt[0]++;
+                 if (x[nom] > x[win[ws]]) {
+                     in[win[ws]]=0;
+@@ -440,6 +443,13 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+             }
+         }
+         __syncthreads();
++        if (free_prefill && n_tokens > 1) {               // decode mode: a prompt batch is routed by stock top-k,
++            for (int e=tid; e<E; e+=nt) {                 // the window above only observes (decode_state.py)
++                const float v=x[e]; int r=0;
++                for (int f=0; f<E; ++f){ const float u=x[f]; r += (u>v) || (u==v && f<e); }
++                if (r<K) out[(size_t)t*K+r]=e;
++            }
++        } else
+         for (int j=tid; j<K; j+=nt) out[(size_t)t*K+j]=win[j];
+         __syncthreads();
+     }
+@@ -575,7 +585,7 @@ static __device__ void tr2_cap(int * lu, int * tmp, int E, int C) {
+ }
+ 
+ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tokens, int E, int K, int mode,
+-                         int C, float lam, int J,
++                         int C, float lam, int J, int tr2_fullsel,
+                          int * st, int * win, int * last, long long * tnow, double * dsum, unsigned long long * dn,
+                          unsigned long long * hist, unsigned long long * cnt, int32_t * __restrict__ out, int * tokl,
+                          int * sloth, int * svalid, int * swp_e, int * swp_s, int * nswp, int32_t * remap,
+@@ -583,7 +593,7 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+     extern __shared__ float sh2[];
+     float * x = sh2; float * z = sh2 + E; int * lu = (int *) (sh2 + 2*E); int * tmp = lu + E;
+     __shared__ int s_ids[TR2_MAXK], s_win[TR2_MAXK], s_state, s_loads;
+-    __shared__ unsigned long long s_a, s_b; __shared__ float s_bias;
++    __shared__ unsigned long long s_a, s_b, s_c, s_d; __shared__ float s_bias; __shared__ int s_go;
+     const int tid = threadIdx.x, nt = blockDim.x;
+     if (tid == 0) s_state = *st;
+     for (int j = tid; j < K; j += nt) s_win[j] = win[j];
+@@ -643,7 +653,44 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+                 tr2_topk(x, E, K, s_ids);
+                 for (int j = tid; j < K; j += nt) lu[s_ids[j]] = t;
+                 __syncthreads();
+-                if (t == n_tokens - 1) { tr2_cap(lu, tmp, E, C); if (tid == 0) { *tnow = (s_state ? *tnow : 0) + n_tokens; s_state = 1; } }
++                if (t == n_tokens - 1) {
++                    tr2_cap(lu, tmp, E, C);
++                    if (C == K) { for (int j = tid; j < K; j += nt) s_win[j] = s_ids[j]; }   // the cache, as a list
++                    if (tid == 0) { *tnow = (s_state ? *tnow : 0) + n_tokens; s_state = 1; }
++                }
++            } else if (C == K && !tr2_fullsel) {
++                // The cache is the previous selection (s_win). top-K of z + bias*cached is reached by swaps:
++                // while the best non-selected expert beats the weakest selected one (cached ones carry the
++                // bias, experts admitted this token do not), exchange them. Admissions come in falling
++                // order and evictions in rising order, so no expert moves twice. J = 1: if the top-1 of z
++                // is outside and loses, it replaces the weakest selected expert and nothing else can enter.
++                for (int e = tid; e < E; e += nt) tmp[e] = lu[e] >= 0;        // 1 cached, 2 admitted now, 3 evicted now
++                __syncthreads();
++                const int top1 = (int) (0xFFFFFFFFu - (unsigned) (s_a & 0xFFFFFFFFull));
++                const int step = (int) *tnow;
++                for (int it = 0; ; ++it) {
++                    if (tid == 0) { s_c = 0ull; s_d = ~0ull; }
++                    __syncthreads();
++                    for (int e = tid; e < E; e += nt) if (!tmp[e]) atomicMax(&s_c, tr2_hi(x[e], 0xFFFFFFFFu - (unsigned) e));
++                    for (int j = tid; j < K; j += nt) { const int e = s_win[j]; atomicMin(&s_d, tr2_hi(x[e] + (tmp[e] == 1 ? s_bias : 0.0f), (unsigned) j)); }
++                    __syncthreads();
++                    if (tid == 0) {
++                        const int nom = (int) (0xFFFFFFFFu - (unsigned) (s_c & 0xFFFFFFFFull)), ws = (int) (s_d & 0xFFFFFFFFull);
++                        const int eo = s_win[ws];
++                        const bool win_ = s_c != 0ull && x[nom] > x[eo] + (tmp[eo] == 1 ? s_bias : 0.0f);
++                        const bool force = !win_ && it == 0 && J > 0 && s_c != 0ull && nom == top1;
++                        if (win_ || force) { s_win[ws] = nom; tmp[nom] = 2; tmp[eo] = 3; lu[eo] = -1; lu[nom] = step; if (it == 0) s_loads = 0; s_loads++; }
++                        s_go = win_ && s_loads < K;
++                    }
++                    __syncthreads();
++                    if (!s_go) break;
++                }
++                if (tid == 0) {
++                    if (s_loads < 0) s_loads = 0;
++                    *tnow = step + 1; cnt[0]++; cnt[1] += s_loads; hist[s_loads]++;
++                }
++                for (int j = tid; j < K; j += nt) s_ids[j] = s_win[j];
++                __syncthreads();
+             } else {
+                 for (int e = tid; e < E; e += nt) z[e] = x[e] + (lu[e] >= 0 ? s_bias : 0.0f);
+                 __syncthreads();
+@@ -678,24 +725,31 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+     if (!sloth) return;
+     if (n_tokens != 1) { if (tid == 0) *svalid = 0; return; }   // a batch ran through the prefill ring: slots stale
+     __syncthreads();
+-    if (tid == 0) {                                             // slots follow the selection (same routine, both modes)
++    // slots follow the selection (same routine, both modes). Each selected expert looks for its slot in
++    // parallel; only the misses (the loads) are placed serially, lowest free slot first, in selection order.
++    __shared__ int s_keep[TR2_MAXK], s_found[TR2_MAXK], s_sv;
++    if (tid == 0) s_sv = *svalid;
++    for (int s = tid; s < K; s += nt) s_keep[s] = 0;
++    __syncthreads();
++    if (s_sv) {
++        for (int j = tid; j < K; j += nt) {
++            const int e = s_ids[j]; int found = -1;
++            for (int s = 0; s < K; ++s) if (sloth[s] == e) found = s;   // slots hold distinct experts
++            s_found[j] = found;
++            if (found >= 0) { s_keep[found] = 1; remap[j] = found; }
++        }
++    }
++    __syncthreads();
++    if (tid == 0) {
+         int ns = 0;
+-        if (!*svalid) {
++        if (!s_sv) {
+             for (int j = 0; j < K; ++j) { sloth[j] = s_ids[j]; swp_e[j] = s_ids[j]; swp_s[j] = j; remap[j] = j; }
+             ns = K;
+         } else {
+-            int keep[TR2_MAXK], hold[TR2_MAXK], miss[TR2_MAXK], nm = 0;
+-            for (int s = 0; s < K; ++s) { hold[s] = sloth[s]; keep[s] = 0; }
+-            for (int j = 0; j < K; ++j) {
+-                int found = -1;
+-                for (int s = 0; s < K; ++s) if (hold[s] == s_ids[j]) { found = s; break; }
+-                if (found >= 0) { keep[found] = 1; remap[j] = found; } else miss[nm++] = j;
+-            }
+             int sp = 0;
+-            for (int m = 0; m < nm; ++m) {
+-                while (keep[sp]) sp++;                          // lowest free slot: its expert is not selected
+-                const int j = miss[m];
+-                sloth[sp] = s_ids[j]; remap[j] = sp; swp_e[ns] = s_ids[j]; swp_s[ns] = sp; ns++; keep[sp] = 1;
++            for (int j = 0; j < K; ++j) if (s_found[j] < 0) {
++                while (s_keep[sp]) sp++;                        // lowest free slot: its expert is not selected
++                sloth[sp] = s_ids[j]; remap[j] = sp; swp_e[ns] = s_ids[j]; swp_s[ns] = sp; ns++; s_keep[sp] = 1;
+             }
+         }
+         *nswp = nocopy ? 0 : ns; *ncopy += ns; *svalid = 1;
+@@ -739,6 +793,8 @@ static void tr2_reset() {
+     CUDA_CHECK(cudaMemset(g2.tnow, 0, TR_MAXLAYER*sizeof(long long)));
+ }
+ 
++// TEMPORAL_CB_FULLSEL=1: skliar decode tokens use the full biased top-K instead of the swap fast path
++static int tr2_fullsel() { static int v=[](){const char*s=getenv("TEMPORAL_CB_FULLSEL");return s?atoi(s):0;}(); return v; }
+ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int n_tokens, int E) {
+     const ggml_tensor * lg = dst->src[0];
+     const int mode = ggml_cuda_temporal_route_mode();
+@@ -780,7 +836,7 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+     }
+     if (g2.dump && g2.ntokl < n_tokens) { if (g2.tokl) cudaFree(g2.tokl); CUDA_CHECK(cudaMalloc(&g2.tokl, n_tokens*sizeof(int))); g2.ntokl = n_tokens; }
+     k_route2<<<1, 256, (size_t) 4*E*sizeof(float), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K, mode,
+-            g2.C, g2.lam, g2.J, g2.st + L, g2.win + (size_t) L*K, g2.last + (size_t) L*E, g2.tnow + L, g2.dsum + L, g2.dn + L,
++            g2.C, g2.lam, g2.J, tr2_fullsel(), g2.st + L, g2.win + (size_t) L*K, g2.last + (size_t) L*E, g2.tnow + L, g2.dsum + L, g2.dn + L,
+             g2.hist + (size_t) L*(K+1), g2.cnt + (size_t) L*4, (int32_t *) dst->data, g2.dump ? g2.tokl : nullptr,
+             sl ? g2.sloth + (size_t) L*K : nullptr, g2.svalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
+             sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr, tr_nocopy());
+@@ -811,7 +867,10 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+     ggml_custom_op_params p; memcpy(&p, dst->op_params, sizeof(p));
+     const int L = (int)(intptr_t) p.userdata, K = (int) dst->ne[0], n_tokens = (int) dst->ne[1], E = (int) lg->ne[0];
+     GGML_ASSERT(L >= 0 && L < TR_MAXLAYER && K < E && E <= 4096 && lg->ne[1] == n_tokens);
+-    if (ggml_cuda_temporal_route_mode() >= 2) { tr2_route(stream, dst, L, K, n_tokens, E); return; }
++    // decode mode runs on the trained rule's kernel (k_route, prompt batches routed by stock top-k);
++    // TEMPORAL_DECODE_K2=1 keeps it on k_route2 (the routing dump for route_check.py lives there)
++    static const bool dec_k2 = getenv("TEMPORAL_DECODE_K2") && atoi(getenv("TEMPORAL_DECODE_K2"));
++    if (ggml_cuda_temporal_route_mode() == 3 || (ggml_cuda_temporal_route_mode() == 2 && dec_k2)) { tr2_route(stream, dst, L, K, n_tokens, E); return; }
+     if (!g_tr_k) {
+         g_tr_K = K;
+         CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
+@@ -822,6 +881,8 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+         CUDA_CHECK(cudaMalloc(&g_tr_vvalid, TR_MAXLAYER*sizeof(int))); CUDA_CHECK(cudaMemset(g_tr_vvalid, 0, TR_MAXLAYER*sizeof(int)));
+         const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP");
+         if (d && d[0]) { g_tr_dump = fopen(d, "wb"); GGML_ASSERT(g_tr_dump); }
++        const char * d2 = getenv("LLAMA_TEMPORAL_ROUTE_DUMP2");
++        if (d2 && d2[0] && ggml_cuda_temporal_route_mode() == 2) { g_tr_dump2 = fopen(d2, "wb"); GGML_ASSERT(g_tr_dump2); g_tr_E = E; }
+         atexit(tr_report);
+     }
+     GGML_ASSERT(K == g_tr_K);
+@@ -834,7 +895,8 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+     k_route<<<1, 256, (size_t)2*E*sizeof(int), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K,
+             g_tr_k + L, g_tr_win + (size_t)L*K, g_tr_cnt + (size_t)L*3, (int32_t *) dst->data,
+             sl ? g_tr_vslot + (size_t)L*K : nullptr, g_tr_vvalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
+-            sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr);
++            sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr,
++            ggml_cuda_temporal_route_mode() == 2);
+     CUDA_CHECK(cudaGetLastError());
+     // TEMPORAL_ROUTE_SLOTS=2: the swap list exists now, so start the copies here instead of at the gate
+     // GEMM. They run on the copy stream under whatever the graph has between the router and the routed
+@@ -847,6 +909,17 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+             cudaEventRecord(T->ev[w], g_copy);
+         }
+     }
++    if (g_tr_dump2) {                                    // decode mode: the record format of tr2_route, for route_check.py
++        std::vector<int32_t> ids((size_t) K*n_tokens); std::vector<float> x((size_t) E*n_tokens);
++        CUDA_CHECK(cudaStreamSynchronize(stream));
++        CUDA_CHECK(cudaMemcpy(ids.data(), dst->data, ids.size()*sizeof(int32_t), cudaMemcpyDeviceToHost));
++        CUDA_CHECK(cudaMemcpy2D(x.data(), E*sizeof(float), lg->data, lg->nb[1], E*sizeof(float), n_tokens, cudaMemcpyDeviceToHost));
++        for (int t = 0; t < n_tokens; ++t) {
++            const int32_t hdr[4] = { L, n_tokens, t, -1 };
++            fwrite(hdr, 4, 4, g_tr_dump2); fwrite(ids.data() + (size_t) t*K, 4, (size_t) K, g_tr_dump2); fwrite(x.data() + (size_t) t*E, 4, (size_t) E, g_tr_dump2);
++        }
++        fflush(g_tr_dump2);
++    }
+     if (g_tr_dump) {
+         std::vector<int32_t> h((size_t)K*n_tokens);
+         CUDA_CHECK(cudaStreamSynchronize(stream));
+@@ -861,5 +934,9 @@ void ggml_cuda_temporal_route_reset() {
+     tr2_reset();
+     if (!g_tr_k) return;
+     CUDA_CHECK(cudaDeviceSynchronize());
++    if (g_tr_dump2) {                                         // sequence start marker: layer -1, rest zero
++        std::vector<int32_t> z((size_t) 4 + g_tr_K + g_tr_E, 0); z[0] = -1;
++        fwrite(z.data(), 4, z.size(), g_tr_dump2);
++    }
+     CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
+ }
+-- 
+2.50.0
+

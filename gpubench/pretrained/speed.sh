@@ -54,5 +54,11 @@ for v in 1 2 3 4 5; do
     RR --model $MOE --tag s${S}x${X}-v$v --env TEMPORAL_ROUTE_SLOTS=$S TEMPORAL_SHEXP_FIRST=$X --arms ours_stream skliar_stream
     RR --model $TM  --tag s${S}x${X}-v$v --env TEMPORAL_ROUTE_SLOTS=$S TEMPORAL_SHEXP_FIRST=$X --arms trained_stream
   done; done
+  for X in 0 1; do      # the kernels patch 0009 replaced, at the copy setting that was fastest for them
+    RR --model $MOE --tag k2-x${X}-v$v --env TEMPORAL_ROUTE_SLOTS=0 TEMPORAL_SHEXP_FIRST=$X TEMPORAL_DECODE_K2=1 --arms ours_stream
+    RR --model $MOE --tag fullsel-x${X}-v$v --env TEMPORAL_ROUTE_SLOTS=0 TEMPORAL_SHEXP_FIRST=$X TEMPORAL_CB_FULLSEL=1 --arms skliar_stream
+  done
+  RR --model $MOE --tag k2-v$v --env TEMPORAL_DECODE_K2=1 --arms ours_vram
+  RR --model $MOE --tag fullsel-v$v --env TEMPORAL_CB_FULLSEL=1 --arms skliar_vram
 done
 echo "### SPEED_DONE $(date -u +%T)"
