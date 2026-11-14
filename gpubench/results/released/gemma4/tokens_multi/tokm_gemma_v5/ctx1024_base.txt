@@ -1,0 +1,5 @@
+Let's think step by step.
+
+First, let's find out how much cat food is used for all cats in one feeding.
+Imma has 3 cats, and each feeding uses 60 grams.
+So, one feeding uses 3 * 60 =

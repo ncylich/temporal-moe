@@ -1,0 +1,6 @@
+0.00.101.936 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.241.529 I srv    load_model: loading model '/root/m/qwen35-q4km.gguf'
+0.04.309.133 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.04.325.449 I srv  llama_server: model loaded
+0.04.325.464 I srv  llama_server: listening on http://127.0.0.1:8093
+0.05.733.470 I srv    operator(): operator(): cleaning up before exit...

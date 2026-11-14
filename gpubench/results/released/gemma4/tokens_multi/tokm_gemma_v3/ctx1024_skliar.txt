@@ -1,0 +1,5 @@
+Let's think step by step.
+
+First, we determine the total number of babies. Since Carla gave birth to octuplets, there are 8 babies.
+
+Next, we calculate how many babies are wearing purple

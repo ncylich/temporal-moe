@@ -1,0 +1,14 @@
+First, let's count the initial number of male and female fish in the pond.
+Male guppies: 4
+Female guppies: 7
+Male goldfishes: 3
+Female goldfishes: 5
+
+Next, let's add the fish Tate buys to these counts.
+New male guppies: 4 + 2 = 6
+New female guppies: 7 + 1 = 8
+New male goldfishes: 3 + 2 = 5
+New female goldfishes: 5 + 3 = 8
+
+Now, let's calculate the total number of male fish and female fish.
+Total male fish = (New male guppies) + (New male gold

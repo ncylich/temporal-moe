@@ -1,0 +1,9 @@
+0.00.099.100 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.231.613 I srv    load_model: loading model '/root/m/gemma4-q4km.gguf'
+0.01.602.817 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.603.659 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.655.098 W load: special_eog_ids contains '<|tool_response>', removing '</s>' token from EOG list
+0.04.527.555 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.04.535.894 I srv  llama_server: model loaded
+0.04.535.908 I srv  llama_server: listening on http://127.0.0.1:8093
+0.05.131.362 I srv    operator(): operator(): cleaning up before exit...

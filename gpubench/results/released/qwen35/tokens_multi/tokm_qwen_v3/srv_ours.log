@@ -1,0 +1,16 @@
+0.00.133.387 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.266.925 I srv    load_model: loading model '/root/m/qwen35-q4km.gguf'
+[temporal-route2] mode=decode K=8 E=256 C=0 lambda=0.000 J=1 nocopy=0
+0.04.408.184 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.04.425.654 I srv  llama_server: model loaded
+0.04.425.669 I srv  llama_server: listening on http://127.0.0.1:8093
+0.05.392.470 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.05.392.565 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.08.292.019 I slot print_timing: id  0 | task 0 | prompt eval time =     389.91 ms /   780 tokens (    0.50 ms per token,  2000.46 tokens per second)
+0.08.292.028 I slot print_timing: id  0 | task 0 |        eval time =    2509.48 ms /   352 tokens (    7.13 ms per token,   140.27 tokens per second)
+0.08.292.030 I slot print_timing: id  0 | task 0 |       total time =    2899.39 ms /  1132 tokens
+0.08.292.043 I slot print_timing: id  0 | task 0 |    graphs reused =        350
+0.08.292.263 I slot      release: id  0 | task 0 | stop processing: n_tokens = 1131, truncated = 0
+0.08.304.557 I srv    operator(): operator(): cleaning up before exit...
+temporal-route2: mode=decode layers=40 decode_layer_tokens=14040 loads=14040 loads_per_layer_token=1.0000 prompt_layer_tokens=31360 cold_decode=0 C=0 lambda=0.000 J=1 hist=[0,14040,0,0,0,0,0,0,0]
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000

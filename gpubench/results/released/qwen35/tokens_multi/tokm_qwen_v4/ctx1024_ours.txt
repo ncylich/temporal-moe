@@ -1,0 +1,7 @@
+First, let's count the total number of male fish.
+Initially, there are 4 male guppies and 3 male goldfishes, which is 4 + 3 = 7 male fish.
+After buying 2 more male guppies and 2 more male goldfishes, the total number of male fish becomes 7 + 2 + 2 = 11 male fish.
+
+Next, let's count the total number of female fish.
+Initially, there are 7 female guppies and 5 female goldfishes, which is 7 + 5 = 12 female fish.
+After buying 1 more female guppy and 3 more female goldfishes, the total number of female

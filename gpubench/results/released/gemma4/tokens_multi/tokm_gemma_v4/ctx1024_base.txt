@@ -1,0 +1,7 @@
+First, let's calculate the initial number of male and female fishes:
+Initial male fishes: 4 (guppies) + 3 (goldfishes) = <<4+3=7>>7 male fishes.
+Initial female fishes: 7 (guppies) + 5 (goldfishes) = <<7+5=12>>12 female fishes.
+
+Next, let's calculate the number of new male and female fishes Tate bought:
+New male fishes: 2 (guppies) + 2 (goldfishes) = <<2+2=4>>4 male fishes.
+New female fishes: 1 (guppy) + 3 (goldfishes) =

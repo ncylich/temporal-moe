@@ -1,0 +1,20 @@
+0.00.108.606 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.240.944 I srv    load_model: loading model '/root/m/qwen35-q4km.gguf'
+0.04.538.081 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.04.556.248 I srv  llama_server: model loaded
+0.04.556.263 I srv  llama_server: listening on http://127.0.0.1:8093
+0.05.855.048 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.05.855.208 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.07.710.699 I slot print_timing: id  0 | task 0 | prompt eval time =     311.02 ms /   780 tokens (    0.40 ms per token,  2507.91 tokens per second)
+0.07.710.715 I slot print_timing: id  0 | task 0 |        eval time =    1544.39 ms /   232 tokens (    6.66 ms per token,   150.22 tokens per second)
+0.07.710.717 I slot print_timing: id  0 | task 0 |       total time =    1855.40 ms /  1012 tokens
+0.07.710.736 I slot print_timing: id  0 | task 0 |    graphs reused =        231
+0.07.710.984 I slot      release: id  0 | task 0 | stop processing: n_tokens = 1011, truncated = 0
+0.07.738.723 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.708 (> 0.100 thold), f_keep = 0.768
+0.07.738.779 I slot launch_slot_: id  0 | task 233 | processing task, is_child = 0
+0.08.280.924 I slot print_timing: id  0 | task 233 | prompt eval time =     297.74 ms /  1096 tokens (    0.27 ms per token,  3681.08 tokens per second)
+0.08.280.942 I slot print_timing: id  0 | task 233 |        eval time =     244.37 ms /    36 tokens (    6.79 ms per token,   147.32 tokens per second)
+0.08.280.944 I slot print_timing: id  0 | task 233 |       total time =     542.11 ms /  1132 tokens
+0.08.280.948 I slot print_timing: id  0 | task 233 |    graphs reused =        265
+0.08.281.035 I slot      release: id  0 | task 233 | stop processing: n_tokens = 1131, truncated = 0
+0.08.295.156 I srv    operator(): operator(): cleaning up before exit...

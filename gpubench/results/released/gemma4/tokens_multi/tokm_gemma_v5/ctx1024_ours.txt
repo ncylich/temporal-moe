@@ -1,0 +1,6 @@
+First, let's determine how much cat food is used in one day.
+Imma has 3 cats.
+Each cat is fed twice a day.
+Total feedings per day = 3 * 2 = <<3*2=6>>6 feedings.
+Each feeding uses 60 grams of food.
+Total food used per day = 

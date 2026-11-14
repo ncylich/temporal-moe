@@ -1,0 +1,13 @@
+0.00.101.871 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.237.800 I srv    load_model: loading model '/root/m/qwen35-q4km.gguf'
+0.04.342.369 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.04.359.373 I srv  llama_server: model loaded
+0.04.359.387 I srv  llama_server: listening on http://127.0.0.1:8093
+0.05.836.853 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.05.836.964 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.07.197.729 I slot print_timing: id  0 | task 0 | prompt eval time =     346.34 ms /   981 tokens (    0.35 ms per token,  2832.45 tokens per second)
+0.07.197.742 I slot print_timing: id  0 | task 0 |        eval time =    1014.36 ms /   151 tokens (    6.72 ms per token,   148.86 tokens per second)
+0.07.197.745 I slot print_timing: id  0 | task 0 |       total time =    1360.70 ms /  1132 tokens
+0.07.197.758 I slot print_timing: id  0 | task 0 |    graphs reused =        149
+0.07.197.994 I slot      release: id  0 | task 0 | stop processing: n_tokens = 1131, truncated = 0
+0.07.211.688 I srv    operator(): operator(): cleaning up before exit...

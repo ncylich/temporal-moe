@@ -1,0 +1,29 @@
+Let's define the length of the yellow rope as $y$ centimeters.
+According to the problem:
+1. The blue rope is 7 cm shorter than the yellow rope, so the blue rope length is $y - 7$.
+2. The red rope is four times the length of the blue rope, so the red rope length is $4(y - 7)$.
+3. The combined length of all three ropes is 37 cm.
+
+We can set up the equation:
+$(\text{Red}) + (\text{Blue}) + (\text{Yellow}) = 37$
+$4(y - 7) + (y - 7) + y = 37$
+
+Simplify the equation:
+$4y - 28 + y - 7 + y = 37$
+Combine like terms ($4y + y + y = 6y$ and $-28 - 7 = -35$):
+$6y - 35 = 37$
+Add 35 to both sides:
+$6y = 72$
+Divide by 6:
+$y = 12$
+
+So, the yellow rope is 12 cm long.
+Now, let's find the blue rope:
+Blue = $12 - 7 = 5$ cm.
+And the red rope:
+Red = $4 \times 5 = 20$ cm.
+
+Let's check the work:
+Red (20) + Blue (5) + Yellow (12) = 37. This matches the combined length given.
+
+The answer is

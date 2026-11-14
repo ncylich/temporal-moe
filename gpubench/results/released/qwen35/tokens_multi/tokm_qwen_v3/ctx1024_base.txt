@@ -1,0 +1,2 @@
+Let's assume there are 8 octuplets (since they are octuplets).
+Carla dresses 3/4 of them in purple: $8 \times \

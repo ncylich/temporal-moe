@@ -1,0 +1,19 @@
+0.00.104.587 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.240.206 I srv    load_model: loading model '/root/m/gemma4-q4km.gguf'
+0.01.493.767 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.494.381 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.527.724 W load: special_eog_ids contains '<|tool_response>', removing '</s>' token from EOG list
+[temporal-route2] mode=decode K=8 E=128 C=0 lambda=0.000 J=1 nocopy=0
+0.04.323.056 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.04.331.604 I srv  llama_server: model loaded
+0.04.331.619 I srv  llama_server: listening on http://127.0.0.1:8093
+0.04.617.834 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.04.617.914 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.06.217.251 I slot print_timing: id  0 | task 0 | prompt eval time =     392.44 ms /   984 tokens (    0.40 ms per token,  2507.41 tokens per second)
+0.06.217.268 I slot print_timing: id  0 | task 0 |        eval time =    1206.83 ms /   148 tokens (    8.15 ms per token,   122.64 tokens per second)
+0.06.217.270 I slot print_timing: id  0 | task 0 |       total time =    1599.27 ms /  1132 tokens
+0.06.217.282 I slot print_timing: id  0 | task 0 |    graphs reused =        146
+0.06.217.428 I slot      release: id  0 | task 0 | stop processing: n_tokens = 1131, truncated = 0
+0.06.235.688 I srv    operator(): operator(): cleaning up before exit...
+temporal-route2: mode=decode layers=30 decode_layer_tokens=4410 loads=4409 loads_per_layer_token=0.9998 prompt_layer_tokens=29640 cold_decode=0 C=0 lambda=0.000 J=1 hist=[1,4409,0,0,0,0,0,0,0]
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000

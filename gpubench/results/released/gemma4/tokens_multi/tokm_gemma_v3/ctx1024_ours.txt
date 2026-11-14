@@ -1,0 +1,4 @@
+There are 8 babies in total (octuplets).
+The number of babies dressed in purple is 8 * 3/4 = <<8*3/4=6>>6.
+The number of babies dressed in blue is 8 * 1/4 = <<8*1/4=2>>2.
+The number of purple wearers wearing bows

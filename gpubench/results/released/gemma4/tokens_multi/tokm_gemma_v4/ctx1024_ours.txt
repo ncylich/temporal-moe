@@ -1,0 +1,13 @@
+First, let's calculate the number of male fishes Tate has after his purchase.
+Initial male guppies: 4
+Initial male goldfishes: 3
+New male guppies: 2
+New male goldfishes: 2
+Total male fishes = 4 + 3 + 2 + 2 = <<4+3+2+2=11>>11
+
+Next, let's calculate the number of female fishes Tate has after his purchase.
+Initial female guppies: 7
+Initial female goldfishes: 5
+New female guppies: 1
+New female goldfishes: 3
+Total female fishes = 7 + 5 + 1 +

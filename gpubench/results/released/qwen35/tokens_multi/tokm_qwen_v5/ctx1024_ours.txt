@@ -1,0 +1,7 @@
+Let's think step by step.
+
+1.  **Calculate daily consumption:**
+    Imma has 3 cats.
+    She feeds them twice a day.
+    Each feeding session uses $3 \text{ cats} \times 60 \text{ grams} = 180$ grams.
+    Since

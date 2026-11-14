@@ -1,0 +1,88 @@
+server base up on 8093 (pid 930116)
+ctx 1024: prompt 980 tokens, 104 finished turns
+ctx 1024 [base]: prompt 980, extra turns 1, last answer 9 tokens, wrote 1024 + 100
+server ours up on 8093 (pid 930367)
+ctx 1024 [ours]: prompt 980, extra turns 1, last answer 9 tokens, wrote 1024 + 100
+server skliar up on 8093 (pid 930527)
+ctx 1024 [skliar]: prompt 980, extra turns 1, last answer 9 tokens, wrote 1024 + 100
+TOKENS_DONE
+base            ctx   1024    134.67 tok/s  7.426 ms  trials ['132.33', '134.29', '134.87', '134.85']  peak 17692 MiB  
+ours_stream     ctx   1024     62.97 tok/s  15.880 ms  trials ['59.72', '63.00', '62.88', '63.04']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     65.27 tok/s  15.321 ms  trials ['61.53', '65.40', '65.08', '65.34']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     62.88 tok/s  15.904 ms  trials ['59.11', '62.95', '62.85', '62.83']  peak 4750 MiB  tempo
+ours_stream     ctx   1024     60.11 tok/s  16.636 ms  trials ['57.14', '60.01', '60.11', '60.20']  peak 4750 MiB  tempo
+server base up on 8093 (pid 931714)
+Traceback (most recent call last):
+  File "/workspace/rel/repo/gpubench/released/serve_client.py", line 124, in <module>
+    main()
+  File "/workspace/rel/repo/gpubench/released/serve_client.py", line 120, in main
+    {"contexts": cmd_contexts, "generate": cmd_generate, "gsm8k": cmd_gsm8k}[a.cmd](a)
+  File "/workspace/rel/repo/gpubench/released/serve_client.py", line 58, in cmd_contexts
+    assert best is not None and len(best) >= target_lo, f"ctx {ctx}: could not fit turns ({best and len(best)})"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ctx 1024: could not fit turns (734)
+variant 2 skipped
+server base up on 8093 (pid 931953)
+ctx 1024: prompt 780 tokens, 304 finished turns
+ctx 1024 [base]: prompt 780, extra turns 1, last answer 52 tokens, wrote 1024 + 100
+server ours up on 8093 (pid 932201)
+ctx 1024 [ours]: prompt 780, extra turns 1, last answer 77 tokens, wrote 1024 + 100
+server skliar up on 8093 (pid 932361)
+ctx 1024 [skliar]: prompt 780, extra turns 1, last answer 45 tokens, wrote 1024 + 100
+TOKENS_DONE
+base            ctx   1024    133.35 tok/s  7.499 ms  trials ['131.58', '133.52', '133.19', '133.34']  peak 17692 MiB  
+ours_stream     ctx   1024     62.66 tok/s  15.960 ms  trials ['59.51', '62.80', '62.68', '62.49']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     67.19 tok/s  14.883 ms  trials ['63.68', '67.18', '67.18', '67.21']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     65.47 tok/s  15.275 ms  trials ['62.11', '65.37', '65.33', '65.70']  peak 4750 MiB  tempo
+ours_stream     ctx   1024     60.55 tok/s  16.517 ms  trials ['57.55', '60.54', '60.49', '60.60']  peak 4750 MiB  tempo
+server base up on 8093 (pid 933539)
+ctx 1024: prompt 984 tokens, 404 finished turns
+ctx 1024 [base]: prompt 984, extra turns 0, last answer 148 tokens, wrote 1024 + 100
+server ours up on 8093 (pid 933773)
+ctx 1024 [ours]: prompt 984, extra turns 0, last answer 148 tokens, wrote 1024 + 100
+server skliar up on 8093 (pid 933933)
+ctx 1024 [skliar]: prompt 984, extra turns 0, last answer 148 tokens, wrote 1024 + 100
+TOKENS_DONE
+base            ctx   1024    133.61 tok/s  7.484 ms  trials ['131.68', '133.70', '133.48', '133.65']  peak 17692 MiB  
+ours_stream     ctx   1024     62.87 tok/s  15.907 ms  trials ['60.16', '63.08', '62.72', '62.80']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     67.25 tok/s  14.870 ms  trials ['63.97', '66.93', '67.78', '67.04']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     65.37 tok/s  15.297 ms  trials ['62.32', '65.37', '65.66', '65.09']  peak 4750 MiB  tempo
+ours_stream     ctx   1024     60.07 tok/s  16.648 ms  trials ['57.18', '60.12', '60.01', '60.07']  peak 4750 MiB  tempo
+server base up on 8093 (pid 935123)
+ctx 1024: prompt 821 tokens, 504 finished turns
+ctx 1024 [base]: prompt 821, extra turns 1, last answer 59 tokens, wrote 1024 + 100
+server ours up on 8093 (pid 935371)
+ctx 1024 [ours]: prompt 821, extra turns 1, last answer 74 tokens, wrote 1024 + 100
+server skliar up on 8093 (pid 935545)
+ctx 1024 [skliar]: prompt 821, extra turns 1, last answer 62 tokens, wrote 1024 + 100
+TOKENS_DONE
+base            ctx   1024    133.44 tok/s  7.494 ms  trials ['131.69', '133.51', '133.58', '133.23']  peak 17692 MiB  
+ours_stream     ctx   1024     62.77 tok/s  15.932 ms  trials ['59.71', '62.71', '62.82', '62.77']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     63.62 tok/s  15.718 ms  trials ['60.76', '63.74', '63.87', '63.25']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     61.88 tok/s  16.160 ms  trials ['59.12', '61.96', '62.04', '61.65']  peak 4750 MiB  tempo
+ours_stream     ctx   1024     60.15 tok/s  16.625 ms  trials ['57.49', '60.27', '60.14', '60.03']  peak 4750 MiB  tempo
+server base up on 8093 (pid 936734)
+Traceback (most recent call last):
+  File "/workspace/rel/repo/gpubench/released/serve_client.py", line 124, in <module>
+    main()
+  File "/workspace/rel/repo/gpubench/released/serve_client.py", line 120, in main
+    {"contexts": cmd_contexts, "generate": cmd_generate, "gsm8k": cmd_gsm8k}[a.cmd](a)
+  File "/workspace/rel/repo/gpubench/released/serve_client.py", line 58, in cmd_contexts
+    assert best is not None and len(best) >= target_lo, f"ctx {ctx}: could not fit turns ({best and len(best)})"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ctx 1024: could not fit turns (717)
+variant 6 skipped
+server base up on 8093 (pid 936973)
+ctx 1024: prompt 946 tokens, 703 finished turns
+ctx 1024 [base]: prompt 946, extra turns 0, last answer 186 tokens, wrote 1024 + 100
+server ours up on 8093 (pid 937210)
+ctx 1024 [ours]: prompt 946, extra turns 0, last answer 183 tokens, wrote 1024 + 100
+server skliar up on 8093 (pid 937387)
+ctx 1024 [skliar]: prompt 946, extra turns 0, last answer 186 tokens, wrote 1024 + 100
+TOKENS_DONE
+base            ctx   1024    133.27 tok/s  7.504 ms  trials ['131.31', '133.28', '133.06', '133.47']  peak 17692 MiB  
+ours_stream     ctx   1024     62.32 tok/s  16.046 ms  trials ['59.62', '62.23', '62.60', '62.13']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     65.51 tok/s  15.266 ms  trials ['62.11', '65.27', '65.81', '65.44']  peak 4738 MiB  tempo
+skliar_stream   ctx   1024     63.73 tok/s  15.692 ms  trials ['60.30', '63.60', '63.80', '63.78']  peak 4750 MiB  tempo
+ours_stream     ctx   1024     60.38 tok/s  16.563 ms  trials ['57.34', '60.30', '60.46', '60.38']  peak 4750 MiB  tempo
+MULTICTX_DONE

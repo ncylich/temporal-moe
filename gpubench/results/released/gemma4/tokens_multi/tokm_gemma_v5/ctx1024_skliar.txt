@@ -1,0 +1,4 @@
+First, let's determine how much food is consumed by all the cats in one day.
+Imma has 3 cats.
+Each cat is fed 60 grams of food per feeding.
+Since they are fed twice a day, one cat eats 60 * 2 = <<6

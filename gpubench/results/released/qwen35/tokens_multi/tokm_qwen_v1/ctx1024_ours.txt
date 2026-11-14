@@ -1,0 +1,9 @@
+Let's think step by step.
+
+First, determine the number of yellow blocks. Since there are twice as many yellow blocks as blue blocks, and there are 4 blue blocks, the number of yellow blocks is $4 \times 2 = 8$.
+
+Next, calculate the total number of blue and yellow blocks combined. Adding the 4 blue blocks and 8 yellow blocks gives $4 + 8 = 12$ blocks.
+
+Then, subtract this sum from the total number of blocks in the tower to find the number of red blocks. The total is 32, so the number of red blocks is $32 - 12 = 10$.
+
+The answer is 10

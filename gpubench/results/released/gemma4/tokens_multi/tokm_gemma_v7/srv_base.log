@@ -1,0 +1,16 @@
+0.00.139.833 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.396.233 I srv    load_model: loading model '/root/m/gemma4-q4km.gguf'
+0.01.702.926 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.703.511 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.735.421 W load: special_eog_ids contains '<|tool_response>', removing '</s>' token from EOG list
+0.05.092.145 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.05.100.543 I srv  llama_server: model loaded
+0.05.100.556 I srv  llama_server: listening on http://127.0.0.1:8093
+0.06.290.469 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.06.290.571 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.08.119.932 I slot print_timing: id  0 | task 0 | prompt eval time =     329.86 ms /   946 tokens (    0.35 ms per token,  2867.93 tokens per second)
+0.08.119.946 I slot print_timing: id  0 | task 0 |        eval time =    1499.42 ms /   186 tokens (    8.06 ms per token,   124.05 tokens per second)
+0.08.119.949 I slot print_timing: id  0 | task 0 |       total time =    1829.28 ms /  1132 tokens
+0.08.119.966 I slot print_timing: id  0 | task 0 |    graphs reused =        184
+0.08.120.282 I slot      release: id  0 | task 0 | stop processing: n_tokens = 1131, truncated = 0
+0.08.140.278 I srv    operator(): operator(): cleaning up before exit...

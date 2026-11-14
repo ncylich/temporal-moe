@@ -1,0 +1,23 @@
+0.00.112.255 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.438.961 I srv    load_model: loading model '/root/m/qwen35-q4km.gguf'
+[temporal-route2] mode=skliar K=8 E=256 C=8 lambda=0.400 J=1 nocopy=0
+0.05.290.798 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.05.308.413 I srv  llama_server: model loaded
+0.05.308.428 I srv  llama_server: listening on http://127.0.0.1:8093
+0.06.098.929 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.06.098.974 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.07.841.864 I slot print_timing: id  0 | task 0 | prompt eval time =     419.99 ms /   823 tokens (    0.51 ms per token,  1959.59 tokens per second)
+0.07.841.878 I slot print_timing: id  0 | task 0 |        eval time =    1322.85 ms /   178 tokens (    7.43 ms per token,   134.56 tokens per second)
+0.07.841.882 I slot print_timing: id  0 | task 0 |       total time =    1742.84 ms /  1001 tokens
+0.07.841.898 I slot print_timing: id  0 | task 0 |    graphs reused =        177
+0.07.842.147 I slot      release: id  0 | task 0 | stop processing: n_tokens = 1000, truncated = 0
+0.07.867.007 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.773 (> 0.100 thold), f_keep = 0.819
+0.07.867.056 I slot launch_slot_: id  0 | task 179 | processing task, is_child = 0
+0.08.832.709 I slot print_timing: id  0 | task 179 | prompt eval time =     425.02 ms /  1059 tokens (    0.40 ms per token,  2491.67 tokens per second)
+0.08.832.719 I slot print_timing: id  0 | task 179 |        eval time =     540.62 ms /    73 tokens (    7.41 ms per token,   135.03 tokens per second)
+0.08.832.722 I slot print_timing: id  0 | task 179 |       total time =     965.63 ms /  1132 tokens
+0.08.832.726 I slot print_timing: id  0 | task 179 |    graphs reused =        248
+0.08.832.826 I slot      release: id  0 | task 179 | stop processing: n_tokens = 1131, truncated = 0
+0.08.849.476 I srv    operator(): operator(): cleaning up before exit...
+temporal-route2: mode=skliar layers=40 decode_layer_tokens=9960 loads=11231 loads_per_layer_token=1.1276 prompt_layer_tokens=75440 cold_decode=0 C=8 lambda=0.400 J=1 hist=[2572,4989,1449,612,227,76,26,8,1]
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
