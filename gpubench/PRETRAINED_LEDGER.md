@@ -71,6 +71,9 @@ Test CE (nats per token; lower is better; SE over the 512 rows about 0.015):
 
 (The trained row equals RESULTS.md's reference value on the same rows, 3.19202, to 6e-5.)
 
+**P1-3 and P1-4 below are superseded** (wrong gates, each arm's own greedy text, one forced kernel
+setting). Kept as the record of what was run; the valid engine results are P1-7 to P1-9.
+
 ## P1-3 -- Engine gates on the A6000 (pod `i65msin9gh64dw`, resumed 20:46 UTC)
 
 Engine tree 20c50f0c (the released runs' build), Q4_0 files above, GPU0 on NUMA node 1
@@ -175,3 +178,89 @@ training.
   is the suspected cause of the 84 tok/s gap to the trained mode); every streamed method is timed at
   slots 0/1/2 with the shared expert first or not, all settings are reported, and methods are compared
   at their fastest.
+
+## P1-7 -- Engine: each method on its fastest kernel (patches 0008 to 0011, tree f6b0026d)
+
+New A6000 pod `8xcjjlxgekub1c` (US, $0.69/h, 22:23 to 23:39 UTC; the earlier pod's host was full).
+GPU0 on NUMA node 1, CPUs 32-63,96-127. Built from the repo's patch files; the pod's tree hash equals
+the local one after every patch.
+
+What was slow, in the order found (plain MoE, one real text, tok/s):
+
+| change | ours streamed | Skliar streamed |
+|---|---|---|
+| 0006 as it was: copies forced to start at the router, k_route2 for both | 560 | 540 |
+| 0008: `TEMPORAL_ROUTE_SLOTS` honoured in decode and skliar modes (0 = at the expert op) | 584 | 557 |
+| 0009: ours on k_route (the trained rule's kernel) with a stock top-k prompt | 602 to 616 | -- |
+| 0009: Skliar swap fast path inside k_route2 | -- | 570 to 581 |
+| 0010: Skliar's max/min pass folded into the first swap round | -- | no change |
+| 0011: k_skliar, a dedicated kernel shaped like k_route | -- | 581 to 594 |
+
+- **0009, ours.** k_route gets a `free_prefill` flag for decode mode: on a prompt batch the window scan
+  runs as before but the ids written are the stock top-k. The serial K x K slot bookkeeping of k_route2
+  is not on this path.
+- **0009 to 0011, Skliar.** With C = K the cache is the previous selection, so the biased top-K is reached
+  by exchanging the best non-selected expert with the weakest selected one until it stops winning; the
+  top-1 guarantee is one forced exchange. 0010 showed the remaining cost was not Skliar's algorithm:
+  our rule on k_route2 ran at Skliar's speed (673.0 against 673.1 in VRAM), 26 tok/s below k_route. So
+  0011 moved single Skliar tokens to their own kernel with k_route's structure (state = the window,
+  no per-expert last-use array loaded or stored).
+- **Tie-break.** k_route evicted, among residents with exactly equal logits, the lowest window position;
+  the Python scan evicts the lowest expert index. This model has such ties, and the old kernel's text
+  diverged from the reference at one. In decode mode k_route now uses the expert index.
+- **Not explained.** With the same 18 experts selected in every layer of a token, two kernels that list
+  them in a different order give router logits that are bit-identical through layer 4 and then differ by
+  2^-14, growing to 0.05 by layer 13 (reversing the list moves batch-1 perplexity from 46.2 to 44.9 on
+  2,048 tokens). The gate weights are gathered with the same ids, so this reads as rounding amplified by
+  a rule that swaps every token, but it was not proven. It does not touch the accuracy table (PyTorch
+  reference) or the timings (fixed token files).
+
+## P1-8 -- Gates on the final engine
+
+- **Routing equality** (`route_check.py`, graphs off, one 512-token prompt and 100 greedy tokens, copy
+  settings 0 and 2): decoded token-layers equal to decode_state.py / cache_bias.py on 1,287 of 1,287 for
+  ours and Skliar, in VRAM and streamed. Prompt token-layers 96.9 to 97.0 % equal; the rest are exact
+  ties at the 18th logit (P1-3). ours is checked on k_route's own logits (0009 adds the dump there).
+- **Skliar on six more texts** (rows 700-705): 96.2 % (VRAM) and 98.5 % (streamed) of 7,722 decoded
+  token-layers equal the reference, loads equal on 99.9 %; the full-selection path it replaces scores
+  96.2 % and 97.6 %. The differences start at prompt ties, which change what the cache holds.
+- **k_skliar against the k_route2 fast path:** identical batch-1 perplexity (38.9311) and identical load
+  count (55,407) on 4 x 1,024 tokens.
+- **Streamed equals all in VRAM** (batch-1 perplexity, 4 x 1,024 held-out tokens, copy settings 0/1/2):
+  ours 42.6913, Skliar 38.9311, trained 22.7367, each identical at every setting; stock 22.6868.
+  Repeats on k_skliar: 6 of 6 at each setting. On the 0009 fast path Skliar at setting 2 gave 39.0424
+  in 1 of 8 repeats (0 of 8 at settings 0 and 1; 0 of 6 for ours and trained at 2), so Skliar is
+  quoted at setting 1.
+- The streamed llama-server aborts on its 2-token warm-up when CUDA graphs are on (the streamed prefill
+  synchronises inside a capture). Not new; streamed server runs use `GGML_CUDA_DISABLE_GRAPHS=1`,
+  timing uses llama-bench.
+
+## P1-9 -- Decode speed, final (speed4/, 23:28 to 23:39 UTC)
+
+Batch 1, Q4_0, `-fa 0 -t 8`, pinned to the GPU's NUMA node, 1,024-token prompt as one batch and the test
+row's own next 100 tokens decoded, the same token files for every arm, rows 601-605, four trials with
+the first dropped. Mean over the five texts, range in brackets. Every setting is in
+`results/pretrained/speed4/summary.md`.
+
+| arm | model | setting | tok/s | ms per token | loads per decoded token-layer | peak VRAM MiB |
+|---|---|---|---|---|---|---|
+| normal MoE, stock top-k | plain | all in VRAM | 655.7 [654.7, 656.1] | 1.525 | -- | 1438 |
+| temporal base | plain | all in VRAM | 699.7 [698.3, 700.4] | 1.429 | 0.999 | 1438 |
+| Skliar | plain | all in VRAM | 684.9 [683.9, 685.9] | 1.460 | 1.054 | 1438 |
+| temporal trained | trained | all in VRAM | 677.2 [676.0, 678.1] | 1.477 | 0.999 | 1438 |
+| temporal base | plain | streamed, slots 2, shared expert first | 616.3 [615.3, 616.8] | 1.622 | 0.999 | 918 |
+| Skliar | plain | streamed, slots 1, shared expert first | 592.8 [589.0, 597.7] | 1.687 | 1.059 | 918 |
+| temporal trained | trained | streamed, slots 1, shared expert first | 598.5 [597.1, 599.7] | 1.671 | 0.999 | 918 |
+
+- Skliar is 3.8 % slower than temporal base streamed and 2.1 % slower in VRAM. It reads max and min of
+  z every token for its bias and loads 6 % more experts. Its loads per decoded token-layer on these
+  texts: 0: 19.4 %, 1: 63.2 %, 2: 11.8 %, 3: 3.9 %, 4+: 1.7 % (17.4 % above one).
+- Replaced kernels on the same binary: ours on k_route2 585.4 streamed / 672.3 VRAM; Skliar full
+  selection 550.2 / 644.8; Skliar k_route2 fast path 581.2 / 673.4.
+- The trained model is 3 % behind temporal base on the same kernel. Its GGUF renormalises the gate
+  weights over the window (sum, clamp, divide per layer); the plain MoE's does not.
+- The routed arms are faster than stock in VRAM because stock runs a full argsort top-k per layer.
+- Bursts do not show up as a stall here: one expert is about 0.26 MB over its three tensors, so a load
+  is a few microseconds of transfer at the tens of GB/s this link moves, against a 1.6 ms token, and
+  most of the streaming cost is per-layer launch overhead. The burst argument applies where transfer
+  is bandwidth-bound (flash); Skliar was not measured there.
