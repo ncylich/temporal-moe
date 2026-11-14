@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--reps", type=int, default=4); ap.add_argument("--fa", type=int, default=1)
     ap.add_argument("--threads", type=int, default=8); ap.add_argument("--ub", type=int, default=0, help="micro-batch for the context fill; 0 = ctx")
     ap.add_argument("--env", nargs="*", default=[], help="extra KEY=VALUE for every arm"); ap.add_argument("--note", default="")
+    ap.add_argument("--prefix", default="", help="command prefix for every arm, e.g. 'taskset -c 0-31,64-95'")
     a = ap.parse_args()
     A = arms(a.nmoe, a.C, a.lam)
     names = list(A) if a.arms == ["all"] else a.arms
@@ -64,7 +65,7 @@ def main():
             env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(a.gpu), **env_add)
             for kv in a.env:
                 k, v = kv.split("=", 1); env[k] = v
-            cmd = [os.path.join(a.bin, "llama-bench"), "-m", a.model, "-ngl", "99", "-fa", str(a.fa), "-t", str(a.threads),
+            cmd = a.prefix.split() + [os.path.join(a.bin, "llama-bench"), "-m", a.model, "-ngl", "99", "-fa", str(a.fa), "-t", str(a.threads),
                    "-ub", str(ub), "-b", str(ub), "-r", str(a.reps), "-o", "json",
                    "-p", "0", "-n", str(a.n), "-d", str(ctx)] + extra
             idle = gpu_used(a.gpu); peak = [idle]; stop = threading.Event()
@@ -76,7 +77,7 @@ def main():
             p = subprocess.run(cmd, env=env, capture_output=True, text=True)
             stop.set(); th.join()
             row = {"tag": a.tag, "arm": arm, "ctx": ctx, "ub": ub, "n_gen": a.n, "reps": a.reps, "rc": p.returncode,
-                   "env": {**env_add, **dict(kv.split("=", 1) for kv in a.env)}, "args": " ".join(cmd[1:]),
+                   "env": {**env_add, **dict(kv.split("=", 1) for kv in a.env)}, "args": " ".join(cmd),
                    "vram_idle_mib": idle, "vram_peak_mib": peak[0], "wall_s": round(time.time() - t0, 1),
                    "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "note": a.note}
             row["route_lines"] = [l for l in p.stderr.splitlines() if l.startswith("temporal-")]
