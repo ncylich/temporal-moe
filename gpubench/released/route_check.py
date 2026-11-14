@@ -48,22 +48,23 @@ def main():
     hdr, ids, lg = read_dump(a.dump, a.K, a.E)
     n = len(hdr)
     # group consecutive records of one op: (layer, n_tokens) runs of n_tokens records
-    i, seq, req = 0, -1, 0
-    stats = {"prompt_tokens": 0, "prompt_equal": 0, "decode_tokens": 0, "decode_equal": 0,
-             "loads_equal": 0, "first_mismatch": None, "sequences": 0, "layers": set()}
-    seen_layers_in_prompt = set(); last_kind = {}; stats["prompt_chunks_continued"] = 0
+    # a record with layer -1 is the engine's sequence reset (position 0); the dump starts inside a sequence
+    i, req = 0, 1
+    stats = {"prompt_tokens": 0, "prompt_equal": 0, "decode_tokens": 0, "decode_equal": 0, "loads_equal": 0,
+             "first_mismatch": None, "sequences": 1, "layers": set(), "prompt_chunks_continued": 0}
+    last_kind = {}
+    DS.reset()
     while i < n:
         L, nt = int(hdr[i, 0]), int(hdr[i, 1])
+        if L == -1:                                        # new sequence
+            DS.reset(); req += 1; last_kind = {}; stats["sequences"] += 1
+            i += 1; continue
         stats["layers"].add(L)
         blk = slice(i, i + nt)
         x = torch.from_numpy(lg[blk])                      # [nt, E]
         eng = ids[blk]
         if nt > 1:                                         # a prompt batch
-            cont = last_kind.get(L) == "prompt"            # follows a prompt batch of this layer: same prompt, next chunk
-            if not cont and (L in seen_layers_in_prompt or seq < 0):   # first layer seen again -> a new sequence
-                seq += 1; req += 1; seen_layers_in_prompt = set(); stats["sequences"] += 1
-                DS.reset()
-            seen_layers_in_prompt.add(L)
+            cont = L in last_kind                          # an earlier batch of this sequence: carry the state
             stats["prompt_chunks_continued"] += cont
             top = x.topk(a.K, dim=-1).indices.numpy()
             for t in range(nt):
@@ -73,7 +74,7 @@ def main():
                 if not ok and stats["first_mismatch"] is None:
                     stats["first_mismatch"] = {"record": i + t, "layer": L, "kind": "prompt"}
             if a.mode == "decode":                         # observe-only scan seeds the state; a continued
-                (DS.observe_chunk if cont else DS.prefill)(L, x.unsqueeze(1))   # chunk carries it (vLLM chunked prefill)
+                (DS.observe_chunk if cont else DS.prefill)(L, x.unsqueeze(1))   # chunk carries it (observe_chunk)
             else:
                 CB.apply(L, x, [(req, nt, True)], True)    # unbiased warm, not counted
         else:

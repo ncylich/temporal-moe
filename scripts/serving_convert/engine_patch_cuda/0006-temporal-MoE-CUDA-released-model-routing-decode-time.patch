@@ -1,4 +1,4 @@
-From 0e8a1beea1bf2c28356330635018db0ff81697ac Mon Sep 17 00:00:00 2001
+From eecf05fbbe1e07b1bbf551d7c44afda4b29be96d Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Sat, 14 Nov 2026 00:20:05 -0800
 Subject: [PATCH] temporal-MoE CUDA: released-model routing (decode-time
@@ -15,10 +15,10 @@ writes logits and ids for the routing check. llama-bench replays real tokens fro
 TEMPORAL_BENCH_CTX/GEN. qwen35moe: TEMPORAL_SHEXP_FIRST=1 orders the shared expert first.
 ---
  ggml/src/ggml-cpu/ggml-cpu.c      |   3 +
- ggml/src/ggml-cuda/temporal.cu    | 360 +++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu    | 365 +++++++++++++++++++++++++++++-
  src/models/qwen35moe.cpp          |  22 +-
  tools/llama-bench/llama-bench.cpp |  29 +++
- 4 files changed, 409 insertions(+), 5 deletions(-)
+ 4 files changed, 414 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
 index 6482f794..7cf2b279 100644
@@ -42,7 +42,7 @@ index 6482f794..7cf2b279 100644
      const int L = (int)(intptr_t) userdata;
      const int K = (int) dst->ne[0];
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index e82ddb12..23d7bf60 100644
+index e82ddb12..9ff1beb5 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -43,6 +43,8 @@ static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVER
@@ -95,7 +95,7 @@ index e82ddb12..23d7bf60 100644
  int ggml_cuda_temporal_route_op_on() {                  // trained routing runs as the CUDA kernel
      static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
      return ggml_cuda_temporal_route_trained() && !host;
-@@ -450,11 +466,346 @@ static void tr_report() {
+@@ -450,11 +466,351 @@ static void tr_report() {
      if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
  }
  
@@ -122,7 +122,8 @@ index e82ddb12..23d7bf60 100644
 +// Exit line `temporal-route2: ...` with loads per decode layer-token and their histogram;
 +// TEMPORAL_ROUTE_HIST=<json> writes {"hist","loads","rows"} like cache_bias.stats();
 +// LLAMA_TEMPORAL_ROUTE_DUMP2=<file> writes, per layer and token: int32 layer, n_tokens, t, loads (-1 if not a
-+// counted decode step), K int32 ids, E float32 logits (syncs after every op: needs GGML_CUDA_DISABLE_GRAPHS=1).
++// counted decode step), K int32 ids, E float32 logits (syncs after every op: needs GGML_CUDA_DISABLE_GRAPHS=1);
++// a record with layer -1 marks a sequence reset (position 0).
 +#define TR2_MAXK 64
 +struct TR2 {
 +    int E = 0, K = 0, C = 0, J = 1; float lam = 0.f; int ready = 0;
@@ -362,6 +363,10 @@ index e82ddb12..23d7bf60 100644
 +static void tr2_reset() {
 +    if (!g2.ready) return;
 +    CUDA_CHECK(cudaDeviceSynchronize());
++    if (g2.dump) {                                            // sequence start marker: layer -1, rest zero
++        std::vector<int32_t> z((size_t) 4 + g2.K + g2.E, 0); z[0] = -1;
++        fwrite(z.data(), 4, z.size(), g2.dump);
++    }
 +    CUDA_CHECK(cudaMemset(g2.st, 0, TR_MAXLAYER*sizeof(int)));
 +    CUDA_CHECK(cudaMemset(g2.tnow, 0, TR_MAXLAYER*sizeof(long long)));
 +}
@@ -442,7 +447,7 @@ index e82ddb12..23d7bf60 100644
      if (!g_tr_k) {
          g_tr_K = K;
          CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
-@@ -501,6 +852,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+@@ -501,6 +857,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
  
  // cold-start every layer's window (llama_context calls this at sequence position 0)
  void ggml_cuda_temporal_route_reset() {
