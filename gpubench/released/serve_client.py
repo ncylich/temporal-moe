@@ -55,7 +55,8 @@ def cmd_contexts(a):
                 break
             msgs, best = trial, toks; j += 1
         assert best is not None and len(best) >= target_lo, f"ctx {ctx}: could not fit turns ({best and len(best)})"
-        out[ctx] = {"prompt": best, "n": len(best), "turns": j}
+        out[ctx] = {"prompt": best, "n": len(best), "turns": j, "messages": msgs + [open_q],
+                    "more": [Q.format(q=items[-10 - k - a.ctx.index(ctx) * 20]["question"]) for k in range(20)]}
         print(f"ctx {ctx}: prompt {len(best)} tokens, {j} finished turns", flush=True)
     json.dump(out, open(a.out, "w"))
 
@@ -65,19 +66,25 @@ def cmd_generate(a):
     os.makedirs(a.out, exist_ok=True)
     for ctx, rec in P.items():
         ctx = int(ctx)
-        need = ctx + a.n_gen - rec["n"]
-        r = post(a.url, "/completion", {"prompt": rec["prompt"], "n_predict": need + 8, "temperature": 0.0,
-                                        "cache_prompt": False, "return_tokens": True, "ignore_eos": False})
+        # greedy continuation; if the answer ends before ctx + n_gen tokens, the chat goes on with a next
+        # question (re-templated, re-tokenized) and the model answers again
+        prompt, msgs, more, turns = rec["prompt"], list(rec["messages"]), list(rec["more"]), 0
+        while True:
+            need = ctx + a.n_gen - len(prompt)
+            r = post(a.url, "/completion", {"prompt": prompt, "n_predict": max(need, 1) + 8, "temperature": 0.0,
+                                            "cache_prompt": False, "return_tokens": True})
+            seq = prompt + r["tokens"]
+            if len(seq) >= ctx + a.n_gen:
+                break
+            msgs += [{"role": "assistant", "content": r["content"]}, {"role": "user", "content": more.pop(0)}]
+            prompt = tokenize(a.url, template(a.url, msgs)); turns += 1
         gen = r["tokens"]
-        seq = rec["prompt"] + gen
-        if len(seq) < ctx + a.n_gen:
-            sys.exit(f"ctx {ctx}: continuation stopped after {len(gen)} tokens; need {need}")
         for ext, part in (("ctx", seq[:ctx]), ("gen", seq[ctx:ctx + a.n_gen])):
             with open(os.path.join(a.out, f"ctx{ctx}_{a.tag}.{ext}"), "wb") as f:
                 f.write(struct.pack(f"<{len(part)}i", *part))
         with open(os.path.join(a.out, f"ctx{ctx}_{a.tag}.txt"), "w") as f:
             f.write(r["content"])
-        print(f"ctx {ctx} [{a.tag}]: prompt {rec['n']}, generated {len(gen)}, wrote {ctx} + {a.n_gen}", flush=True)
+        print(f"ctx {ctx} [{a.tag}]: prompt {rec['n']}, extra turns {turns}, last answer {len(gen)} tokens, wrote {ctx} + {a.n_gen}", flush=True)
 
 
 def cmd_gsm8k(a):
