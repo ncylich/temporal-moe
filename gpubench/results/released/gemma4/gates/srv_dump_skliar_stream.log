@@ -1,0 +1,39 @@
+0.00.187.613 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.413.237 I srv    load_model: loading model '/root/m/gemma4-q4km.gguf'
+0.01.735.811 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.736.411 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.768.631 W load: special_eog_ids contains '<|tool_response>', removing '</s>' token from EOG list
+0.01.805.438 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --no-mmap for better performance
+[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=8 + CPU pool
+[temporal-route2] mode=skliar K=8 E=128 C=8 lambda=0.500 J=1 nocopy=0
+[temporal-prefill] EXPERT-MAJOR STREAMING (default): n_tokens=2 k=8 active=12/128 ring=96 slots (12 batches x 8), be=1089KB
+0.14.694.067 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.14.702.858 I srv  llama_server: model loaded
+0.14.702.872 I srv  llama_server: listening on http://127.0.0.1:8091
+0.15.942.815 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.15.942.886 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.19.462.723 I slot print_timing: id  0 | task 0 | n_decoded =    155, tg =  51.30 t/s, tg_3s =  51.30 t/s
+0.19.523.364 I slot print_timing: id  0 | task 0 | prompt eval time =     498.51 ms /    90 tokens (    5.54 ms per token,   180.54 tokens per second)
+0.19.523.373 I slot print_timing: id  0 | task 0 |        eval time =    3081.91 ms /   158 tokens (   19.51 ms per token,    51.27 tokens per second)
+0.19.523.377 I slot print_timing: id  0 | task 0 |       total time =    3580.42 ms /   248 tokens
+0.19.523.391 I slot print_timing: id  0 | task 0 |    graphs reused =        157
+0.19.523.524 I slot      release: id  0 | task 0 | stop processing: n_tokens = 247, truncated = 0
+0.19.529.022 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.115 (> 0.100 thold), f_keep = 0.024
+0.19.562.825 I slot launch_slot_: id  0 | task 159 | processing task, is_child = 0
+0.21.780.214 I slot print_timing: id  0 | task 159 | prompt eval time =     351.07 ms /    52 tokens (    6.75 ms per token,   148.12 tokens per second)
+0.21.780.222 I slot print_timing: id  0 | task 159 |        eval time =    1866.27 ms /    95 tokens (   19.64 ms per token,    50.90 tokens per second)
+0.21.780.225 I slot print_timing: id  0 | task 159 |       total time =    2217.34 ms /   147 tokens
+0.21.780.227 I slot print_timing: id  0 | task 159 |    graphs reused =        250
+0.21.780.276 I slot      release: id  0 | task 159 | stop processing: n_tokens = 146, truncated = 0
+0.21.786.451 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = 994789504326
+0.21.806.794 I slot launch_slot_: id  0 | task 255 | processing task, is_child = 0
+0.25.226.591 I slot print_timing: id  0 | task 255 | n_decoded =    162, tg =  53.81 t/s, tg_3s =  53.81 t/s
+0.26.839.129 I slot print_timing: id  0 | task 255 | prompt eval time =     409.36 ms /    83 tokens (    4.93 ms per token,   202.76 tokens per second)
+0.26.839.136 I slot print_timing: id  0 | task 255 |        eval time =    4622.94 ms /   250 tokens (   18.49 ms per token,    54.08 tokens per second)
+0.26.839.139 I slot print_timing: id  0 | task 255 |       total time =    5032.30 ms /   333 tokens
+0.26.839.141 I slot print_timing: id  0 | task 255 |    graphs reused =        497
+0.26.839.222 I slot      release: id  0 | task 255 | stop processing: n_tokens = 332, truncated = 0
+0.26.894.946 I srv    operator(): operator(): cleaning up before exit...
+temporal-route2: mode=skliar layers=30 decode_layer_tokens=15000 loads=13815 loads_per_layer_token=0.9210 prompt_layer_tokens=6870 cold_decode=0 C=8 lambda=0.500 J=1 hist=[5135,6893,2169,653,129,17,4,0,0]
+temporal-cuda: layers=30 slot swap-ins decided on single-token steps=14453
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000

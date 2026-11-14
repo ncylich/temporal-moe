@@ -1,0 +1,32 @@
+### gate 1: routing equality 11:28:34
+server ours up on 8091 (pid 897171)
+temporal-route2: mode=decode layers=30 decode_layer_tokens=17130 loads=17109 loads_per_layer_token=0.9988 prompt_layer_tokens=6870 cold_decode=0 C=0 lambda=0.000 J=1 hist=[21,17109,0,0,0,0,0,0,0]
+[temporal] decode step path: eager
+{"prompt_tokens": 6870, "prompt_equal": 6870, "decode_tokens": 17130, "decode_equal": 17130, "loads_equal": 0, "first_mismatch": null, "sequences": 5, "layers": 30, "prompt_chunks_continued": 0}
+server skliar up on 8091 (pid 897489)
+temporal-route2: mode=skliar layers=30 decode_layer_tokens=19260 loads=17398 loads_per_layer_token=0.9033 prompt_layer_tokens=6870 cold_decode=0 C=8 lambda=0.500 J=1 hist=[6655,8900,2797,750,137,20,1,0,0]
+{"prompt_tokens": 6870, "prompt_equal": 6870, "decode_tokens": 19260, "decode_equal": 19260, "loads_equal": 19260, "first_mismatch": null, "sequences": 5, "layers": 30, "prompt_chunks_continued": 0}
+server ours_stream up on 8091 (pid 897904)
+temporal-route2: mode=decode layers=30 decode_layer_tokens=18150 loads=18127 loads_per_layer_token=0.9987 prompt_layer_tokens=6870 cold_decode=0 C=0 lambda=0.000 J=1 hist=[23,18127,0,0,0,0,0,0,0]
+[temporal] decode step path: eager
+{"prompt_tokens": 6870, "prompt_equal": 6870, "decode_tokens": 18150, "decode_equal": 18150, "loads_equal": 0, "first_mismatch": null, "sequences": 5, "layers": 30, "prompt_chunks_continued": 0}
+server skliar_stream up on 8091 (pid 898285)
+temporal-route2: mode=skliar layers=30 decode_layer_tokens=15000 loads=13815 loads_per_layer_token=0.9210 prompt_layer_tokens=6870 cold_decode=0 C=8 lambda=0.500 J=1 hist=[5135,6893,2169,653,129,17,4,0,0]
+{"prompt_tokens": 6870, "prompt_equal": 6870, "decode_tokens": 15000, "decode_equal": 15000, "loads_equal": 15000, "first_mismatch": null, "sequences": 5, "layers": 30, "prompt_chunks_continued": 0}
+### gate 2: GSM8K load histograms (200 items) 11:30:37
+server skliar up on 8092 (pid 898732)
+temporal-route2: mode=skliar layers=30 decode_layer_tokens=1610100 loads=1510110 loads_per_layer_token=0.9379 prompt_layer_tokens=519990 cold_decode=0 C=8 lambda=0.500 J=1 hist=[525736,765829,232109,68588,15142,2462,217,17,0]
+server ours up on 8092 (pid 899414)
+temporal-route2: mode=decode layers=30 decode_layer_tokens=1553340 loads=1551159 loads_per_layer_token=0.9986 prompt_layer_tokens=519990 cold_decode=0 C=0 lambda=0.000 J=1 hist=[2181,1551159,0,0,0,0,0,0,0]
+server base up on 8092 (pid 900056)
+### gate 3: batch-1 perplexity 11:52:48
+decode vram: 0.34.712.341 I Final estimate: PPL = 73.2257 +/- 9.74357 | temporal-route2: mode=decode layers=30 decode_layer_tokens=122760 loads=122658 loads_per_layer_token=0.9992 prompt_layer
+[1]100.8822 [2]62.2031 [3]92.5127 [4]73.2257 
+decode stream: 1.20.267.767 I Final estimate: PPL = 73.2257 +/- 9.74357 | temporal-route2: mode=decode layers=30 decode_layer_tokens=122760 loads=122658 loads_per_layer_token=0.9992 prompt_layer
+[1]100.8822 [2]62.2031 [3]92.5127 [4]73.2257 
+skliar vram: 0.35.445.142 I Final estimate: PPL = 77.8332 +/- 10.62048 | temporal-route2: mode=skliar layers=30 decode_layer_tokens=122760 loads=99189 loads_per_layer_token=0.8080 prompt_layer_
+[1]55.6226 [2]31.6268 [3]66.9017 [4]77.8332 
+skliar stream: 1.15.078.693 I Final estimate: PPL = 77.8332 +/- 10.62048 | temporal-route2: mode=skliar layers=30 decode_layer_tokens=122760 loads=99189 loads_per_layer_token=0.8080 prompt_layer_
+[1]55.6226 [2]31.6268 [3]66.9017 [4]77.8332 
+base vram: 0.35.443.270 I Final estimate: PPL = 20.7269 +/- 2.39479
+### GATES_DONE 11:57:21
