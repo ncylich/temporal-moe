@@ -1,0 +1,46 @@
+engine tree c79aa364
+embed: write output file /workspace/rel/eng/llama.cpp/build/tools/ui/ui.h
+embed: write output file /workspace/rel/eng/llama.cpp/build/tools/ui/ui.cpp
+[ 96%] Built target llama-ui-assets
+[ 96%] Building CXX object tools/ui/CMakeFiles/llama-ui.dir/ui.cpp.o
+[ 96%] Linking CXX static library libllama-ui.a
+[ 96%] Built target llama-ui
+[ 96%] Linking CXX shared library ../../bin/libmtmd.so
+[ 96%] Built target mtmd
+[ 96%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-queue.cpp.o
+[ 96%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-chat.cpp.o
+[ 96%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-common.cpp.o
+[ 96%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-task.cpp.o
+[ 98%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-stream.cpp.o
+[ 98%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-context.cpp.o
+[ 98%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-tools.cpp.o
+[ 98%] Building CXX object tools/server/CMakeFiles/server-context.dir/server-schema.cpp.o
+[ 98%] Linking CXX static library libserver-context.a
+[ 98%] Built target server-context
+[ 98%] Building CXX object tools/server/CMakeFiles/llama-server-impl.dir/server.cpp.o
+[ 98%] Building CXX object tools/server/CMakeFiles/llama-server-impl.dir/server-http.cpp.o
+[100%] Building CXX object tools/server/CMakeFiles/llama-server-impl.dir/server-models.cpp.o
+[100%] Linking CXX shared library ../../bin/libllama-server-impl.so
+[100%] Built target llama-server-impl
+[100%] Building CXX object tools/server/CMakeFiles/llama-server.dir/main.cpp.o
+[100%] Linking CXX executable ../../bin/llama-server
+[100%] Built target llama-server
+[  0%] Built target llama-common-base
+[  3%] Built target ggml-base
+[  3%] Built target cpp-httplib
+[  7%] Built target ggml-cpu
+[ 44%] Built target ggml-cuda
+[ 44%] Built target ggml
+[ 89%] Built target llama
+[ 98%] Built target llama-common
+[ 98%] Building CXX object tools/quantize/CMakeFiles/llama-quantize-impl.dir/quantize.cpp.o
+[ 98%] Linking CXX shared library ../../bin/libllama-quantize-impl.so
+[ 98%] Built target llama-quantize-impl
+[100%] Building CXX object tools/quantize/CMakeFiles/llama-quantize.dir/main.cpp.o
+[100%] Linking CXX executable ../../bin/llama-quantize
+[100%] Built target llama-quantize
+ee3172a4f43c3b82edc382cbc0c86649b813c6b48b51d9b53e8f78d07f3681a4  build/bin/llama-bench
+b667ab53415f7289c13c8d597e6564857fb71cb031147e1dff0d806f4f9ce751  build/bin/llama-perplexity
+11c0b1241e28189c3b815ad05ea8b3e9436ec53ef8e7e624fd8a2ed5bd294b6a  build/bin/libllama.so
+35078a2cc2716855496b1809756f5ad3f11b3bb2623a30df06a4a884d067d719  build/bin/libggml-cuda.so
+BUILD_DONE
