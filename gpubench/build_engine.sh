@@ -15,7 +15,7 @@ git apply "$REPO"/llamacpp-bench/systems_bench.patch
 git add -A && git -c user.name=build -c user.email=build@localhost commit -q -m "systems bench patch"
 git -c user.name=build -c user.email=build@localhost am -q "$REPO"/scripts/serving_convert/engine_patch_cuda/000*.patch
 echo "engine tree $(git rev-parse --short=8 'HEAD^{tree}')"
-cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86 -DLLAMA_CURL=OFF -DLLAMA_BUILD_UI=OFF > build_cmake.log 2>&1
+cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86 -DLLAMA_CURL=OFF -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF > build_cmake.log 2>&1
 cmake --build build --target llama llama-bench llama-perplexity llama-server llama-quantize -j 48 2>&1 | tail -40
 g++ -std=c++17 -O2 "$REPO"/scripts/serving_convert/gguf_logits.cpp -I include -I ggml/include \
     -L build/bin -lllama -Wl,-rpath,"$PWD/build/bin" -o build/bin/gguf_logits
