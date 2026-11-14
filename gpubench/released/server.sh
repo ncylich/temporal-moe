@@ -14,6 +14,8 @@ case $ARM in
   skliar) ENVV+=(LLAMA_TEMPORAL_ROUTE=skliar TEMPORAL_CB_C=${SK_C:?} TEMPORAL_CB_LAMBDA=${SK_LAM:?} TEMPORAL_CB_J=1) ;;
   ours_stream) ENVV+=(LLAMA_TEMPORAL_ROUTE=decode TEMPORAL_UNIFIED=1) ;;
   skliar_stream) ENVV+=(LLAMA_TEMPORAL_ROUTE=skliar TEMPORAL_CB_C=${SK_C:?} TEMPORAL_CB_LAMBDA=${SK_LAM:?} TEMPORAL_CB_J=1 TEMPORAL_UNIFIED=1) ;;
+  trained) ENVV+=(LLAMA_TEMPORAL_ROUTE=trained) ;;
+  trained_stream) ENVV+=(LLAMA_TEMPORAL_ROUTE=trained TEMPORAL_UNIFIED=1) ;;
   *) echo "unknown arm $ARM" >&2; exit 1 ;;
 esac
 if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then echo "port $PORT already serves something; refusing to start"; exit 1; fi

@@ -12,7 +12,7 @@ import numpy as np
 import torch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path[:0] = [os.path.join(ROOT, "scripts", "serving_convert"), os.path.join(ROOT, "analysis", "residency")]
+sys.path[:0] = [ROOT, os.path.join(ROOT, "scripts", "serving_convert"), os.path.join(ROOT, "analysis", "residency")]
 from ref_model import RefModel  # noqa: E402
 import cache_bias  # noqa: E402
 
@@ -53,7 +53,16 @@ def main():
     sw, tk, _ = cache_bias.stats()
     print(f"layers {len(seen)} token-layers {rows} mismatches {bad}")
     print(f"loads: ref {m.loads[0]}/{m.loads[1]}  cache_bias {sw}/{tk}")
-    print("GATE PASS" if bad == 0 and m.loads[0] == sw and m.loads[1] == tk else "GATE FAIL")
+    # our rule: the GPU scan used on CUDA equals the CPU reference scan on these same logits
+    from temporal.temporal_router import compute_resident_mask, compute_resident_mask_accel
+    tbad = 0
+    if a.device == "cuda":
+        for L, lg, _ in seen:
+            x = lg.transpose(0, 1).contiguous()
+            tbad += int(not torch.equal(compute_resident_mask(x, 18, "min_logit"),
+                                        compute_resident_mask_accel(x.cuda(), 18, "min_logit").cpu()))
+        print(f"temporal GPU scan vs CPU scan: {tbad} of {len(seen)} layers differ")
+    print("GATE PASS" if tbad == 0 and bad == 0 and m.loads[0] == sw and m.loads[1] == tk else "GATE FAIL")
 
 
 if __name__ == "__main__":

@@ -30,6 +30,9 @@ def arms(nmoe, C, lam):
         "skliar_nobytes":  ({**sk, **st, "TEMPORAL_ROUTE_NOCOPY": "1"}, nc, "skliar"),
         "ours_nocopy":     ({**ours, **st, "TEMPORAL_ROUTE_NOCOPY": "2"}, nc, "ours"),     # no copy kernels at all
         "skliar_nocopy":   ({**sk, **st, "TEMPORAL_ROUTE_NOCOPY": "2"}, nc, "skliar"),
+        # the temporally trained 1e19 model under its own rule (prompt included), for gpubench/pretrained
+        "trained_vram":    ({"LLAMA_TEMPORAL_ROUTE": "trained"}, [], "trained"),
+        "trained_stream":  ({"LLAMA_TEMPORAL_ROUTE": "trained", **st}, nc, "trained"),
     }
 
 

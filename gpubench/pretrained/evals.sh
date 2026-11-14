@@ -6,7 +6,7 @@ set -uo pipefail
 cd /workspace/tm
 W=/workspace; O=/workspace/out; mkdir -p $O
 MOE=$W/moe_fine_1e19.safetensors; TMOE=$W/fine_1e19.safetensors
-RM="python3 scripts/serving_convert/ref_model.py --device cuda --seq 2048 --batch 8"
+RM="python3 scripts/serving_convert/ref_model.py --device cuda --seq 2048 --batch 16"
 SWEEP="--tokens $W/test_tokens_2048.npz --start 1536 --n 64"        # held out from the 512-row CE eval
 TASKS=arc_challenge,arc_easy,hellaswag,openbookqa,piqa,winogrande,boolq,copa,lambada_openai,sciq
 done_() { [ -s "$1" ] && grep -q "^loss " "$1"; }
@@ -23,8 +23,12 @@ done
 python3 gpubench/pretrained/pick_lambda.py $O/sweep_ours.log $O/sweep_skliar_*.log | tee $O/lambda.txt
 LAM=$(grep -oE "^LAMBDA [0-9.]+" $O/lambda.txt | awk '{print $2}')
 [ -n "$LAM" ] || { echo "no lambda"; exit 1; }
-done_ $O/sweep_skliar_star.log || $RM --weights $MOE $SWEEP --routing skliar --cb-lambda $LAM > $O/sweep_skliar_star.log 2>&1
-grep -h "loads per" $O/sweep_ours.log $O/sweep_skliar_star.log
+# the interpolated lambda gave 0.958 loads against ours 1.000: bisect between the grid point above and it
+TGT=$(grep -oE "loads per token-layer [0-9.]+" $O/sweep_ours.log | awk '{print $4}')
+[ -s $O/bisect.txt ] || python3 gpubench/pretrained/bisect_lambda.py --target $TGT --lo 0.75 --hi $LAM --log-dir $O -- \
+    --device cuda --seq 2048 --batch 16 --weights $MOE $SWEEP | tee $O/bisect.txt
+LAM=$(grep -oE "^LAMBDA [0-9.]+" $O/bisect.txt | awk '{print $2}')
+echo "lambda* $LAM"
 
 echo "### test CE, 512 rows $(date -u +%H:%M)"
 CE="--tokens $W/test_tokens.npz --n 512"
@@ -39,10 +43,9 @@ lme() { # name weights routing [lambda]
   [ -s $O/lme_$1/done ] && return
   mkdir -p $O/lme_$1
   python3 gpubench/pretrained/lmeval_ref.py --model refmoe \
-    --model_args weights=$2,routing=$3,cb_lambda=${4:-0.5},batch=32,loads_out=$O/lme_$1/loads.jsonl \
+    --model_args weights=$2,routing=$3,cb_lambda=${4:-0.5},batch=64,loads_out=$O/lme_$1/loads.jsonl \
     --tasks $TASKS --num_fewshot 0 --seed 42 --output_path $O/lme_$1 > $O/lme_$1.log 2>&1 && touch $O/lme_$1/done
 }
-lme moe_topk $MOE topk & lme moe_ours $MOE temporal & wait
-lme moe_skliar $MOE skliar $LAM & lme tmoe_trained $TMOE temporal & wait
+lme moe_skliar $MOE skliar $LAM & lme moe_topk $MOE topk & lme moe_ours $MOE temporal & lme tmoe_trained $TMOE temporal & wait
 for n in moe_topk moe_ours moe_skliar tmoe_trained; do echo "== $n"; grep -E "^\|" $O/lme_$n.log | head -40; done
 echo "### ALL DONE $(date -u +%H:%M)"
