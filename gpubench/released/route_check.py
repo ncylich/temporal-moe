@@ -82,8 +82,12 @@ def main():
             else:
                 before = CB.COUNT[0]
                 out = CB.apply(L, x, [(req, 1, False)], True)[0]
-                ref = set(torch.nonzero(torch.isfinite(out)).flatten().tolist())
-                ref_loads = CB.COUNT[0] - before
+                if torch.isfinite(out).all():              # first token of a sequence without a prompt:
+                    ref = set(x[0].topk(a.K).indices.tolist())   # the reference warms the cache and routes freely
+                    ref_loads = -1
+                else:
+                    ref = set(torch.nonzero(torch.isfinite(out)).flatten().tolist())
+                    ref_loads = CB.COUNT[0] - before
             got = set(eng[0].tolist())
             stats["decode_tokens"] += 1
             ok = ref == got
