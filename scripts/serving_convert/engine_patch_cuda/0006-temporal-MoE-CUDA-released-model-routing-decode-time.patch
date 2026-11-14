@@ -1,4 +1,4 @@
-From c57c7c1a8933df22915fd616c5ae5ac696d61d43 Mon Sep 17 00:00:00 2001
+From eef4567fbdefd7312dcc5dd4e9a14df874b2168d Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Sat, 14 Nov 2026 00:20:05 -0800
 Subject: [PATCH] temporal-MoE CUDA: released-model routing (decode-time
@@ -15,10 +15,10 @@ writes logits and ids for the routing check. llama-bench replays real tokens fro
 TEMPORAL_BENCH_CTX/GEN. qwen35moe: TEMPORAL_SHEXP_FIRST=1 orders the shared expert first.
 ---
  ggml/src/ggml-cpu/ggml-cpu.c      |   3 +
- ggml/src/ggml-cuda/temporal.cu    | 303 +++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu    | 305 +++++++++++++++++++++++++++++-
  src/models/qwen35moe.cpp          |  22 ++-
  tools/llama-bench/llama-bench.cpp |  29 +++
- 4 files changed, 352 insertions(+), 5 deletions(-)
+ 4 files changed, 354 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
 index 6482f794..7cf2b279 100644
@@ -42,10 +42,19 @@ index 6482f794..7cf2b279 100644
      const int L = (int)(intptr_t) userdata;
      const int K = (int) dst->ne[0];
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index e82ddb12..a9438fa4 100644
+index e82ddb12..70e709e8 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
-@@ -242,7 +242,7 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+@@ -43,6 +43,8 @@ static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVER
+ static int tu_lean() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_LEAN");return s?atoi(s):0;}(); return v; }
+ static int tr_slots();
+ int ggml_cuda_temporal_route_op_on();
++int ggml_cuda_temporal_route_mode();
++static int tr_nocopy();
+ static int tu_nocopy() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_NOCOPY");return s?atoi(s):0;}(); return v; }  // decomposition: skip swap-copy (wrong output)
+ // Swap-rate EMULATION. The real mechanism swaps <=1 expert/layer/token; the trained models' measured
+ // mean_swap_rate (probe_replay e1) is p in [0,1] (shipped policy ~1.0). Emulate a global rate p on this
+@@ -242,7 +244,7 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
      int64_t need = (int64_t)stride1 * n_tokens;
      if (L.remap_words < need) { if (L.remap_ids) cudaFree(L.remap_ids); cudaMalloc(&L.remap_ids, need*sizeof(int32_t)); L.remap_words = need; }
      if (tr_slots() == 2 && ggml_cuda_temporal_route_op_on() && n_tokens == 1) {   // copies were issued at the route op
@@ -54,7 +63,7 @@ index e82ddb12..a9438fa4 100644
          *ids_out_ptr = L.remap_ids;
          return 1;
      }
-@@ -352,14 +352,28 @@ static int *g_tr_k = nullptr, *g_tr_win = nullptr;       // [TR_MAXLAYER], [TR_M
+@@ -352,14 +354,28 @@ static int *g_tr_k = nullptr, *g_tr_win = nullptr;       // [TR_MAXLAYER], [TR_M
  static unsigned long long *g_tr_cnt = nullptr;           // [TR_MAXLAYER*3]: steps, swaps, cold fills
  static int g_tr_K = 0;
  static int *g_tr_vslot = nullptr, *g_tr_vvalid = nullptr; // [TR_MAXLAYER*K], [TR_MAXLAYER] (TEMPORAL_ROUTE_SLOTS)
@@ -86,7 +95,7 @@ index e82ddb12..a9438fa4 100644
  int ggml_cuda_temporal_route_op_on() {                  // trained routing runs as the CUDA kernel
      static int host=[](){const char*s=getenv("TEMPORAL_ROUTE_HOST");return s?atoi(s):0;}();
      return ggml_cuda_temporal_route_trained() && !host;
-@@ -450,11 +464,291 @@ static void tr_report() {
+@@ -450,11 +466,291 @@ static void tr_report() {
      if (g_tr_dump) { fclose(g_tr_dump); g_tr_dump=nullptr; }
  }
  
@@ -378,7 +387,7 @@ index e82ddb12..a9438fa4 100644
      if (!g_tr_k) {
          g_tr_K = K;
          CUDA_CHECK(cudaMalloc(&g_tr_k, TR_MAXLAYER*sizeof(int)));        CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
-@@ -501,6 +795,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+@@ -501,6 +797,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
  
  // cold-start every layer's window (llama_context calls this at sequence position 0)
  void ggml_cuda_temporal_route_reset() {
