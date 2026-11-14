@@ -53,3 +53,23 @@ Measured in ledger entry G1-7. All pass the batch-1 perplexity gate. Only the la
 | `TEMPORAL_ROUTE_SLOTS=1` | the routing kernel keeps the VRAM slots, no residency kernel | +0.5% |
 | `TEMPORAL_ROUTE_SLOTS=2` | the same, and the copies start at the router | +2% (0.85 to 0.87 speed kept) |
 | `TEMPORAL_SHEXP_FIRST=1` | orders glm4moe's shared expert before the routed experts | no gain |
+
+## Released checkpoints (patches 0006 and 0007)
+
+For Qwen3.5-35B-A3B and Gemma4-26B-IT, unadapted. Checks and numbers: `gpubench/RELEASED_MODELS_LEDGER.md`;
+drivers in `gpubench/released/`.
+
+| switch | what it does |
+|---|---|
+| `LLAMA_TEMPORAL_ROUTE=decode` | our rule at decode time, as `analysis/residency/decode_state.py`: a prompt batch is routed with the stock top-k while the rule runs observe-only over it; each single-token batch is one rule step and routes inside the K residents |
+| `LLAMA_TEMPORAL_ROUTE=skliar` + `TEMPORAL_CB_C`, `TEMPORAL_CB_LAMBDA` (`TEMPORAL_CB_J`, default 1) | Skliar et al.'s cache-conditional routing, as `analysis/residency/cache_bias.py`: LRU cache of C per layer, lambda times the running mean of max-min logit added to cached experts, top-1 guarantee; the prompt is routed freely and warms the cache |
+| `TEMPORAL_UNIFIED=1 -ncmoe <n_layer>` | streamed: K slots per layer in VRAM, pool in pinned CPU memory. In both modes the routing kernel keeps the slots with one shared routine and the copies start at the router (the `TEMPORAL_ROUTE_SLOTS=2` design, forced on). With `skliar`, C must equal K (the cache is the slots) |
+| `TEMPORAL_ROUTE_NOCOPY=1` / `=2` | timing controls, output wrong: copy kernels with an empty list / no copy kernels or events |
+| `TEMPORAL_ROUTE_HIST=<json>` | loads-per-layer-token histogram at exit, format of the saved Python histograms |
+| `LLAMA_TEMPORAL_ROUTE_DUMP2=<file>` | logits and ids per layer-token, plus a marker at each sequence reset, for `gpubench/released/route_check.py`; needs `GGML_CUDA_DISABLE_GRAPHS=1` |
+| `TEMPORAL_BENCH_CTX`, `TEMPORAL_BENCH_GEN` | `llama-bench` fills the context and feeds the decode steps from token files (real text) instead of random tokens |
+| `TEMPORAL_SHEXP_FIRST=1` (0007) | orders Qwen3.5's shared expert or Gemma4's dense MLP between the router and the routed experts, so the copies run under it; same ops, same result |
+
+Patch 0006 also carries an earlier `TEMPORAL_SHEXP_FIRST` for `qwen35moe` that puts the shared expert before
+the router; 0007 replaces it. `gpubench/build_engine.sh` builds the server without its web UI
+(`-DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF`), whose asset step fails offline.
