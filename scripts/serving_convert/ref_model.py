@@ -16,6 +16,12 @@ Routing modes:
   temporal  training-time rule, compute_resident_mask(k, evict) per sequence (the scored model)
   topk      unconstrained top-k per token, gates = softmax over the selected k. This is what
             stock llama.cpp computes with softmax gating and expert_weights_norm=true.
+  skliar    cache-conditional routing (analysis/residency/cache_bias.py, select and _cap reused
+            unchanged) teacher-forced on every token: token 0 is the unbiased top-k and warms an
+            LRU cache of C experts; every later token ranks z + lambda*delta*cached with the top-J
+            of z kept. delta is the running mean of max(z)-min(z) over this sequence's tokens so
+            far, which is cache_bias's running mean for one sequence fed token by token. The
+            loads (selected and not cached) are counted in self.loads = [loads, token-layers].
 
     python scripts/serving_convert/ref_model.py --weights $WORK/fine_1e19.safetensors \
         --tokens $WORK/test_tokens.npz --n 512 --routing temporal
@@ -29,6 +35,8 @@ from safetensors.torch import load_file
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 from temporal.temporal_router import compute_resident_mask  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "analysis", "residency"))
+import cache_bias  # noqa: E402
 
 BPB_DIVISOR = 2.9780   # ln2 * 4.296 bytes/token, pythia 50k on dclm (docs/EVALUATION_METHODOLOGY.md)
 
@@ -50,7 +58,7 @@ class _AsDouble(dict):
 
 
 class RefModel:
-    def __init__(self, path, topk, head_dim=16, evict="min_logit", device="cpu"):
+    def __init__(self, path, topk, head_dim=16, evict="min_logit", device="cpu", cb_C=18, cb_lam=0.5, cb_J=1):
         sd = {k: v.float().to(device) for k, v in load_file(path).items()}
         self.sd = sd
         self.H = sd["embedding.word_embeddings.weight"].shape[1]
@@ -58,6 +66,9 @@ class RefModel:
         self.hd, self.nh = head_dim, self.H // head_dim
         self.topk, self.evict, self.device = topk, evict, device
         self.E = sd["decoder.layers.1.mlp.router.weight"].shape[0]
+        self.cb_C, self.cb_lam, self.cb_J = cb_C, cb_lam, cb_J
+        self.loads = [0, 0]          # [loads, token-layers] after token 0, temporal and skliar routing
+        self.valid = None            # [B,S] bool: real (unpadded) tokens, set by a batching caller
 
     def attention(self, x, i):
         B, S, H = x.shape
@@ -81,12 +92,38 @@ class RefModel:
         if routing == "temporal":
             m = compute_resident_mask(logits.transpose(0, 1).cpu(), self.topk, self.evict)
             mask = m.transpose(0, 1).to(logits.device)
+            ld = (mask[:, 1:] & ~mask[:, :-1]).sum(-1)                               # experts entering the window
+            v = self.valid[:, 1:] if self.valid is not None else torch.ones_like(ld, dtype=torch.bool)
+            self.loads[0] += int(ld[v].sum()); self.loads[1] += int(v.sum())
+        elif routing == "skliar":
+            mask = self.skliar(logits, self.valid)
         elif routing == "topk":
             mask = torch.zeros_like(logits, dtype=torch.bool)
             mask.scatter_(-1, logits.topk(self.topk, dim=-1).indices, True)
         else:
             raise ValueError(routing)
         return mask, torch.softmax(logits.masked_fill(~mask, float("-inf")), dim=-1)
+
+    def skliar(self, logits, valid=None):
+        """logits [B,S,E] -> mask [B,S,E]; valid [B,S] bool limits the load count to real tokens."""
+        B, S, E = logits.shape
+        lt = logits.float()
+        neg = float("-inf")
+        mask = torch.zeros_like(lt, dtype=torch.bool)
+        sel = torch.zeros((B, E), dtype=torch.bool, device=lt.device).scatter_(1, lt[:, 0].topk(self.topk, dim=-1).indices, True)
+        mask[:, 0] = sel
+        last = cache_bias._cap(torch.where(sel, torch.zeros_like(lt[:, 0]), torch.full_like(lt[:, 0], neg)), self.cb_C)
+        rng = lt.max(-1).values - lt.min(-1).values                                   # [B,S]
+        dsum = rng[:, 0].clone()
+        for t in range(1, S):
+            dsum += rng[:, t]
+            sel = cache_bias.select(lt[:, t], last, (dsum / (t + 1))[:, None], self.cb_lam, self.cb_J, self.topk)
+            ld = (sel & ~(last > neg)).sum(-1)
+            v = valid[:, t] if valid is not None else torch.ones_like(ld, dtype=torch.bool)
+            self.loads[0] += int(ld[v].sum()); self.loads[1] += int(v.sum())
+            last = cache_bias._cap(torch.where(sel, torch.full_like(last, float(t)), last), self.cb_C)
+            mask[:, t] = sel
+        return mask
 
     def moe(self, h, i, routing):
         B, S, H = h.shape
@@ -139,13 +176,15 @@ def main():
     ap.add_argument("--seq", type=int, default=2048)
     ap.add_argument("--topk", type=int, default=18)
     ap.add_argument("--evict", default="min_logit", help="as logged by the run's router banner")
-    ap.add_argument("--routing", default="temporal", choices=["temporal", "topk"])
+    ap.add_argument("--routing", default="temporal", choices=["temporal", "topk", "skliar"])
+    ap.add_argument("--cb-C", type=int, default=18)
+    ap.add_argument("--cb-lambda", type=float, default=0.5)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--save-logits", help="write logits of the first sequence to this .npy")
     ap.add_argument("--save-losses", help="write per-token losses [n, seq] to this .npy")
     a = ap.parse_args()
 
-    model = RefModel(a.weights, a.topk, evict=a.evict, device=a.device)
+    model = RefModel(a.weights, a.topk, evict=a.evict, device=a.device, cb_C=a.cb_C, cb_lam=a.cb_lambda)
     toks = torch.from_numpy(np.load(a.tokens)["tokens"][a.start:a.start + a.n].astype(np.int64))
     losses, t0 = [], time.time()
     for b in range(0, len(toks), a.batch):
@@ -164,6 +203,8 @@ def main():
     mean = per.mean().item()
     se = per.mean(1).std().item() / math.sqrt(len(per)) if len(per) > 1 else float("nan")
     print(f"routing={a.routing} evict={a.evict} k={a.topk} samples={len(per)} tokens={per.numel()}")
+    if a.routing != "topk":
+        print(f"{a.routing} C={a.cb_C} lambda={a.cb_lambda} loads per token-layer {model.loads[0] / max(model.loads[1], 1):.4f}")
     print(f"loss {mean:.5f} nats/token (SE over samples {se:.5f})  "
           f"bpb {mean/BPB_DIVISOR:.5f} (SE {se/BPB_DIVISOR:.5f})")
 
