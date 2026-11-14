@@ -1,0 +1,1 @@
+{"dump": "route_skliar_stream.bin", "mode": "skliar", "K": 8, "E": 256, "C": 8, "lam": 0.4, "J": 1, "out": "check_skliar_stream.json", "prompt_tokens": 8920, "prompt_equal": 8920, "decode_tokens": 26680, "decode_equal": 26680, "loads_equal": 26680, "first_mismatch": null, "sequences": 5, "layers": 40, "prompt_chunks_continued": 0}

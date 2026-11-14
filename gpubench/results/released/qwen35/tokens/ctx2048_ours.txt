@@ -1,0 +1,9 @@
+Let's assume all 20 animals are chickens first.
+If all 20 were chickens, the total number of legs would be 20 * 2 = 40 legs.
+The actual total number of legs is 70.
+The difference between the actual legs and the assumed legs is 70 - 40 = 30 extra legs.
+Each cow has 2 more legs than a chicken (4 legs vs 2 legs).
+So, the number of cows is 30 / 2 = 15 cows.
+Since the total number of animals is 20, the number of chickens is 20 - 15 = 5 chickens.
+Alternatively, let $c$ be chickens and $k$ be cows.
+$c + k

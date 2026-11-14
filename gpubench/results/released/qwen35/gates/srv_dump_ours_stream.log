@@ -1,0 +1,37 @@
+0.00.194.567 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.332.719 I srv    load_model: loading model '/root/m/qwen35-q4km.gguf'
+0.01.359.713 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --no-mmap for better performance
+[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=8 + CPU pool
+[temporal-route2] mode=decode K=8 E=256 C=0 lambda=0.000 J=1 nocopy=0
+[temporal-prefill] EXPERT-MAJOR STREAMING (default): n_tokens=2 k=8 active=16/256 ring=96 slots (12 batches x 8), be=576KB
+0.17.243.332 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+0.17.265.554 I srv  llama_server: model loaded
+0.17.265.566 I srv  llama_server: listening on http://127.0.0.1:8091
+0.18.127.914 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.18.127.999 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.21.730.655 I slot print_timing: id  0 | task 0 | n_decoded =    162, tg =  53.91 t/s, tg_3s =  53.91 t/s
+0.21.922.209 I slot print_timing: id  0 | task 0 | prompt eval time =     597.49 ms /    88 tokens (    6.79 ms per token,   147.28 tokens per second)
+0.21.922.221 I slot print_timing: id  0 | task 0 |        eval time =    3196.65 ms /   172 tokens (   18.59 ms per token,    53.81 tokens per second)
+0.21.922.224 I slot print_timing: id  0 | task 0 |       total time =    3794.14 ms /   260 tokens
+0.21.922.241 I slot print_timing: id  0 | task 0 |    graphs reused =        170
+0.21.922.381 I slot      release: id  0 | task 0 | stop processing: n_tokens = 259, truncated = 0
+0.21.951.638 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = 986958961334
+0.22.013.563 I slot launch_slot_: id  0 | task 173 | processing task, is_child = 0
+0.24.087.724 I slot print_timing: id  0 | task 173 | prompt eval time =     422.73 ms /    50 tokens (    8.45 ms per token,   118.28 tokens per second)
+0.24.087.731 I slot print_timing: id  0 | task 173 |        eval time =    1651.39 ms /    89 tokens (   18.55 ms per token,    53.89 tokens per second)
+0.24.087.732 I slot print_timing: id  0 | task 173 |       total time =    2074.11 ms /   139 tokens
+0.24.087.736 I slot print_timing: id  0 | task 173 |    graphs reused =        257
+0.24.087.768 I slot      release: id  0 | task 173 | stop processing: n_tokens = 138, truncated = 0
+0.24.121.978 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = 986961126722
+0.24.181.590 I slot launch_slot_: id  0 | task 263 | processing task, is_child = 0
+0.27.666.199 I slot print_timing: id  0 | task 263 | n_decoded =    160, tg =  53.25 t/s, tg_3s =  53.25 t/s
+0.30.670.882 I slot print_timing: id  0 | task 263 | n_decoded =    313, tg =  52.08 t/s, tg_3s =  50.92 t/s
+0.32.279.848 I slot print_timing: id  0 | task 263 | prompt eval time =     479.73 ms /    81 tokens (    5.92 ms per token,   168.84 tokens per second)
+0.32.279.859 I slot print_timing: id  0 | task 263 |        eval time =    7618.48 ms /   400 tokens (   19.05 ms per token,    52.50 tokens per second)
+0.32.279.862 I slot print_timing: id  0 | task 263 |       total time =    8098.22 ms /   481 tokens
+0.32.279.865 I slot print_timing: id  0 | task 263 |    graphs reused =        654
+0.32.279.928 I slot      release: id  0 | task 263 | stop processing: n_tokens = 480, truncated = 0
+0.32.317.467 I srv    operator(): operator(): cleaning up before exit...
+temporal-route2: mode=decode layers=40 decode_layer_tokens=26320 loads=26318 loads_per_layer_token=0.9999 prompt_layer_tokens=8920 cold_decode=0 C=0 lambda=0.000 J=1 hist=[2,26318,0,0,0,0,0,0,0]
+temporal-cuda: layers=40 slot swap-ins decided on single-token steps=27158
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000

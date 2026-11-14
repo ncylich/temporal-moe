@@ -1,0 +1,1 @@
+{"dump": "route_ours_stream.bin", "mode": "decode", "K": 8, "E": 256, "C": 8, "lam": 0.4, "J": 1, "out": "check_ours_stream.json", "prompt_tokens": 8920, "prompt_equal": 8920, "decode_tokens": 26320, "decode_equal": 26320, "loads_equal": 0, "first_mismatch": null, "sequences": 5, "layers": 40, "prompt_chunks_continued": 0}

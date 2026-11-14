@@ -1,0 +1,13 @@
+ours_stream     ctx   1024     73.27 tok/s  13.648 ms  trials ['69.03', '71.30', '73.33', '75.20']  peak 3636 
+skliar_stream   ctx   1024     75.88 tok/s  13.179 ms  trials ['72.79', '75.88', '75.78', '75.97']  peak 3636 
+ours_stream     ctx   1024     75.20 tok/s  13.298 ms  trials ['72.18', '76.41', '76.88', '72.31']  peak 3904 
+skliar_stream   ctx   1024     76.28 tok/s  13.109 ms  trials ['73.52', '76.39', '76.19', '76.26']  peak 3636 
+ours_stream     ctx   1024     78.54 tok/s  12.732 ms  trials ['74.71', '78.33', '78.57', '78.72']  peak 3636 
+skliar_stream   ctx   1024     75.95 tok/s  13.166 ms  trials ['72.77', '76.04', '75.88', '75.94']  peak 3636 
+ours_stream     ctx   1024     78.78 tok/s  12.694 ms  trials ['75.05', '78.75', '78.75', '78.83']  peak 3636 
+skliar_stream   ctx   1024     76.11 tok/s  13.138 ms  trials ['73.36', '76.22', '76.08', '76.05']  peak 3636 
+ours_stream     ctx   1024     78.60 tok/s  12.722 ms  trials ['74.01', '78.17', '78.82', '78.82']  peak 3636 
+skliar_stream   ctx   1024     76.25 tok/s  13.115 ms  trials ['73.45', '76.20', '76.27', '76.27']  peak 3636 
+ours_stream     ctx   1024     72.18 tok/s  13.854 ms  trials ['70.44', '78.11', '70.06', '68.37']  peak 3636 
+skliar_stream   ctx   1024     70.65 tok/s  14.155 ms  trials ['67.54', '71.98', '70.75', '69.22']  peak 3636 
+ALT_DONE

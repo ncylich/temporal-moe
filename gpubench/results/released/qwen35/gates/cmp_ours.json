@@ -1,0 +1,1 @@
+{"engine": "hist_ours.json", "engine_rows": 2620160, "engine_mean": 0.9999473314606742, "engine_frac": [5.26685393258427e-05, 0.9999473314606742, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "gsm8k_correct": 165, "gsm8k_n": 200}

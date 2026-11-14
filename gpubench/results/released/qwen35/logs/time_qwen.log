@@ -1,0 +1,30 @@
++ cd /workspace/rel
++ bash repo/gpubench/released/tokens.sh /root/m/qwen35-q4km.gguf /workspace/rel/tok_qwen 8 0.4 1024 2048 4096
+server base up on 8093 (pid 492836)
+ctx 1024: prompt 957 tokens, 5 finished turns
+ctx 2048: prompt 1990 tokens, 9 finished turns
+ctx 4096: prompt 3989 tokens, 17 finished turns
+ctx 1024 [base]: prompt 957, extra turns 1, last answer 11 tokens, wrote 1024 + 100
+ctx 2048 [base]: prompt 1990, extra turns 0, last answer 166 tokens, wrote 2048 + 100
+ctx 4096 [base]: prompt 3989, extra turns 1, last answer 9 tokens, wrote 4096 + 100
+server ours up on 8093 (pid 493071)
+ctx 1024 [ours]: prompt 957, extra turns 1, last answer 17 tokens, wrote 1024 + 100
+ctx 2048 [ours]: prompt 1990, extra turns 0, last answer 166 tokens, wrote 2048 + 100
+ctx 4096 [ours]: prompt 3989, extra turns 1, last answer 9 tokens, wrote 4096 + 100
+server skliar up on 8093 (pid 493232)
+ctx 1024 [skliar]: prompt 957, extra turns 1, last answer 23 tokens, wrote 1024 + 100
+ctx 2048 [skliar]: prompt 1990, extra turns 0, last answer 166 tokens, wrote 2048 + 100
+ctx 4096 [skliar]: prompt 3989, extra turns 1, last answer 9 tokens, wrote 4096 + 100
+TOKENS_DONE
++ python3 repo/gpubench/released/run_released.py --bin eng/llama.cpp/build/bin --model /root/m/qwen35-q4km.gguf --nmoe 40 --C 8 --lam 0.4 --tokens /workspace/rel/tok_qwen --ctx 1024 --out /workspace/rel/res/qwen_decode.jsonl --tag R1-q-dec1
+base            ctx   1024    152.36 tok/s  6.563 ms  trials ['144.84', '151.54', '149.96', '155.59']  peak 21336 MiB  
+ours_vram       ctx   1024    140.70 tok/s  7.108 ms  trials ['137.22', '141.30', '140.36', '140.42']  peak 21338 MiB  temporal-route2: mode=decode layers=40 decode_layer_tokens=16000 loads=15994 loads_per_layer_token=0.9996 prompt_layer_tokens=40960 cold_decode=40 C=0 lambda=0.000 J=1 hist=[6,15994,0,0,0,0,0,0,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
+skliar_vram     ctx   1024    139.16 tok/s  7.186 ms  trials ['135.20', '138.59', '139.52', '139.36']  peak 21338 MiB  temporal-route2: mode=skliar layers=40 decode_layer_tokens=16000 loads=16331 loads_per_layer_token=1.0207 prompt_layer_tokens=40960 cold_decode=0 C=8 lambda=0.400 J=1 hist=[5172,7449,2014,843,338,137,41,6,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
+ours_stream     ctx   1024     71.63 tok/s  13.960 ms  trials ['69.72', '71.60', '73.69', '69.61']  peak 3636 MiB  temporal-route2: mode=decode layers=40 decode_layer_tokens=16000 loads=15995 loads_per_layer_token=0.9997 prompt_layer_tokens=40960 cold_decode=40 C=0 lambda=0.000 J=1 hist=[5,15995,0,0,0,0,0,0,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-cuda: layers=40 slot swap-ins decided on single-token steps=16595
+skliar_stream   ctx   1024     76.09 tok/s  13.143 ms  trials ['73.42', '76.13', '76.10', '76.03']  peak 3636 MiB  temporal-route2: mode=skliar layers=40 decode_layer_tokens=16000 loads=16338 loads_per_layer_token=1.0211 prompt_layer_tokens=40960 cold_decode=0 C=8 lambda=0.400 J=1 hist=[5175,7443,2021,831,345,136,43,6,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-cuda: layers=40 slot swap-ins decided on single-token steps=16927
+ours_nobytes    ctx   1024    133.69 tok/s  7.480 ms  trials ['129.17', '133.74', '133.98', '133.34']  peak 3636 MiB  temporal-route2: mode=decode layers=40 decode_layer_tokens=16000 loads=15997 loads_per_layer_token=0.9998 prompt_layer_tokens=40960 cold_decode=40 C=0 lambda=0.000 J=1 hist=[3,15997,0,0,0,0,0,0,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-cuda: layers=40 slot swap-ins decided on single-token steps=16597
+skliar_nobytes  ctx   1024    127.85 tok/s  7.821 ms  trials ['124.08', '127.65', '128.28', '127.63']  peak 3636 MiB  temporal-route2: mode=skliar layers=40 decode_layer_tokens=16000 loads=13308 loads_per_layer_token=0.8317 prompt_layer_tokens=40960 cold_decode=0 C=8 lambda=0.400 J=1 hist=[6290,7484,1348,532,226,96,20,4,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-cuda: layers=40 slot swap-ins decided on single-token steps=13911
+ours_nocopy     ctx   1024    130.26 tok/s  7.677 ms  trials ['127.55', '130.28', '130.31', '130.18']  peak 3636 MiB  temporal-route2: mode=decode layers=40 decode_layer_tokens=16000 loads=15997 loads_per_layer_token=0.9998 prompt_layer_tokens=40960 cold_decode=40 C=0 lambda=0.000 J=1 hist=[3,15997,0,0,0,0,0,0,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-cuda: layers=40 slot swap-ins decided on single-token steps=16597
+skliar_nocopy   ctx   1024    129.10 tok/s  7.746 ms  trials ['125.47', '128.70', '129.50', '129.09']  peak 3636 MiB  temporal-route2: mode=skliar layers=40 decode_layer_tokens=16000 loads=13308 loads_per_layer_token=0.8317 prompt_layer_tokens=40960 cold_decode=0 C=8 lambda=0.400 J=1 hist=[6290,7484,1348,532,226,96,20,4,0] | temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-cuda: layers=40 slot swap-ins decided on single-token steps=13911
++ echo TIMING_1K_DONE
+TIMING_1K_DONE

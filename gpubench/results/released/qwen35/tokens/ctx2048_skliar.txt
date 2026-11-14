@@ -1,0 +1,12 @@
+Let $c$ be the number of chickens and $o$ be the number of cows.
+We know that chickens have 2 legs and cows have 4 legs.
+We have two equations:
+1. $c + o = 20$ (total animals)
+2. $2c + 4o = 70$ (total legs)
+
+From equation 1, we can express $o$ in terms of $c$: $o = 20 - c$.
+Substitute this into equation 2:
+$2c + 4(20 - c) = 70$
+$2c + 80 - 4c = 70$
+$-2c + 80 = 70$
+$-2c
