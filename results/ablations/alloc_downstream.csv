@@ -1,0 +1,8 @@
+"# Downstream validation of fitted per-layer allocation vs uniform at iso-memory, base surfaces, training-free. ds_mean = 10-task 0-shot mean (limit 500). BPB from perlayer_*.csv / frontier_olmoe.csv alloc rows; OLMoE ds rows in layer_freeing_downstream.csv, qwen per-task rows in alloc_ds_cells/. Producers: analysis/residency/downstream.py --base --r-map, analysis/residency/downstream_trained_unsloth.py --base --r-map."
+model,budget_slots,arm,bpb,ds_mean
+qwen3,576,fitted,0.669544,0.6504
+qwen3,576,uniform_R12,0.692144,0.6398
+olmoe,192,fitted,0.790166,0.5967
+olmoe,192,uniform_R12,0.795202,0.5968
+qwen3_5,480,fitted,0.665459,0.7130
+qwen3_5,480,uniform_R12,0.669046,0.7120

@@ -1,5 +1,23 @@
-label,run,kind,E,k,distinct_experts_per_seq,distinct_frac_of_E,tokens_per_expert_median,tokens_per_expert_mean
-s0_TEMPORAL,g3_tmoe_s0_1e16,temporal,192,18,158.12,0.8235,12257.0,12288.0
-s0_FULL,g3_moe_s0_1e16_sigmoid,full,192,18,192.0,1.0,12207.5,12288.0
-s2_TEMPORAL,tmoe_minlogit_sh1_s2_1e17,temporal,64,6,62.2,0.9719,2973.0,3072.0
-s2_FULL,v16k_sweep_s2_1e17,full,64,6,64.0,1.0,3052.0,3072.0
+run,budget,regime,grain,E,k,distinct_experts_per_seq,distinct_frac_of_E,tokens_per_expert_median,tokens_per_expert_mean
+flame38m_g1_temporal,1e18,temporal,coarse 6/64,64,6,61.99,0.9686,6072.5,6144.0
+flame38m_g3_temporal,1e18,temporal,fine 18/192,192,18,163.39,0.8510,6071.5,6144.0
+g1_tmoe_coarse_1e19,1e19,temporal,coarse 6/64,64,6,63.91,0.9986,1514.5,1536.0
+g3_tmoe_s0_1e16_ant0p02,1e16,temporal,fine 18/192,192,18,49.64,0.2585,0.0,12288.0
+g3_tmoe_s0_1e16_ant0p02_g0p9,1e16,temporal,fine 18/192,192,18,50.60,0.2636,0.0,12288.0
+g3_tmoe_s0_1e16_ant0p1,1e16,temporal,fine 18/192,192,18,24.33,0.1267,0.0,12288.0
+g3_tmoe_s0_1e16_bursty,1e16,temporal,fine 18/192,192,18,42.29,0.2203,0.0,12288.0
+g3_tmoe_s0_1e16_head,1e16,temporal,fine 18/192,192,18,102.28,0.5327,13740.5,12288.0
+g3_tmoe_s0_1e16_head_b05,1e16,temporal,fine 18/192,192,18,127.20,0.6625,14745.5,12288.0
+g3_tmoe_s0_1e16_head_c,1e16,temporal,fine 18/192,192,18,157.23,0.8189,12443.0,12288.0
+g3_tmoe_s0_1e16_head_tc,1e16,temporal,fine 18/192,192,18,123.20,0.6417,14338.0,12288.0
+g3_tmoe_s0_1e16_mom,1e16,temporal,fine 18/192,192,18,162.80,0.8479,12790.5,12288.0
+g3_tmoe_s0_1e16_mom_seed2,1e16,temporal,fine 18/192,192,18,156.85,0.8169,12452.0,12288.0
+g3_tmoe_s0_1e16_momg_b05,1e16,temporal,fine 18/192,192,18,165.65,0.8627,12317.5,12288.0
+g3_tmoe_s0_1e16_momr,1e16,temporal,fine 18/192,192,18,164.65,0.8575,12488.5,12288.0
+g3_tmoe_s0_1e16_momr_b1,1e16,temporal,fine 18/192,192,18,168.51,0.8776,12023.0,12288.0
+g3_tmoe_s0_1e16_momr_b2,1e16,temporal,fine 18/192,192,18,170.81,0.8896,11018.5,12288.0
+g3_tmoe_s2_1e17,1e17,temporal,fine 18/192,192,18,160.75,0.8373,12462.5,12288.0
+g3_tmoe_s2_1e17_auxfree,1e17,temporal,fine 18/192,192,18,150.92,0.7861,8519.0,12288.0
+g3_tmoe_s2_1e17_karen,1e17,temporal,fine 18/192,192,18,152.51,0.7943,8458.0,12288.0
+moe_coarse_1e19,1e19,full,coarse 6/64,64,6,64.00,1.0000,1512.5,1536.0
+temporal_fine_g3_1e19,1e19,temporal,fine 18/192,192,18,184.17,0.9592,1514.0,1536.0

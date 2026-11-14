@@ -13,3 +13,7 @@
 	path = lm-evaluation-harness
 	url = https://github.com/yuzc19/lm-evaluation-harness.git
     branch=megatron
+[submodule "paper"]
+	path = paper
+	url = https://git@git.overleaf.com/6a8a0f933585f3442314d29e
+	branch = main

@@ -322,3 +322,84 @@ def coherence_bce_loss(logits, resident_mask):
     Returns a scalar (mean BCE over all experts).
     """
     return F.binary_cross_entropy_with_logits(logits, resident_mask.to(logits.dtype).detach())
+
+def cosmoes_bles_loss(logits: torch.Tensor, k: int, tau: float = 1.0) -> torch.Tensor:
+    """CoSMoEs Block-wise Expert Selection (BlES) loss, exactly Eq. 4-7 of arXiv:2503.00245.
+
+    BASELINE_METHODS_COMPARISON.md baseline #1. Replaces an earlier distinct-experts-per-
+    block surrogate that was NOT the published loss (the paper defines BlES on sequence
+    level, with no blocks, despite its name).
+
+    Paper quantities, with our seq-first [S, B, E] layout (paper writes [B, T, E]):
+      W = softmax(tau * R)                                        routing weights (soft)
+      Eq. 4: H_e = sum_{b,t} | 1[e in S_{t+1}] - 1[e in S_t] |    S = hard top-k selection
+      Eq. 5: H_norm = floor(H/2) / (B * K * (T-1))
+      Eq. 6: L = sum_{b,t,e} | W_{t+1,e} - W_{t,e} |
+      Eq. 7: loss = H_norm * L_norm,   L_norm = L / (B * T)
+    "In the non-differentiable part of the loss, we select the top-k experts": H is a
+    counting statistic computed from hard selections and carries no gradient; the gradient
+    flows only through the soft L1 term, scaled by how much hard switching actually
+    happened. The paper does not state tau; default 1.0, override via COSMOES_TAU.
+    Pure function; unit-tested inline in tests below the definition site.
+    """
+    S, B, E = logits.shape
+    if S < 2:
+        return logits.sum() * 0.0
+    W = torch.softmax(tau * logits.float(), dim=-1)                       # [S, B, E]
+    with torch.no_grad():
+        sel = torch.zeros(S, B, E, dtype=torch.bool, device=logits.device)
+        sel.scatter_(-1, logits.topk(k, dim=-1).indices, True)
+        H = (sel[1:].float() - sel[:-1].float()).abs().sum()              # Eq. 4, summed over e
+        H_norm = torch.floor(H / 2) / (B * k * (S - 1))                   # Eq. 5
+    L = (W[1:] - W[:-1]).abs().sum()                                      # Eq. 6
+    L_norm = L / (B * S)                                                  # Eq. 7 normalisation
+    return H_norm * L_norm
+
+
+def remoe_reuse_loss(logits: torch.Tensor, k: int, gamma: float = 0.9) -> torch.Tensor:
+    """ReMoE recency-bias reuse objective (Zhu et al., arXiv:2605.27081), reimplemented.
+
+    BASELINE_METHODS_COMPARISON.md baseline #2. Their method gives the router a bonus for
+    experts it picked on recent tokens, so it tends to pick them again, then finetunes ONLY
+    the router to lean into that bonus. Nothing is forbidden and the router may still choose
+    any expert, so the resident set is never bounded -- which is exactly why it cannot serve
+    at R = k by construction and we can. Their reported result is ~26% better expert reuse.
+
+    The objective here: maintain a recency-decayed record of which experts recent tokens
+    actually selected, then reward the router for placing probability mass on them.
+
+        u_t = gamma * u_{t-1} + onehot(top-k at t-1)        (detached: it is a TARGET)
+        loss = -mean_t < softmax(logits_t), u_t / sum(u_t) >
+
+    Minimising this makes consecutive tokens reuse experts, lengthening the stretches an
+    expert stays in use so a cache misses less often. The history is detached because it is
+    the bonus the router is being trained toward, not a quantity to differentiate through --
+    differentiating through it would let the model trivially shrink the loss by collapsing
+    its own history rather than by learning reuse.
+
+    Contrast with `cosmoes_block_loss`, the other reimplemented competitor: CoSMoEs penalises
+    how many DISTINCT experts a fixed block touches (support size, trained from scratch);
+    this rewards temporal CONTINUITY between adjacent tokens (a post-hoc router finetune).
+    Neither bounds the resident set.
+
+    Args:
+        logits: [S, B, E] router logits, sequence-first.
+        k: experts selected per token (top-k), matching the model's router.
+        gamma: recency decay. 0.9 gives a ~10-token effective window.
+    Returns:
+        scalar loss; lower means more reuse. Differentiable through `logits` only.
+    """
+    S, B, E = logits.shape
+    if S < 2:
+        return logits.sum() * 0.0
+    p = torch.softmax(logits.float(), dim=-1)
+    with torch.no_grad():
+        sel = torch.zeros_like(p)
+        sel.scatter_(-1, logits.float().topk(k, dim=-1).indices, 1.0)
+    u = torch.zeros_like(p[0])
+    total = 0.0
+    for t in range(1, S):
+        u = gamma * u + sel[t - 1]                       # history through t-1, detached
+        w = u / u.sum(dim=-1, keepdim=True).clamp_min(1e-9)
+        total = total + (p[t] * w).sum(dim=-1).mean()
+    return -(total / (S - 1))

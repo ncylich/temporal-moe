@@ -43,3 +43,14 @@ temporal_fine_1e19,openbookqa,acc_norm,0.29,0.020313
 temporal_fine_1e19,piqa,acc,0.653972,0.011099
 temporal_fine_1e19,piqa,acc_norm,0.651251,0.011119
 temporal_fine_1e19,winogrande,acc,0.486188,0.014047
+moe_fine_1e19,arc_challenge,acc,0.194539,0.011568
+moe_fine_1e19,arc_challenge,acc_norm,0.246587,0.012596
+moe_fine_1e19,arc_easy,acc,0.495791,0.010259
+moe_fine_1e19,arc_easy,acc_norm,0.444865,0.010197
+moe_fine_1e19,hellaswag,acc,0.301534,0.00458
+moe_fine_1e19,hellaswag,acc_norm,0.338678,0.004723
+moe_fine_1e19,openbookqa,acc,0.178,0.017124
+moe_fine_1e19,openbookqa,acc_norm,0.308,0.020667
+moe_fine_1e19,piqa,acc,0.662133,0.011035
+moe_fine_1e19,piqa,acc_norm,0.657236,0.011074
+moe_fine_1e19,winogrande,acc,0.509077,0.01405

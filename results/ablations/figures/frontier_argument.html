@@ -1,0 +1,172 @@
+<title>The 5–30× Residency Frontier</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#FAFAF7; --panel:#FFFFFF; --ink:#1A2330; --muted:#6B7482; --grid:#E4E4DD;
+  --ours:#0C6B66; --oursSoft:#0C6B6622; --skliar:#B4532A; --remoe:#64748B; --base:#9AA1AB;
+  --ref:#B9BFC7; --edge:#D8D8D0;
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#14181D; --panel:#1B2027; --ink:#E8EAED; --muted:#98A1AC; --grid:#2A313A;
+    --ours:#2FA79F; --oursSoft:#2FA79F26; --skliar:#D97A4C; --remoe:#8FA0B8; --base:#6B7482;
+    --ref:#4A525C; --edge:#333B45;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#14181D; --panel:#1B2027; --ink:#E8EAED; --muted:#98A1AC; --grid:#2A313A;
+  --ours:#2FA79F; --oursSoft:#2FA79F26; --skliar:#D97A4C; --remoe:#8FA0B8; --base:#6B7482;
+  --ref:#4A525C; --edge:#333B45;
+}
+*{box-sizing:border-box}
+body{background:var(--ground); color:var(--ink); font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif; margin:0; padding:22px 26px 26px;}
+.wrap{max-width:1060px; margin:0 auto}
+header h1{font-size:21px; font-weight:700; margin:0 0 2px; letter-spacing:-.01em}
+header p{margin:0; color:var(--muted); font-size:13.5px}
+header p b{color:var(--ink); font-weight:600}
+.legend{display:flex; flex-wrap:wrap; gap:14px 22px; margin:12px 0 6px; font-size:12.5px; color:var(--muted); align-items:center}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.sw{width:13px; height:13px; display:inline-block; flex:none}
+.panels{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:4px}
+.panel{background:var(--panel); border:1px solid var(--edge); border-radius:6px; padding:10px 10px 4px}
+.panel h2{font-size:13px; font-weight:600; margin:2px 6px 0; display:flex; justify-content:space-between}
+.panel h2 small{color:var(--muted); font-weight:400; font-family:"IBM Plex Mono",monospace; font-size:11px}
+svg text{font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--muted)}
+svg .pt-label{font-family:"IBM Plex Sans",sans-serif; font-size:10.5px; font-weight:600}
+.takeaways{display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; margin-top:16px}
+.take{border-top:2px solid var(--edge); padding-top:8px; font-size:13px}
+.take b{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px}
+.take.t1 b{color:var(--skliar)} .take.t2 b{color:var(--ours)} .take.t3 b{color:var(--ink)}
+.take .num{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+footer{margin-top:14px; color:var(--muted); font-size:11.5px; font-family:"IBM Plex Mono",monospace}
+@media (max-width:820px){ .panels,.takeaways{grid-template-columns:1fr} }
+</style>
+<div class="wrap">
+<header>
+  <h1>Rolling residency vs. serving-cache baselines at aggressive memory reduction</h1>
+  <p>GSM8K (n=1319) against expert-transfer traffic, <b>all methods at the same memory budget as ours</b> (gemma 6.25% resident = 16×, qwen 3.1% = 32×). Hollow points: Skliar at its own comfortable 50% setting (2×), where it is excellent — that regime is not in dispute.</p>
+</header>
+<div class="legend">
+  <span><span class="sw" style="background:var(--ours); transform:rotate(45deg)"></span>ours, adapted (hard cap: ≤1 swap/token·layer)</span>
+  <span><span class="sw" style="border:2px solid var(--ours); transform:rotate(45deg); background:transparent"></span>ours, training-free (released model under the same hard cap)</span>
+  <span><span class="sw" style="background:var(--skliar); border-radius:50%"></span>Skliar cache at our memory (λ sweep)</span>
+  <span><span class="sw" style="border:2px solid var(--skliar); border-radius:50%; background:transparent"></span>Skliar at 50% memory (its setting)</span>
+  <span><span class="sw" style="background:var(--remoe)"></span>ReMoE (its pick, R8)</span>
+</div>
+<div class="panels">
+  <div class="panel"><h2>gemma4-26B <small>free = 87.8 · 16× reduction</small></h2><svg id="g" viewBox="0 0 500 300" width="100%"></svg></div>
+  <div class="panel"><h2>Qwen3.5-35B <small>free = 85.9 · 32× reduction</small></h2><svg id="q" viewBox="0 0 500 300" width="100%"></svg></div>
+</div>
+<div class="panels" style="margin-top:18px">
+  <div class="panel"><h2>Per-token transfer distribution <small>matched points, both models, ≈1 mean</small></h2><svg id="pdf" viewBox="0 0 500 300" width="100%"></svg></div>
+  <div class="panel"><h2>CoSMoEs (BlES loss, grain 3) <small>trained venue · vanilla anchor: 14.1 transfers, 191/192 experts</small></h2><svg id="cos" viewBox="0 0 500 300" width="100%"></svg></div>
+</div>
+<div class="takeaways">
+  <div class="take t1"><b>Their regime: ~2× reduction</b>
+    At 50% resident, Skliar is lossless at <span class="num">0.03–0.84</span> loads/token·layer. ReMoE is quality-neutral only with all experts resident.</div>
+  <div class="take t2"><b>Our regime: 5–30× reduction</b>
+    At matched memory <i>and</i> traffic, ours wins on both models: <span class="num">84.0 vs 80.7</span> (gemma, paired z=+3.5) and <span class="num">83.5 vs 74.5</span> (qwen). Below the budget their cache collapses (<span class="num">69.5→45.1</span>). Full 5-task surface at the matched points: ours <span class="num">+2.8</span> mean at 32×, tied at 16× — the gap grows with the reduction.</div>
+  <div class="take t3"><b>The guarantee differs in kind</b>
+    Their traffic is a mean with unbounded per-token bursts; ours is a hard 1-swap cap you can provision bandwidth for. Their only nearby point needs <span class="num">1.33×</span> our traffic. And CoSMoEs, the one trained-loss competitor: higher CE at every weight, expert collapse, and it still demands <span class="num">7–13</span> transfers/token·layer — slow at runtime no matter the λ.</div>
+</div>
+<footer>GSM8K flexible-extract, full n · loads measured over all generated tokens · adapters: on-policy reverse-KL self-distillation under the residency bound</footer>
+</div>
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function panel(id, D){
+  const W=500,H=300,L=44,R=12,T=14,B=34;
+  const x=v=>L+(Math.log10(v)-Math.log10(0.025))/(Math.log10(8)-Math.log10(0.025))*(W-L-R);
+  const y=v=>T+(92-v)/(92-40)*(H-T-B);
+  let s='';
+  // grid + axes
+  for(const gy of [50,60,70,80,90]) s+=`<line x1="${L}" x2="${W-R}" y1="${y(gy)}" y2="${y(gy)}" stroke="${css('--grid')}" stroke-width="1"/><text x="${L-6}" y="${y(gy)+3.5}" text-anchor="end">${gy}</text>`;
+  for(const gx of [0.03,0.1,0.3,1,3]) s+=`<line y1="${T}" y2="${H-B}" x1="${x(gx)}" x2="${x(gx)}" stroke="${css('--grid')}" stroke-width="1" stroke-dasharray="2 3"/><text x="${x(gx)}" y="${H-B+14}" text-anchor="middle">${gx}</text>`;
+  // free reference
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(D.free)}" y2="${y(D.free)}" stroke="${css('--ref')}" stroke-dasharray="5 4" stroke-width="1.3"/><text x="${W-R-2}" y="${y(D.free)-4}" text-anchor="end">free model ${D.free}</text>`;
+  // our traffic budget line
+  s+=`<line y1="${T}" y2="${H-B}" x1="${x(1)}" x2="${x(1)}" stroke="${css('--ours')}" stroke-width="1" stroke-dasharray="4 3" opacity="0.55"/>`;
+  // skliar curve at our memory
+  const sk=D.skliar, skc=css('--skliar');
+  s+=`<polyline points="${sk.map(p=>x(p[0])+','+y(p[1])).join(' ')}" fill="none" stroke="${skc}" stroke-width="1.6" opacity="0.8"/>`;
+  for(const p of sk) s+=`<circle cx="${x(p[0])}" cy="${y(p[1])}" r="4.2" fill="${skc}"/>`;
+  // skliar at its own 50% setting (hollow)
+  for(const p of D.skliar50) s+=`<circle cx="${x(p[0])}" cy="${y(p[1])}" r="4.6" fill="none" stroke="${skc}" stroke-width="2"/>`;
+  // remoe square
+  s+=`<rect x="${x(D.remoe[0])-4.5}" y="${y(D.remoe[1])-4.5}" width="9" height="9" fill="${css('--remoe')}"/>`;
+  // ours, training-free: hollow diamond at the same budget (fair vs Skliar's no-training cache)
+  const bx=x(D.base[0]), by=y(D.base[1]);
+  s+=`<rect x="${bx-5}" y="${by-5}" width="10" height="10" fill="none" stroke="${css('--ours')}" stroke-width="2" transform="rotate(45 ${bx} ${by})"/>`;
+  // ours diamond, emphasized
+  const ox=x(D.ours[0]), oy=y(D.ours[1]);
+  s+=`<circle cx="${ox}" cy="${oy}" r="11" fill="${css('--oursSoft')}"/>`;
+  s+=`<rect x="${ox-5.6}" y="${oy-5.6}" width="11.2" height="11.2" fill="${css('--ours')}" transform="rotate(45 ${ox} ${oy})"/>`;
+  s+=`<text class="pt-label" x="${ox+10}" y="${oy+4}" fill="${css('--ours')}">ours, adapted ${D.ours[1].toFixed(1)}</text>`;
+  for(const a of D.notes) s+=`<text class="pt-label" x="${x(a[0])+a[3]}" y="${y(a[1])+a[4]}" fill="${a[5]||css('--muted')}">${a[2]}</text>`;
+  // axis titles
+  s+=`<text x="${(L+W-R)/2}" y="${H-4}" text-anchor="middle">expert loads / token·layer (log)</text>`;
+  s+=`<text transform="rotate(-90 12 ${(T+H-B)/2})" x="12" y="${(T+H-B)/2}" text-anchor="middle">GSM8K</text>`;
+  document.getElementById(id).innerHTML=s;
+}
+function draw(){
+  panel('g',{free:87.8, ours:[1.00,84.0], base:[1.00,78.8], remoe:[1.00,80.4],
+    skliar:[[0.49,45.1],[0.52,50.2],[0.70,69.5],[0.94,80.7],[1.33,85.8],[2.62,87.3],[3.56,87.2],[4.67,87.8]],
+    skliar50:[[0.031,87.9],[0.31,87.9]],
+    notes:[[0.94,80.7,'80.7 @ matched traffic',-165,14],[0.52,50.2,'cache collapses',8,10],[0.31,87.9,'50% memory',8,-8],[1.00,78.8,'ours, no training',10,13],[1.00,80.4,'ReMoE',-52,4]]});
+  panel('q',{free:85.9, ours:[1.00,83.5], base:[1.00,76.6], remoe:[1.00,63.1],
+    skliar:[[0.66,66.6],[0.81,69.8],[1.01,74.5],[1.41,82.6],[2.13,84.9],[3.44,86.0],[5.63,86.0]],
+    skliar50:[[0.069,85.8],[0.84,86.0]],
+    notes:[[1.01,74.5,'74.5 @ matched traffic',10,14],[0.81,69.8,'cliff below budget',8,10],[0.84,86.0,'50% memory',-88,-8],[1.00,76.6,'ours, no training',10,12],[1.00,63.1,'ReMoE',10,4],[5.63,86.0,'5.6× our traffic',-104,-8]]});
+}
+function pdfPanel(){
+  const W=500,H=300,L=44,R=12,T=16,B=36, id='pdf';
+  // Skliar C=8 lam0.5, gemma, GSM8K n=1319: loads per token-layer over 9.20M samples
+  const h=[3013940,4359240,1327737,402077,86592,13299,1253,72]; const tot=h.reduce((a,b)=>a+b,0);
+  const hq=[4537155, 9866202, 2056892, 721109, 253411, 75644, 22112, 6240]; const totq=hq.reduce((a,b)=>a+b,0);
+  const x=i=>L+18+i*(W-L-R-30)/8, bw=(W-L-R-30)/8*0.68;
+  const y=v=>T+(1-v)*(H-T-B);
+  let s='';
+  for(const gy of [0,.25,.5,.75,1]) s+=`<line x1="${L}" x2="${W-R}" y1="${y(gy)}" y2="${y(gy)}" stroke="${css('--grid')}"/><text x="${L-6}" y="${y(gy)+3.5}" text-anchor="end">${Math.round(gy*100)}%</text>`;
+  h.forEach((c,i)=>{const f=c/tot, fq=hq[i]/totq;
+    s+=`<rect x="${x(i)-bw/2}" y="${y(f)}" width="${bw/2}" height="${y(0)-y(f)}" fill="${css('--skliar')}" opacity="0.9"/>`;
+    s+=`<rect x="${x(i)}" y="${y(fq)}" width="${bw/2}" height="${y(0)-y(fq)}" fill="${css('--skliar')}" opacity="0.45"/>`;
+    if(f>0.005) s+=`<text x="${x(i)-bw/4}" y="${y(f)-4}" text-anchor="middle">${(f*100).toFixed(0)}</text>`;
+    if(fq>0.005) s+=`<text x="${x(i)+bw/4}" y="${y(fq)-4}" text-anchor="middle">${(fq*100).toFixed(0)}</text>`;
+    s+=`<text x="${x(i)}" y="${H-B+14}" text-anchor="middle">${i}</text>`;});
+  // ours: Dirac at 1
+  s+=`<rect x="${x(1)-bw/2-3}" y="${y(1)}" width="6" height="${y(0)-y(1)}" fill="${css('--ours')}"/>`;
+  s+=`<text class="pt-label" x="${x(1)+8}" y="${y(1)+12}" fill="${css('--ours')}">ours: 100% at exactly 1 (hard cap)</text>`;
+  s+=`<text class="pt-label" x="${x(3)}" y="${y(0.30)}" fill="${css('--skliar')}">Skliar at ≈1 mean: dark = gemma (λ0.5),</text>`;
+  s+=`<text class="pt-label" x="${x(3)}" y="${y(0.30)+13}" fill="${css('--skliar')}">light = qwen (λ0.4); 20–25% of tokens need ≥2</text>`;
+  s+=`<text x="${(L+W-R)/2}" y="${H-4}" text-anchor="middle">expert transfers in one token·layer</text>`;
+  s+=`<text transform="rotate(-90 12 ${(T+H-B)/2})" x="12" y="${(T+H-B)/2}" text-anchor="middle">fraction of tokens</text>`;
+  document.getElementById(id).innerHTML=s;
+}
+function cosPanel(){
+  const W=500,H=300,L=44,R=12,T=16,B=36, id='cos';
+  // g3 @1e16: lambda -> [BPB tax %, effective experts (of 192), transfers/tok-layer]
+  const lam=['0.01','0.03','0.1','1','10','100'];
+  const tax=[0.8,3.2,5.1,9.2,20.2,23.7], eff=[157.8,120.0,68.4,64.6,43.4,36.1], xf=[12.85,11.93,10.19,10.44,8.58,7.33];
+  const ours={tax:1.2, eff:186.0, xf:1.0};
+  const x=i=>L+30+i*(W-L-R-50)/(lam.length-1);
+  const y1=v=>T+ (25-v)/25*(H-T-B);            // tax axis 0..25%
+  let s='';
+  for(const gy of [0,5,10,15,20,25]) s+=`<line x1="${L}" x2="${W-R}" y1="${y1(gy)}" y2="${y1(gy)}" stroke="${css('--grid')}"/><text x="${L-6}" y="${y1(gy)+3.5}" text-anchor="end">${gy}%</text>`;
+  // (a) CE/BPB tax curve
+  s+=`<polyline points="${tax.map((v,i)=>x(i)+','+y1(v)).join(' ')}" fill="none" stroke="${css('--remoe')}" stroke-width="2"/>`;
+  tax.forEach((v,i)=>{s+=`<circle cx="${x(i)}" cy="${y1(v)}" r="4" fill="${css('--remoe')}"/>`;});
+  // effective experts as ring size annotation under each point
+  eff.forEach((v,i)=>{s+=`<text x="${x(i)}" y="${y1(tax[i])-8}" text-anchor="middle">${Math.round(v)}exp·${xf[i].toFixed(0)}xf</text>`;});
+  lam.forEach((v,i)=>{s+=`<text x="${x(i)}" y="${H-B+14}" text-anchor="middle">${v}</text>`;});
+  // ours line
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y1(ours.tax)}" y2="${y1(ours.tax)}" stroke="${css('--ours')}" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+  s+=`<text class="pt-label" x="${W-R-2}" y="${y1(ours.tax)-5}" text-anchor="end" fill="${css('--ours')}">ours: +1.2% · 186 experts · 1.0 transfer (served)</text>`;
+  s+=`<text class="pt-label" x="${x(2)}" y="${y1(21)}" fill="${css('--remoe')}">labels: effective experts · transfers/token·layer</text>`;
+  s+=`<text x="${(L+W-R)/2}" y="${H-4}" text-anchor="middle">BlES loss weight λ (log grid)</text>`;
+  s+=`<text transform="rotate(-90 12 ${(T+H-B)/2})" x="12" y="${(T+H-B)/2}" text-anchor="middle">quality tax (BPB %)</text>`;
+  document.getElementById(id).innerHTML=s;
+}
+const draw0=draw; draw=function(){draw0(); pdfPanel(); cosPanel();};
+draw();
+if(window.matchMedia){ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw); }
+</script>

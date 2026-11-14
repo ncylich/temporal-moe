@@ -1,0 +1,13 @@
+{
+ "seqs": 1024,
+ "tokens": 4194304,
+ "tokens_seen": 44842,
+ "lambda_star": 3.602921290846245,
+ "within": 19.79273649607293,
+ "between": 5.493524531429345,
+ "delta": "MoE_free - MoE_residency on the UNTRAINED base model",
+ "reference": "untrained base",
+ "free_side": "base model",
+ "shrunk_before_svd": true,
+ "rel_recon_err_r512": 0.52548748254776
+}

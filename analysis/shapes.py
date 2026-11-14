@@ -19,6 +19,16 @@ SHAPES = {
     # 1e19 compute-optimal point (t19 panel): N_active ~184.1M, between the paper-alpha (~159M)
     # and strict-empirical (~288M) extrapolations; flame aspect (L=h/64+2, ffn~5.34h, moe~0.6875h).
     "s19opt": dict(h=800, L=14, ffn=4272, moe_ffn=550),
+    # The 1e18 panel. These were trained by their own launchers in experiments/scale_1e18_1e19/ with
+    # geometry hardcoded, so neither run.sh nor this table could address them and every probe branch
+    # was unreachable for the whole budget. Each mirrors the matching case in run.sh, verified against
+    # every field of the runs' committed run.meta. All three are L=9: the 1e18 panel varies hidden size
+    # at FIXED depth, which is what makes it an isoFLOP panel. s192f/s512f share h/ffn/moe_ffn with
+    # s1/s6 but NOT depth, which is exactly why they need their own names -- reading depth off the
+    # same-ffn 1e16/1e17 shape gave 5 and 10 and built models that did not match their checkpoints.
+    "s38m":  dict(h=256, L=9, ffn=1368, moe_ffn=176),   # flame38m_*, the 1e18 middle (38M active)
+    "s192f": dict(h=192, L=9, ffn=1026, moe_ffn=132),   # flame192_*, 1e18 left flank
+    "s512f": dict(h=512, L=9, ffn=2736, moe_ffn=352),   # flame512_*, 1e18 right flank
 }
 import os
 # GRAIN>1: fine-grain the ROUTED experts (see run.sh). num_experts and top-k scale by GRAIN; each
@@ -28,14 +38,18 @@ import os
 GRAIN = int(os.environ.get("GRAIN", "1"))
 TOPK, SHARED_MULT, NEXP = 6 * GRAIN, 2, 64 * GRAIN
 
-def active_nonembed(h, L, ffn, moe_ffn):
-    moe_ffn_routed = 2 * round((moe_ffn / GRAIN) / 2) if GRAIN != 1 else moe_ffn
+def active_nonembed(h, L, ffn, moe_ffn, grain=None):
+    """Active non-embedding params. grain defaults to $GRAIN so existing call sites are unchanged;
+    pass it explicitly to price several granularities in one process, which the CSV writers need."""
+    g = GRAIN if grain is None else int(grain)
+    topk, nexp = 6 * g, 64 * g
+    moe_ffn_routed = 2 * round((moe_ffn / g) / 2) if g != 1 else moe_ffn
     attn = 4 * h * h                      # qkv (3h^2) + out (h^2), no bias
     norm = 2 * h                          # 2 RMSNorms/layer (gamma only)
     dense_ffn = 3 * h * ffn               # swiglu: fc1=2*h*ffn, fc2=h*ffn
-    router = h * NEXP
+    router = h * nexp
     shared = 3 * h * (SHARED_MULT * moe_ffn)          # shared from ORIGINAL moe_ffn (not grained)
-    routed_active = TOPK * (3 * h * moe_ffn_routed)
+    routed_active = topk * (3 * h * moe_ffn_routed)
     moe = router + shared + routed_active
     n = 0
     for layer in range(L):

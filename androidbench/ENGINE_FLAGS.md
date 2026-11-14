@@ -25,7 +25,7 @@ LLAMA_TEMPORAL_SPIN_US=5000
 
 | flag | default | meaning |
 |---|---|---|
-| `LLAMA_TEMPORAL_R` | off | experts held resident. `< n_expert` enables the pool AND lazy expert load (loader skips reading expert data). `== n_expert` = fully resident baseline. |
+| `LLAMA_TEMPORAL_R` | off | experts held resident. `< n_expert` enables the pool AND lazy expert load (loader skips reading expert data). `== n_expert` = fully resident baseline. **READ THIS BEFORE USING R AS A CACHE SIZE:** the code that actually caps residency at R is the FIFO trim in `ggml_tm_ensure` (`ggml-cpu.c:2930`), which lives inside `mul_mat_id` and is therefore **bypassed entirely by `CPU_REPACK`** (pitfall #8/#25). With `REPACK=1` and no `TWOPASS`, R silently becomes "lazy-load on first touch, never evict" -- `evictions=0`, unbounded growth, and an arm that measures a nearly-fully-resident model. Under `TWOPASS`, R is inert for every `R >= top_k` because the window is sized `n_expert_used`, not R (pitfall #26). So: R sizes a real cache **only** under `LLAMA_NO_REPACK=1` without `TWOPASS`. Always confirm `evictions > 0` on a streamed arm. |
 | `LLAMA_TEMPORAL_TWOPASS` | off | two-pass expert FFN (resident sub-pass + new-expert sub-pass) and enforced 1 random swap/layer/token. Implies `ENFORCE`. |
 | `LLAMA_TEMPORAL_ENFORCE` | off | enforced random swap without the two-pass split. |
 | `LLAMA_TEMPORAL_SWAP_PROB` | 0 | prescribed turnover probability (the CUDA analogue). Not used with TWOPASS. |

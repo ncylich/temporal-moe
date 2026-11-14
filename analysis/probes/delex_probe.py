@@ -54,7 +54,18 @@ TopKRouter.forward = _router_forward
 def _register(model):
     import re
     def layer_of(name):
-        m = re.search(r"layers\.(\d+)\.", name); return int(m.group(1)) if m else -1
+        """Module path -> the SAME layer key the router uses.
+
+        `decoder.layers.N` is 0-based; Megatron's TopKRouter.layer_number is 1-based, so the router
+        writes keys 2..L for a `[0]+[1]*(L-1)` MoE schedule while the expert modules sit at indices
+        1..L-1. Keying the expert-output hook by the raw index therefore filed every layer's output
+        vectors one layer too shallow: the lens for layer j was computed from layer j+1's experts, the
+        deepest MoE layer got no out_sum at all (visible as out_cnt=None in every capture produced
+        before this fix), and the entry for index 1 -- the dense FFN's neighbour -- was dropped for
+        having no logits. +1 aligns the two key spaces; _dump asserts they agree.
+        """
+        m = re.search(r"layers\.(\d+)\.", name)
+        return int(m.group(1)) + 1 if m else -1
     for name, mod in model.named_modules():
         cls = mod.__class__.__name__
         ln = layer_of(name)
@@ -109,9 +120,19 @@ def _dump():
             "k": d["k"], "out_sum": d["out_sum"], "out_cnt": d["out_cnt"],
         }
     emb = torch.cat(EMB, dim=1) if EMB else None                            # [S, B_total, H]
+    # Router logits and expert outputs must land on the same layer keys. If they do not, the logit
+    # lens is silently attributed to the wrong layer, which is exactly the defect layer_of() now
+    # avoids -- so fail loudly here rather than write a capture that reads fine and is misaligned.
+    missing = [ln for ln, d in layers.items() if d["out_cnt"] is None]
+    if missing:
+        raise RuntimeError(
+            f"[delex] layers {sorted(missing)} have router logits but no expert outputs: the router "
+            f"and expert-module key spaces disagree, so any logit lens from this capture would be "
+            f"misattributed. Check layer_of() against TopKRouter.layer_number.")
     torch.save({"temporal": _TEMPORAL, "evict": _EVICT, "n_mb": N_MB, "emb": emb, "layers": layers}, out)
     ex = layers[sorted(layers)[0]]
-    print(f"[delex] saved {out}: {len(layers)} MoE layers, emb {tuple(emb.shape) if emb is not None else None}, "
+    print(f"[delex] saved {out}: {len(layers)} MoE layers {sorted(layers)}, "
+          f"emb {tuple(emb.shape) if emb is not None else None}, "
           f"logits {tuple(ex['logits'].shape)}, temporal={_TEMPORAL}")
 
 
