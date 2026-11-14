@@ -45,8 +45,9 @@ def cmd_contexts(a):
     for ctx in a.ctx:
         # finished turns from the front of the test set, the open question from the back
         target_lo, target_hi = ctx - a.slack_hi, ctx - a.slack_lo
-        msgs, j, best = [], 0, None
-        open_q = {"role": "user", "content": Q.format(q=items[-1 - a.ctx.index(ctx)]["question"])}
+        # --variant v draws the finished turns and the open question from a different part of the test set
+        msgs, j, best = [], 100 * a.variant, None
+        open_q = {"role": "user", "content": Q.format(q=items[-1 - a.ctx.index(ctx) - 50 * a.variant]["question"])}
         while j < len(items):
             trial = msgs + [{"role": "user", "content": Q.format(q=items[j]["question"])},
                             {"role": "assistant", "content": items[j]["answer"].replace("####", "The answer is")}]
@@ -55,8 +56,8 @@ def cmd_contexts(a):
                 break
             msgs, best = trial, toks; j += 1
         assert best is not None and len(best) >= target_lo, f"ctx {ctx}: could not fit turns ({best and len(best)})"
-        out[ctx] = {"prompt": best, "n": len(best), "turns": j, "messages": msgs + [open_q],
-                    "more": [Q.format(q=items[-10 - k - a.ctx.index(ctx) * 20]["question"]) for k in range(20)]}
+        out[ctx] = {"prompt": best, "n": len(best), "turns": j - 100 * a.variant, "messages": msgs + [open_q],
+                    "more": [Q.format(q=items[-10 - k - a.ctx.index(ctx) * 20 - 50 * a.variant]["question"]) for k in range(20)]}
         print(f"ctx {ctx}: prompt {len(best)} tokens, {j} finished turns", flush=True)
     json.dump(out, open(a.out, "w"))
 
@@ -107,6 +108,7 @@ def main():
     c = sub.add_parser("contexts"); c.add_argument("--url", required=True); c.add_argument("--gsm8k", required=True)
     c.add_argument("--ctx", type=int, nargs="+", default=[1024, 2048, 4096]); c.add_argument("--out", required=True)
     c.add_argument("--slack-lo", type=int, default=30); c.add_argument("--slack-hi", type=int, default=250)
+    c.add_argument("--variant", type=int, default=0, help="0 = the timing contexts; 1.. = other conversations")
     g = sub.add_parser("generate"); g.add_argument("--url", required=True); g.add_argument("--prompts", required=True)
     g.add_argument("--tag", required=True); g.add_argument("--out", required=True); g.add_argument("--n-gen", type=int, default=100)
     s = sub.add_parser("gsm8k"); s.add_argument("--url", required=True); s.add_argument("--gsm8k", required=True)
