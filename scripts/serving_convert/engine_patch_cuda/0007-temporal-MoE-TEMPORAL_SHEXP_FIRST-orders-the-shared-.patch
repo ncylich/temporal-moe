@@ -1,4 +1,4 @@
-From 3fd5bba5d9f9eb2284fc134e92e5dea96b25b92a Mon Sep 17 00:00:00 2001
+From 9d46adf0508dfc033a2f3862d6b376ab158eb781 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Sat, 14 Nov 2026 02:23:40 -0800
 Subject: [PATCH] temporal-MoE: TEMPORAL_SHEXP_FIRST orders the shared expert
@@ -29,7 +29,7 @@ index 26ca1641..fbf544b5 100644
      // temporal two-pass split: run the FFN twice through the *same* mul_mat_id kernel --
      // once for the K-1 resident experts (never stalls) and once for the 1 new expert
 diff --git a/src/llama-graph.h b/src/llama-graph.h
-index 97141ef9..e5d7eae3 100644
+index 97141ef9..42a9695a 100644
 --- a/src/llama-graph.h
 +++ b/src/llama-graph.h
 @@ -933,6 +933,10 @@ struct llm_graph_context {
@@ -38,7 +38,7 @@ index 97141ef9..e5d7eae3 100644
  
 +    // temporal streaming: a node build_moe_ffn expands right after the router and gate weights, before the
 +    // routed-expert GEMMs (TEMPORAL_SHEXP_FIRST=1), so expert copies started at the router run under it
-+    ggml_tensor * tm_after_router = nullptr;
++    mutable ggml_tensor * tm_after_router = nullptr;
 +
      llm_graph_context(const llm_graph_params & params);
      virtual ~llm_graph_context() = default;
