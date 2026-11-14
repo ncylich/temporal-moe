@@ -40,21 +40,29 @@ def main():
     m.prefill = torch.full((a.n,), a.prefill, device=a.device) if a.prefill else None
     m.forward(toks, "skliar")
     cache_bias.CFG.update(C=a.C, lam=a.lam, J=1, k=18)
-    bad = 0; rows = 0
+    bad = 0; rows = 0; ties = 0; tied_seq = set()
     for L, lg, mk in seen:
         for b in range(lg.shape[0]):
             cache_bias.STATE.clear(); cache_bias.DELTA.clear()
             key = f"r{b}"
             pre = cache_bias.apply(L, lg[b, :P], [(key, P, True)], True)    # prompt: one prefill batch (unbiased, warms the cache)
-            bad += int(not torch.equal(lg[b, :P].topk(18).indices.sort().values, mk[b, :P].nonzero()[:, 1].view(P, 18)))
+            for t in range(P):                                              # prompt tokens: stock top-k
+                rows += 1
+                if not torch.equal(lg[b, t].topk(18).indices.sort().values, mk[b, t].nonzero()[:, 0]):
+                    v = lg[b, t].sort(descending=True).values; tie = bool(v[17] == v[18])
+                    ties += tie; bad += not tie
             for t in range(P, lg.shape[1]):
                 out = cache_bias.apply(L, lg[b, t:t + 1], [(key, 1, False)], True)
                 sel = out[0] > float("-inf")
                 rows += 1
-                if not torch.equal(sel, mk[b, t]):
-                    bad += 1
+                if not torch.equal(sel, mk[b, t]):                          # an exact tie at the cut is not a mismatch
+                    d = sel ^ mk[b, t]
+                    tie = bool(d.sum() == 2 and lg[b, t][d][0] == lg[b, t][d][1])
+                    ties += tie; bad += not tie
+                    if tie: tied_seq.add((L, b))
     sw, tk, _ = cache_bias.stats()
-    print(f"layers {len(seen)} token-layers {rows} mismatches {bad}")
+    print(f"layers {len(seen)} token-layers {rows} mismatches {bad} (plus {ties} exact logit ties at the cut, "
+          f"in {len(tied_seq)} layer-sequences whose later steps may then differ)")
     print(f"loads: ref {m.loads[0]}/{m.loads[1]}  cache_bias {sw}/{tk}")
     sk_loads = list(m.loads)
     # our rule: the GPU scan used on CUDA equals the CPU reference scan on these same logits
