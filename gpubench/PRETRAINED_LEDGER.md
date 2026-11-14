@@ -82,7 +82,7 @@ Engine tree 20c50f0c (the released runs' build), Q4_0 files above, GPU0 on NUMA 
   arm. Diagnosed on a fresh dump: all 179 differing prompt token-layers have the 18th and 19th router
   logits exactly equal (gap 0), so engine and `torch.topk` pick different, equally valid members of a
   tie. Skliar warms its cache from the prompt, which is where its VRAM decode differences start. The
-  released models had no exact ties; this model's Q4_0 router produces them.
+  released models had no such mismatches; why this model's logits tie exactly was not checked.
 - **Streamed equals all in VRAM** (batch-1 perplexity, 4 x 1024 tokens of held-out test text): ours
   181.5047 both, Skliar 166.1783 both, trained 22.6354 both.
 
