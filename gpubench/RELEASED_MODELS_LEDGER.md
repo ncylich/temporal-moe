@@ -542,3 +542,124 @@ Sanity check only: GSM8K flexible-extract on the 200 engine generations, stock 1
 (The text is GSM8K questions and solutions without the chat template, and at batch 1 every token after a
 chunk's first is under the constraint, which an instruction-tuned model handles badly; this is an identity
 check, not a quality measurement.)
+
+## R1-10 -- Gemma4 decode timing (engine tree `20c50f0c`, 11:58-12:41 UTC)
+
+`gpubench/released/final_gemma.sh` (pod-side, kept in `gpubench/results/released/gemma4/logs/`): token files
+as for Qwen (1k / 2k / 4k contexts of 961 / 1999 / 4007 prompt tokens), then the same nine arms and pass
+structure as R1-5, once without and once with `TEMPORAL_SHEXP_FIRST=1` (which for Gemma4 places the dense
+MLP between the router and the routed experts), then stock top-k on the checkpoint's fused gate/up file.
+Rows: `gemma_decode_final.jsonl`, `gemma_decode_shexp.jsonl` (63 rows each, no failures),
+`gemma_decode_fusedbase.jsonl`.
+
+**The split file does not weaken the baseline.** Stock top-k on the fused file: 133.83 / 131.66 / 130.58
+tok/s at 1k / 2k / 4k (three passes each), 133.26 / 132.17 / 131.08 with `TEMPORAL_SHEXP_FIRST=1`;
+on the split file 132.86 / 131.52 / 130.51 and 133.40 / 132.50 / 130.78. The differences are below 0.8%
+and go both ways.
+
+### Without `TEMPORAL_SHEXP_FIRST`
+
+### 1024 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 132.86 | 133.24 / 132.59 / 132.75 | 7.527 | 17704 | 1.000 |  |  |
+| ours_vram | 127.56 | 127.99 / 127.51 / 127.18 | 7.839 | 17704 | 0.960 | 0.9987 | 0.001 / 0.999 / 0.000 / 0.000 |
+| skliar_vram | 126.72 | 127.07 / 126.72 / 126.37 | 7.892 | 17704 | 0.954 | 0.7924 | 0.401 / 0.451 / 0.113 / 0.036 |
+| ours_stream | 60.41 | 60.49 / 60.48 / 60.25 | 16.554 | 4750 | 0.455 | 0.9980 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_stream | 66.23 | 66.19 / 66.29 / 66.21 | 15.099 | 5018 | 0.498 | 0.8017 | 0.395 / 0.452 / 0.117 / 0.036 |
+| ours_nobytes | 118.94 | 118.72 / 118.93 / 119.17 | 8.407 | 4750 | 0.895 | 0.9945 | 0.005 / 0.995 / 0.000 / 0.000 |
+| skliar_nobytes | 117.70 | 117.89 / 117.27 / 117.95 | 8.496 | 4750 | 0.886 | 0.5674 | 0.539 / 0.380 / 0.064 / 0.017 |
+| ours_nocopy | 119.31 | 119.79 / 119.27 / 118.85 | 8.382 | 4750 | 0.898 | 0.9945 | 0.005 / 0.995 / 0.000 / 0.000 |
+| skliar_nocopy | 118.30 | 118.18 / 118.02 / 118.71 | 8.453 | 4750 | 0.890 | 0.5674 | 0.539 / 0.380 / 0.064 / 0.017 |
+
+### 2048 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 131.52 | 131.99 / 131.06 | 7.603 | 19030 | 1.000 |  |  |
+| ours_vram | 126.53 | 126.63 / 126.43 | 7.903 | 19030 | 0.962 | 0.9992 | 0.001 / 0.999 / 0.000 / 0.000 |
+| skliar_vram | 125.32 | 125.67 / 124.97 | 7.980 | 19030 | 0.953 | 1.0188 | 0.316 / 0.440 / 0.175 / 0.069 |
+| ours_stream | 60.12 | 60.07 / 60.18 | 16.632 | 6160 | 0.457 | 0.9988 | 0.001 / 0.999 / 0.000 / 0.000 |
+| skliar_stream | 57.71 | 57.79 / 57.64 | 17.327 | 6160 | 0.439 | 1.0450 | 0.308 / 0.444 / 0.171 / 0.077 |
+| ours_nobytes | 116.91 | 117.50 / 116.32 | 8.553 | 6160 | 0.889 | 0.9977 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_nobytes | 116.50 | 116.41 / 116.59 | 8.584 | 6160 | 0.886 | 0.5592 | 0.526 / 0.402 / 0.061 / 0.010 |
+| ours_nocopy | 118.30 | 118.37 / 118.22 | 8.453 | 6160 | 0.899 | 0.9968 | 0.003 / 0.997 / 0.000 / 0.000 |
+| skliar_nocopy | 116.94 | 116.84 / 117.04 | 8.551 | 6160 | 0.889 | 0.5705 | 0.523 / 0.400 / 0.064 / 0.013 |
+
+### 4096 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 130.51 | 130.26 / 130.77 | 7.662 | 21672 | 1.000 |  |  |
+| ours_vram | 124.90 | 124.25 / 125.54 | 8.007 | 21672 | 0.957 | 0.9980 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_vram | 123.77 | 122.80 / 124.74 | 8.080 | 21672 | 0.948 | 0.7623 | 0.414 / 0.450 / 0.102 / 0.034 |
+| ours_stream | 59.80 | 59.62 / 59.98 | 16.723 | 8976 | 0.458 | 0.9982 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_stream | 66.56 | 66.50 / 66.61 | 15.024 | 8976 | 0.510 | 0.7755 | 0.408 / 0.450 / 0.107 / 0.035 |
+| ours_nobytes | 116.36 | 116.47 / 116.25 | 8.594 | 8976 | 0.892 | 0.9953 | 0.005 / 0.995 / 0.000 / 0.000 |
+| skliar_nobytes | 115.80 | 115.38 / 116.22 | 8.636 | 8976 | 0.887 | 0.5719 | 0.524 / 0.401 / 0.059 / 0.017 |
+| ours_nocopy | 117.29 | 117.52 / 117.05 | 8.526 | 8976 | 0.899 | 0.9954 | 0.005 / 0.995 / 0.000 / 0.000 |
+| skliar_nocopy | 116.84 | 116.71 / 116.97 | 8.559 | 8976 | 0.895 | 0.5640 | 0.529 / 0.397 / 0.059 / 0.015 |
+
+### With `TEMPORAL_SHEXP_FIRST=1` (dense MLP under the copies)
+
+### 1024 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 133.40 | 133.33 / 133.54 / 133.35 | 7.496 | 17692 | 1.000 |  |  |
+| ours_vram | 127.68 | 127.43 / 127.70 / 127.91 | 7.832 | 17692 | 0.957 | 0.9987 | 0.001 / 0.999 / 0.000 / 0.000 |
+| skliar_vram | 126.46 | 126.05 / 126.53 / 126.79 | 7.908 | 17692 | 0.948 | 0.7924 | 0.401 / 0.451 / 0.113 / 0.036 |
+| ours_stream | 62.90 | 62.73 / 63.16 / 62.80 | 15.899 | 4738 | 0.471 | 0.9980 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_stream | 68.04 | 68.03 / 68.02 / 68.07 | 14.697 | 4738 | 0.510 | 0.8017 | 0.395 / 0.452 / 0.117 / 0.036 |
+| ours_nobytes | 118.64 | 118.67 / 119.04 / 118.22 | 8.429 | 4738 | 0.889 | 0.9945 | 0.005 / 0.995 / 0.000 / 0.000 |
+| skliar_nobytes | 117.67 | 117.64 / 117.53 / 117.84 | 8.498 | 4738 | 0.882 | 0.5674 | 0.539 / 0.380 / 0.064 / 0.017 |
+| ours_nocopy | 119.67 | 119.36 / 119.65 / 120.00 | 8.356 | 4738 | 0.897 | 0.9945 | 0.005 / 0.995 / 0.000 / 0.000 |
+| skliar_nocopy | 118.79 | 118.85 / 118.63 / 118.88 | 8.418 | 4738 | 0.890 | 0.5674 | 0.539 / 0.380 / 0.064 / 0.017 |
+
+### 2048 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 132.50 | 132.55 / 132.45 | 7.547 | 19008 | 1.000 |  |  |
+| ours_vram | 126.69 | 126.60 / 126.78 | 7.893 | 19008 | 0.956 | 0.9992 | 0.001 / 0.999 / 0.000 / 0.000 |
+| skliar_vram | 125.89 | 125.85 / 125.94 | 7.943 | 19008 | 0.950 | 1.0188 | 0.316 / 0.440 / 0.175 / 0.069 |
+| ours_stream | 62.31 | 62.59 / 62.02 | 16.050 | 6138 | 0.470 | 0.9991 | 0.001 / 0.999 / 0.000 / 0.000 |
+| skliar_stream | 59.00 | 59.26 / 58.74 | 16.948 | 6138 | 0.445 | 1.0450 | 0.308 / 0.444 / 0.171 / 0.077 |
+| ours_nobytes | 117.41 | 117.85 / 116.97 | 8.517 | 6138 | 0.886 | 0.9972 | 0.003 / 0.997 / 0.000 / 0.000 |
+| skliar_nobytes | 116.58 | 116.52 / 116.64 | 8.578 | 6138 | 0.880 | 0.5534 | 0.535 / 0.392 / 0.061 / 0.012 |
+| ours_nocopy | 118.40 | 118.38 / 118.42 | 8.446 | 6138 | 0.894 | 0.9968 | 0.003 / 0.997 / 0.000 / 0.000 |
+| skliar_nocopy | 117.16 | 117.43 / 116.89 | 8.535 | 6138 | 0.884 | 0.5829 | 0.511 / 0.411 / 0.066 / 0.013 |
+
+### 4096 context
+
+| arm | tok/s pooled | per pass | ms per token | peak VRAM MiB | vs stock | loads per layer-token | P(0) / P(1) / P(2) / P(3+) |
+|---|---|---|---|---|---|---|---|
+| base | 130.78 | 131.03 / 130.53 | 7.646 | 21628 | 1.000 |  |  |
+| ours_vram | 125.33 | 125.51 / 125.15 | 7.979 | 21628 | 0.958 | 0.9980 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_vram | 124.15 | 124.18 / 124.12 | 8.055 | 21628 | 0.949 | 0.7623 | 0.414 / 0.450 / 0.102 / 0.034 |
+| ours_stream | 62.32 | 62.28 / 62.36 | 16.046 | 8932 | 0.477 | 0.9977 | 0.002 / 0.998 / 0.000 / 0.000 |
+| skliar_stream | 68.16 | 67.90 / 68.41 | 14.672 | 8932 | 0.521 | 0.7742 | 0.404 / 0.457 / 0.106 / 0.033 |
+| ours_nobytes | 116.54 | 116.41 / 116.66 | 8.581 | 8932 | 0.891 | 0.9958 | 0.004 / 0.996 / 0.000 / 0.000 |
+| skliar_nobytes | 115.58 | 115.54 / 115.61 | 8.652 | 8932 | 0.884 | 0.5633 | 0.531 / 0.395 / 0.058 / 0.016 |
+| ours_nocopy | 117.73 | 117.56 / 117.89 | 8.494 | 8932 | 0.900 | 0.9956 | 0.004 / 0.996 / 0.000 / 0.000 |
+| skliar_nocopy | 116.78 | 116.84 / 116.71 | 8.563 | 8932 | 0.893 | 0.5674 | 0.532 / 0.390 / 0.061 / 0.017 |
+
+**Where the time goes** (ms per token, pooled):
+
+| step | ours 1k | Skliar 1k | ours 2k | Skliar 2k | ours 4k | Skliar 4k |
+|---|---|---|---|---|---|---|
+| routing op (all in VRAM) over stock | +0.313 | +0.365 | +0.300 | +0.376 | +0.345 | +0.417 |
+| slot machinery, no copy kernels | +0.542 | +0.561 | +0.550 | +0.572 | +0.519 | +0.479 |
+| copy kernels launched, nothing moved | +0.026 | +0.043 | +0.100 | +0.033 | +0.068 | +0.077 |
+| bytes moved | +8.147 | +6.603 | +8.079 | +8.744 | +8.129 | +6.389 |
+| cost per load (bytes moved / loads) | 272 us | 275 us | 270 us | 279 us | 271 us | 275 us |
+| same, with the dense MLP under the copies | 250 us | 258 us | 251 us | 267 us | 249 us | 259 us |
+
+(Without `TEMPORAL_SHEXP_FIRST` in the upper rows.) One load is 4.3 MB here, so about 16 GB/s; the per-load
+cost is the same for both arms, so **the streamed time is set by the number of loads**. Ours is at 1.00 on
+every text. Skliar's depends on the text it replays: 0.80, 1.05 and 0.78 loads per layer-token on the 1k,
+2k and 4k continuations, against 0.938 on 200 GSM8K generations (gate 2). Skliar's arm is therefore faster
+than ours at 1k and 4k (68.0 against 62.9 and 68.2 against 62.3 tok/s with the dense MLP under the copies)
+and slower at 2k (59.0 against 62.3). One 100-token replay per context is too small a sample of a
+text-dependent load rate, which is why R1-11 times the streamed arms on several conversations.
