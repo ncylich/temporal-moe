@@ -52,12 +52,12 @@ for r in csv.DictReader(open(os.path.join(REPO, "results", "ablations",
     rows[r["run"]][int(r["layer"])] = float(r["hit_rate"])
 
 if PAPER:   # printed at ~1/3 scale in a half-column minipage, so the text is set large
-    plt.rcParams.update({"xtick.labelsize": 15, "ytick.labelsize": 15, "axes.labelsize": 16.5})
+    plt.rcParams.update({"xtick.labelsize": 20, "ytick.labelsize": 20, "axes.labelsize": 22})
 fig, ax = plt.subplots(figsize=(6.4, 4.8) if PAPER else (7.8, 6.4))
 ax.axhline(RANDOM_FLOOR, color="#b03030", lw=1.2, ls="--", zorder=1)
 if PAPER:   # below the floor line, where no data runs, so the larger text clears the markers
     ax.text(2.15, RANDOM_FLOOR - 0.006, "random resident set (k/E = 0.094)",
-            color="#b03030", fontsize=13, va="top")
+            color="#b03030", fontsize=17, va="top")
 else:
     ax.text(2.15, RANDOM_FLOOR + 0.008, "random resident set (k/E = 0.094)",
             color="#b03030", fontsize=9, va="bottom")
@@ -74,7 +74,7 @@ for run, (lab, col) in PAIR.items():
     ls = sorted(rows[run])
     ax.plot(ls, [rows[run][l] for l in ls], color=col, lw=2.6, marker="o", ms=7,
             markeredgecolor="white", markeredgewidth=0.9, zorder=4,
-            label=(f"{lab}, 6 of 64 at $10^{{19}}$" if PAPER
+            label=(lab if PAPER
                    else f"{lab} — 1e19, 6 of 64 (matched pair)"))
 if not PAPER:
     ax.plot([], [], color=TMP, alpha=0.32, lw=1.4, marker="o", ms=3.5,
@@ -84,10 +84,11 @@ ax.set_xlabel("MoE layer" if PAPER else "MoE layer  (layer 1 is a dense FFN in e
 ax.set_ylabel("cache hit rate" if PAPER else
               "cache hit rate  (share of demanded top-k already resident)")
 ax.set_xticks(range(2, 15))
+if PAPER: ax.set_xticklabels([str(i) if i % 2 == 0 else "" for i in range(2, 15)])
 ax.set_ylim(0.05, 0.50)
 ax.grid(alpha=0.25, lw=0.6)
 if PAPER:
-    ax.legend(loc="upper left", fontsize=12.5, framealpha=0.95, borderpad=0.3,
+    ax.legend(loc="upper left", fontsize=16.5, framealpha=0.95, borderpad=0.3,
               handlelength=1.6, borderaxespad=0.3)
 else:
     ax.legend(loc="upper left", fontsize=9, framealpha=0.95)

@@ -18,8 +18,8 @@ PAPER = NO_CAPTION
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 RUNS = f"{REPO}/results/phase0/runs"; OUT = f"{REPO}/results/phase0/figures"
 if PAPER:
-    plt.rcParams.update({"font.size": 15, "axes.titlesize": 15, "axes.labelsize": 15,
-                         "xtick.labelsize": 13, "ytick.labelsize": 13, "legend.fontsize": 13})
+    plt.rcParams.update({"font.size": 21, "axes.titlesize": 20, "axes.labelsize": 21,
+                         "xtick.labelsize": 19, "ytick.labelsize": 19, "legend.fontsize": 18})
 def outname(f): return f.replace(".png", "_nocaption.png") if NO_CAPTION else f
 def load(run):
     import torch  # lazy: paper-mode learned-locality reads a CSV, so torch is only needed with raw logs
@@ -73,11 +73,11 @@ def _draw_raster(panels, k, E, L, tag, outfile):
     if len(panels) == 1: axes = [axes]
     for ax, (title, M, c) in zip(axes, panels):
         ys, xs = np.where(M.T); ax.scatter(xs, ys, s=(2.4 if PAPER else 6), c=c, marker="o", linewidths=0)
-        ax.set_ylabel("expert index"); ax.set_title(title, loc="left", fontsize=(15 if PAPER else 10))
+        ax.set_ylabel("" if PAPER else "expert index"); ax.set_title(title, loc="left", fontsize=(20 if PAPER else 10))
         ax.set_ylim(-1, E); ax.set_yticks([0, (E-1)//2, E-1]); ax.grid(True, ls=":", alpha=0.3)
     axes[-1].set_xlabel("token position" if PAPER else f"token position (sequence 0, MoE layer {L})")
     if PAPER:
-        fig.suptitle(f"Experts active per token ({k} of {E})", fontsize=16)
+        fig.suptitle(f"Experts active per token ({k} of {E})", fontsize=22); fig.supylabel("expert index", fontsize=21)
     else:
         fig.suptitle(f"Which experts are active at each token: {tag} (top-k = {k} of {E} experts)\n"
                      "horizontal streaks = an expert stays active across consecutive tokens (temporal locality)")
@@ -122,7 +122,7 @@ def raster_from_csv(active_params_M, outfile):
     # display names for the panel keys stored in the committed CSV
     RENAME = {"full MoE  (top-k)": "standard MoE (top-k)",
               "temporal (resident set used)": "Temporal MoE (resident set used)",
-              "temporal (unconstrained preference)": "Temporal MoE (constraint removed, free top-k)"}
+              "temporal (unconstrained preference)": "Temporal MoE (constraint removed)"}
     panels = []
     for title, cells in by_panel.items():              # dict preserves CSV (panel) order
         M = np.zeros((W, E), bool)
