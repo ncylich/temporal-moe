@@ -149,3 +149,29 @@ above its VRAM row against 0.22 ms on the trained path; 0006 forces `TEMPORAL_RO
 issued at the router on the copy stream), the trained path defaults to copies at the expert op, so the
 first test is the trained path with `TEMPORAL_ROUTE_SLOTS=2`; (2) Skliar's serving loads (0.81)
 against its eval loads (1.01), separated by the real-text replay.
+
+## P1-6 -- Corrected protocol (21:35 UTC); everything above for the plain MoE is superseded
+
+Two things were wrong before, both now fixed for every plain-MoE arm (stock, temporal base, Skliar):
+the gates (P1-5), and the prompt. The first passes applied our rule and Skliar to every token of a
+scored sequence. That is the trained model's protocol, not the one for a model without temporal
+training.
+
+- **Plain MoE** (stock / temporal base = our rule without training / Skliar): its own gates; the prompt
+  is routed by stock top-k while the rule observes (decode_state.py and cache_bias.py, unchanged); the
+  rule applies to the tokens after the prompt. Loads are counted on those tokens only.
+- **Trained model**: its rule on every token, prompt included; gates over the resident window.
+- **Test CE**: the first 1,024 tokens of a test row are the prompt, the loss is on tokens 1,024 to
+  2,047, the same tokens for every arm. 512 rows, 524,288 scored tokens.
+- **lm-eval**: a request's context is the prompt, its continuation is scored. A one-token
+  continuation is predicted from the prompt alone, so on such requests the plain arms equal stock.
+- **Skliar's lambda**: re-tuned under this protocol, bisected to our rule's loads on decoded tokens.
+- **Gate** (pod, CUDA, 8 x 512 tokens, 256-token prompt): Skliar in the reference equals
+  `cache_bias.apply` (prompt as one prefill batch, then one step per token) on every layer-token with
+  equal load counts, apart from one exact logit tie at the cut; our rule equals `decode_state.prefill`
+  plus `step` on every step; GPU scan equals CPU scan on all 13 layers.
+- **Speed**: every arm replays the same real text (the test row's own next 100 tokens). Engine patch
+  0008 lets `TEMPORAL_ROUTE_SLOTS` apply to the decode and skliar modes (0006 forced the value 2, which
+  is the suspected cause of the 84 tok/s gap to the trained mode); every streamed method is timed at
+  slots 0/1/2 with the shared expert first or not, all settings are reported, and methods are compared
+  at their fastest.
