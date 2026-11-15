@@ -264,3 +264,87 @@ the first dropped. Mean over the five texts, range in brackets. Every setting is
   is a few microseconds of transfer at the tens of GB/s this link moves, against a 1.6 ms token, and
   most of the streaming cost is per-layer launch overhead. The burst argument applies where transfer
   is bandwidth-bound (flash); Skliar was not measured there.
+
+## P1-10 -- Accuracy, final (corrected protocol of P1-6; evals/)
+
+lambda* = 0.72070 (bisected on rows 1536-1599: Skliar 0.9999 loads per decoded token-layer against
+ours 1.0000). Sweep on those rows, CE on tokens 1,024 to 2,047 after a stock top-k prompt:
+
+| lambda | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.75 | 1.0 | 1.5 | 2.0 |
+|---|---|---|---|---|---|---|---|---|---|
+| loads | 12.79 | 11.51 | 8.83 | 6.31 | 2.65 | 0.924 | 0.699 | 0.676 | 0.676 |
+| CE | 3.204 | 3.205 | 3.214 | 3.237 | 3.360 | 3.674 | 3.792 | 3.818 | 3.818 |
+
+Ours on the same rows: loads 1.000, CE 3.682. Stock on the same rows was not run.
+
+Test CE on 512 rows (524,288 scored tokens) and the ten 0-shot lm-eval tasks, value and standard error:
+
+| | Skliar (plain MoE) | temporal base (plain MoE, our rule) | temporal trained | normal MoE (stock top-k) |
+|---|---|---|---|---|
+| test CE, nats per token (lower is better) | 3.5605 ± 0.0172 | 3.6056 ± 0.0177 | 3.1333 ± 0.0173 | 3.1191 ± 0.0171 |
+| loads per decoded token-layer, test CE rows | 1.006 | 1.000 | 1.000 | -- |
+| loads per decoded token-layer, lm-eval | 1.074 | 1.000 | 1.000 | -- |
+| arc_challenge acc | 0.1945 ± 0.0116 | 0.1962 ± 0.0116 | 0.2090 ± 0.0119 | 0.1937 ± 0.0115 |
+| arc_challenge acc_norm | 0.2355 ± 0.0124 | 0.2381 ± 0.0124 | 0.2577 ± 0.0128 | 0.2491 ± 0.0126 |
+| arc_easy acc | 0.4798 ± 0.0103 | 0.4752 ± 0.0102 | 0.4916 ± 0.0103 | 0.4958 ± 0.0103 |
+| arc_easy acc_norm | 0.4423 ± 0.0102 | 0.4373 ± 0.0102 | 0.4436 ± 0.0102 | 0.4432 ± 0.0102 |
+| boolq acc | 0.5991 ± 0.0086 | 0.5991 ± 0.0086 | 0.5719 ± 0.0087 | 0.5991 ± 0.0086 |
+| copa acc | 0.6400 ± 0.0482 | 0.6000 ± 0.0492 | 0.6800 ± 0.0469 | 0.6200 ± 0.0488 |
+| hellaswag acc | 0.2983 ± 0.0046 | 0.2981 ± 0.0046 | 0.3010 ± 0.0046 | 0.3016 ± 0.0046 |
+| hellaswag acc_norm | 0.3292 ± 0.0047 | 0.3281 ± 0.0047 | 0.3349 ± 0.0047 | 0.3386 ± 0.0047 |
+| lambada_openai acc | 0.2954 ± 0.0064 | 0.2827 ± 0.0063 | 0.3041 ± 0.0064 | 0.3080 ± 0.0064 |
+| lambada_openai perplexity | 51.1 | 60.4 | 40.4 | 39.0 |
+| openbookqa acc | 0.1840 ± 0.0173 | 0.1720 ± 0.0169 | 0.1800 ± 0.0172 | 0.1780 ± 0.0171 |
+| openbookqa acc_norm | 0.3000 ± 0.0205 | 0.2880 ± 0.0203 | 0.2940 ± 0.0204 | 0.3100 ± 0.0207 |
+| piqa acc | 0.6398 ± 0.0112 | 0.6328 ± 0.0112 | 0.6507 ± 0.0111 | 0.6578 ± 0.0111 |
+| piqa acc_norm | 0.6518 ± 0.0111 | 0.6420 ± 0.0112 | 0.6594 ± 0.0111 | 0.6561 ± 0.0111 |
+| sciq acc | 0.6930 ± 0.0146 | 0.6890 ± 0.0146 | 0.7190 ± 0.0142 | 0.7070 ± 0.0144 |
+| sciq acc_norm | 0.6020 ± 0.0155 | 0.6030 ± 0.0155 | 0.6310 ± 0.0153 | 0.6110 ± 0.0154 |
+| winogrande acc | 0.5130 ± 0.0140 | 0.4933 ± 0.0141 | 0.4925 ± 0.0141 | 0.4996 ± 0.0141 |
+
+Checks on the harness:
+- Trained model here against its Megatron lm-eval (t19_lmeval_finegrain.csv): arc_challenge 0.209 /
+  0.207, arc_easy 0.492 / 0.498, hellaswag 0.301 / 0.303, openbookqa 0.180 / 0.180, piqa 0.651 /
+  0.654, winogrande 0.493 / 0.487.
+- Normal MoE against trained on test CE: 3.119 against 3.133, a gap of 0.014; Megatron logged 3.158
+  against 3.172 on the full test set (0.014). (Different tokens are scored here, the second half of
+  each row, so the levels differ.)
+- boolq is identical for the three plain arms, as it must be: its one-token answer is predicted from
+  the prompt, which all three route by stock top-k.
+
+Statements (measured unless marked):
+- At 18 slots per layer and one load per decoded token-layer, the trained model loses 0.014 nats to the
+  normal MoE with all 192 experts available; Skliar loses 0.44 and our rule without training 0.49.
+- Skliar is 0.045 nats better than our rule without training at matched loads (2.6 standard errors of
+  one arm; a paired test on the per-row losses was not run).
+- On the lm-eval tasks the four columns are within about two standard errors of each other almost
+  everywhere. With a normal prompt the rule only acts on the few tokens of each continuation, so these
+  tasks barely see it. lambada_openai (one word after a long passage) is the most sensitive: perplexity
+  39.0 normal, 40.4 trained, 51.1 Skliar, 60.4 our rule without training.
+- Skliar's loads rise to 1.074 per decoded token-layer on the lm-eval continuations (lambda* was matched
+  on running text).
+
+Not done or not verified:
+- Engine accuracy under the routed modes was not compared with the reference; accuracy comes from the
+  PyTorch reference, the engine was checked for routing equality and streamed = VRAM only.
+- The order sensitivity of the engine forward (P1-7) is not explained.
+- Why this model's router logits tie exactly was not checked.
+- Skliar on bandwidth-bound storage (phone, laptop NVMe) was not measured; the A6000 does not show a
+  burst penalty at this model size.
+- Speed is at 1k context only (the model's limit is 2,048 positions), on five texts.
+- The Megatron "imposed R18" numbers for the plain MoE use window-renormalised gates and are not
+  comparable with the temporal-base column.
+
+## P1-11 -- Pods and cost
+
+| pod | card | ran (UTC, 2026-11-14) | $/h | cost |
+|---|---|---|---|---|
+| `hvcggjwvmohc7a` | L40S, evals | 18:51 to 00:02 | 1.09 | about $5.65 |
+| `i65msin9gh64dw` | A6000, first speed pass (superseded) | 20:46 to 21:20 | 0.69 | about $0.39 |
+| `bcnqix1ewwwjr3` | A6000, resumed by the same call and stopped at once | under a minute | 0.59 | under $0.02 |
+| `8xcjjlxgekub1c` | A6000, kernels and final speed | 22:23 to 23:39 | 0.69 | about $0.88 |
+
+About $6.9 for this comparison (about $10.1 with the released-model runs). All four pods are stopped,
+none terminated; stopped pods still bill for disk. Nothing on the two new pods is needed again: the
+weights, GGUFs and token files are on the laptop under ~/Documents/temporal-moe-serving, and the engine
+rebuilds from the patch files.

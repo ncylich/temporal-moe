@@ -1,0 +1,13 @@
+ours: loads 1.0000 loss 3.68166
+skliar lambda 0.050: loads 12.7948 loss 3.20354
+skliar lambda 0.100: loads 11.5051 loss 3.20542
+skliar lambda 0.200: loads 8.8260 loss 3.21446
+skliar lambda 0.300: loads 6.3137 loss 3.23725
+skliar lambda 0.500: loads 2.6470 loss 3.35974
+skliar lambda 0.750: loads 0.9239 loss 3.67402
+skliar lambda 1.000: loads 0.6988 loss 3.79204
+skliar lambda 1.500: loads 0.6758 loss 3.81808
+skliar lambda 2.000: loads 0.6756 loss 3.81782
+skliar lambda 3.000: loads 0.6756 loss 3.81782
+LAMBDA 0.7390
+BRACKET 0.5 0.75

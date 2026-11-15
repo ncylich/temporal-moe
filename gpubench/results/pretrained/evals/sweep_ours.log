@@ -1,0 +1,8 @@
+[temporal] scan path: triton (verified == reference)
+[16/64] loss 3.85618  2s
+[32/64] loss 3.74216  4s
+[48/64] loss 3.70700  5s
+[64/64] loss 3.68166  6s
+routing=temporal evict=min_logit k=18 samples=64 tokens=65536 gates=full prefill=1024 score_from=1024
+temporal C=18 lambda=0.5 loads per token-layer 1.0000
+loss 3.68166 nats/token (SE over samples 0.07552)  bpb 1.23629 (SE 0.02536)

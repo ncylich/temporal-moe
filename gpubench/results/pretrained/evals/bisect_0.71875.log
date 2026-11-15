@@ -1,0 +1,7 @@
+[16/64] loss 3.81771  19s
+[32/64] loss 3.69903  37s
+[48/64] loss 3.66682  56s
+[64/64] loss 3.64367  74s
+routing=skliar evict=min_logit k=18 samples=64 tokens=65536 gates=full prefill=1024 score_from=1024
+skliar C=18 lambda=0.71875 loads per token-layer 1.0058
+loss 3.64367 nats/token (SE over samples 0.07477)  bpb 1.22353 (SE 0.02511)

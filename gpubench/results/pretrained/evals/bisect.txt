@@ -1,0 +1,8 @@
+lambda 0.62500: loads 1.4382 loss 3.51902
+lambda 0.68750: loads 1.1158 loss 3.60431
+lambda 0.71875: loads 1.0058 loss 3.64367
+lambda 0.73438: loads 0.9616 loss 3.65917
+lambda 0.72656: loads 0.9830 loss 3.65287
+lambda 0.72266: loads 0.9939 loss 3.64815
+lambda 0.72070: loads 0.9999 loss 3.64325
+LAMBDA 0.72070

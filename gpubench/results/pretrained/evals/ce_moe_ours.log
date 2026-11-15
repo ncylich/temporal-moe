@@ -1,0 +1,36 @@
+[temporal] scan path: triton (verified == reference)
+[16/512] loss 3.66599  2s
+[32/512] loss 3.65539  4s
+[48/512] loss 3.60222  5s
+[64/512] loss 3.61975  6s
+[80/512] loss 3.65589  7s
+[96/512] loss 3.64874  9s
+[112/512] loss 3.64614  10s
+[128/512] loss 3.63486  11s
+[144/512] loss 3.61123  12s
+[160/512] loss 3.63014  14s
+[176/512] loss 3.62331  15s
+[192/512] loss 3.61189  16s
+[208/512] loss 3.61173  17s
+[224/512] loss 3.62213  18s
+[240/512] loss 3.62742  20s
+[256/512] loss 3.62666  21s
+[272/512] loss 3.62486  22s
+[288/512] loss 3.62870  23s
+[304/512] loss 3.62247  25s
+[320/512] loss 3.62063  26s
+[336/512] loss 3.61138  27s
+[352/512] loss 3.61360  28s
+[368/512] loss 3.61111  30s
+[384/512] loss 3.61017  31s
+[400/512] loss 3.60420  32s
+[416/512] loss 3.60490  33s
+[432/512] loss 3.60113  35s
+[448/512] loss 3.59989  36s
+[464/512] loss 3.60357  37s
+[480/512] loss 3.60447  38s
+[496/512] loss 3.60713  39s
+[512/512] loss 3.60555  41s
+routing=temporal evict=min_logit k=18 samples=512 tokens=524288 gates=full prefill=1024 score_from=1024
+temporal C=18 lambda=0.5 loads per token-layer 1.0000
+loss 3.60555 nats/token (SE over samples 0.01775)  bpb 1.21073 (SE 0.00596)

@@ -1,0 +1,6 @@
+loads: ref 83254/26624  cache_bias 83254/26624
+[temporal] scan path: triton (verified == reference)
+[temporal] decode step path: eager
+temporal with free prefill vs decode_state: 0 mismatching steps; loads [26624, 26624]
+temporal GPU scan vs CPU scan: 0 of 13 layers differ
+GATE PASS
