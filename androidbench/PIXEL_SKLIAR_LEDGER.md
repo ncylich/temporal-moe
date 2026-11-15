@@ -258,7 +258,8 @@ after the prompt 143 against 269 ms. Fit over the Skliar-shaped tokens: ms = 43.
 - **Measured.** On the 11 B geometry Skliar-shaped loads are 7.6 % slower than one load per token, for 2.8 %
   more loads.
 - **Derived.** At the one-load arm's 45 loads per token the fit gives 72.4 ms against 68.8 ms measured for
-  the one-load arm, so about 5 % of the gap is the burstiness itself and the rest the extra loads. On the
+  the one-load arm: at equal loads the bursty pattern is about 5 % slower per token, and the extra loads
+  and the slower first token after the prompt account for the rest of the 7.6 %. On the
   1.26 B model the same comparison showed no gap (S1-5). An expert here is about 0.66 MB over its three
   tensors against 0.26 MB there, and each layer's compute hides less of a multi-expert read.
 - **Limits.** Load counts are drawn independently per layer and token, so the way real Skliar bursts line up
