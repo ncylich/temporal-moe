@@ -339,7 +339,7 @@ Not done or not verified:
 
 | pod | card | ran (UTC, 2026-11-14) | $/h | cost |
 |---|---|---|---|---|
-| `hvcggjwvmohc7a` | L40S, evals | 18:51 to 00:02 | 1.09 | about $5.65 |
+| `hvcggjwvmohc7a` | L40S, evals | 18:51 to 00:04 | 1.09 | about $5.7 |
 | `i65msin9gh64dw` | A6000, first speed pass (superseded) | 20:46 to 21:20 | 0.69 | about $0.39 |
 | `bcnqix1ewwwjr3` | A6000, resumed by the same call and stopped at once | under a minute | 0.59 | under $0.02 |
 | `8xcjjlxgekub1c` | A6000, kernels and final speed | 22:23 to 23:39 | 0.69 | about $0.88 |
