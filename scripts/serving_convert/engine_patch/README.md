@@ -34,3 +34,40 @@ routes every token. Builds made before `0002` are wrong for prefills and llama-p
 
 Checks are in `androidbench/TRAINED_MODEL_LEDGER.md` (step 2) and
 `scripts/serving_convert/check_engine_routing.py`.
+
+## Decode-time rules on the CPU path (patch 0003)
+
+For a model without temporal training (the plain 1e19 MoE): our rule applied at decode time, and Skliar
+et al.'s cache-conditional routing. Before these patches both existed only as CUDA kernels
+(`../engine_patch_cuda/0006` to `0011`) and aborted on the CPU backend. `0003` applies after `0001` and `0002`:
+
+```bash
+git checkout -b pixel-skliar 43bec5f3
+git am /path/to/temporal-moe/scripts/serving_convert/engine_patch/000*.patch
+```
+
+| switch | what it does |
+|---|---|
+| `LLAMA_TEMPORAL_ROUTE=decode` | our rule as `analysis/residency/decode_state.py`: a prompt batch (more than one token) is routed by the stock top-k while the min_logit window scan observes it; each single-token batch is one rule step (0 or 1 expert admitted) and routes inside the K residents |
+| `LLAMA_TEMPORAL_ROUTE=skliar` + `TEMPORAL_CB_C`, `TEMPORAL_CB_LAMBDA` (`TEMPORAL_CB_J`, 0 or 1, default 1) | Skliar's rule as `analysis/residency/cache_bias.py`: LRU cache of C experts per layer, lambda times the running mean of max-min logit added to cached experts, top-1 guarantee; the prompt is routed by the stock top-k and warms the cache. Any number of experts can enter on one token |
+| `TEMPORAL_CB_FULLSEL=1` | Skliar by a plain top-K of the biased logits instead of the exchange loop used when C = K (same selections; cross-check only) |
+| `LLAMA_TEMPORAL_TWOPASS=1` with either mode | streamed: K experts per layer in RAM, the pool on flash. The window op evicts every expert that left the window and queues all missing ones at once, so the fetch workers read them in parallel. Experts that entered on this token sit last in the window; the first sub-pass does not wait for them up front, and the repacked kernel computes that layer's residents first. With `skliar`, C must equal K |
+| `LLAMA_TEMPORAL_TAIL=<n>` (default 1, any mode) | the two-pass FFN ends with n single-expert sub-passes instead of one |
+| `LLAMA_TEMPORAL_R >= n_expert` with either mode | nothing is evicted: the all-in-RAM twin of the streamed path, same graph and kernels |
+| `TEMPORAL_ROUTE_HIST=<json>` | loads-per-layer-token histogram at exit, format of `cache_bias.stats()` |
+| `LLAMA_TEMPORAL_ROUTE_DUMP2=<file>` | logits and ids per layer-token plus a marker at each sequence reset, for `gpubench/released/route_check.py` |
+| `TEMPORAL_BENCH_CTX`, `TEMPORAL_BENCH_GEN` | `llama-bench` fills the context and feeds the decode steps from int32 token files (real text) instead of random tokens |
+| `TEMPORAL_BENCH_REPREFILL=1` | `llama-bench` fills the context again on every repetition. Without it the saved KV state is restored, and the router state (window, cache) is not part of it, so later repetitions start from where the previous one ended |
+| `TEMPORAL_BENCH_TOKLOG=<csv>` | per decoded token: time, loads summed over the layers, largest per-layer load count, time blocked on fetches |
+| `TEMPORAL_BENCH_LOGIT_HASH=1` | adds a 64-bit hash of each decoded token's logits to that file (output-identity gate) |
+
+Exit line: `temporal-route2: mode=... decode_layer_tokens=... loads=... loads_per_layer_token=... hist=[...]`.
+Loads are counted on single-token batches only. Skliar's running mean of max-min is per layer and per
+process, as in the reference; it is not reset between sequences.
+
+`LLAMA_TEMPORAL_ROUTE=trained` is unchanged by this patch (same rule, same window order, same waits).
+
+Checked: `git am` of `0001` to `0003` on a fresh clone at `43bec5f3` gives tree `b1f58983`, the tree the phone
+binaries were built from (local engine commit `d9f0f2d1`, not pushed to the fork).
+
+Checks and numbers: `androidbench/PIXEL_SKLIAR_LEDGER.md`.

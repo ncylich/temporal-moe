@@ -1,0 +1,2 @@
+skliar A all in RAM R=192    PPL = 40.8885 +/- 4.00633   fetches=0 evictions=0
+   temporal-route2: mode=skliar layers=13 decode_layer_tokens=26598 loads=29849 loads_per_layer_token=1.1222 prompt_layer_tokens=0 cold_decode=39 C=18 lambda=0.7207 J=1 hist=[4485,16838,3558,1179,380,119,31,7,1]

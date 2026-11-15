@@ -1,0 +1,11 @@
+LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=moe_fine_1e19-full-q4_0-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_FETCHPROF=1 LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=skliar TEMPORAL_CB_C=18 TEMPORAL_CB_LAMBDA=0.7207 TEMPORAL_CB_J=1 TEMPORAL_BENCH_CTX=tok/ctx1024_v1.ctx TEMPORAL_BENCH_GEN=tok/ctx1024_v1.gen TEMPORAL_BENCH_REPREFILL=1 TEMPORAL_ROUTE_HIST=_hist.json TEMPORAL_BENCH_TOKLOG=_tok.csv LLAMA_TEMPORAL_TAIL=2 TEMPORAL_BENCH_LOGIT_HASH=1 LLAMA_TEMPORAL_ROUTE_DUMP2=_route.bin
+temporal-pool: active, R=18 swap_prob=0.000 odirect=1 workers=6 sibling=1 split=2
+llama-bench: TEMPORAL_BENCH_GEN = tok/ctx1024_v1.gen (100 tokens)
+temporal-pool: O_DIRECT bounce path (off%4096=384 dst%4096=1664 len%4096=384) -- costs a memcpy per fetch
+llama-bench: TEMPORAL_BENCH_CTX = tok/ctx1024_v1.ctx (1024 tokens)
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=1300 loads=1386 loads_per_layer_token=1.0662 prompt_layer_tokens=13312 cold_decode=13 C=18 lambda=0.7207 J=1 hist=[263,817,138,53,17,6,6]
+temporal-pool: fetches=11601 fetched_mib=955.9 evictions=10899 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=1257.4 qwait_hi_us=1087.9 wait_ms=3934.3 odirect=1 workers=6 sibling=1 split=2
+temporal-pool: ENFORCE on, swaps=1571
+PEAKSWAP_KB=0
+PEAKHWM_KB=910140
+MINMAXF7=1557000

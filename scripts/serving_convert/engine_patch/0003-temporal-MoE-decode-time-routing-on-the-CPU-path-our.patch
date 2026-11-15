@@ -1,0 +1,690 @@
+From 8995af66445a8db30c72c2ce335398d790dc26e6 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Sat, 14 Nov 2026 18:53:09 -0800
+Subject: [PATCH] temporal-MoE: decode-time routing on the CPU path (our rule
+ without training, Skliar's cache-conditional routing), several expert loads
+ per token, real-text replay in llama-bench
+
+LLAMA_TEMPORAL_ROUTE=decode follows analysis/residency/decode_state.py and LLAMA_TEMPORAL_ROUTE=skliar
+follows analysis/residency/cache_bias.py (TEMPORAL_CB_C, TEMPORAL_CB_LAMBDA, TEMPORAL_CB_J): a prompt batch
+is routed by the stock top-k while the rule observes it, and each single-token batch is one rule step.
+Both existed only as CUDA kernels before.
+
+Skliar can admit several experts on one token. The window op now evicts every expert that left the window
+and queues all missing ones at once, so the fetch workers read them in parallel. The experts that entered
+sit last in the window; the first sub-pass does not wait for them up front, and the repacked kernel
+computes that layer's residents first, so the fetches run under the residents' compute.
+LLAMA_TEMPORAL_TAIL=<n> ends the two-pass FFN with n single-expert sub-passes instead of one. With
+LLAMA_TEMPORAL_R >= n_expert nothing is evicted (the all-in-RAM twin of the streamed path). Streamed skliar
+needs TEMPORAL_CB_C equal to n_expert_used.
+
+In these modes compute threads other than 0 poll for a streamed expert and never take the pool mutex or
+sleep (ledger S1-3: blocking there gave multi-second stalls on a throttled Pixel 10a).
+
+Reporting: exit line temporal-route2 with the loads histogram, TEMPORAL_ROUTE_HIST, and
+LLAMA_TEMPORAL_ROUTE_DUMP2 for gpubench/released/route_check.py.
+
+llama-bench: TEMPORAL_BENCH_CTX/GEN replay real tokens, TEMPORAL_BENCH_REPREFILL fills the context again on
+every repetition, TEMPORAL_BENCH_TOKLOG writes time, loads and fetch wait per decoded token, and
+TEMPORAL_BENCH_LOGIT_HASH adds a hash of each token's logits.
+
+LLAMA_TEMPORAL_ROUTE=trained is unchanged.
+---
+ ggml/include/ggml-cpu.h           |   7 +
+ ggml/src/ggml-cpu/ggml-cpu.c      | 359 +++++++++++++++++++++++++++++-
+ ggml/src/ggml-cpu/repack.cpp      |   5 +-
+ src/llama-graph.cpp               |  16 +-
+ tools/llama-bench/llama-bench.cpp |  75 ++++++-
+ 5 files changed, 452 insertions(+), 10 deletions(-)
+
+diff --git a/ggml/include/ggml-cpu.h b/ggml/include/ggml-cpu.h
+index f3e72dc3..cce7b7b6 100644
+--- a/ggml/include/ggml-cpu.h
++++ b/ggml/include/ggml-cpu.h
+@@ -167,6 +167,13 @@ extern "C" {
+     GGML_BACKEND_API int  ggml_temporal_route_trained(void);
+     GGML_BACKEND_API void ggml_temporal_route_reset(void);
+     GGML_BACKEND_API int  ggml_temporal_route_last(int L, int * admitted, int * evicted, const int ** window);
++    // decode-time rules (LLAMA_TEMPORAL_ROUTE=decode|skliar): loads summed over the layers and the largest
++    // per-layer load count since the previous call (then both restart from 0), and the cumulative time the
++    // compute thread spent blocked on expert fetches. For per-token attribution in llama-bench.
++    GGML_BACKEND_API void ggml_temporal_route_tokstat(uint64_t * loads, uint64_t * max_layer_loads, uint64_t * wait_ns);
++    // LLAMA_TEMPORAL_TAIL=<n> (default 1): the two-pass FFN ends with n single-expert sub-passes
++    GGML_BACKEND_API int  ggml_temporal_tail(void);
++    GGML_BACKEND_API const int * ggml_tm_src_order(const struct ggml_tensor * src0);
+ 
+     GGML_BACKEND_API void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void * userdata);
+ 
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 6482f794..2d17e76e 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -1511,7 +1511,80 @@ static int      g_tr_last_out[GGML_TR_MAXLAYER];  // last token: evicted expert,
+ static uint64_t g_tr_steps[GGML_TR_MAXLAYER], g_tr_nswaps[GGML_TR_MAXLAYER], g_tr_ncold[GGML_TR_MAXLAYER];
+ static FILE *   g_tr_dump = NULL;
+ 
++// ---- decode-time rules for a model WITHOUT temporal training (modes 2 and 3) ---------------
++// The prompt is routed by the stock top-k while the rule only observes it; the rule decides the
++// experts from the first decoded token on. A prompt batch is any batch of more than one token, a
++// decoded token is a single-token batch (one rule step each). Loads are counted on decoded tokens.
++//   LLAMA_TEMPORAL_ROUTE=decode   our rule, as analysis/residency/decode_state.py: the min_logit window
++//                                 scan runs observe-only over the prompt and seeds the decode state;
++//                                 each decoded token is one step (0 or 1 expert admitted) and routes
++//                                 inside the K residents. Ties among residents evict the lowest index.
++//   LLAMA_TEMPORAL_ROUTE=skliar   Skliar et al. (arXiv:2412.00099), as analysis/residency/cache_bias.py:
++//                                 an LRU cache of TEMPORAL_CB_C experts per layer; z' = z + lambda *
++//                                 (running mean of max(z)-min(z)) on cached experts; top-K of z'; the
++//                                 top-1 of z is always selected (TEMPORAL_CB_J = 1; 0 turns it off);
++//                                 loads = selected experts that were not cached. Any number of experts
++//                                 can enter per token. TEMPORAL_CB_LAMBDA sets lambda. The prompt warms
++//                                 the cache (its C most recently used experts). With C = K the cache is
++//                                 the previous selection, and the biased top-K is reached by exchanging
++//                                 the best outsider with the weakest member until it stops winning
++//                                 (TEMPORAL_CB_FULLSEL=1 runs the plain top-K selection instead).
++// In both modes the window lists the experts kept from the previous token first and the ones that
++// entered on this token last, so the two-pass FFN waits only where bytes can be missing.
++//   exit line `temporal-route2: ...` with loads per decoded layer-token and their histogram
++//   TEMPORAL_ROUTE_HIST=<json>         {"hist","loads","rows"} like cache_bias.stats()
++//   LLAMA_TEMPORAL_ROUTE_DUMP2=<file>  per layer and token: int32 layer, n_tokens, t, loads (-1 if not
++//                                      a counted decode step), K int32 ids, E float32 logits; a record
++//                                      with layer -1 marks a sequence reset (gpubench/released/route_check.py)
++#define GGML_TR2_HIST 64
++static int      g_tr2_mode = 0, g_tr2_K = 0, g_tr2_E = 0;
++static int      g_sk_C = 0, g_sk_J = 1, g_sk_fullsel = 0;
++static double   g_sk_lam = 0.0;
++static int64_t  g_sk_last[GGML_TR_MAXLAYER][GGML_TR_MAXE];    // skliar: step of last use, -1 = not cached
++static int64_t  g_sk_t[GGML_TR_MAXLAYER];
++static double   g_sk_dsum[GGML_TR_MAXLAYER];                  // running mean of max-min: per layer, per process
++static uint64_t g_sk_dn[GGML_TR_MAXLAYER];
++static int      g_tr2_nnew[GGML_TR_MAXLAYER];                 // last single-token step: experts that entered the window
++static uint64_t g_tr2_hist[GGML_TR2_HIST], g_tr2_rows, g_tr2_loads, g_tr2_prompt, g_tr2_cold;
++static uint64_t g_tr2_layer_seen[GGML_TR_MAXLAYER];
++static uint64_t g_tr2_tok_loads, g_tr2_tok_max;               // since the last ggml_temporal_route_tokstat
++static FILE *   g_tr_dump2 = NULL;
++static uint64_t ggml_tm_wait_ns_total(void);
++
++static void ggml_tr2_init(int mode) {
++    g_tr2_mode = mode;
++    if (mode == 3) {
++        const char * c = getenv("TEMPORAL_CB_C"), * l = getenv("TEMPORAL_CB_LAMBDA"), * j = getenv("TEMPORAL_CB_J");
++        if (!c || !l) { fprintf(stderr, "temporal-route: FATAL LLAMA_TEMPORAL_ROUTE=skliar needs TEMPORAL_CB_C and TEMPORAL_CB_LAMBDA\n"); abort(); }
++        g_sk_C = atoi(c); g_sk_lam = strtod(l, NULL); g_sk_J = j ? atoi(j) : 1;
++        if (g_sk_C < 1 || (g_sk_J != 0 && g_sk_J != 1)) { fprintf(stderr, "temporal-route: FATAL TEMPORAL_CB_C >= 1 and TEMPORAL_CB_J in {0,1}\n"); abort(); }
++        const char * f = getenv("TEMPORAL_CB_FULLSEL"); g_sk_fullsel = (f && atoi(f)) ? 1 : 0;
++    }
++    const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP2");
++    if (d && d[0]) { g_tr_dump2 = fopen(d, "wb"); if (!g_tr_dump2) { fprintf(stderr, "temporal-route: FATAL cannot open %s\n", d); abort(); } }
++}
++
++static void ggml_tr2_report(void) {
++    int nl = 0, H = 1;
++    for (int L = 0; L < GGML_TR_MAXLAYER; L++) if (g_tr2_layer_seen[L]) nl++;
++    for (int i = 0; i < GGML_TR2_HIST; i++) if (g_tr2_hist[i]) H = i + 1;
++    fprintf(stderr, "temporal-route2: mode=%s layers=%d decode_layer_tokens=%llu loads=%llu loads_per_layer_token=%.4f "
++            "prompt_layer_tokens=%llu cold_decode=%llu C=%d lambda=%.4f J=%d hist=[", g_tr2_mode == 2 ? "decode" : "skliar", nl,
++            (unsigned long long) g_tr2_rows, (unsigned long long) g_tr2_loads,
++            g_tr2_rows ? (double) g_tr2_loads / (double) g_tr2_rows : 0.0,
++            (unsigned long long) g_tr2_prompt, (unsigned long long) g_tr2_cold, g_sk_C, g_sk_lam, g_sk_J);
++    for (int i = 0; i < H; i++) fprintf(stderr, "%s%llu", i ? "," : "", (unsigned long long) g_tr2_hist[i]);
++    fprintf(stderr, "]\n");
++    const char * hp = getenv("TEMPORAL_ROUTE_HIST");
++    if (hp && hp[0]) { FILE * f = fopen(hp, "w"); if (f) {
++        fprintf(f, "{\"hist\": ["); for (int i = 0; i < GGML_TR2_HIST; i++) fprintf(f, "%s%llu", i ? ", " : "", (unsigned long long) g_tr2_hist[i]);
++        fprintf(f, "], \"loads\": %llu, \"rows\": %llu, \"mode\": \"%s\"}\n", (unsigned long long) g_tr2_loads,
++                (unsigned long long) g_tr2_rows, g_tr2_mode == 2 ? "decode" : "skliar"); fclose(f); } }
++    if (g_tr_dump2) { fclose(g_tr_dump2); g_tr_dump2 = NULL; }
++}
++
+ static void ggml_tr_report(void) {
++    if (g_tr2_mode) { ggml_tr2_report(); return; }
+     uint64_t st = 0, sw = 0, co = 0; int nl = 0;
+     for (int L = 0; L < GGML_TR_MAXLAYER; L++) {
+         if (!g_tr_steps[L]) continue;
+@@ -1528,12 +1601,15 @@ int ggml_temporal_route_trained(void) {
+     if (mode < 0) {
+         const char * r = getenv("LLAMA_TEMPORAL_ROUTE");
+         if (r && strcmp(r, "trained") == 0)     mode = 1;
++        else if (r && strcmp(r, "decode") == 0) mode = 2;   // our rule at decode time, model without temporal training
++        else if (r && strcmp(r, "skliar") == 0) mode = 3;   // Skliar et al. cache-conditional routing
+         else if (r && strcmp(r, "random") == 0) mode = 0;
+         else if (r && r[0]) { fprintf(stderr, "temporal-route: FATAL unknown LLAMA_TEMPORAL_ROUTE=%s\n", r); abort(); }
+         else mode = getenv("LLAMA_TEMPORAL_TWOPASS") ? 1 : 0;
+         if (mode) {
+             const char * d = getenv("LLAMA_TEMPORAL_ROUTE_DUMP");
+             if (d && d[0]) { g_tr_dump = fopen(d, "wb"); if (!g_tr_dump) { fprintf(stderr, "temporal-route: FATAL cannot open %s\n", d); abort(); } }
++            if (mode >= 2) { ggml_tr2_init(mode); }
+             atexit(ggml_tr_report);
+         }
+     }
+@@ -1542,6 +1618,19 @@ int ggml_temporal_route_trained(void) {
+ 
+ void ggml_temporal_route_reset(void) {
+     memset(g_tr_k, 0, sizeof(g_tr_k));
++    memset(g_sk_t, 0, sizeof(g_sk_t));
++    if (g_tr_dump2 && g_tr2_K) {                        // sequence start marker: layer -1, rest zero
++        int32_t z[4] = { -1, 0, 0, 0 }; fwrite(z, 4, 4, g_tr_dump2);
++        static const int32_t zero = 0;
++        for (int i = 0; i < g_tr2_K + g_tr2_E; i++) fwrite(&zero, 4, 1, g_tr_dump2);
++    }
++}
++
++void ggml_temporal_route_tokstat(uint64_t * loads, uint64_t * max_layer_loads, uint64_t * wait_ns) {
++    if (loads)           *loads = g_tr2_tok_loads;
++    if (max_layer_loads) *max_layer_loads = g_tr2_tok_max;
++    if (wait_ns)         *wait_ns = ggml_tm_wait_ns_total();
++    g_tr2_tok_loads = 0; g_tr2_tok_max = 0;
+ }
+ 
+ int ggml_temporal_route_last(int L, int * admitted, int * evicted, const int ** window) {
+@@ -1552,6 +1641,172 @@ int ggml_temporal_route_last(int L, int * admitted, int * evicted, const int **
+     return g_tr_k[L];
+ }
+ 
++// top-K of x, highest first, ties to the lower index; `in` gets the membership flags
++static void ggml_tr2_topk(const float * x, int E, int K, int * ids, uint8_t * in) {
++    memset(in, 0, (size_t) E);
++    for (int j = 0; j < K; j++) {
++        int b = -1;
++        for (int e = 0; e < E; e++) if (!in[e] && (b < 0 || x[e] > x[b])) b = e;
++        ids[j] = b; in[b] = 1;
++    }
++}
++
++// our rule, one token: cold fill, or admit the best outsider iff it beats the worst resident.
++// Returns the number of experts that entered (0 or 1; K on a cold fill).
++static int ggml_tr2_decode_step(int L, const float * x, int E, int K) {
++    int * win = g_tr_win[L];
++    uint8_t * in = g_tr_in[L];
++    if (g_tr_k[L] != K) { ggml_tr2_topk(x, E, K, win, in); g_tr_k[L] = K; return K; }
++    int nom = -1, ws = 0;
++    for (int e = 0; e < E; e++) if (!in[e] && (nom < 0 || x[e] > x[nom])) nom = e;
++    for (int j = 1; j < K; j++) {                           // lowest logit; ties evict the lowest expert index
++        if (x[win[j]] < x[win[ws]] || (x[win[j]] == x[win[ws]] && win[j] < win[ws])) ws = j;
++    }
++    if (!(x[nom] > x[win[ws]])) return 0;
++    in[win[ws]] = 0;
++    if (ws != K - 1) win[ws] = win[K - 1];                  // the previous newcomer fills the gap
++    win[K - 1] = nom; in[nom] = 1;                          // the newcomer sits in slot K-1
++    return 1;
++}
++
++// Skliar, a prompt batch (or the first token of a sequence that has no prompt): unbiased, warms the cache
++static void ggml_tr2_skliar_warm(int L, const float * lg, size_t stride, int n_tokens, int E, int K, int32_t * out) {
++    int * win = g_tr_win[L];
++    uint8_t * in = g_tr_in[L];
++    int64_t * last = g_sk_last[L];
++    for (int e = 0; e < E; e++) last[e] = -1;
++    for (int t = 0; t < n_tokens; t++) {
++        const float * x = (const float *) ((const char *) lg + (size_t) t * stride);
++        float mx = x[0], mn = x[0];
++        for (int e = 1; e < E; e++) { if (x[e] > mx) mx = x[e]; if (x[e] < mn) mn = x[e]; }
++        g_sk_dsum[L] += (double) (mx - mn); g_sk_dn[L]++;
++        ggml_tr2_topk(x, E, K, win, in);
++        for (int j = 0; j < K; j++) { last[win[j]] = t; out[(size_t) t * K + j] = win[j]; }
++    }
++    int cached = 0;
++    for (int e = 0; e < E; e++) cached += last[e] >= 0;
++    for (; cached > g_sk_C; cached--) {                     // keep the C most recently used (ties keep the higher index)
++        int w = -1;
++        for (int e = 0; e < E; e++) if (last[e] >= 0 && (w < 0 || last[e] < last[w])) w = e;
++        last[w] = -1;
++    }
++    g_sk_t[L] += n_tokens;
++    g_tr_k[L] = K;                                          // win / in hold the last token's selection
++}
++
++// Skliar, one decoded token. Returns the loads (selected experts that were not cached); *n_new gets the
++// number of experts that were not in the previous token's selection (they sit at the end of the window).
++static int ggml_tr2_skliar_step(int L, const float * x, int E, int K, int * n_new) {
++    static uint8_t cur[GGML_TR_MAXE];
++    static int     keep[GGML_TR_MAXK];
++    int * win = g_tr_win[L];
++    uint8_t * in = g_tr_in[L];
++    int64_t * last = g_sk_last[L];
++    float mx = x[0], mn = x[0]; int t1 = 0;
++    for (int e = 1; e < E; e++) { if (x[e] > mx) { mx = x[e]; t1 = e; } if (x[e] < mn) mn = x[e]; }
++    g_sk_dsum[L] += (double) (mx - mn); g_sk_dn[L]++;
++    const float b = (float) (g_sk_lam * (g_sk_dsum[L] / (double) g_sk_dn[L]));
++#define GGML_SK_ZB(e) (last[e] >= 0 ? x[e] + b : x[e])
++    if (g_sk_C == K && !g_sk_fullsel) {
++        // the cache is the previous selection: exchange the best outsider with the weakest member while it wins
++        memcpy(cur, in, (size_t) E);
++        for (;;) {
++            int nom = -1, ws = -1; float zn = 0.0f, zw = 0.0f;
++            for (int e = 0; e < E; e++) {
++                const float z = GGML_SK_ZB(e);
++                if (cur[e]) { if (ws < 0 || z < zw)  { ws = e;  zw = z; } }
++                else        { if (nom < 0 || z > zn) { nom = e; zn = z; } }
++            }
++            if (!(zn > zw)) break;
++            cur[ws] = 0; cur[nom] = 1;
++        }
++    } else {                                                // plain top-K of z'
++        memset(cur, 0, (size_t) E);
++        for (int j = 0; j < K; j++) {
++            int bi = -1; float zbst = 0.0f;
++            for (int e = 0; e < E; e++) if (!cur[e]) { const float z = GGML_SK_ZB(e); if (bi < 0 || z > zbst) { bi = e; zbst = z; } }
++            cur[bi] = 1;
++        }
++    }
++    if (g_sk_J >= 1 && !cur[t1]) {                          // the top-1 of z is always selected
++        int ws = -1; float zw = 0.0f;
++        for (int e = 0; e < E; e++) if (cur[e]) { const float z = GGML_SK_ZB(e); if (ws < 0 || z < zw) { ws = e; zw = z; } }
++        cur[ws] = 0; cur[t1] = 1;
++    }
++#undef GGML_SK_ZB
++    int nk = 0, loads = 0, nn = 0;
++    for (int j = 0; j < K; j++) if (cur[win[j]]) keep[nk++] = win[j];       // kept from the previous token, in place
++    const int64_t t = g_sk_t[L]++;
++    for (int e = 0; e < E; e++) {
++        if (!cur[e]) continue;
++        if (last[e] < 0) loads++;
++        if (!in[e]) { win[nk + nn] = e; nn++; }                               // entered on this token: end of the window
++        last[e] = t;
++    }
++    for (int j = 0; j < nk; j++) win[j] = keep[j];
++    if (g_sk_C == K) {
++        for (int e = 0; e < E; e++) if (!cur[e]) last[e] = -1;                // the cache is exactly the selection
++    } else {
++        int cached = 0;
++        for (int e = 0; e < E; e++) cached += last[e] >= 0;
++        for (; cached > g_sk_C; cached--) {
++            int w = -1;
++            for (int e = 0; e < E; e++) if (last[e] >= 0 && (w < 0 || last[e] < last[w])) w = e;
++            last[w] = -1;
++        }
++    }
++    memcpy(in, cur, (size_t) E);
++    *n_new = nn;
++    return loads;
++}
++
++// modes 2 and 3 of ggml_temporal_route
++static void ggml_temporal_route2(struct ggml_tensor * dst, const struct ggml_tensor * lg, int L, int K, int n_tokens, int E) {
++    int32_t * out = (int32_t *) dst->data;
++    g_tr2_K = K; g_tr2_E = E; g_tr2_layer_seen[L] += (uint64_t) n_tokens;
++    const float * x0 = (const float *) lg->data;
++    int loads = -1;                                         // -1: not a counted decode step
++    const bool cold = g_tr_k[L] != K;
++    if (n_tokens > 1 || (g_tr2_mode == 3 && cold)) {        // prompt batch: stock top-k, the rule observes
++        if (g_tr2_mode == 3) {
++            ggml_tr2_skliar_warm(L, x0, lg->nb[1], n_tokens, E, K, out);
++        } else {
++            static uint8_t tmp_in[GGML_TR_MAXE];
++            static int     tmp_ids[GGML_TR_MAXK];
++            for (int t = 0; t < n_tokens; t++) {
++                const float * x = (const float *) ((const char *) lg->data + (size_t) t * lg->nb[1]);
++                ggml_tr2_decode_step(L, x, E, K);
++                ggml_tr2_topk(x, E, K, tmp_ids, tmp_in);
++                for (int j = 0; j < K; j++) out[(size_t) t * K + j] = tmp_ids[j];
++            }
++        }
++        g_tr2_nnew[L] = K;
++        if (n_tokens > 1) g_tr2_prompt += (uint64_t) n_tokens; else g_tr2_cold++;
++    } else {                                                // one decoded token: one rule step
++        int nn = 0;
++        if (g_tr2_mode == 3) { loads = ggml_tr2_skliar_step(L, x0, E, K, &nn); }
++        else                 { nn = ggml_tr2_decode_step(L, x0, E, K); loads = cold ? -1 : nn; }
++        g_tr2_nnew[L] = nn;
++        for (int j = 0; j < K; j++) out[j] = g_tr_win[L][j];
++        if (loads >= 0) {
++            g_tr2_rows++; g_tr2_loads += (uint64_t) loads;
++            g_tr2_hist[loads < GGML_TR2_HIST ? loads : GGML_TR2_HIST - 1]++;
++            g_tr2_tok_loads += (uint64_t) loads;
++            if ((uint64_t) loads > g_tr2_tok_max) g_tr2_tok_max = (uint64_t) loads;
++        } else {
++            g_tr2_cold++;
++        }
++    }
++    if (g_tr_dump2) {
++        for (int t = 0; t < n_tokens; t++) {
++            int32_t hdr[4] = { L, n_tokens, t, loads };
++            fwrite(hdr, 4, 4, g_tr_dump2);
++            fwrite(out + (size_t) t * K, 4, (size_t) K, g_tr_dump2);
++            fwrite((const char *) lg->data + (size_t) t * lg->nb[1], 4, (size_t) E, g_tr_dump2);
++        }
++    }
++}
++
+ // custom op: src[0] = router logits [E, n_tokens] (F32); dst = ids [K, n_tokens] (I32)
+ void ggml_temporal_route(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
+     (void) nth;
+@@ -1563,6 +1818,7 @@ void ggml_temporal_route(struct ggml_tensor * dst, int ith, int nth, void * user
+     const int E = (int) lg->ne[0];
+     GGML_ASSERT(lg->type == GGML_TYPE_F32 && lg->ne[1] == n_tokens);
+     GGML_ASSERT(L >= 0 && L < GGML_TR_MAXLAYER && K <= GGML_TR_MAXK && E <= GGML_TR_MAXE && K < E);
++    if (g_tr2_mode) { ggml_temporal_route2(dst, lg, L, K, n_tokens, E); return; }
+     int * win = g_tr_win[L];
+     uint8_t * in = g_tr_in[L];
+     int32_t * out = (int32_t *) dst->data;
+@@ -1700,6 +1956,11 @@ static bool     g_tm_twopass = false;   // split FFN into resident(K-1)+new(1) s
+ static int      g_tm_ewin[GGML_TM_MAXLAYER][GGML_TM_MAXK];
+ static int      g_tm_ewin_k[GGML_TM_MAXLAYER];
+ static uint8_t  g_tm_ein[GGML_TM_MAXLAYER][8192];
++static int      g_tm_enew[GGML_TM_MAXLAYER];   // decode-time rules: experts that entered the window on the last token
++static int      g_tm_tail = 1;                 // LLAMA_TEMPORAL_TAIL: single-expert sub-passes at the end of the window
++static int      g_tm_ord[8192];                // compute order for the layer in g_tm_ord_layer: residents first
++static uint8_t  g_tm_ord_new[8192];
++static int      g_tm_ord_layer = -1;
+ static uint64_t g_tm_ernd[GGML_TM_MAXLAYER];
+ static tm_au64_t g_tm_swaps;
+ 
+@@ -2986,7 +3247,53 @@ void ggml_temporal_window_fill(struct ggml_tensor * dst, int ith, int nth, void
+         else if (g_tm_pool[i].slot == 2) ti_d = i;
+     }
+     tm_mutex_lock(&g_tm_mtx);
+-    if (trained) {
++    if (g_tr2_mode) {
++        // decode-time rules (our rule without training, Skliar): any number of experts can enter on one
++        // token. Evict every expert that left the window, then queue ALL of the window's missing experts
++        // here, at once, so the fetch workers take them in parallel; residents are a no-op. The window
++        // lists the entered experts last (ggml_temporal_route2).
++        const int * w = g_tr_win[L];
++        if (g_tr2_mode == 3 && g_sk_C != K) {              // the K resident experts are the cache
++            fprintf(stderr, "temporal-route: FATAL streamed skliar needs TEMPORAL_CB_C == n_expert_used (%d)\n", K); abort();
++        }
++        const bool had = g_tm_ewin_k[L] == K;
++        if (had) { for (int j = 0; j < K; j++) g_tm_ein[L][g_tm_ewin[L][j]] = 0; }
++        else     { memset(g_tm_ein[L], 0, sizeof(g_tm_ein[L])); }
++        for (int j = 0; j < K; j++) g_tm_ein[L][w[j]] = 1;
++        if (had && g_tm_R < E) {                           // R >= E: everything stays resident once loaded
++            for (int j = 0; j < K; j++) {
++                const int ev = g_tm_ewin[L][j];
++                if (g_tm_ein[L][ev]) continue;
++                if (ti_g>=0) ggml_tm_evict(&g_tm_pool[ti_g], ev);
++                if (ti_u>=0) ggml_tm_evict(&g_tm_pool[ti_u], ev);
++                if (ti_d>=0) ggml_tm_evict(&g_tm_pool[ti_d], ev);
++                tm_add64(&g_tm_swaps, 1);
++            }
++        }
++        for (int j = 0; j < K; j++) {
++            const int e = w[j];
++            g_tm_ewin[L][j] = e;
++            if (g_tm_fused) { ggml_tm_submit_fused(L, e); } else {
++            if (ti_g>=0) ggml_tm_submit2(ti_g, e, 0);
++            if (ti_u>=0) ggml_tm_submit2(ti_u, e, 0);
++            if (ti_d>=0) ggml_tm_submit2(ti_d, e, 0); }
++        }
++        g_tm_ewin_k[L] = K;
++        // experts that entered on this token and are computed inside a multi-expert sub-pass: that
++        // sub-pass computes its residents first (ggml_tm_src_order), so they wait only for what is left
++        const int nn = g_tr2_nnew[L] < K ? g_tr2_nnew[L] : K;
++        g_tm_enew[L] = nn;
++        if (nn > g_tm_tail && nn < K) {
++            int oi = 0;
++            for (int e = 0; e < E; e++) g_tm_ord_new[e] = 0;
++            for (int j = K - nn; j < K; j++) g_tm_ord_new[w[j]] = 1;
++            for (int e = 0; e < E; e++) if (!g_tm_ord_new[e]) g_tm_ord[oi++] = e;
++            for (int j = K - nn; j < K; j++) g_tm_ord[oi++] = w[j];
++            g_tm_ord_layer = L;
++        } else {
++            g_tm_ord_layer = -1;
++        }
++    } else if (trained) {
+         int adm = -1, ev = -1; const int * w = NULL;
+         ggml_temporal_route_last(L, &adm, &ev, &w);
+         if (ev >= 0) {                                    // the swap the router just made
+@@ -3284,6 +3591,22 @@ void ggml_tm_wait_src_expert(const struct ggml_tensor * src0, int e, int ith) {
+         struct ggml_tm_pool_tensor * t = &g_tm_pool[i];
+         if (t->data != src0->data) continue;
+         if (e < 0 || e >= t->n_experts) return;
++        if (g_tr2_mode && g_tm_twopass && ith != 0) {
++            // decode-time rules, streamed: several experts can still be in flight when the first
++            // sub-pass reaches them, and every compute thread arrives here. Threads other than 0 must not
++            // block: on the Pixel 10a, once one of them had taken the pool mutex or slept on the condvar,
++            // whole runs of tokens took 3.8 s each under thermal throttling (ledger S1-3). They poll.
++            for (;;) {
++                const uint8_t st = tm_load8_acq(&t->state[e]);
++                if (st == GGML_TM_RESIDENT) return;
++                if (st == GGML_TM_ABSENT) {
++                    tm_mutex_lock(&g_tm_mtx);
++                    if (t->state[e] == GGML_TM_ABSENT) { ggml_tm_submit(i, e); }
++                    tm_mutex_unlock(&g_tm_mtx);
++                }
++                ggml_thread_cpu_relax();
++            }
++        }
+         if (tm_load8_acq(&t->state[e]) != GGML_TM_RESIDENT) {
+             tm_mutex_lock(&g_tm_mtx);
+             if (t->state[e] == GGML_TM_ABSENT) {
+@@ -3297,6 +3620,28 @@ void ggml_tm_wait_src_expert(const struct ggml_tensor * src0, int e, int ith) {
+     }
+ }
+ 
++// compute order for the repacked mul_mat_id: NULL (index order) unless this tensor's layer just had more
++// experts enter than the single-expert sub-passes hold; then residents first, entered experts last.
++const int * ggml_tm_src_order(const struct ggml_tensor * src0) {
++    const int L = g_tm_ord_layer;
++    if (L < 0 || !src0 || !src0->data) return NULL;
++    for (int i = 0; i < g_tm_pool_n; i++) {
++        if (g_tm_pool[i].data == src0->data) return g_tm_pool[i].layer_id == L ? g_tm_ord : NULL;
++    }
++    return NULL;
++}
++int ggml_temporal_tail(void) {
++    static int init = 0;
++    if (!init) {
++        const char * v = getenv("LLAMA_TEMPORAL_TAIL");
++        const int n = v ? atoi(v) : 1;
++        g_tm_tail = n < 1 ? 1 : (n > 8 ? 8 : n);
++        init = 1;
++    }
++    return g_tm_tail;
++}
++static uint64_t ggml_tm_wait_ns_total(void) { return tm_load64(&g_tm_wait_ns); }
++
+ // trace hooks for the REPACKED mul_mat_id (repack.cpp). That kernel is a separate code
+ // path from the custom mul_mat_id here, so it emits no GEMV events of its own -- the
+ // temporal timeline would be empty of compute once experts are routed to CPU_REPACK.
+@@ -3332,8 +3677,13 @@ void ggml_temporal_wait_new(struct ggml_tensor * dst, int ith, int nth, void * u
+     if (g_tm_R < 0 || L < 0 || L >= GGML_TM_MAXLAYER) return;
+     const int K = g_tm_ewin_k[L];
+     if (K <= 0) return;
+-    const int lo = mode ? K - 1 : 0;
+-    const int hi = mode ? K     : K - 1;
++    // mode 0 = the first sub-pass, slots 0..K-tail-1; mode m >= 1 = the single slot K-tail+m-1.
++    const int lo = mode ? K - g_tm_tail + mode - 1 : 0;
++    int       hi = mode ? lo + 1                   : K - g_tm_tail;
++    // decode-time rules: experts that entered on this token and fall inside the first sub-pass are not
++    // waited for here. The kernel waits for each expert as it reaches it and computes residents first,
++    // so their fetches run under the residents' compute.
++    if (g_tr2_mode && !mode && g_tm_enew[L] < K && K - g_tm_enew[L] < hi) hi = K - g_tm_enew[L];
+     for (int s = lo; s < hi; s++) {
+         const int e = g_tm_ewin[L][s];
+         for (int i = 0; i < g_tm_pool_n; i++) {
+@@ -3360,6 +3710,9 @@ void ggml_temporal_wait_new(struct ggml_tensor * dst, int ith, int nth, void * u
+     (void) dst; (void) ith; (void) nth; (void) userdata;
+ }
+ void   ggml_tm_wait_src_expert(const struct ggml_tensor * src0, int e, int ith) { (void) src0; (void) e; (void) ith; }
++const int * ggml_tm_src_order(const struct ggml_tensor * src0) { (void) src0; return NULL; }
++int    ggml_temporal_tail(void) { const char * v = getenv("LLAMA_TEMPORAL_TAIL"); const int n = v ? atoi(v) : 1; return n < 1 ? 1 : (n > 8 ? 8 : n); }
++static uint64_t ggml_tm_wait_ns_total(void) { return 0; }
+ int    ggml_tm_trace_on(void)  { return 0; }
+ double ggml_tm_trace_now(void) { return 0.0; }
+ void   ggml_tm_trace_gemv(double ts, double dur, int ith, int layer, int expert) {
+diff --git a/ggml/src/ggml-cpu/repack.cpp b/ggml/src/ggml-cpu/repack.cpp
+index 0793776e..7bacbdef 100644
+--- a/ggml/src/ggml-cpu/repack.cpp
++++ b/ggml/src/ggml-cpu/repack.cpp
+@@ -4476,7 +4476,10 @@ template <typename BLOC_TYPE, int64_t INTER_SIZE, int64_t NB_COLS, ggml_type PAR
+         int tm_layer = -1;
+         if (tm_trace && src0->name[0]) { sscanf(src0->name, "blk.%d.", &tm_layer); }
+ 
+-        for (int cur_a = 0; cur_a < n_as; ++cur_a) {
++        // temporal: when several experts entered this layer on one token, residents are computed first
++        const int * tm_ord = ggml_tm_src_order(src0);
++        for (int tm_oi = 0; tm_oi < n_as; ++tm_oi) {
++            const int cur_a = tm_ord ? tm_ord[tm_oi] : tm_oi;
+             const int64_t cne1 = matrix_row_counts[cur_a];
+ 
+             if (cne1 == 0) {
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 26ca1641..93f3c252 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1990,7 +1990,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     // full K window, then sliced. Output = out_resident + out_new. Bit-identical kernel.
+     if (tm_tp_here) {
+         ggml_tensor * curin = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
+-        auto one_pass = [&](int64_t off, int64_t nu, bool wait_new) -> ggml_tensor * {
++        auto one_pass = [&](int64_t off, int64_t nu, int wait_mode) -> ggml_tensor * {
+             ggml_tensor * sel = ggml_cont(ctx0, ggml_view_2d(ctx0, selected_experts, nu, n_tokens,
+                     selected_experts->nb[1], off * selected_experts->nb[0]));
+             // Both sub-passes need a fetch barrier (kernel-agnostic; the repacked
+@@ -1998,7 +1998,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+             // the resident window -- free in steady state, but required on the first
+             // token when the whole window is still streaming. Passes ids through.
+             {
+-                const intptr_t ud = (intptr_t) il | ((intptr_t)(wait_new ? 1 : 0) << 16);
++                const intptr_t ud = (intptr_t) il | ((intptr_t) wait_mode << 16);
+                 sel = ggml_custom_4d(ctx0, GGML_TYPE_I32, nu, n_tokens, 1, 1,
+                         &sel, 1, ggml_temporal_wait_new, 1, (void *) ud);
+             }
+@@ -2015,9 +2015,15 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+             }
+             return o;
+         };
+-        ggml_tensor * outA = one_pass(0, n_expert_used - 1, false); // resident sub-pass
+-        ggml_tensor * outB = one_pass(n_expert_used - 1, 1, true);  // new-expert sub-pass (waits)
+-        ggml_tensor * moe_out = ggml_cont(ctx0, ggml_add(ctx0, outA, outB));
++        // LLAMA_TEMPORAL_TAIL=<n> (default 1): n single-expert sub-passes at the end of the window instead
++        // of one, for rules that can admit several experts on one token (the entered experts sit last).
++        static const int tm_tail = ggml_temporal_tail();
++        GGML_ASSERT(tm_tail < n_expert_used);
++        ggml_tensor * outA = one_pass(0, n_expert_used - tm_tail, 0);   // resident sub-pass
++        for (int i = 0; i < tm_tail; ++i) {                             // new-expert sub-passes (each waits)
++            outA = ggml_add(ctx0, outA, one_pass(n_expert_used - tm_tail + i, 1, i + 1));
++        }
++        ggml_tensor * moe_out = ggml_cont(ctx0, outA);
+         cb(moe_out, "ffn_moe_out", il);
+         return moe_out;
+     }
+diff --git a/tools/llama-bench/llama-bench.cpp b/tools/llama-bench/llama-bench.cpp
+index 1ccfbc5f..2074218a 100644
+--- a/tools/llama-bench/llama-bench.cpp
++++ b/tools/llama-bench/llama-bench.cpp
+@@ -2115,6 +2115,50 @@ struct ctx_state {
+     std::vector<uint8_t> buf; // the llama_context state buffer
+ };
+ 
++// TEMPORAL_BENCH_CTX / TEMPORAL_BENCH_GEN = files of int32 token ids: the context is filled with the first
++// n tokens of CTX instead of random tokens, and generation step i feeds GEN[i] (teacher-forced replay of a
++// real continuation) instead of a random token, so routing sees real text. Unset: stock behaviour.
++// TEMPORAL_BENCH_REPREFILL=1: every repetition fills the context again instead of restoring the saved KV
++// state. The router's per-layer state is not part of that state, so with a restore the repetitions after
++// the first start from the routing state the previous one ended in, not from the prompt's.
++// TEMPORAL_BENCH_TOKLOG=<file>: one line per decoded token: repetition, index, nanoseconds, expert loads
++// summed over the layers, largest per-layer load count, nanoseconds blocked on expert fetches.
++// TEMPORAL_BENCH_LOGIT_HASH=1 adds a 64-bit FNV-1a hash of the token's output logits to that line (computed
++// outside the per-token time, inside the repetition's total): two runs produce the same output iff the
++// hashes match on every token.
++static const std::vector<llama_token> & tb_tokens(const char * env) {
++    static std::vector<llama_token> c, g; static bool rc = false, rg = false;
++    const bool is_ctx = strcmp(env, "TEMPORAL_BENCH_CTX") == 0;
++    std::vector<llama_token> & v = is_ctx ? c : g; bool & r = is_ctx ? rc : rg;
++    if (!r) {
++        r = true;
++        const char * p = getenv(env);
++        if (p && p[0]) {
++            FILE * f = fopen(p, "rb");
++            if (!f) { fprintf(stderr, "%s: cannot open %s\n", env, p); exit(1); }
++            int32_t x; while (fread(&x, 4, 1, f) == 1) v.push_back(x);
++            fclose(f);
++            fprintf(stderr, "llama-bench: %s = %s (%zu tokens)\n", env, p, v.size());
++        }
++    }
++    return v;
++}
++struct tb_tok { int rep; int i; uint64_t ns, loads, max_loads, wait_ns, hash; };
++static std::vector<tb_tok> g_tb_toklog;
++static int g_tb_rep = -1;   // -1 = warm-up
++static void tb_toklog_write() {
++    const char * p = getenv("TEMPORAL_BENCH_TOKLOG");
++    if (!p || !p[0]) return;
++    FILE * f = fopen(p, "w");
++    if (!f) { fprintf(stderr, "TEMPORAL_BENCH_TOKLOG: cannot open %s\n", p); return; }
++    fprintf(f, "rep,i,ns,loads,max_layer_loads,wait_ns,logit_hash\n");
++    for (const auto & t : g_tb_toklog) {
++        fprintf(f, "%d,%d,%llu,%llu,%llu,%llu,%016llx\n", t.rep, t.i, (unsigned long long) t.ns, (unsigned long long) t.loads,
++                (unsigned long long) t.max_loads, (unsigned long long) t.wait_ns, (unsigned long long) t.hash);
++    }
++    fclose(f);
++}
++
+ static bool test_prompt(llama_context * ctx, int n_prompt, int n_batch, int n_threads) {
+     llama_set_n_threads(ctx, n_threads, n_threads);
+ 
+@@ -2132,6 +2176,11 @@ static bool test_prompt(llama_context * ctx, int n_prompt, int n_batch, int n_th
+         for (int i = 1; i < n_tokens; i++) {
+             tokens[i] = std::rand() % n_vocab;
+         }
++        const auto & tbc = tb_tokens("TEMPORAL_BENCH_CTX");
++        if (!tbc.empty()) {
++            if ((int) tbc.size() < n_prompt) { fprintf(stderr, "TEMPORAL_BENCH_CTX has %zu tokens, need %d\n", tbc.size(), n_prompt); exit(1); }
++            for (int i = 0; i < n_tokens; i++) tokens[i] = tbc[n_processed + i];
++        }
+         int res = llama_decode(ctx, llama_batch_get_one(tokens.data(), n_tokens));
+         if (res != 0) {
+             fprintf(stderr, "%s: failed to decode prompt batch, res = %d\n", __func__, res);
+@@ -2152,14 +2201,35 @@ static bool test_gen(llama_context * ctx, int n_gen, int n_threads) {
+     const int32_t       n_vocab = llama_vocab_n_tokens(vocab);
+ 
+     llama_token token = llama_vocab_get_add_bos(vocab) ? llama_vocab_bos(vocab) : std::rand() % n_vocab;
++    const auto & tbg = tb_tokens("TEMPORAL_BENCH_GEN");
++    if (!tbg.empty() && (int) tbg.size() < n_gen) { fprintf(stderr, "TEMPORAL_BENCH_GEN has %zu tokens, need %d\n", tbg.size(), n_gen); exit(1); }
++    static const bool toklog = getenv("TEMPORAL_BENCH_TOKLOG") != nullptr;
++    static const bool logit_hash = getenv("TEMPORAL_BENCH_LOGIT_HASH") && atoi(getenv("TEMPORAL_BENCH_LOGIT_HASH"));
++    uint64_t tl_loads = 0, tl_max = 0, tl_wait0 = 0, tl_wait1 = 0;
++    if (toklog) { ggml_temporal_route_tokstat(&tl_loads, &tl_max, &tl_wait0); }
+ 
+     for (int i = 0; i < n_gen; i++) {
++        if (!tbg.empty()) token = tbg[i];
++        const uint64_t tl_t0 = toklog ? get_time_ns() : 0;
+         int res = llama_decode(ctx, llama_batch_get_one(&token, 1));
+         if (res != 0) {
+             fprintf(stderr, "%s: failed to decode generation batch, res = %d\n", __func__, res);
+             return false;
+         }
+         llama_synchronize(ctx);
++        if (toklog) {
++            const uint64_t ns = get_time_ns() - tl_t0;
++            ggml_temporal_route_tokstat(&tl_loads, &tl_max, &tl_wait1);
++            uint64_t h = 0;
++            if (logit_hash) {
++                const float * lg = llama_get_logits_ith(ctx, -1);
++                const unsigned char * b = (const unsigned char *) lg;
++                h = 1469598103934665603ull;
++                for (size_t k = 0; k < (size_t) n_vocab * sizeof(float); k++) { h ^= b[k]; h *= 1099511628211ull; }
++            }
++            g_tb_toklog.push_back({ g_tb_rep, i, ns, tl_loads, tl_max, tl_wait1 - tl_wait0, h });
++            tl_wait0 = tl_wait1;
++        }
+         token = std::rand() % n_vocab;
+     }
+     return true;
+@@ -2527,11 +2597,13 @@ int llama_bench(int argc, char ** argv) {
+             }
+         }
+ 
++        static const bool tb_reprefill = getenv("TEMPORAL_BENCH_REPREFILL") && atoi(getenv("TEMPORAL_BENCH_REPREFILL"));
+         for (int i = 0; i < params.reps; i++) {
+             llama_memory_clear(llama_get_memory(ctx), false);
++            g_tb_rep = i;
+ 
+             if (t.n_depth > 0) {
+-                bool is_cached = t.n_depth == cstate.depth;
++                bool is_cached = t.n_depth == cstate.depth && !tb_reprefill;
+ 
+                 if (is_cached) {
+                     // if previously we have computed at this depth, just restore the state
+@@ -2611,6 +2683,7 @@ int llama_bench(int argc, char ** argv) {
+         }
+ 
+         llama_perf_context_print(ctx);
++        tb_toklog_write();
+ 
+         llama_free(ctx);
+ 
+-- 
+2.50.0
+

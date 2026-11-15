@@ -1,0 +1,9 @@
+LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=fine_1e19-q4_0-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_FETCHPROF=1 LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained TEMPORAL_BENCH_TOKLOG=_tok.csv
+temporal-pool: active, R=18 swap_prob=0.000 odirect=1 workers=6 sibling=1 split=2
+temporal-pool: O_DIRECT bounce path (off%4096=3072 dst%4096=256 len%4096=0) -- costs a memcpy per fetch
+temporal-route: trained min_logit, layers=13 layer_tokens=14625 cold_fills=26 swaps=14599 swaps_per_layer_token=1.0000
+temporal-pool: fetches=9474 fetched_mib=780.6 evictions=8772 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=960.8 qwait_hi_us=572.9 wait_ms=3365.6 odirect=1 workers=6 sibling=1 split=2
+temporal-pool: ENFORCE on, swaps=1300
+PEAKSWAP_KB=0
+PEAKHWM_KB=763104
+MINMAXF7=2294000
