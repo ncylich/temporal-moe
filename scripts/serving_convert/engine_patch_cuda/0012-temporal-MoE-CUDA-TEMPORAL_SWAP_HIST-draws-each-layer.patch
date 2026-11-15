@@ -1,0 +1,88 @@
+From ae7a46b34849c05786afced8ab5d2a19116e080b Mon Sep 17 00:00:00 2001
+From: build <build@localhost>
+Date: Sun, 15 Nov 2026 00:50:21 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_SWAP_HIST draws each
+ layer-token's forced load count from a histogram
+
+---
+ ggml/src/ggml-cuda/temporal.cu | 50 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
+
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index ffae0367..8a753bca 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -193,6 +193,52 @@ __global__ void k_force_nswap(int* swp_e, int* swp_s, int* nswp, int n, int E, i
+     if (i < n) { swp_e[i] = (int)((base + (unsigned)i) % (unsigned)E); swp_s[i] = i % R; }
+     if (i == 0) *nswp = n;
+ }
++// Replay of a load-count distribution (TEMPORAL_SWAP_HIST="w0,w1,w2,..."): each layer-token draws its number
++// of cold swap-copies n from the weights (w_n = weight of n loads) with a counter hash, on the device, so the
++// draw changes on every CUDA graph replay. Same kernels and launch shapes whatever n is; "0,1" is exactly one
++// load. Timing only, like TEMPORAL_SWAP_N. d_cum[n] = cumulative weight scaled to 2^32-1; counters at exit.
++__device__ unsigned g_hist_step = 0, g_hist_base = 0;
++__device__ unsigned long long g_hist_cnt[32];
++__global__ void k_force_hist(int* swp_e, int* swp_s, int* nswp, const unsigned* cum, int ncum, int E, int R) {
++    int i = threadIdx.x;
++    __shared__ unsigned base; __shared__ int n;
++    if (i == 0) {
++        unsigned x = atomicAdd(&g_hist_step, 1u) + 0x9E3779B9u;      // lowbias32 hash of the step counter
++        x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
++        int m = 0; while (m < ncum - 1 && x > cum[m]) m++;
++        if (m > R) m = R;
++        n = m; base = atomicAdd(&g_hist_base, (unsigned)m);
++        atomicAdd(&g_hist_cnt[m < 31 ? m : 31], 1ull);
++    }
++    __syncthreads();
++    if (i < n) { swp_e[i] = (int)((base + (unsigned)i) % (unsigned)E); swp_s[i] = i % R; }
++    if (i == 0) *nswp = n;
++}
++__global__ void k_hist_read(unsigned long long* out) { for (int i = 0; i < 32; ++i) out[i] = g_hist_cnt[i]; }
++static unsigned* g_hist_cum = nullptr; static int g_hist_n = 0;
++static void tu_hist_report() {
++    unsigned long long* d = nullptr, h[32] = {0};
++    if (cudaMalloc(&d, sizeof(h)) != cudaSuccess) return;
++    k_hist_read<<<1,1>>>(d);
++    if (cudaMemcpy(h, d, sizeof(h), cudaMemcpyDeviceToHost) != cudaSuccess) return;
++    unsigned long long tot = 0, ld = 0; for (int i = 0; i < 32; ++i) { tot += h[i]; ld += h[i] * i; }
++    fprintf(stderr, "temporal-swap-hist: layer_tokens=%llu loads=%llu counts=", tot, ld);
++    for (int i = 0; i < g_hist_n; ++i) fprintf(stderr, "%s%llu", i ? "," : "", h[i]);
++    fprintf(stderr, "\n");
++}
++static int tu_swap_hist() {          // number of entries, 0 = off
++    static int v = [](){
++        const char* s = getenv("TEMPORAL_SWAP_HIST"); if (!s) return 0;
++        std::vector<double> w; for (const char* p = s; *p; ) { char* e; w.push_back(strtod(p, &e)); p = (*e == ',') ? e + 1 : e; if (e == p && *e) break; }
++        double tot = 0; for (double x : w) tot += x; if (w.empty() || tot <= 0 || w.size() > 31) return 0;
++        std::vector<unsigned> c(w.size()); double acc = 0;
++        for (size_t i = 0; i < w.size(); ++i) { acc += w[i]; c[i] = (unsigned)(acc / tot * 4294967295.0); }
++        c.back() = 4294967295u;
++        cudaMalloc(&g_hist_cum, c.size() * sizeof(unsigned)); cudaMemcpy(g_hist_cum, c.data(), c.size() * sizeof(unsigned), cudaMemcpyHostToDevice);
++        g_hist_n = (int)c.size(); atexit(tu_hist_report);
++        return g_hist_n; }();
++    return v;
++}
+ // device-indexed swap copy: read host-mapped pool[expert] -> device slot[victim], for each recorded swap.
+ // Vectorized uint4 (16B/thread) path: host-mapped PCIe reads want wide transactions; byte-per-thread
+ // starves the link. Expert byte-sizes are quant-row multiples (16B-aligned) so nv=be/16 is exact and the
+@@ -251,7 +297,8 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+     // swap-rate emulation: this layer does the 1-swap iff layer < round(p*nlayers); else 0 swaps.
+     const int sp1000 = tu_swap_prob_x1000();
+     const int swap_n = tu_swap_n();
+-    const bool emulate = sp1000 >= 0 || swap_n >= 0;
++    const int swap_hist = n_tokens == 1 ? tu_swap_hist() : 0;
++    const bool emulate = sp1000 >= 0 || swap_n >= 0 || swap_hist > 0;
+     bool layer_swaps = true;
+     if (sp1000 >= 0) {
+         const int nl = (int)g_L.size();
+@@ -277,6 +324,7 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+         if (emulate && !layer_swaps) cudaMemsetAsync(L.d_nswp, 0, sizeof(int), stream);
+         // FLOOR emulation: override the swap list to pin exactly swap_n copies on this layer.
+         if (swap_n >= 0) k_force_nswap<<<1, (swap_n>0?swap_n:1), 0, stream>>>(L.d_swp_e, L.d_swp_s, L.d_nswp, swap_n, L.E, L.R);
++        if (swap_hist > 0) k_force_hist<<<1, L.R, 0, stream>>>(L.d_swp_e, L.d_swp_s, L.d_nswp, g_hist_cum, swap_hist, L.E, L.R);
+         if (tu_lean() == 2) {
+             k_swapcopy3<<<tu_copy_blocks(),256,0,stream>>>(L.pool_dev[0], L.slot[0], L.be[0], L.pool_dev[1], L.slot[1], L.be[1],
+                                                          L.pool_dev[2], L.slot[2], L.be[2], L.d_swp_e, L.d_swp_s, L.d_nswp);
+-- 
+2.50.0
+
