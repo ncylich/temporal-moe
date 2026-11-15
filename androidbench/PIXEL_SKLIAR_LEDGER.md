@@ -11,6 +11,9 @@ the pool on flash, at 1.029 loads per decoded token-layer. The trained model's s
 `TRAINED_MODEL_LEDGER.md` and 32.60 tok/s re-run on this build. Skliar is 1.2 % behind the re-run row and
 inside the spread of its own texts (30.03 to 33.23).
 
+On the 11 B random-weight model with Skliar's load pattern imposed (S1-6): 13.21 tok/s against 14.30 with
+exactly one load per layer per token, 7.6 % slower.
+
 ## S1-0 -- Protocol (2026-11-14)
 
 Fixed by the task and not changed:
@@ -230,6 +233,40 @@ Statements:
   during the prefill: the plain MoE's prompt is routed by the stock top-k, which touches more distinct
   experts than the trained rule's window, and the batched path does not evict until decoding starts. Decode
   -phase RSS was not sampled for Skliar.
+
+## S1-6 -- The 11 B random-weight model with Skliar-shaped loads (20:23 to 20:30)
+
+Asked afterwards out of curiosity. The phone's 11 B model (`qwen3moe-rand-fine-Q4pure.gguf`, 45 MoE layers,
+192 experts, 18 active, 5.9 GB, the model of `CTX_DESIGNPOINT_2026-08-24.md`) has random weights. Its router
+decides nothing meaningful, so Skliar's rule cannot be run on it, and its earlier temporal rows used an imposed
+policy (one random swap per layer per token). This entry does the same for Skliar: `LLAMA_TEMPORAL_ROUTE=replay`
+(added to patch 0003, engine tree `536002e3`) draws each layer-token's load count from the histogram Skliar
+produced on the 1.26 B model in S1-5 and swaps that many random experts. The comparison arm draws from "0,1",
+exactly one load, on the same code path and the same binary.
+
+Same protocol as S1-0 (context 1,024, 128 tokens, 3 repetitions, cool gate), llama-bench's random tokens,
+arms alternated, four runs, none void (big-core cap at rating, no swap, no token above 141 ms).
+
+| arm | tok/s, the two runs (sd over 3 reps) | mean | ms per token | loads per decoded token-layer |
+|---|---|---|---|---|
+| one load per layer per token | 14.18 (0.66), 14.42 (0.44) | 14.30 | 69.9 | 1.000 |
+| Skliar-shaped loads | 13.03 (0.22), 13.40 (0.40) | 13.21 | 75.7 | 1.028 |
+
+Per token after the first of each repetition: 68.81 ms against 73.14 ms; p95 83.1 against 91.6 ms; first token
+after the prompt 143 against 269 ms. Fit over the Skliar-shaped tokens: ms = 43.75 + 0.636 x loads (r^2 0.13).
+
+- **Measured.** On the 11 B geometry Skliar-shaped loads are 7.6 % slower than one load per token, for 2.8 %
+  more loads.
+- **Derived.** At the one-load arm's 45 loads per token the fit gives 72.4 ms against 68.8 ms measured for
+  the one-load arm, so about 5 % of the gap is the burstiness itself and the rest the extra loads. On the
+  1.26 B model the same comparison showed no gap (S1-5). An expert here is about 0.66 MB over its three
+  tensors against 0.26 MB there, and each layer's compute hides less of a multi-expert read.
+- **Limits.** Load counts are drawn independently per layer and token, so the way real Skliar bursts line up
+  across the layers of one token is not reproduced. The experts swapped are random. The histogram comes from
+  the 1.26 B model; a trained 11 B model's Skliar histogram is unknown. Two runs per arm.
+- Not comparable with the 2026-08-24 row for this model (17.80 tok/s at context 1,024): that run was rooted
+  with the governor pinned, on an older build and the earlier random-swap policy. Peak RSS (3.7 to 4.4 GB,
+  rising run to run) is set by the prefill of the 5.9 GB model and was not controlled.
 
 ## Not verified
 

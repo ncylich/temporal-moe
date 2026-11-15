@@ -1,0 +1,10 @@
+LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=qwen3moe-rand-fine-Q4pure-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_FETCHPROF=1 LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=replay TEMPORAL_REPLAY_HIST=5118,15783,2825,850,272,76,27,8,1 TEMPORAL_BENCH_TOKLOG=_tok.csv
+temporal-pool: active, R=18 swap_prob=0.000 odirect=1 workers=6 sibling=1 split=2
+temporal-pool: O_DIRECT zero-copy fetch ENABLED (no bounce memcpy)
+temporal-route2: mode=replay layers=45 decode_layer_tokens=1440 loads=1419 loads_per_layer_token=0.9854 prompt_layer_tokens=45056 cold_decode=46 C=0 lambda=0.0000 J=1 hist=[307,935,136,43,13,5,1]
+temporal-fetchprof: fetches=26874 syscalls/fetch=1.00 wall/fetch=731us sys/fetch=730us first_call=730us outside_sys=1us max_call=29035us short_reads=0
+temporal-pool: fetches=13437 fetched_mib=2834.4 evictions=11007 tensors=135 hook_calls=0 hook_miss=0 avg_fetch_us=1462.4 qwait_hi_us=1628.3 wait_ms=5107.5 odirect=1 workers=6 sibling=1 split=2
+temporal-pool: ENFORCE on, swaps=2129
+PEAKSWAP_KB=0
+PEAKHWM_KB=3143596
+MINMAXF7=3105000

@@ -21,6 +21,7 @@ BENCH = "llama-bench-skliar"
 GGUF = "moe_fine_1e19-full-q4_0.gguf"
 SIDE = "moe_fine_1e19-full-q4_0-repacked.bin"
 K, E, LAM = 18, 192, "0.7207"
+CTX = int(os.environ.get("CTX", "1024"))
 SK = f"LLAMA_TEMPORAL_ROUTE=skliar TEMPORAL_CB_C={K} TEMPORAL_CB_LAMBDA={LAM} TEMPORAL_CB_J=1"
 
 # R experts per layer in RAM and the routing flags. Streamed arms need TWOPASS (run_ctx_designpoint.py).
@@ -38,6 +39,13 @@ ARMS = {
     "trained_deploy":  (K, "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained"),
 }
 TRAINED = ("fine_1e19-q4_0.gguf", "fine_1e19-q4_0-repacked.bin")
+# The 11 B random-weight model of CTX_DESIGNPOINT_2026-08-24.md (45 MoE layers, 192 experts, 18 active). Its
+# router is not meaningful, so loads are imposed (LLAMA_TEMPORAL_ROUTE=replay): one per layer per token, or
+# drawn from Skliar's measured histogram on the 1.26 B model (the timed rows of ledger S1-5).
+BIG = ("qwen3moe-rand-fine-Q4pure.gguf", "qwen3moe-rand-fine-Q4pure-repacked.bin")
+SKLIAR_HIST = "5118,15783,2825,850,272,76,27,8,1"
+ARMS["big_one_load"] = (K, "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=replay TEMPORAL_REPLAY_HIST=0,1")
+ARMS["big_skliar_loads"] = (K, "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=replay TEMPORAL_REPLAY_HIST=" + SKLIAR_HIST)
 
 
 def thermal():
@@ -70,8 +78,8 @@ def wait_cool(timeout_s=3600):
 def run(arm, v, reps, ngen, tag, extra="", dump=False, cool=True):
     R, route = ARMS[arm]
     name = f"{arm}_v{v}_{tag}"
-    trained = arm.startswith("trained")
-    gguf, side = TRAINED if trained else (GGUF, SIDE)
+    trained = arm.startswith("trained") or arm.startswith("big")      # llama-bench's random tokens
+    gguf, side = BIG if arm.startswith("big") else TRAINED if trained else (GGUF, SIDE)
     text = "" if trained else (f"TEMPORAL_BENCH_CTX=tok/ctx1024_v{v}.ctx TEMPORAL_BENCH_GEN=tok/ctx1024_v{v}.gen "
                                f"TEMPORAL_BENCH_REPREFILL=1 TEMPORAL_ROUTE_HIST=_hist.json ")
     env = (f"LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE={side} "
@@ -93,7 +101,7 @@ def run(arm, v, reps, ngen, tag, extra="", dump=False, cool=True):
     s = "#!/system/bin/sh\n" + f"cd {DEV}\n" + "echo 1000 > /proc/self/oom_score_adj\nrm -f _tok.csv _hist.json _route.bin _bench.json\n"
     for kv in env:
         s += f"export {kv}\n"
-    s += (f"./{BENCH} -m {gguf} -t 4 -p 0 -n {ngen} -d 1024 -r {reps} -mmp 0 -ot \"_exps=CPU\" -o json > _bench.json &\n"
+    s += (f"./{BENCH} -m {gguf} -t 4 -p 0 -n {ngen} -d {CTX} -r {reps} -mmp 0 -ot \"_exps=CPU\" -o json > _bench.json &\n"
           "P=$!\nMAXSW=0\nHWM=0\nMF7=99999999\n"
           "while kill -0 $P 2>/dev/null; do\n"
           "  SW=$(grep VmSwap /proc/$P/status 2>/dev/null | tr -dc 0-9)\n"
@@ -114,7 +122,7 @@ def run(arm, v, reps, ngen, tag, extra="", dump=False, cool=True):
     g = lambda pat: (int(re.search(pat, out).group(1)) if re.search(pat, out) else None)
     mf7 = g(r"MINMAXF7=(\d+)")
     throttled = mf7 is None or mf7 < H.RATED[7]
-    row = dict(ts=time.strftime("%Y-%m-%dT%H:%M:%S"), arm=arm, text=v, tag=tag, R=R, ctx=1024, n_gen=ngen, reps=reps,
+    row = dict(ts=time.strftime("%Y-%m-%dT%H:%M:%S"), arm=arm, text=v, tag=tag, R=R, ctx=CTX, n_gen=ngen, reps=reps,
                env=" ".join(env), peak_swap_mb=(g(r"PEAKSWAP_KB=(\d+)") or 0) // 1024,
                peak_rss_mb=round((g(r"PEAKHWM_KB=(\d+)") or 0) / 1024, 1), min_max_freq7=mf7,
                soc_temp_c=c.get("soc_temp"), skin_c_before=c.get("skin_c"), rooted=False)
@@ -135,7 +143,7 @@ def run(arm, v, reps, ngen, tag, extra="", dump=False, cool=True):
         row.update(decode_layer_tokens=int(rt.group(1)), loads=int(rt.group(2)), loads_per_layer_token=float(rt.group(3)),
                    hist=[int(x) for x in rt.group(4).split(",") if x])
     tr = re.search(r"temporal-route: .*layer_tokens=(\d+) cold_fills=(\d+) swaps=(\d+) swaps_per_layer_token=([\d.]+)", out)
-    if trained and tr:
+    if arm.startswith("trained") and tr:
         row.update(swaps_per_layer_token=float(tr.group(4)), route_layer_tokens=int(tr.group(1)))
         rt = tr
     row["route_lines"] = [l for l in out.splitlines() if l.startswith("temporal-")]

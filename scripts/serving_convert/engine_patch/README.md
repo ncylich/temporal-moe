@@ -50,6 +50,7 @@ git am /path/to/temporal-moe/scripts/serving_convert/engine_patch/000*.patch
 |---|---|
 | `LLAMA_TEMPORAL_ROUTE=decode` | our rule as `analysis/residency/decode_state.py`: a prompt batch (more than one token) is routed by the stock top-k while the min_logit window scan observes it; each single-token batch is one rule step (0 or 1 expert admitted) and routes inside the K residents |
 | `LLAMA_TEMPORAL_ROUTE=skliar` + `TEMPORAL_CB_C`, `TEMPORAL_CB_LAMBDA` (`TEMPORAL_CB_J`, 0 or 1, default 1) | Skliar's rule as `analysis/residency/cache_bias.py`: LRU cache of C experts per layer, lambda times the running mean of max-min logit added to cached experts, top-1 guarantee; the prompt is routed by the stock top-k and warms the cache. Any number of experts can enter on one token |
+| `LLAMA_TEMPORAL_ROUTE=replay` + `TEMPORAL_REPLAY_HIST="c0,c1,c2,..."` | for models whose router is not meaningful (random weights): each layer-token draws its load count from the histogram (weights for 0, 1, 2, ... loads) and swaps that many random experts; `0,1` is exactly one load per layer per token. Same downstream path as `skliar` |
 | `TEMPORAL_CB_FULLSEL=1` | Skliar by a plain top-K of the biased logits instead of the exchange loop used when C = K (same selections; cross-check only) |
 | `LLAMA_TEMPORAL_TWOPASS=1` with either mode | streamed: K experts per layer in RAM, the pool on flash. The window op evicts every expert that left the window and queues all missing ones at once, so the fetch workers read them in parallel. Experts that entered on this token sit last in the window; the first sub-pass does not wait for them up front, and the repacked kernel computes that layer's residents first. With `skliar`, C must equal K |
 | `LLAMA_TEMPORAL_TAIL=<n>` (default 1, any mode) | the two-pass FFN ends with n single-expert sub-passes instead of one |
@@ -67,7 +68,7 @@ process, as in the reference; it is not reset between sequences.
 
 `LLAMA_TEMPORAL_ROUTE=trained` is unchanged by this patch (same rule, same window order, same waits).
 
-Checked: `git am` of `0001` to `0003` on a fresh clone at `43bec5f3` gives tree `b1f58983`, the tree the phone
-binaries were built from (local engine commit `d9f0f2d1`, not pushed to the fork).
+Checked: `git am` of `0001` to `0003` on a fresh clone at `43bec5f3` gives tree `536002e3` (local engine commit `4f9948d8`, not pushed to the fork). The 1.26 B rows of the ledger were
+timed on tree `b1f58983` (commit `d9f0f2d1`), which is this patch without the `replay` mode; the 11 B rows on `536002e3`.
 
 Checks and numbers: `androidbench/PIXEL_SKLIAR_LEDGER.md`.
