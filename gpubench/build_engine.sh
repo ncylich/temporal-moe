@@ -13,7 +13,7 @@ git -c user.name=build -c user.email=build@localhost am -q "$REPO"/scripts/servi
 [ "$(git rev-parse --short=8 'HEAD^{tree}')" = b69151b6 ] || { echo "tree mismatch after CPU patches" >&2; exit 1; }
 git apply "$REPO"/llamacpp-bench/systems_bench.patch
 git add -A && git -c user.name=build -c user.email=build@localhost commit -q -m "systems bench patch"
-git -c user.name=build -c user.email=build@localhost am -q "$REPO"/scripts/serving_convert/engine_patch_cuda/000*.patch
+git -c user.name=build -c user.email=build@localhost am -q "$REPO"/scripts/serving_convert/engine_patch_cuda/00*.patch
 echo "engine tree $(git rev-parse --short=8 'HEAD^{tree}')"
 cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86 -DLLAMA_CURL=OFF -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF > build_cmake.log 2>&1
 cmake --build build --target llama llama-bench llama-perplexity llama-server llama-quantize -j 48 2>&1 | tail -40

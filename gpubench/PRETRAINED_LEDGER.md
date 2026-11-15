@@ -348,3 +348,70 @@ About $6.9 for this comparison (about $10.1 with the released-model runs). All f
 none terminated; stopped pods still bill for disk. Nothing on the two new pods is needed again: the
 weights, GGUFs and token files are on the laptop under ~/Documents/temporal-moe-serving, and the engine
 rebuilds from the patch files.
+
+## P1-12 -- Skliar-shaped loads on the 11 B random-weight model (2026-11-15, 09:36 to 10:04 UTC)
+
+Asked afterwards: is the 11 B model large enough for the per-load cost to separate the two rules on the
+A6000? The 11 B model (`llamacpp-bench/`, Qwen3-MoE, 45 layers, 192 experts, 18 active, Q4_K_M, regenerated
+on the pod, 7,032,387,840 bytes, sha256 `af987fed...c172d004`) has random weights. Its router decides
+nothing meaningful, so Skliar's rule cannot be run on it, and its paper rows were driven by an imposed swap
+rate. This entry does the same for Skliar: the number of loads on each layer-token is drawn from the
+histogram Skliar produced on the 1.26 B model in P1-9, and that many cold experts are copied.
+
+**Engine.** Patch 0012 (`TEMPORAL_SWAP_HIST="w0,w1,..."`, tree `26f21c79` = `f6b0026d` plus 0012): a kernel
+draws n for each layer-token from the weights with a hash of a device counter, so the draw changes on every
+CUDA graph replay, and writes n cold expert-to-slot pairs for the existing copy kernels. The launch shapes
+are the same whatever n is. `0,1` is exactly one load. Counts are read back at exit. Timing only, like
+`TEMPORAL_SWAP_N`: the experts copied are not the ones computed.
+
+**Protocol.** `gpubench/big11b/run_hist.sh`, the recipe of `llamacpp-bench/README.md`: `llama-bench -ngl 99
+-fa 1 -ub 1 -b 1 -d 1024 -n 128 -r 8`, streamed arms with `-ncmoe 48 TEMPORAL_UNIFIED=1`. Three passes over
+all arms; the two replay arms are run twice per pass, alternated. Weights for Skliar:
+`5047,16440,3074,1008,292,93,35,10,1` (26,000 decoded token-layers, mean 1.059). Pod `bcnqix1ewwwjr3`.
+
+| arm | runs | tok/s, mean (sd over runs) | range | ms per token | loads per layer-token | peak VRAM MiB |
+|---|---|---|---|---|---|---|
+| all experts in VRAM, stock kernel | 3 | 212.4 (1.1) | 211.7 to 213.7 | 4.708 | none | 7,154 |
+| streamed, 0 loads pinned | 3 | 197.5 (0.5) | 197.1 to 198.1 | 5.064 | 0 | 1,378 |
+| streamed, exactly one load (`0,1`) | 6 | 156.3 (2.7) | 153.6 to 160.7 | 6.397 | 1.000 | 1,378 |
+| **streamed, Skliar-shaped loads** | 6 | **154.9 (3.3)** | 150.1 to 157.3 | 6.458 | 1.058 | 1,378 |
+| streamed, the paper's deploy path (`TEMPORAL_SWAP_PROB=1.0`) | 3 | 166.6 (2.6) | 163.6 to 168.4 | 6.002 | 1 | 1,378 |
+| streamed, 1 load pinned (`TEMPORAL_SWAP_N=1`) | 3 | 160.8 (0.4) | 160.4 to 161.2 | 6.218 | 1 | 1,378 |
+| streamed, 2 loads pinned | 3 | 130.9 (0.3) | 130.5 to 131.1 | 7.642 | 2 | 1,378 |
+| streamed, 3 loads pinned | 3 | 107.9 (4.5) | 102.7 to 111.1 | 9.271 | 3 | 1,378 |
+| streamed, 4 loads pinned | 3 | 91.9 (3.6) | 89.7 to 96.0 | 10.878 | 4 | 1,378 |
+
+Realised draw of the Skliar arm (every run, 299,565 layer-tokens, context fill included since it is fed one
+token at a time): 0: 19.4 %, 1: 63.4 %, 2: 11.9 %, 3: 3.8 %, 4 and more: 1.6 %; 316,804 loads.
+
+- **Measured.** Skliar-shaped loads run at 154.9 tok/s against 156.3 for exactly one load on the same
+  kernels: 0.9 % slower for 5.8 % more loads. The gap is smaller than the run-to-run spread of either arm
+  (sd 2.7 and 3.3 tok/s over six runs each), so the two are not separated.
+- **Measured.** Position in the pass matters by about 2 %: the first replay run of each pass (after the
+  0-load arm) is slower than the repeat two runs later (one load 154.2 against 158.4 on average, Skliar 152.9
+  against 156.8). Paired by position, Skliar is 0.8 % and 1.0 % slower.
+- **Measured.** Pinned loads cost 1.15 ms per token for the first load per layer (25.6 us per layer), then
+  1.42, 1.63 and 1.61 ms for the second to fourth (32 to 36 us per layer). The curve is mildly convex.
+- **Derived.** Weighting the pinned curve by the realised draw predicts 1.30 ms of load time per token
+  against 1.15 ms for one load, 2.4 % slower. The measured 0.9 % is below that. The pinned rows put the
+  same count on all 45 layers of a token; in the replay arm a token mixes layers with zero, one and several
+  loads, and the mix costs less than the pinned rows predict.
+- **Derived.** Share of the all-in-VRAM speed: 0.736 for one load, 0.729 for Skliar-shaped loads on this
+  path; 0.784 for the deploy path (the paper's row is 0.83 on a different machine and build).
+- **What went wrong.** An estimate made before the run from the July rows in
+  `results/ablations/serving_benchmarks.csv` said 3 % slower (160 against 165 tok/s). It assumed the first
+  load is half hidden and a zero-load row from another day; neither holds on this build. The first three
+  rows of a first attempt were timed on a library that did not contain patch 0012 (the pod's network disk
+  has clock skew and make kept a stale object). It showed as a missing `temporal-swap-hist` line; the file
+  was recompiled and those rows are not in the results. `gpubench/build_engine.sh` applied only patches
+  `000*` of the CUDA series, so 0010 to 0012 were skipped until its glob was widened.
+
+Limits: load counts are drawn independently per layer-token, so real Skliar bursts that line up across the
+layers of one token are not reproduced. The experts copied are cold and arbitrary. The histogram comes from
+the 1.26 B model; a trained 11 B model's Skliar histogram is unknown. The replay arms run a different
+list-writing kernel from the pinned and deploy rows: one load on the replay path is 156.3 tok/s against
+160.8 pinned and 166.6 on the deploy path, so the replay arms are compared only with each other. The cost of
+Skliar's own routing kernel against ours is not in this entry (P1-9 has it at 1.26 B). Context 1,024 only.
+
+Pod `bcnqix1ewwwjr3` ran 08:58 to 10:04 UTC at $0.69/h, about $0.76, and is stopped. Raw output:
+`gpubench/results/pretrained/big11b/`.

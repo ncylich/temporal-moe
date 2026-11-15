@@ -68,6 +68,7 @@ drivers in `gpubench/released/`.
 | `TEMPORAL_ROUTE_HIST=<json>` | loads-per-layer-token histogram at exit, format of the saved Python histograms |
 | `LLAMA_TEMPORAL_ROUTE_DUMP2=<file>` | logits and ids per layer-token, plus a marker at each sequence reset, for `gpubench/released/route_check.py`; needs `GGML_CUDA_DISABLE_GRAPHS=1` |
 | `TEMPORAL_BENCH_CTX`, `TEMPORAL_BENCH_GEN` | `llama-bench` fills the context and feeds the decode steps from token files (real text) instead of random tokens |
+| `TEMPORAL_SWAP_HIST=w0,w1,...` (0012) | timing only, like `TEMPORAL_SWAP_N`: each layer-token copies n cold experts, n drawn on the device from the weights (w_n for n loads); `0,1` is exactly one load; realised counts are printed at exit as `temporal-swap-hist:` |
 | `TEMPORAL_SHEXP_FIRST=1` (0007) | orders Qwen3.5's shared expert or Gemma4's dense MLP between the router and the routed experts, so the copies run under it; same ops, same result |
 
 Patch 0006 also carries an earlier `TEMPORAL_SHEXP_FIRST` for `qwen35moe` that puts the shared expert before

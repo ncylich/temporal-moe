@@ -1,0 +1,34 @@
+p1-ceiling: 213.67 tok/s (sd 0.94) peak 7154 MiB 
+p1-n0: 198.06 tok/s (sd 1.24) peak 1378 MiB 
+p1-one: 153.62 tok/s (sd 2.78) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p1-skliar: 157.31 tok/s (sd 2.53) peak 1378 MiB layer_tokens=299565 loads=316804 counts=57987,189784,35508,11345,3384,1044,387,117,9
+p1-one-b: 157.02 tok/s (sd 1.84) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p1-skliar-b: 156.04 tok/s (sd 1.89) peak 1378 MiB layer_tokens=299565 loads=316804 counts=57987,189784,35508,11345,3384,1044,387,117,9
+p1-deploy: 168.41 tok/s (sd 0.94) peak 1378 MiB 
+p1-pin1: 161.21 tok/s (sd 0.92) peak 1378 MiB 
+p1-pin2: 131.11 tok/s (sd 0.45) peak 1378 MiB 
+p1-pin3: 102.73 tok/s (sd 6.19) peak 1378 MiB 
+p1-pin4: 90.02 tok/s (sd 3.95) peak 1378 MiB 
+p2-ceiling: 211.69 tok/s (sd 1.10) peak 7421 MiB 
+p2-n0: 197.10 tok/s (sd 1.04) peak 1378 MiB 
+p2-one: 154.00 tok/s (sd 1.22) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p2-skliar: 151.30 tok/s (sd 0.43) peak 1378 MiB layer_tokens=299565 loads=316804 counts=57987,189784,35508,11345,3384,1044,387,117,9
+p2-one-b: 157.58 tok/s (sd 2.72) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p2-skliar-b: 157.32 tok/s (sd 0.78) peak 1378 MiB layer_tokens=299565 loads=316804 counts=57987,189784,35508,11345,3384,1044,387,117,9
+p2-deploy: 163.61 tok/s (sd 2.71) peak 1378 MiB 
+p2-pin1: 160.41 tok/s (sd 2.72) peak 1378 MiB 
+p2-pin2: 130.50 tok/s (sd 2.57) peak 1378 MiB 
+p2-pin3: 109.73 tok/s (sd 0.76) peak 1378 MiB 
+p2-pin4: 89.72 tok/s (sd 2.94) peak 1378 MiB 
+p3-ceiling: 211.87 tok/s (sd 1.01) peak 7154 MiB 
+p3-n0: 197.24 tok/s (sd 0.98) peak 1378 MiB 
+p3-one: 155.05 tok/s (sd 4.26) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p3-skliar: 150.10 tok/s (sd 4.02) peak 1378 MiB layer_tokens=299565 loads=316804 counts=57987,189784,35508,11345,3384,1044,387,117,9
+p3-one-b: 160.68 tok/s (sd 0.74) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p3-skliar-b: 157.06 tok/s (sd 0.81) peak 1378 MiB layer_tokens=299565 loads=316804 counts=57987,189784,35508,11345,3384,1044,387,117,9
+p3-deploy: 167.82 tok/s (sd 0.95) peak 1378 MiB 
+p3-pin1: 160.86 tok/s (sd 0.68) peak 1645 MiB 
+p3-pin2: 130.94 tok/s (sd 0.60) peak 1378 MiB 
+p3-pin3: 111.12 tok/s (sd 0.37) peak 1378 MiB 
+p3-pin4: 96.04 tok/s (sd 0.28) peak 1378 MiB 
+RUN_DONE
