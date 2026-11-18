@@ -489,8 +489,8 @@ the two settings flipped between the texts. 8 runs, none void: big-core cap at r
 - S1-10: two texts, one run each. `SPLIT=1` was not timed with the shared expert after the wait, on the
   all-in-RAM arm (it reads nothing), on the 11 B model, or with other worker counts.
 - S1-7: the switch was timed at context 1,024 on five texts only, one run per text and setting, on the 1.26 B
-  models. The 11 B model was not touched: the switch is in `glm4-moe.cpp` only, and that model's architecture
-  (`qwen3moe` by its file name) was not checked. The trained
+  models. The switch does not apply to the 11 B model: its file declares architecture `qwen3moe`
+  (read from the GGUF header on the phone), and `src/models/qwen3moe.cpp` loads and builds no shared expert. The trained
   model's all-in-RAM arm, our decode-time rule and `trained_deploy` on random tokens were not re-timed with
   the switch. Placing the shared expert elsewhere (for example split around the resident sub-pass) was not
   tried. Why the host build reports 0.089 loads per token-layer for Skliar without the two-pass graph is open.
