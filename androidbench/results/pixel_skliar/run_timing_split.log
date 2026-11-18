@@ -1,0 +1,33 @@
+[23:34:42] trainedtext_stream_v1_sp2 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 32.4871}
+[23:35:01]   -> 33.727196 tok/s sd 0.910435 trials [32.758, 34.5645, 33.8591] rss 859.8 MB loads None hist None evictions 21249 wait_ms 5408.2
+[23:35:01]   resting 60s
+[23:36:01] DONE
+[23:36:22] trainedtext_stream_v1_sp1 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 32.82751}
+[23:36:40]   -> 35.109124 tok/s sd 0.774562 trials [34.3552, 35.9028, 35.0693] rss 860.3 MB loads None hist None evictions 21249 wait_ms 5602.6
+[23:36:40]   resting 60s
+[23:37:40] DONE
+[23:38:01] skliar_stream_v1_sp2 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 32.862907}
+[23:38:20]   -> 33.649351 tok/s sd 0.338045 trials [33.5709, 34.0197, 33.3574] rss 889.5 MB loads 0.9842 hist [1095, 3221, 449, 149, 54, 14, 9, 1] evictions 21483 wait_ms 5542.6
+[23:38:20]   resting 60s
+[23:39:20] DONE
+[23:39:41] skliar_stream_v1_sp1 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 33.065777}
+[23:40:00]   -> 34.906416 tok/s sd 0.929866 trials [34.1162, 35.9311, 34.672] rss 890.2 MB loads 0.9842 hist [1095, 3221, 449, 149, 54, 14, 9, 1] evictions 21483 wait_ms 5660.7
+[23:40:00]   resting 60s
+[23:41:00] DONE
+[23:41:21] trainedtext_stream_v2_sp1 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 32.87104}
+[23:41:39]   -> 35.459253 tok/s sd 0.571963 trials [34.9468, 36.0763, 35.3547] rss 836.6 MB loads None hist None evictions 20856 wait_ms 5268.0
+[23:41:39]   resting 60s
+[23:42:39] DONE
+[23:43:00] trainedtext_stream_v2_sp2 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 33.07102}
+[23:43:18]   -> 33.318415 tok/s sd 0.447079 trials [32.8213, 33.6876, 33.4463] rss 837.1 MB loads None hist None evictions 20856 wait_ms 5323.2
+[23:43:18]   resting 60s
+[23:44:18] DONE
+[23:44:39] skliar_stream_v2_sp1 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 33.29032}
+[23:44:57]   -> 35.023753 tok/s sd 0.968242 trials [34.2468, 36.1085, 34.716] rss 889.2 MB loads 0.9573 hist [1047, 3311, 472, 127, 32, 3] evictions 21075 wait_ms 5418.3
+[23:44:57]   resting 60s
+[23:45:57] DONE
+[23:46:18] skliar_stream_v2_sp2 R=18: cool gate passed {'soc_temp': 27.854002, 0: 1950000, 4: 2600000, 7: 3105000, 'thermal_status': 0, 'skin_c': 33.35894}
+[23:46:37]   -> 33.588647 tok/s sd 0.172848 trials [33.4427, 33.5437, 33.7795] rss 888.8 MB loads 0.9573 hist [1047, 3311, 472, 127, 32, 3] evictions 21075 wait_ms 5430.0
+[23:46:37]   resting 60s
+[23:47:37] DONE
+TIMING_DONE

@@ -444,6 +444,32 @@ one. Had all six started with the first, the last byte would land at 639 us.
 - `SPLIT=1` helps both arms (trained 1.26 ms per token, Skliar 1.01 ms). With it the trained model is 1.6 %
   ahead of Skliar on later-token time on this one text. These are quick runs, not cool-gated rows.
 
+## S1-10 -- Three reads per expert against six, timed (2026-11-17, 23:33 to 23:47)
+
+`results/pixel_skliar/run_timing_split.sh`, rows tagged `sp2` (`LLAMA_TEMPORAL_SPLIT=2`, the protocol so far)
+and `sp1` (`SPLIT=1`). Kept short on request: texts 1 and 2 only, two arms, 3 repetitions, 128 tokens, context
+1,024, shared expert first in every run, cool gate and 60 s rest, one binary (engine `5f992263`), the order of
+the two settings flipped between the texts. 8 runs, none void: big-core cap at rating, no swap, skin at most
+33.4 C at the start.
+
+| arm | reads per expert | tok/s, text 1, text 2 | mean | ms per token | p95 token ms | slowest token ms | ms per token blocked on fetches |
+|---|---|---|---|---|---|---|---|
+| trained, pool on flash | six | 33.73, 33.32 | 33.52 | 29.83 | 35.3 | 41.0 | 5.44 |
+| trained, pool on flash | three | 35.11, 35.46 | **35.28** | 28.34 | 31.9 | 38.9 | 4.35 |
+| Skliar (1.002 loads over five texts; 0.984 and 0.957 on these two) | six | 33.65, 33.59 | 33.62 | 29.75 | 35.9 | 65.3 | 5.52 |
+| Skliar | three | 34.91, 35.02 | **34.97** | 28.60 | 33.8 | 45.6 | 4.19 |
+
+- **Measured.** Three reads per expert are faster for both arms: trained +4.1 % and +6.4 % on the two texts
+  (+5.3 % on the means), Skliar +3.7 % and +4.3 % (+4.0 %). The time blocked on fetches falls by 1.1 and
+  1.3 ms per token.
+- **Measured.** Trained against Skliar: +0.2 % and -0.8 % with six reads, +0.6 % and +1.2 % with three. Two
+  texts; on these two Skliar loads 3 % fewer experts than the trained model, so the comparison leans
+  slightly toward Skliar.
+- **Gate.** Logits with three reads are bit-identical to the six-read gate runs of S1-7 on every decoded token
+  of text 1, both arms (385 tokens each; tag `g4s1`). Texts 2 to 5 were not checked.
+- Against the all-in-RAM reference of S1-7 (20.79 ms per token), streaming now costs the trained model
+  7.5 ms per token, down from 10.1 ms in S1-5's configuration (shared expert after the wait, six reads).
+
 ## Not verified
 
 - The stalls of S1-3 are not fully explained. The timed rows are free of them, but only cool runs are.
@@ -460,6 +486,8 @@ one. Had all six started with the first, the last byte would land at 639 us.
   peak RSS includes the prefill.
 - Accuracy is not part of this ledger (P1-10 has it); the engine was checked for routing equality and
   flash-equals-RAM only.
+- S1-10: two texts, one run each. `SPLIT=1` was not timed with the shared expert after the wait, on the
+  all-in-RAM arm (it reads nothing), on the 11 B model, or with other worker counts.
 - S1-7: the switch was timed at context 1,024 on five texts only, one run per text and setting, on the 1.26 B
   models. The 11 B model was not touched: the switch is in `glm4-moe.cpp` only, and that model's architecture
   (`qwen3moe` by its file name) was not checked. The trained
@@ -467,7 +495,7 @@ one. Had all six started with the first, the last byte would land at 639 us.
   the switch. Placing the shared expert elsewhere (for example split around the resident sub-pass) was not
   tried. Why the host build reports 0.089 loads per token-layer for Skliar without the two-pass graph is open.
 - `rows.jsonl` holds every run of the session, including smoke, exploration, diagnostic and gate runs made
-  hot; only rows tagged `t2` (S1-5), `big1` (S1-6), `sx0` and `sx1` (S1-7) are results.
+  hot; only rows tagged `t2` (S1-5), `big1` (S1-6), `sx0` and `sx1` (S1-7), `sp2` and `sp1` (S1-10) are results.
 
 ## Files
 
