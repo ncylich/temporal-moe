@@ -1,0 +1,384 @@
+From 90c89eb79dd7d559a51b1c2f610ee614ad352c14 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 18 Nov 2026 00:45:43 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED, one fused op per MoE layer
+ on single-token steps
+
+Off by default. The shared expert, the routed experts, the weighting and the sum over experts of one token
+become one custom op that the CUDA backend runs as three launches; on the streamed path the op moves the
+experts the routing op selected from the host-mapped pool into their slots inside those launches, so no
+copy kernels, events or second stream are involved. The router, the softmax, the routing op and the gate-weight
+ops stay ordinary graph nodes. Q4_0 experts with glm4moe's shapes only; other models keep the old path.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu |   7 +-
+ ggml/src/ggml-cuda/temporal.cu  | 180 +++++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cuh |   5 +
+ src/llama-graph.cpp             |  34 ++++++
+ src/llama-graph.h               |   4 +
+ src/models/glm4-moe.cpp         |  12 +++
+ 6 files changed, 237 insertions(+), 5 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index bb562d44..77d54b6c 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -2416,8 +2416,9 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
+         case GGML_OP_MUL_MAT_ID:
+             ggml_cuda_mul_mat_id(ctx, dst);
+             break;
+-        case GGML_OP_CUSTOM:   // trained temporal routing (the only custom op supports_op accepts)
+-            ggml_cuda_temporal_route(ctx.stream(), dst);
++        case GGML_OP_CUSTOM:   // trained temporal routing, or the fused MoE-layer op (the only custom ops supports_op accepts)
++            if (ggml_cuda_temporal_fused_op(dst)) ggml_cuda_temporal_fused(ctx.stream(), dst);
++            else ggml_cuda_temporal_route(ctx.stream(), dst);
+             break;
+         case GGML_OP_OUT_PROD:
+             ggml_cuda_out_prod(ctx, dst);
+@@ -4917,7 +4918,7 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
+ 
+     switch (op->op) {
+         case GGML_OP_CUSTOM:
+-            return ggml_cuda_temporal_route_op(op);
++            return ggml_cuda_temporal_route_op(op) || ggml_cuda_temporal_fused_op(op);
+         case GGML_OP_UNARY:
+             switch (ggml_get_unary_op(op)) {
+                 case GGML_UNARY_OP_ABS:
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index dffd6614..197d4405 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -49,6 +49,10 @@ static int tr_slots();
+ // expert next), single pass. Off by default.
+ int ggml_cuda_temporal_load_first() { static int v=[](){const char*s=getenv("TEMPORAL_LOAD_FIRST");return s?atoi(s):0;}();
+                                       return ggml_cuda_temporal_unified() ? v : 0; }
++// TEMPORAL_FUSED=1: one fused op per MoE layer on single-token steps (see the end of this file). On the
++// streamed path it does the loads itself, inside its own launches, so the routing op starts no copy kernels;
++// it forces TEMPORAL_ROUTE_SLOTS=2 (the routing kernel keeps the slot table and writes the swap list).
++int ggml_cuda_temporal_fused_on() { static int v=[](){const char*s=getenv("TEMPORAL_FUSED");return s?atoi(s):0;}(); return v; }
+ int ggml_cuda_temporal_route_op_on();
+ int ggml_cuda_temporal_route_mode();
+ static int tr_nocopy();
+@@ -455,6 +459,7 @@ int ggml_cuda_temporal_route_mode();
+ static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");
+                             return s ? atoi(s) : (ggml_cuda_temporal_route_mode()>=2 ? 2 : 0);}();
+                         if (ggml_cuda_temporal_load_first()) return 2;
++                        if (ggml_cuda_temporal_fused_on() && ggml_cuda_temporal_unified()) return 2;
+                         return v && ggml_cuda_temporal_unified(); }
+ // TEMPORAL_ROUTE_NOCOPY (released-model modes, timing controls, output wrong): 1 = copy kernels launched
+ // with an empty swap list (no bytes moved); 2 = no copy kernels, no events, nothing waited on.
+@@ -1089,7 +1094,7 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+     if (sl && tr_slots() == 2 && n_tokens == 1 && (tu_swap_n() >= 0 || tu_swap_hist() > 0))
+         k_force_route<<<1, K, 0, stream>>>(T->d_swp_e, T->d_swp_s, T->d_nswp, tu_swap_n(), E, K, T->remap_ids, T->split_ids,
+                                            tu_swap_hist() > 0 ? g_hist_cum : nullptr, g_hist_n);
+-    if (sl && tr_slots() == 2 && n_tokens == 1 && tr_nocopy() != 2) {   // copies start at the router; =1 leaves them to the expert op
++    if (sl && tr_slots() == 2 && n_tokens == 1 && tr_nocopy() != 2 && !ggml_cuda_temporal_fused_on()) {   // copies start at the router; =1 leaves them to the expert op
+         cudaEventRecord(T->fork, stream);
+         cudaStreamWaitEvent(g_copy, T->fork, 0);
+         for (int w = 0; w < 3; ++w) {
+@@ -1153,7 +1158,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+     // TEMPORAL_ROUTE_SLOTS=2: the swap list exists now, so start the copies here instead of at the gate
+     // GEMM. They run on the copy stream under whatever the graph has between the router and the routed
+     // experts (gate weights, and the shared expert when the graph puts it first).
+-    if (sl && tr_slots() == 2 && n_tokens == 1) {
++    if (sl && tr_slots() == 2 && n_tokens == 1 && !ggml_cuda_temporal_fused_on()) {
+         cudaEventRecord(T->fork, stream);
+         cudaStreamWaitEvent(g_copy, T->fork, 0);
+         for (int w = 0; w < 3; ++w) {
+@@ -1192,3 +1197,174 @@ void ggml_cuda_temporal_route_reset() {
+     }
+     CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
+ }
++
++// ===== TEMPORAL_FUSED: the MoE layer after the gate weights, as three launches =====
++// Replaces, for one token: the shared expert (gate, up, SwiGLU, down), the routed experts (gate, up, SwiGLU,
++// down), experts * weights, the sum over experts and + shared. Same model, same Q4_0 weights, same slots. The
++// selected experts, the swap list and the gate weights are inputs, written by the engine's own router,
++// softmax, routing op and gate-weight ops earlier in the graph; nothing here knows a load before they ran.
++//   A   gate and up products of every routed expert and of the shared expert: one block per 32 rows of one
++//       tensor, one warp per row, one lane per Q4_0 block. Each block quantises the layer input itself (Q8_1,
++//       as mul_mat_vec_q's input). The blocks of an expert being loaded first move their part of the gate or
++//       up tensor from the host-mapped pool into the slot, one 16-byte read per thread, then compute from it.
++//   A2  SwiGLU and Q8_1 quantisation of the activations.
++//   B   down products, experts * gate weights, sum over experts in selection order, + shared: one block per
++//       output row. The down row of an expert being loaded is moved from the pool by extra threads of the same
++//       block while the other experts' products are computed; its own products follow.
++// Dot products use llama.cpp's Q4_0 x Q8_1 integer arithmetic but one 32-weight block per thread and float
++// (not half) activation scales, so sums are formed in a different order from mul_mat_vec_q: results agree
++// with the unfused path to rounding, not bit for bit. Streamed and all-in-VRAM run the same code and are
++// bit-identical to each other.
++struct __attribute__((packed)) tf_q4 { uint16_t d; uint8_t qs[16]; };
++struct tf_q8 { float d; float s; int8_t qs[32]; };                         // s = d * sum(qs)
++static __device__ inline int tf_load4(const uint8_t * p) { int v; memcpy(&v, p, 4); return v; }
++static __device__ inline float tf_dot(const tf_q4 * w, const tf_q8 * x) {
++    int sumi = 0;
++#pragma unroll
++    for (int i = 0; i < 4; ++i) {
++        const int v = tf_load4(w->qs + 4*i);
++        sumi = __dp4a(v & 0x0F0F0F0F, tf_load4((const uint8_t *) x->qs + 4*i), sumi);
++        sumi = __dp4a((v >> 4) & 0x0F0F0F0F, tf_load4((const uint8_t *) x->qs + 16 + 4*i), sumi);
++    }
++    return __half2float(__ushort_as_half(w->d)) * (x->d * (float) sumi - 8.0f * x->s);
++}
++static __device__ inline void tf_quant(const float * x, tf_q8 * q) {
++    float amax = 0.0f;
++    for (int i = 0; i < 32; ++i) amax = fmaxf(amax, fabsf(x[i]));
++    const float d = amax / 127.0f, id = d ? 1.0f / d : 0.0f; int sum = 0;
++    for (int i = 0; i < 32; ++i) { const int v = (int) roundf(x[i] * id); q->qs[i] = (int8_t) v; sum += v; }
++    q->d = d; q->s = d * (float) sum;
++}
++static __device__ inline float tf_wsum(float a) {
++#pragma unroll
++    for (int o = 16; o > 0; o >>= 1) a += __shfl_xor_sync(0xFFFFFFFFu, a, o);
++    return a;
++}
++struct TFA {
++    const float * x;
++    const uint8_t * W[3]; const int * ids; const uint8_t * pool[3];        // gate, up, (down unused here)
++    const int * swp_e, * swp_s, * nswp;
++    const uint8_t * SG, * SU;
++    float * gu, * sg, * su;
++    size_t be; int D, F, FS, K;
++};
++__global__ void k_tf_a(TFA A) {
++    __shared__ tf_q8 xq[28]; __shared__ float xs[896];
++    const int lane = threadIdx.x & 31, row = threadIdx.x >> 5, blk = blockIdx.x;
++    const int DB = A.D / 32, GR = A.F / 32, NR = A.K * GR * 2;
++    for (int i = threadIdx.x; i < A.D; i += 1024) xs[i] = A.x[i];
++    __syncthreads();
++    if (threadIdx.x < DB) tf_quant(xs + 32 * threadIdx.x, xq + threadIdx.x);
++    __syncthreads();
++    if (blk >= NR) {                                                       // shared expert: gate or up, 32 rows
++        const int sb = blk - NR, w = sb & 1, r = (sb >> 1) * 32 + row; float a = 0.0f;
++        if (lane < DB) { const tf_q4 q = ((const tf_q4 *) (w ? A.SU : A.SG))[(size_t) r * DB + lane]; a = tf_dot(&q, xq + lane); }
++        a = tf_wsum(a); if (lane == 0) (w ? A.su : A.sg)[r] = a;
++        return;
++    }
++    const int w = blk % 2, g = (blk / 2) % GR, c = blk / (2 * GR), slot = A.ids[c];
++    if (A.pool[0]) {                                                       // streamed: is this position's expert being loaded?
++        int e = -1; const int ns = min(*A.nswp, A.K);
++        for (int k = 0; k < ns; ++k) if (A.swp_s[k] == slot) e = A.swp_e[k];
++        if (e >= 0) {
++            const int NV = (int) (A.be / 16 / GR);
++            if ((int) threadIdx.x < NV) {
++                const size_t o = (size_t) g * NV + threadIdx.x;
++                ((uint4 *) A.W[w])[(size_t) slot * (A.be / 16) + o] = ((const uint4 *) A.pool[w])[(size_t) e * (A.be / 16) + o];
++            }
++            __syncthreads();
++        }
++    }
++    const int r = g * 32 + row; float a = 0.0f;
++    if (lane < DB) { const tf_q4 q = ((const tf_q4 *) A.W[w])[(size_t) slot * (A.be / 18) + (size_t) r * DB + lane]; a = tf_dot(&q, xq + lane); }
++    a = tf_wsum(a);
++    if (lane == 0) A.gu[((size_t) w * A.K + c) * A.F + r] = a;
++}
++__global__ void k_tf_a2(const float * __restrict__ gu, const float * __restrict__ sg, const float * __restrict__ su, tf_q8 * __restrict__ aq, int nrouted, int KF) {
++    __shared__ float act[32];
++    const int q = blockIdx.x, i = threadIdx.x;
++    float g, u;
++    if (q < nrouted) { g = gu[(size_t) q * 32 + i]; u = gu[(size_t) KF + (size_t) q * 32 + i]; }
++    else             { g = sg[(q - nrouted) * 32 + i]; u = su[(q - nrouted) * 32 + i]; }
++    act[i] = g / (1.0f + expf(-g)) * u;
++    __syncthreads();
++    if (i == 0) tf_quant(act, aq + q);
++}
++struct TFB {
++    const tf_q8 * aq; const float * wgt;
++    const uint8_t * Dn; const int * ids; const uint8_t * poolD;
++    const int * swp_e, * swp_s, * nswp;
++    const uint8_t * SD;
++    float * y;
++    size_t be; int D, F, FS, K;
++};
++__global__ void k_tf_b(TFB B) {                                            // one block per output row; 128 compute + 32 copy threads
++    __shared__ float v[128]; __shared__ float part[65];
++    const int i = threadIdx.x, r = blockIdx.x, GR = B.F / 32, NRQ = B.K * GR, NQ = NRQ + B.FS / 32, RB = GR * 18;
++    const int ns = B.poolD ? min(*B.nswp, B.K) : 0;
++    float a = 0.0f; bool late = false; int slot = 0, b = 0;
++    if (i < NRQ) {
++        b = i % GR; slot = B.ids[i / GR];
++        for (int k = 0; k < ns; ++k) late |= B.swp_s[k] == slot;
++        if (!late) { const tf_q4 w = ((const tf_q4 *) B.Dn)[(size_t) slot * (B.be / 18) + (size_t) r * GR + b]; a = tf_dot(&w, B.aq + i); }
++    } else if (i < NQ) {
++        const tf_q4 w = ((const tf_q4 *) B.SD)[(size_t) r * (B.FS / 32) + (i - NRQ)];
++        a = tf_dot(&w, B.aq + i);
++    } else if (i >= 128) {
++        // the 16-byte vectors covering row r of each loaded expert's down tensor, pool -> slot, one read per
++        // thread; vectors on a row boundary are written by both neighbouring rows with the same bytes
++        const int j = i - 128, vi = j % 8;
++        const size_t first = (size_t) r * RB / 16, last = ((size_t) r * RB + RB - 1) / 16;
++        for (int k = j / 8; k < ns; k += 4)
++            if (first + vi <= last) ((uint4 *) B.Dn)[(size_t) B.swp_s[k] * (B.be / 16) + first + vi] = ((const uint4 *) B.poolD)[(size_t) B.swp_e[k] * (B.be / 16) + first + vi];
++    }
++    __syncthreads();
++    if (late) { const tf_q4 w = ((const tf_q4 *) B.Dn)[(size_t) slot * (B.be / 18) + (size_t) r * GR + b]; a = tf_dot(&w, B.aq + i); }
++    if (i < 128) v[i] = a;
++    __syncthreads();
++    if (i < B.K) { float p = 0.0f; for (int q = 0; q < GR; ++q) p += v[i * GR + q]; part[i] = p; }
++    else if (i == B.K) { float p = 0.0f; for (int q = NRQ; q < NQ; ++q) p += v[q]; part[B.K] = p; }
++    __syncthreads();
++    if (i == 0) {
++        float s2 = part[0] * B.wgt[0];
++        for (int c = 1; c < B.K; ++c) s2 += part[c] * B.wgt[c];
++        B.y[r] = s2 + part[B.K];
++    }
++}
++bool ggml_cuda_temporal_fused_op(const ggml_tensor * t) {
++    return ggml_cuda_temporal_fused_on() && ggml_cuda_temporal_route_op_on() && strncmp(t->name, "ffn_moe_fused", 13) == 0 && t->type == GGML_TYPE_F32;
++}
++void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst) {
++    const ggml_tensor * x = dst->src[0], * ids = dst->src[1], * wgt = dst->src[2];
++    const ggml_tensor * W[3] = { dst->src[3], dst->src[4], dst->src[5] }, * Sx[3] = { dst->src[6], dst->src[7], dst->src[8] };
++    const int D = (int) x->ne[0], F = (int) W[0]->ne[1], FS = (int) Sx[0]->ne[1], K = (int) ids->ne[0], GR = F / 32;
++    GGML_ASSERT(x->ne[1] == 1 && D % 32 == 0 && D <= 896 && F % 32 == 0 && F <= 192 && FS % 32 == 0 && K * GR + FS / 32 <= 128 && K <= 64);
++    static float * gu = nullptr, * sg = nullptr, * su = nullptr; static tf_q8 * aq = nullptr; static int cap = 0;
++    if (!gu) {
++        CUDA_CHECK(cudaMalloc(&gu, (size_t) 2 * 64 * 192 * sizeof(float))); CUDA_CHECK(cudaMalloc(&sg, 4096 * sizeof(float))); CUDA_CHECK(cudaMalloc(&su, 4096 * sizeof(float)));
++        CUDA_CHECK(cudaMalloc(&aq, 128 * sizeof(tf_q8))); cap = 1;
++        fprintf(stderr, "[temporal-fused] one fused op per MoE layer on single-token steps: D=%d F=%d FS=%d K=%d\n", D, F, FS, K);
++    }
++    GGML_ASSERT(FS <= 4096);
++    TFA A; memset(&A, 0, sizeof A); TFB B; memset(&B, 0, sizeof B);
++    auto it = g_tptr.find(W[0]->data);
++    if (it != g_tptr.end()) {                                              // streamed: slots, pool, the routing op's swap list
++        TU & L = g_L[it->second.first];
++        GGML_ASSERT(L.remap_ids && L.R == K && (L.be[0] / 16) % GR == 0 && L.be[0] / 16 / GR <= 1024 && L.be[0] == L.be[1] && L.be[0] == L.be[2]);
++        for (int w = 0; w < 3; ++w) { A.W[w] = L.slot[w]; A.pool[w] = L.pool_dev[w]; }
++        A.ids = L.remap_ids; A.swp_e = L.d_swp_e; A.swp_s = L.d_swp_s; A.nswp = L.d_nswp; A.be = L.be[0];
++        B.poolD = L.pool_dev[2];
++    } else {                                                               // all in VRAM: the full tables, expert ids
++        for (int w = 0; w < 3; ++w) A.W[w] = (const uint8_t *) W[w]->data;
++        A.ids = (const int *) ids->data; A.be = W[0]->nb[2];
++    }
++    A.x = (const float *) x->data; A.SG = (const uint8_t *) Sx[0]->data; A.SU = (const uint8_t *) Sx[1]->data;
++    A.gu = gu; A.sg = sg; A.su = su; A.D = D; A.F = F; A.FS = FS; A.K = K;
++    k_tf_a<<<K * GR * 2 + (FS / 32) * 2, 1024, 0, stream>>>(A);
++    k_tf_a2<<<K * GR + FS / 32, 32, 0, stream>>>(gu, sg, su, aq, K * GR, K * F);
++    B.aq = aq; B.wgt = (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
++    B.SD = (const uint8_t *) Sx[2]->data; B.y = (float *) dst->data; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K;
++    k_tf_b<<<D, 160, 0, stream>>>(B);
++    CUDA_CHECK(cudaGetLastError());
++    (void) cap;
++}
+diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
+index 2bb55f5f..55d9c9f2 100644
+--- a/ggml/src/ggml-cuda/temporal.cuh
++++ b/ggml/src/ggml-cuda/temporal.cuh
+@@ -18,6 +18,11 @@ int  ggml_cuda_temporal_load_first();
+ extern "C" int ggml_cuda_temporal_split_ids(const void* src0_data, int pass, int n_used, int n_tokens,
+                                             int32_t** ids_out_ptr, cudaStream_t stream);
+ 
++// TEMPORAL_FUSED: the fused MoE-layer op (shared expert, routed experts, weighting, sum), see temporal.cu
++int  ggml_cuda_temporal_fused_on();
++bool ggml_cuda_temporal_fused_op(const ggml_tensor * t);
++void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst);
++
+ // ===== EXPERT-MAJOR STREAMING PREFILL support (default path for n_tokens>1 under unified) =====
+ // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
+ // batched GEMM per expert. Decode (n_tokens==1) is untouched.
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index eb02cb59..29fcae4f 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1798,6 +1798,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     );
+ }
+ 
++// TEMPORAL_FUSED has no CPU implementation: the op exists only in the CUDA backend
++static void ggml_temporal_fused_cpu(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    (void) dst; (void) ith; (void) nth; (void) userdata;
++    GGML_ABORT("TEMPORAL_FUSED needs the CUDA backend");
++}
++
+ ggml_tensor * llm_graph_context::build_moe_ffn(
+          ggml_tensor * cur,
+          ggml_tensor * gate_inp,
+@@ -1995,6 +2001,34 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     ggml_build_forward_expand(gf, weights);
+     if (tm_after_router) { ggml_build_forward_expand(gf, tm_after_router); tm_after_router = nullptr; }
+ 
++    // TEMPORAL_FUSED=1 (CUDA, single-token steps, routing op on the device): everything after the gate weights
++    // -- shared expert, routed experts, weighting, sum over experts, + shared -- is one custom op that the CUDA
++    // backend runs as three launches (ggml_cuda_temporal_fused). The router, the softmax, the routing op and the
++    // gate-weight ops above stay ordinary nodes, so the selection, the loads and the weights are the engine's.
++    // Inputs: x, selected ids, gate weights, the routed gate/up/down tensors, the shared gate/up/down tensors.
++    {
++        static const bool tm_fused = getenv("TEMPORAL_FUSED") && atoi(getenv("TEMPORAL_FUSED"));
++        tm_fused_done = false;
++        ggml_tensor ** sh = tm_fused_shexp;
++        const bool q4 = up_exps && gate_exps && down_exps && sh[0] && sh[1] && sh[2]
++            && up_exps->type == GGML_TYPE_Q4_0 && gate_exps->type == GGML_TYPE_Q4_0 && down_exps->type == GGML_TYPE_Q4_0
++            && sh[0]->type == GGML_TYPE_Q4_0 && sh[1]->type == GGML_TYPE_Q4_0 && sh[2]->type == GGML_TYPE_Q4_0;
++        if (tm_fused && q4 && n_tokens == 1 && tm_trained && il >= 0 && selected_experts_in == nullptr && hparams.n_expert_groups <= 1
++                && !gate_up_exps && type_op == LLM_FFN_SILU && !up_exps_b && !gate_exps_b && !down_exps_b
++                && !up_exps_s && !gate_exps_s && !down_exps_s && !weight_before_ffn && loras->empty()
++                && !(hparams.swiglu_clamp_exp[il] > 1e-6f)
++                && n_embd % 32 == 0 && n_embd <= 896 && gate_exps->ne[1] % 32 == 0 && gate_exps->ne[1] <= 256 && sh[0]->ne[1] % 32 == 0
++                && n_expert_used * (gate_exps->ne[1] / 32) + sh[0]->ne[1] / 32 <= 128) {
++            ggml_tensor * args[9] = { cur, selected_experts, weights, gate_exps, up_exps, down_exps, sh[0], sh[1], sh[2] };
++            ggml_tensor * fused = ggml_custom_4d(ctx0, GGML_TYPE_F32, n_embd, n_tokens, 1, 1, args, 9, ggml_temporal_fused_cpu, 1, (void *)(intptr_t) il);
++            cb(fused, "ffn_moe_fused", il);
++            sh[0] = sh[1] = sh[2] = nullptr;
++            tm_fused_done = true;
++            return fused;
++        }
++        sh[0] = sh[1] = sh[2] = nullptr;
++    }
++
+     // TEMPORAL_LOAD_FIRST=1|2: the routed experts run in two passes over the same selection. Pass A computes
+     // the experts already in their VRAM slots and waits for nothing, so it runs while the copies started at the
+     // routing op are in flight; pass B computes the experts being loaded, after their copies. The backend
+diff --git a/src/llama-graph.h b/src/llama-graph.h
+index 42a9695a..bd074f0f 100644
+--- a/src/llama-graph.h
++++ b/src/llama-graph.h
+@@ -936,6 +936,10 @@ struct llm_graph_context {
+     // temporal streaming: a node build_moe_ffn expands right after the router and gate weights, before the
+     // routed-expert GEMMs (TEMPORAL_SHEXP_FIRST=1), so expert copies started at the router run under it
+     mutable ggml_tensor * tm_after_router = nullptr;
++    // TEMPORAL_FUSED: the shared expert's gate, up and down weights of the layer being built; build_moe_ffn then
++    // returns routed experts + shared expert from one fused op and clears them (tm_fused_done tells the caller)
++    mutable ggml_tensor * tm_fused_shexp[3] = { nullptr, nullptr, nullptr };
++    mutable bool          tm_fused_done = false;
+ 
+     llm_graph_context(const llm_graph_params & params);
+     virtual ~llm_graph_context() = default;
+diff --git a/src/models/glm4-moe.cpp b/src/models/glm4-moe.cpp
+index fdde9a65..de36b362 100644
+--- a/src/models/glm4-moe.cpp
++++ b/src/models/glm4-moe.cpp
+@@ -252,6 +252,12 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+                 tm_after_router = shared_early;
+             }
+ 
++            // TEMPORAL_FUSED: hand the shared expert's weights to build_moe_ffn; if it builds the fused op, that op's
++            // output already is routed + shared
++            tm_fused_shexp[0] = model.layers[il].ffn_gate_shexp;
++            tm_fused_shexp[1] = model.layers[il].ffn_up_shexp;
++            tm_fused_shexp[2] = model.layers[il].ffn_down_shexp;
++
+             // Process routed experts using existing MoE infrastructure
+             ggml_tensor * routed_out = build_moe_ffn(cur,
+                     model.layers[il].ffn_gate_inp,
+@@ -265,6 +271,11 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+                     (llama_expert_gating_func_type) hparams.expert_gating_func,
+                     il);
+             cb(routed_out, "ffn_moe_out", il);
++            if (tm_fused_done) {
++                tm_fused_done = false;
++                cur = routed_out;
++                cb(cur, "ffn_out", il);
++            } else {
+ 
+             // Process shared expert on original input
+             ggml_tensor * shared_out = shared_early ? shared_early : build_ffn(cur,
+@@ -288,6 +299,7 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+             // Final output: routed_output + shared_output
+             cur = ggml_add(ctx0, routed_out, shared_out);
+             cb(cur, "ffn_out", il);
++            }
+         }
+         cur = ggml_add(ctx0, cur, ffn_inp);
+ 
+-- 
+2.50.0
+
