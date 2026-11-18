@@ -5,12 +5,13 @@
 # router probe and the load metrics (analysis/probes/cosmoes_metrics.py) on the checkpoint.
 #
 #   NAME=g3_sticky0.1_1e16 METHOD=sticky LAMBDA=0.1 GPUS=2 bash .../baselines_1e16.sh
-#   METHOD=moe: stock standard MoE (pretrain_gpt.py). METHOD=none: patched router at R=E, no loss.
+#   METHOD=moe: stock standard MoE (pretrain_gpt.py). METHOD=temporal: ours.
+#   METHOD=none: patched router at R=E, no loss.
 #   GPUS=0,1 trains data-parallel on two cards (same global batch and iteration count).
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/../../scripts/env.sh"
 cd "$ROOT"
-NAME=${NAME:?run name}; METHOD=${METHOD:?moe | none | cosmoes | sticky}; LAMBDA=${LAMBDA:-0}
+NAME=${NAME:?run name}; METHOD=${METHOD:?moe | temporal | none | cosmoes | sticky}; LAMBDA=${LAMBDA:-0}
 GPUS=${GPUS:-0}
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568 EVAL_AT_END=1 EXTRA_ARGS="--no-rope-fusion"
@@ -22,6 +23,7 @@ export RUN_NAME=$NAME RDZV_PORT=${RDZV_PORT:-$((29510 + ${GPUS%%,*}))}
 export TEMPORAL=1 TEMPORAL_EVICT=min_logit TEMPORAL_RESIDENCY_R=192
 case $METHOD in
   moe)     export TEMPORAL=0; unset TEMPORAL_RESIDENCY_R;;
+  temporal) unset TEMPORAL_RESIDENCY_R;;                 # ours: rolling residency, R = k
   none)    ;;
   cosmoes) export COSMOES_LAMBDA=$LAMBDA;;
   sticky)  export STICKY_LAMBDA=$LAMBDA;;
