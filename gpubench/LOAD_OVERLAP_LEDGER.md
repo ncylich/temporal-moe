@@ -513,3 +513,130 @@ incoming expert computed last) needs the one-launch kernel of O2-2.
 
 Pod `8xcjjlxgekub1c` ran 07:33 to 08:39 UTC on 2026-11-18, 1.1 h at $0.69/h, about $0.76, and is stopped.
 Both parts together about $2.46.
+
+# Part 3 -- The fused MoE-layer op in the engine (2026-11-18, from 08:41 UTC)
+
+From here on the engine's tok/s is the number that counts. The Part 2 harness numbers are superseded: an
+audit of `harness.cu` found, correctly, that its fused path (a) started an expert's load in the launch that
+computed the router logits, before any real engine could know the load, (b) left out the softmax, the routing
+op, the gather and renormalisation of the gate weights and used a constant weight, and (c) was compared with
+a baseline whose launches cost about twice the engine's. It also had the wrong shared-expert width: the
+model's shared expert is 1,152 wide (six experts' worth), not 384 (two), which I took from the task
+description without checking the GGUF. O2-3's "2.7 times" and "+3.9 %" should not be quoted.
+
+## O3-0 -- Engine patch 0014, `TEMPORAL_FUSED=1` (off by default)
+
+`scripts/serving_convert/engine_patch_cuda/0014-*.patch`. On single-token steps with the routing op on the
+device, `build_moe_ffn` replaces everything after the gate weights (shared expert, routed experts, experts
+times weights, the sum over experts, plus shared) by one custom graph node, which the CUDA backend runs as
+its own launches. The router matmul, the softmax, the routing op (`k_route` / `k_skliar`) and the gate-weight
+ops (gather; sum, clamp, divide for the trained model) stay ordinary nodes and run first; the op reads the
+selected slots, the swap list and the gate weights from what they wrote. On the streamed path the op moves the
+experts on the swap list from the host-mapped pool into their slots inside its own launches (no copy
+kernels, events or second stream). `glm4moe` shapes with Q4_0 experts only; anything else keeps the old path.
+`TEMPORAL_FUSED_SKIP` (1: no gate/up launch, 2: no down launch) is a profiling switch with wrong output.
+
+**Changes relative to the engine's computation, and the ground rules one by one.**
+1. Model: unchanged. Same GGUF files, 13 MoE layers, 192 experts, 18 active, shared expert, SwiGLU, the
+   engine's gate weights (renormalised over the window for the trained model). No operation dropped or
+   approximated.
+2. Weights and format: Q4_0 as stored. No requantisation, no dequantised copies. The op's only buffer is 160
+   Q8_1 activation blocks (5.8 kB), the same activations `mul_mat_vec_q` quantises today.
+3. Numbers: bit-identical to the unfused path. The op calls the engine's `vec_dot_q4_0_q8_1` on half blocks,
+   quantises as `quantize_q8_1` does (scale and sum as halves) and adds each row's partial sums in
+   `mul_mat_vec_q`'s order for this card; SwiGLU is up times silu(gate); experts times weights are added in
+   selection order, then the shared expert. Gate: batch-1 perplexity equal in every printed digit, all in VRAM
+   and streamed, all three arms, every round. A first version with its own dot-product arithmetic (whole
+   blocks, float scales) gave 42.0990 against 42.6913 for our rule on the plain MoE and was discarded.
+4. Memory: 18 slots per layer in VRAM, pool in pinned host RAM, peak VRAM 916 MiB streamed as before. No
+   staging area, no extra residents.
+5. Routing and loads: the op loads exactly the swap list the routing op wrote in the same decode step. No
+   prefetch, no lookahead. Loads per decoded token-layer are those of the unfused path (1.0000, 0.9972).
+6. Dependency chain: batch 1, one token at a time, one graph, layers in order.
+7. Timed region: `llama-bench`'s decode timing, unchanged; the loads happen inside it.
+8. One kernel for both rules: the op does not know which rule wrote the swap list.
+9. Portability: it is in the engine. What differs from today's engine: fewer launches (order of products
+   within a launch is by block index), the experts of a layer are computed by one grid, and the copy is done
+   by the threads that compute the incoming expert instead of by copy kernels on a second stream.
+
+## O3-1 -- Round 0: first version (engine tree `389c246c`, three launches per layer)
+
+Launches: A gate and up products (one block per 32 rows of one tensor), A2 SwiGLU and activation
+quantisation, B down products and the sum (one block per output row). Gates pass (`r0/fused_engine_r0.log`):
+perplexity 42.6913 / 40.0690 / 22.7367 for ours / Skliar / trained, unfused and fused, VRAM and streamed;
+routing equal to the references on 1,287 of 1,287 decoded token-layers for ours and Skliar streamed.
+
+P1-9 protocol, three passes with alternating order, 15 runs per arm, tok/s (ms per token), sd over passes at
+most 2.2 tok/s. `off` = `TEMPORAL_ROUTE_SLOTS=2`; `order+fuse` = Part 1's best setting.
+
+| arm | all in VRAM, unfused | all in VRAM, fused | streamed, off | streamed, order+fuse | streamed, fused | fused, no bytes |
+|---|---|---|---|---|---|---|
+| ours, plain MoE | 691.1 (1.4470) | 787.8 (1.2693) | 607.8 (1.6453) | 660.8 (1.5134) | 703.5 (1.4214) | 763.9 (1.3091) |
+| Skliar, plain MoE, 0.997 loads | 676.8 (1.4775) | 768.3 (1.3015) | 588.4 (1.6996) | 635.9 (1.5727) | 701.0 (1.4266) | 739.5 (1.3524) |
+| ours, trained model | 669.3 (1.4941) | 758.8 (1.3178) | 587.5 (1.7023) | 634.9 (1.5750) | 682.7 (1.4649) | 738.2 (1.3546) |
+
+Stock top-k, all in VRAM: 647.4. Ours against Skliar streamed, fused: +0.4 %. Exposed load time (streamed
+minus no bytes): ours 0.112 ms per token, Skliar 0.074, trained 0.110. The load is not hidden here, and a
+layer with any load pays a latency that a second load in the same layer does not pay again, so Skliar's
+21 % of layers with no load help it.
+
+## O3-2 -- Round 1 (engine tree `c82a1081`, two launches per layer)
+
+**Profile going in** (round 0): fused op 3 launches; streamed 1.42 ms of which 0.11 is exposed load.
+
+**Five ideas, ranked by expected gain.**
+1. Schedule the blocks of an expert being loaded first, so its read starts with the launch (they could
+   start in a later wave of the 288-block grid). Expected: a third of the exposed load, about 3 % streamed.
+2. Merge SwiGLU and activation quantisation into the gate/up launch (one block computes gate rows, up rows
+   and the 32 activations): one launch less per layer and half the blocks. Expected 2 to 3 %, every arm.
+3. Size the down launch to one wave (160 threads per block instead of 192). Expected 1 to 2 %.
+4. Fold softmax, gather and renormalisation into the routing kernel. Expected 2 % (plain) to 5 % (trained);
+   needs the softmax kernel's summation order reproduced exactly. Not tried this round.
+5. One cooperative launch with grid barriers instead of two launches. Expected under 1 % (a barrier costs
+   0.7 us, a launch in a replayed graph about 1 us). Not tried.
+
+Implemented 1, 2 and 3 (3 is a two-line change made with 2). Gates pass again, same values.
+
+| arm | all in VRAM, fused | streamed, fused | fused, no bytes | exposed load, ms per token |
+|---|---|---|---|---|
+| ours, plain MoE | 802.9 (1.2456), was 787.8 | **727.9** (1.3739), was 703.5 | 780.0 (1.2821) | 0.092, was 0.112 |
+| Skliar, plain MoE | 780.7 (1.2810), was 768.3 | **700.5** (1.4276), was 701.0 | 752.3 (1.3293) | 0.098, was 0.074 |
+| ours, trained model | 770.7 (1.2976), was 758.8 | **704.2** (1.4200), was 682.7 | 752.5 (1.3290) | 0.091, was 0.110 |
+
+sd over passes up to 5.5 tok/s for ours streamed this round (0.5 to 2.1 for the others).
+
+- Against the switch off (O3-1): ours +19.8 %, Skliar +19.1 %, trained +19.9 % streamed; +16 % in VRAM.
+- Streamed with 18 slots is now faster than the unfused engine with everything in VRAM for every arm
+  (727.9 against 691.1; 700.5 against 676.8; 704.2 against 669.3).
+- **Ours against Skliar, streamed, fused: +3.9 %** (pass ratios 3.6, 3.5, 4.7). Round 1 helped our arm's
+  streamed speed by 3.5 % and Skliar's by nothing: its exposed load went up (0.074 to 0.098 ms) because a
+  loading block now issues two host reads in sequence per thread (gate, then up), and its layers with
+  several loads have more of those. In VRAM the two arms gained the same (1.9 % and 1.6 %).
+- **Profile after round 1** (ours, no bytes, `TEMPORAL_FUSED_SKIP`): token 1.282 ms; without the gate/up
+  launch 1.130 (so it costs 0.153 ms, 11.7 us per layer); without the down launch 1.195 (0.088 ms, 6.7 us
+  per layer); without both 1.039. The op is 0.243 ms, 19 % of the token. It reads 6.22 MB per layer (18
+  experts and the shared expert), so its floor at step 0's 424 GB/s is 14.7 us per layer and it runs at
+  18.7: 27 % above the floor (73 % above at the 578 GB/s large-transfer rate).
+- **The other 1.04 ms is outside the op**: attention (`-fa 0`, 1k context), the router matmul, softmax,
+  routing op and gate-weight ops (5 to 8 launches per layer), norms and the output head. With the op free
+  the token would run at 962 tok/s. Further work on the op can gain at most a few percent of the token.
+- The load: 0.09 ms per token, 7 us per layer, of which step 0 says about 11 us is one load's full price.
+  About a third is hidden.
+
+**Not carried from harness to engine.** The harness predicted a first load at 40 % of full price with
+blocks-first scheduling; in the engine it is about 65 %. The harness had a shorter gate/up launch per block
+(one tensor per block, one host read per thread) and a 384-wide shared expert; the engine version reads
+gate and up in sequence in each loading thread. The harness was not updated to the engine op.
+
+## O3-3 -- Not done or not verified (Part 3, so far)
+
+- Rounds beyond 1. Idea 4 (gate-weight ops into the routing kernel) is the largest remaining item inside the
+  MoE layer; the attention path is the largest in the token and is outside this task.
+- The harness still has the superseded fused path and the wrong shared-expert width. It should either be
+  rebuilt around patch 0014's kernels or dropped; it was not touched after the port.
+- Round 1's gate output was read from the terminal and not saved to a log file (the routing-check JSON files
+  are saved). Round 0's log is saved.
+- Only the 1.26 B shapes are supported by the op. Qwen3.5, Gemma4 and the 11 B model keep the old path.
+- A first decode token after a prompt loads all 18 slots through the op; this was exercised by the gates
+  (every chunk of the perplexity run starts that way) and not timed separately.
+- The fused op was not run with CUDA graphs disabled except in the routing gate.

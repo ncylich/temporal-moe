@@ -1,0 +1,309 @@
+### gates 09:19:04
+decode vram unfused: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer|
+decode vram fused:   Final estimate: PPL = 42.6913 +/- 2.98935 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer|
+decode stream unfused (slots 2): Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream fused rep 1: Final estimate: PPL = 42.6913 +/- 2.98935 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream fused rep 2: Final estimate: PPL = 42.6913 +/- 2.98935 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+skliar vram unfused: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prom|
+skliar vram fused:   Final estimate: PPL = 40.0690 +/- 2.84434 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prom|
+skliar stream unfused (slots 2): Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prom|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream fused rep 1: Final estimate: PPL = 40.0690 +/- 2.84434 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prom|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream fused rep 2: Final estimate: PPL = 40.0690 +/- 2.84434 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prom|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+trained vram unfused: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer|
+trained vram fused:   Final estimate: PPL = 22.7367 +/- 1.50944 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer|
+trained stream unfused (slots 2): Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream fused rep 1: Final estimate: PPL = 22.7367 +/- 1.50944 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream fused rep 2: Final estimate: PPL = 22.7367 +/- 1.50944 | [temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18|temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+### routing equality, fused streamed 09:20:54
+fused ours_stream: {"prompt_tokens": 6708, "prompt_equal": 6508, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 0, "first_mismatch": {"record": 6, "layer": 4, "kind":
+fused skliar_stream: {"prompt_tokens": 6708, "prompt_equal": 6508, "decode_tokens": 1287, "decode_equal": 1287, "loads_equal": 1287, "first_mismatch": {"record": 6, "layer": 4, "kin
+### GATES_DONE 09:21:10
+vram-stock           p1 v1  ctx   1024    651.68 tok/s  1.534 ms  trials ['600.28', '651.62', '651.86', '651.56']  peak 1438 MiB  
+vram-ours            p1 v1  ctx   1024    697.85 tok/s  1.433 ms  trials ['626.04', '697.11', '697.21', '699.22']  peak 1438 MiB  te
+vram-ours-fused      p1 v1  ctx   1024    790.28 tok/s  1.265 ms  trials ['753.08', '792.16', '787.97', '790.72']  peak 1438 MiB  te
+ours-s2              p1 v1  ctx   1024    606.62 tok/s  1.648 ms  trials ['573.65', '612.13', '594.76', '612.99']  peak 918 MiB  tem
+ours-lf3f            p1 v1  ctx   1024    661.46 tok/s  1.512 ms  trials ['625.41', '670.59', '645.10', '668.70']  peak 916 MiB  tem
+ours-fused           p1 v1  ctx   1024    701.42 tok/s  1.426 ms  trials ['667.21', '707.18', '687.51', '709.57']  peak 916 MiB  tem
+ours-fused-nb        p1 v1  ctx   1024    768.12 tok/s  1.302 ms  trials ['730.07', '766.99', '767.13', '770.24']  peak 916 MiB  tem
+vram-skliar          p1 v1  ctx   1024    678.40 tok/s  1.474 ms  trials ['630.25', '677.06', '680.06', '678.08']  peak 1438 MiB  te
+vram-skliar-fused    p1 v1  ctx   1024    771.27 tok/s  1.297 ms  trials ['725.76', '770.92', '770.82', '772.07']  peak 1438 MiB  te
+skliar-s2            p1 v1  ctx   1024    588.32 tok/s  1.700 ms  trials ['556.28', '594.31', '577.29', '593.34']  peak 918 MiB  tem
+skliar-lf3f          p1 v1  ctx   1024    633.40 tok/s  1.579 ms  trials ['604.90', '644.59', '612.11', '643.51']  peak 916 MiB  tem
+skliar-fused         p1 v1  ctx   1024    706.43 tok/s  1.416 ms  trials ['651.45', '705.34', '706.99', '706.97']  peak 916 MiB  tem
+skliar-fused-nb      p1 v1  ctx   1024    744.12 tok/s  1.344 ms  trials ['708.20', '744.12', '744.97', '743.27']  peak 916 MiB  tem
+vram-trained         p1 v1  ctx   1024    670.00 tok/s  1.493 ms  trials ['633.70', '668.63', '670.49', '670.89']  peak 1438 MiB  te
+vram-trained-fused   p1 v1  ctx   1024    760.27 tok/s  1.315 ms  trials ['709.27', '761.59', '760.40', '758.84']  peak 1438 MiB  te
+trained-s2           p1 v1  ctx   1024    586.80 tok/s  1.704 ms  trials ['553.63', '592.03', '574.66', '593.71']  peak 918 MiB  tem
+trained-lf3f         p1 v1  ctx   1024    632.90 tok/s  1.580 ms  trials ['598.23', '640.41', '617.32', '640.98']  peak 916 MiB  tem
+trained-fused        p1 v1  ctx   1024    686.72 tok/s  1.456 ms  trials ['643.90', '687.08', '686.12', '686.96']  peak 916 MiB  tem
+trained-fused-nb     p1 v1  ctx   1024    735.74 tok/s  1.359 ms  trials ['704.75', '744.05', '717.87', '745.32']  peak 916 MiB  tem
+vram-stock           p1 v2  ctx   1024    650.46 tok/s  1.537 ms  trials ['595.21', '650.36', '650.19', '650.82']  peak 1438 MiB  
+vram-ours            p1 v2  ctx   1024    693.66 tok/s  1.442 ms  trials ['651.30', '693.56', '693.29', '694.11']  peak 1438 MiB  te
+vram-ours-fused      p1 v2  ctx   1024    786.33 tok/s  1.272 ms  trials ['722.72', '785.34', '786.08', '787.57']  peak 1438 MiB  te
+ours-s2              p1 v2  ctx   1024    605.08 tok/s  1.653 ms  trials ['571.11', '611.36', '593.43', '610.44']  peak 918 MiB  tem
+ours-lf3f            p1 v2  ctx   1024    660.09 tok/s  1.515 ms  trials ['622.83', '667.31', '646.10', '666.87']  peak 916 MiB  tem
+ours-fused           p1 v2  ctx   1024    704.19 tok/s  1.420 ms  trials ['667.04', '710.22', '690.79', '711.57']  peak 916 MiB  tem
+ours-fused-nb        p1 v2  ctx   1024    760.70 tok/s  1.315 ms  trials ['732.43', '770.19', '743.18', '768.74']  peak 916 MiB  tem
+vram-skliar          p1 v2  ctx   1024    677.58 tok/s  1.476 ms  trials ['638.48', '678.76', '676.86', '677.12']  peak 1438 MiB  te
+vram-skliar-fused    p1 v2  ctx   1024    768.93 tok/s  1.301 ms  trials ['692.47', '769.10', '769.00', '768.71']  peak 1438 MiB  te
+skliar-s2            p1 v2  ctx   1024    589.86 tok/s  1.695 ms  trials ['552.52', '594.68', '579.33', '595.56']  peak 918 MiB  tem
+skliar-lf3f          p1 v2  ctx   1024    637.55 tok/s  1.568 ms  trials ['602.32', '642.82', '628.24', '641.61']  peak 916 MiB  tem
+skliar-fused         p1 v2  ctx   1024    702.13 tok/s  1.424 ms  trials ['667.13', '707.79', '687.78', '710.83']  peak 916 MiB  tem
+skliar-fused-nb      p1 v2  ctx   1024    738.35 tok/s  1.354 ms  trials ['712.63', '747.83', '719.59', '747.63']  peak 916 MiB  tem
+vram-trained         p1 v2  ctx   1024    672.22 tok/s  1.488 ms  trials ['636.12', '671.75', '672.46', '672.46']  peak 1438 MiB  te
+vram-trained-fused   p1 v2  ctx   1024    763.78 tok/s  1.309 ms  trials ['692.17', '763.38', '763.61', '764.34']  peak 1438 MiB  te
+trained-s2           p1 v2  ctx   1024    593.06 tok/s  1.686 ms  trials ['553.22', '592.52', '594.79', '591.87']  peak 918 MiB  tem
+trained-lf3f         p1 v2  ctx   1024    632.90 tok/s  1.580 ms  trials ['600.55', '642.25', '613.82', '642.61']  peak 916 MiB  tem
+trained-fused        p1 v2  ctx   1024    674.76 tok/s  1.482 ms  trials ['646.11', '683.53', '655.17', '685.58']  peak 916 MiB  tem
+trained-fused-nb     p1 v2  ctx   1024    739.26 tok/s  1.353 ms  trials ['708.63', '746.44', '746.06', '725.27']  peak 916 MiB  tem
+vram-stock           p1 v3  ctx   1024    649.22 tok/s  1.540 ms  trials ['592.91', '648.79', '649.00', '649.86']  peak 1438 MiB  
+vram-ours            p1 v3  ctx   1024    688.97 tok/s  1.451 ms  trials ['648.92', '690.08', '686.93', '689.91']  peak 1438 MiB  te
+vram-ours-fused      p1 v3  ctx   1024    788.91 tok/s  1.268 ms  trials ['749.01', '790.67', '788.49', '787.57']  peak 1438 MiB  te
+ours-s2              p1 v3  ctx   1024    609.66 tok/s  1.640 ms  trials ['571.03', '609.15', '609.14', '610.68']  peak 918 MiB  tem
+ours-lf3f            p1 v3  ctx   1024    659.18 tok/s  1.517 ms  trials ['621.71', '665.78', '647.70', '664.06']  peak 916 MiB  tem
+ours-fused           p1 v3  ctx   1024    708.43 tok/s  1.412 ms  trials ['662.43', '708.98', '708.76', '707.56']  peak 916 MiB  tem
+ours-fused-nb        p1 v3  ctx   1024    757.11 tok/s  1.321 ms  trials ['729.88', '764.93', '739.84', '766.57']  peak 916 MiB  tem
+vram-skliar          p1 v3  ctx   1024    675.19 tok/s  1.481 ms  trials ['639.44', '673.86', '674.17', '677.53']  peak 1438 MiB  te
+vram-skliar-fused    p1 v3  ctx   1024    766.42 tok/s  1.305 ms  trials ['720.71', '766.35', '766.62', '766.31']  peak 1438 MiB  te
+skliar-s2            p1 v3  ctx   1024    585.25 tok/s  1.709 ms  trials ['553.13', '588.64', '577.94', '589.17']  peak 918 MiB  tem
+skliar-lf3f          p1 v3  ctx   1024    629.97 tok/s  1.587 ms  trials ['595.42', '635.14', '618.11', '636.65']  peak 916 MiB  tem
+skliar-fused         p1 v3  ctx   1024    697.21 tok/s  1.434 ms  trials ['657.00', '701.50', '685.48', '704.65']  peak 916 MiB  tem
+skliar-fused-nb      p1 v3  ctx   1024    734.71 tok/s  1.361 ms  trials ['705.74', '742.10', '719.96', '742.09']  peak 916 MiB  tem
+vram-trained         p1 v3  ctx   1024    668.05 tok/s  1.497 ms  trials ['630.67', '668.30', '667.43', '668.42']  peak 1438 MiB  te
+vram-trained-fused   p1 v3  ctx   1024    760.21 tok/s  1.315 ms  trials ['717.73', '760.51', '760.52', '759.62']  peak 1438 MiB  te
+trained-s2           p1 v3  ctx   1024    586.51 tok/s  1.705 ms  trials ['511.24', '591.61', '575.90', '592.03']  peak 918 MiB  tem
+trained-lf3f         p1 v3  ctx   1024    635.35 tok/s  1.574 ms  trials ['594.00', '641.28', '622.59', '642.18']  peak 916 MiB  tem
+trained-fused        p1 v3  ctx   1024    687.83 tok/s  1.454 ms  trials ['634.21', '688.95', '686.78', '687.76']  peak 916 MiB  tem
+trained-fused-nb     p1 v3  ctx   1024    742.03 tok/s  1.348 ms  trials ['702.50', '744.23', '742.53', '739.32']  peak 916 MiB  tem
+vram-stock           p1 v4  ctx   1024    647.43 tok/s  1.545 ms  trials ['612.29', '648.11', '646.31', '647.86']  peak 1438 MiB  
+vram-ours            p1 v4  ctx   1024    691.15 tok/s  1.447 ms  trials ['649.25', '693.49', '688.79', '691.16']  peak 1438 MiB  te
+vram-ours-fused      p1 v4  ctx   1024    790.04 tok/s  1.266 ms  trials ['741.24', '790.22', '789.69', '790.21']  peak 1438 MiB  te
+ours-s2              p1 v4  ctx   1024    611.77 tok/s  1.635 ms  trials ['573.01', '611.51', '611.67', '612.12']  peak 918 MiB  tem
+ours-lf3f            p1 v4  ctx   1024    666.55 tok/s  1.500 ms  trials ['620.66', '666.97', '666.41', '666.26']  peak 916 MiB  tem
+ours-fused           p1 v4  ctx   1024    709.39 tok/s  1.410 ms  trials ['665.62', '708.65', '709.78', '709.75']  peak 916 MiB  tem
+ours-fused-nb        p1 v4  ctx   1024    760.22 tok/s  1.315 ms  trials ['731.30', '769.50', '743.40', '767.75']  peak 916 MiB  tem
+vram-skliar          p1 v4  ctx   1024    676.17 tok/s  1.479 ms  trials ['631.92', '675.28', '675.66', '677.58']  peak 1438 MiB  te
+vram-skliar-fused    p1 v4  ctx   1024    766.52 tok/s  1.305 ms  trials ['686.78', '765.57', '767.30', '766.70']  peak 1438 MiB  te
+skliar-s2            p1 v4  ctx   1024    587.62 tok/s  1.702 ms  trials ['549.78', '588.58', '585.46', '588.82']  peak 918 MiB  tem
+skliar-lf3f          p1 v4  ctx   1024    637.38 tok/s  1.569 ms  trials ['595.43', '637.53', '637.10', '637.51']  peak 916 MiB  tem
+skliar-fused         p1 v4  ctx   1024    692.84 tok/s  1.443 ms  trials ['653.27', '699.19', '680.09', '699.26']  peak 916 MiB  tem
+skliar-fused-nb      p1 v4  ctx   1024    742.74 tok/s  1.346 ms  trials ['697.66', '743.28', '743.10', '741.85']  peak 916 MiB  tem
+vram-trained         p1 v4  ctx   1024    671.24 tok/s  1.490 ms  trials ['637.21', '671.61', '671.51', '670.59']  peak 1438 MiB  te
+vram-trained-fused   p1 v4  ctx   1024    757.98 tok/s  1.319 ms  trials ['682.11', '756.36', '757.39', '760.18']  peak 1438 MiB  te
+trained-s2           p1 v4  ctx   1024    587.78 tok/s  1.701 ms  trials ['555.42', '592.48', '579.76', '591.11']  peak 918 MiB  tem
+trained-lf3f         p1 v4  ctx   1024    641.41 tok/s  1.559 ms  trials ['599.52', '640.92', '641.38', '641.93']  peak 916 MiB  tem
+trained-fused        p1 v4  ctx   1024    684.37 tok/s  1.461 ms  trials ['642.95', '683.48', '683.96', '685.67']  peak 916 MiB  tem
+trained-fused-nb     p1 v4  ctx   1024    735.34 tok/s  1.360 ms  trials ['706.67', '742.67', '743.78', '719.56']  peak 916 MiB  tem
+vram-stock           p1 v5  ctx   1024    646.56 tok/s  1.547 ms  trials ['588.36', '646.38', '646.62', '646.67']  peak 1438 MiB  
+vram-ours            p1 v5  ctx   1024    692.78 tok/s  1.443 ms  trials ['654.86', '692.48', '693.06', '692.81']  peak 1438 MiB  te
+vram-ours-fused      p1 v5  ctx   1024    787.74 tok/s  1.269 ms  trials ['747.70', '787.85', '789.04', '786.34']  peak 1438 MiB  te
+ours-s2              p1 v5  ctx   1024    611.41 tok/s  1.636 ms  trials ['571.06', '611.58', '612.22', '610.45']  peak 918 MiB  tem
+ours-lf3f            p1 v5  ctx   1024    659.87 tok/s  1.515 ms  trials ['617.40', '664.13', '649.61', '665.87']  peak 916 MiB  tem
+ours-fused           p1 v5  ctx   1024    703.30 tok/s  1.422 ms  trials ['657.94', '710.34', '690.82', '708.73']  peak 916 MiB  tem
+ours-fused-nb        p1 v5  ctx   1024    766.44 tok/s  1.305 ms  trials ['726.71', '766.40', '766.30', '766.62']  peak 916 MiB  tem
+vram-skliar          p1 v5  ctx   1024    678.59 tok/s  1.474 ms  trials ['645.11', '676.94', '679.02', '679.80']  peak 1438 MiB  te
+vram-skliar-fused    p1 v5  ctx   1024    771.23 tok/s  1.297 ms  trials ['729.26', '770.76', '770.82', '772.10']  peak 1438 MiB  te
+skliar-s2            p1 v5  ctx   1024    590.67 tok/s  1.693 ms  trials ['555.39', '595.04', '582.15', '594.83']  peak 918 MiB  tem
+skliar-lf3f          p1 v5  ctx   1024    640.31 tok/s  1.562 ms  trials ['603.16', '646.08', '628.85', '645.99']  peak 916 MiB  tem
+skliar-fused         p1 v5  ctx   1024    704.46 tok/s  1.420 ms  trials ['655.14', '713.17', '688.23', '711.99']  peak 916 MiB  tem
+skliar-fused-nb      p1 v5  ctx   1024    744.86 tok/s  1.343 ms  trials ['707.84', '744.93', '745.63', '744.04']  peak 916 MiB  tem
+vram-trained         p1 v5  ctx   1024    669.94 tok/s  1.493 ms  trials ['613.71', '671.04', '670.15', '668.65']  peak 1438 MiB  te
+vram-trained-fused   p1 v5  ctx   1024    756.51 tok/s  1.322 ms  trials ['718.71', '757.50', '756.80', '755.23']  peak 1438 MiB  te
+trained-s2           p1 v5  ctx   1024    586.57 tok/s  1.705 ms  trials ['548.60', '590.09', '577.67', '591.94']  peak 918 MiB  tem
+trained-lf3f         p1 v5  ctx   1024    634.80 tok/s  1.575 ms  trials ['598.06', '641.03', '622.11', '641.26']  peak 916 MiB  tem
+trained-fused        p1 v5  ctx   1024    678.70 tok/s  1.473 ms  trials ['644.00', '686.43', '661.24', '688.41']  peak 916 MiB  tem
+trained-fused-nb     p1 v5  ctx   1024    735.45 tok/s  1.360 ms  trials ['708.11', '746.29', '715.60', '744.45']  peak 916 MiB  tem
+### pass 1 done 09:25:44
+trained-fused-nb     p2 v1  ctx   1024    737.54 tok/s  1.356 ms  trials ['704.41', '744.52', '745.60', '722.49']  peak 916 MiB  tem
+trained-fused        p2 v1  ctx   1024    685.07 tok/s  1.460 ms  trials ['641.05', '685.26', '684.91', '685.04']  peak 916 MiB  tem
+trained-lf3f         p2 v1  ctx   1024    636.29 tok/s  1.572 ms  trials ['598.23', '642.49', '623.98', '642.40']  peak 916 MiB  tem
+trained-s2           p2 v1  ctx   1024    588.19 tok/s  1.700 ms  trials ['554.65', '592.42', '579.05', '593.10']  peak 918 MiB  tem
+vram-trained-fused   p2 v1  ctx   1024    759.59 tok/s  1.316 ms  trials ['715.68', '759.20', '759.53', '760.05']  peak 1438 MiB  te
+vram-trained         p2 v1  ctx   1024    668.45 tok/s  1.496 ms  trials ['635.51', '668.26', '669.32', '667.78']  peak 1438 MiB  te
+skliar-fused-nb      p2 v1  ctx   1024    735.38 tok/s  1.360 ms  trials ['708.70', '743.99', '721.42', '740.71']  peak 916 MiB  tem
+skliar-fused         p2 v1  ctx   1024    705.83 tok/s  1.417 ms  trials ['659.14', '705.25', '706.76', '705.47']  peak 916 MiB  tem
+skliar-lf3f          p2 v1  ctx   1024    641.04 tok/s  1.560 ms  trials ['597.97', '640.95', '640.75', '641.41']  peak 916 MiB  tem
+skliar-s2            p2 v1  ctx   1024    590.88 tok/s  1.692 ms  trials ['549.57', '589.55', '590.75', '592.33']  peak 918 MiB  tem
+vram-skliar-fused    p2 v1  ctx   1024    766.33 tok/s  1.305 ms  trials ['718.84', '765.48', '767.34', '766.18']  peak 1438 MiB  te
+vram-skliar          p2 v1  ctx   1024    676.13 tok/s  1.479 ms  trials ['621.46', '676.05', '675.79', '676.55']  peak 1438 MiB  te
+ours-fused-nb        p2 v1  ctx   1024    763.62 tok/s  1.310 ms  trials ['734.75', '771.18', '747.17', '772.50']  peak 916 MiB  tem
+ours-fused           p2 v1  ctx   1024    699.67 tok/s  1.429 ms  trials ['665.52', '708.23', '683.34', '707.42']  peak 916 MiB  tem
+ours-lf3f            p2 v1  ctx   1024    660.66 tok/s  1.514 ms  trials ['623.91', '667.08', '648.18', '666.73']  peak 916 MiB  tem
+ours-s2              p2 v1  ctx   1024    606.09 tok/s  1.650 ms  trials ['573.74', '611.89', '595.10', '611.30']  peak 918 MiB  tem
+vram-ours-fused      p2 v1  ctx   1024    787.64 tok/s  1.270 ms  trials ['735.63', '789.32', '788.05', '785.55']  peak 1438 MiB  te
+vram-ours            p2 v1  ctx   1024    691.58 tok/s  1.446 ms  trials ['655.58', '691.01', '692.28', '691.44']  peak 1438 MiB  te
+vram-stock           p2 v1  ctx   1024    646.69 tok/s  1.546 ms  trials ['616.25', '646.69', '646.54', '646.83']  peak 1438 MiB  
+trained-fused-nb     p2 v2  ctx   1024    741.39 tok/s  1.349 ms  trials ['703.08', '740.94', '741.73', '741.50']  peak 916 MiB  tem
+trained-fused        p2 v2  ctx   1024    679.43 tok/s  1.472 ms  trials ['643.76', '685.16', '685.72', '667.40']  peak 916 MiB  tem
+trained-lf3f         p2 v2  ctx   1024    634.51 tok/s  1.576 ms  trials ['596.22', '640.51', '623.73', '639.28']  peak 916 MiB  tem
+trained-s2           p2 v2  ctx   1024    591.10 tok/s  1.692 ms  trials ['552.85', '590.01', '592.40', '590.89']  peak 918 MiB  tem
+vram-trained-fused   p2 v2  ctx   1024    759.20 tok/s  1.317 ms  trials ['719.68', '758.26', '759.36', '759.99']  peak 1438 MiB  te
+vram-trained         p2 v2  ctx   1024    669.79 tok/s  1.493 ms  trials ['601.58', '668.23', '670.25', '670.88']  peak 1438 MiB  te
+skliar-fused-nb      p2 v2  ctx   1024    744.14 tok/s  1.344 ms  trials ['705.41', '744.62', '743.34', '744.45']  peak 916 MiB  tem
+skliar-fused         p2 v2  ctx   1024    700.66 tok/s  1.427 ms  trials ['663.62', '708.32', '686.78', '706.87']  peak 916 MiB  tem
+skliar-lf3f          p2 v2  ctx   1024    636.71 tok/s  1.571 ms  trials ['599.85', '639.47', '626.69', '643.95']  peak 916 MiB  tem
+skliar-s2            p2 v2  ctx   1024    590.48 tok/s  1.694 ms  trials ['555.24', '594.22', '583.73', '593.51']  peak 918 MiB  tem
+vram-skliar-fused    p2 v2  ctx   1024    767.43 tok/s  1.303 ms  trials ['729.05', '768.97', '768.26', '765.06']  peak 1438 MiB  te
+vram-skliar          p2 v2  ctx   1024    675.30 tok/s  1.481 ms  trials ['634.02', '675.33', '675.22', '675.35']  peak 1438 MiB  te
+ours-fused-nb        p2 v2  ctx   1024    761.81 tok/s  1.313 ms  trials ['718.88', '769.87', '746.45', '769.12']  peak 916 MiB  tem
+ours-fused           p2 v2  ctx   1024    700.41 tok/s  1.428 ms  trials ['662.19', '706.86', '689.28', '705.07']  peak 916 MiB  tem
+ours-lf3f            p2 v2  ctx   1024    659.50 tok/s  1.516 ms  trials ['618.67', '663.84', '648.73', '665.92']  peak 916 MiB  tem
+ours-s2              p2 v2  ctx   1024    608.52 tok/s  1.643 ms  trials ['569.64', '607.66', '608.28', '609.63']  peak 918 MiB  tem
+vram-ours-fused      p2 v2  ctx   1024    787.89 tok/s  1.269 ms  trials ['746.23', '785.15', '788.46', '790.05']  peak 1438 MiB  te
+vram-ours            p2 v2  ctx   1024    689.72 tok/s  1.450 ms  trials ['646.61', '689.21', '691.02', '688.94']  peak 1438 MiB  te
+vram-stock           p2 v2  ctx   1024    645.42 tok/s  1.549 ms  trials ['591.90', '646.50', '645.29', '644.48']  peak 1438 MiB  
+trained-fused-nb     p2 v3  ctx   1024    740.60 tok/s  1.350 ms  trials ['704.31', '740.23', '740.94', '740.64']  peak 916 MiB  tem
+trained-fused        p2 v3  ctx   1024    688.61 tok/s  1.452 ms  trials ['646.24', '688.66', '689.72', '687.45']  peak 916 MiB  tem
+trained-lf3f         p2 v3  ctx   1024    634.68 tok/s  1.576 ms  trials ['594.01', '643.82', '620.52', '639.71']  peak 916 MiB  tem
+trained-s2           p2 v3  ctx   1024    584.73 tok/s  1.710 ms  trials ['552.29', '591.49', '573.23', '589.48']  peak 918 MiB  tem
+vram-trained-fused   p2 v3  ctx   1024    758.19 tok/s  1.319 ms  trials ['710.05', '758.69', '756.23', '759.64']  peak 1438 MiB  te
+vram-trained         p2 v3  ctx   1024    671.12 tok/s  1.490 ms  trials ['634.06', '670.13', '671.68', '671.57']  peak 1438 MiB  te
+skliar-fused-nb      p2 v3  ctx   1024    733.22 tok/s  1.364 ms  trials ['705.36', '741.06', '718.11', '740.48']  peak 916 MiB  tem
+skliar-fused         p2 v3  ctx   1024    695.29 tok/s  1.438 ms  trials ['660.81', '702.44', '681.47', '701.95']  peak 916 MiB  tem
+skliar-lf3f          p2 v3  ctx   1024    630.52 tok/s  1.586 ms  trials ['594.09', '636.92', '616.95', '637.70']  peak 916 MiB  tem
+skliar-s2            p2 v3  ctx   1024    588.76 tok/s  1.698 ms  trials ['552.45', '588.52', '589.09', '588.68']  peak 918 MiB  tem
+vram-skliar-fused    p2 v3  ctx   1024    768.66 tok/s  1.301 ms  trials ['722.09', '768.28', '769.82', '767.88']  peak 1438 MiB  te
+vram-skliar          p2 v3  ctx   1024    677.95 tok/s  1.475 ms  trials ['622.87', '677.65', '678.89', '677.31']  peak 1438 MiB  te
+ours-fused-nb        p2 v3  ctx   1024    766.82 tok/s  1.304 ms  trials ['728.66', '766.95', '767.11', '766.41']  peak 916 MiB  tem
+ours-fused           p2 v3  ctx   1024    701.74 tok/s  1.425 ms  trials ['663.09', '709.22', '686.39', '709.63']  peak 916 MiB  tem
+ours-lf3f            p2 v3  ctx   1024    660.24 tok/s  1.515 ms  trials ['621.34', '667.70', '648.06', '664.96']  peak 916 MiB  tem
+ours-s2              p2 v3  ctx   1024    609.21 tok/s  1.641 ms  trials ['572.98', '610.57', '607.76', '609.31']  peak 918 MiB  tem
+vram-ours-fused      p2 v3  ctx   1024    786.12 tok/s  1.272 ms  trials ['745.93', '786.50', '786.12', '785.73']  peak 1438 MiB  te
+vram-ours            p2 v3  ctx   1024    689.47 tok/s  1.450 ms  trials ['649.07', '691.69', '687.13', '689.60']  peak 1438 MiB  te
+vram-stock           p2 v3  ctx   1024    646.19 tok/s  1.548 ms  trials ['612.89', '647.09', '646.30', '645.16']  peak 1438 MiB  
+trained-fused-nb     p2 v4  ctx   1024    739.13 tok/s  1.353 ms  trials ['700.84', '741.03', '738.59', '737.77']  peak 916 MiB  tem
+trained-fused        p2 v4  ctx   1024    684.00 tok/s  1.462 ms  trials ['642.86', '684.23', '684.84', '682.93']  peak 916 MiB  tem
+trained-lf3f         p2 v4  ctx   1024    631.16 tok/s  1.584 ms  trials ['597.04', '638.17', '618.36', '636.96']  peak 916 MiB  tem
+trained-s2           p2 v4  ctx   1024    587.49 tok/s  1.702 ms  trials ['553.11', '592.02', '577.80', '592.65']  peak 918 MiB  tem
+vram-trained-fused   p2 v4  ctx   1024    758.93 tok/s  1.318 ms  trials ['719.71', '759.02', '759.18', '758.58']  peak 1438 MiB  te
+vram-trained         p2 v4  ctx   1024    670.80 tok/s  1.491 ms  trials ['600.95', '670.37', '670.62', '671.40']  peak 1438 MiB  te
+skliar-fused-nb      p2 v4  ctx   1024    743.69 tok/s  1.345 ms  trials ['708.46', '743.30', '743.60', '744.17']  peak 916 MiB  tem
+skliar-fused         p2 v4  ctx   1024    701.68 tok/s  1.425 ms  trials ['657.02', '704.12', '700.68', '700.25']  peak 916 MiB  tem
+skliar-lf3f          p2 v4  ctx   1024    637.65 tok/s  1.568 ms  trials ['588.29', '638.56', '637.13', '637.25']  peak 916 MiB  tem
+skliar-s2            p2 v4  ctx   1024    585.27 tok/s  1.709 ms  trials ['547.35', '590.59', '576.29', '588.93']  peak 918 MiB  tem
+vram-skliar-fused    p2 v4  ctx   1024    769.43 tok/s  1.300 ms  trials ['720.70', '769.58', '768.55', '770.14']  peak 1438 MiB  te
+vram-skliar          p2 v4  ctx   1024    677.59 tok/s  1.476 ms  trials ['617.92', '677.30', '677.03', '678.45']  peak 1438 MiB  te
+ours-fused-nb        p2 v4  ctx   1024    757.90 tok/s  1.319 ms  trials ['711.57', '763.69', '742.95', '767.08']  peak 916 MiB  tem
+ours-fused           p2 v4  ctx   1024    706.89 tok/s  1.415 ms  trials ['662.80', '706.38', '706.63', '707.66']  peak 916 MiB  tem
+ours-lf3f            p2 v4  ctx   1024    666.11 tok/s  1.501 ms  trials ['625.49', '667.58', '665.67', '665.07']  peak 916 MiB  tem
+ours-s2              p2 v4  ctx   1024    606.53 tok/s  1.649 ms  trials ['572.34', '611.72', '597.98', '609.90']  peak 918 MiB  tem
+vram-ours-fused      p2 v4  ctx   1024    786.73 tok/s  1.271 ms  trials ['748.19', '780.92', '788.40', '790.87']  peak 1438 MiB  te
+vram-ours            p2 v4  ctx   1024    690.42 tok/s  1.448 ms  trials ['648.10', '690.78', '690.86', '689.63']  peak 1438 MiB  te
+vram-stock           p2 v4  ctx   1024    648.32 tok/s  1.542 ms  trials ['615.09', '647.08', '648.84', '649.05']  peak 1438 MiB  
+trained-fused-nb     p2 v5  ctx   1024    737.24 tok/s  1.356 ms  trials ['706.86', '745.33', '720.81', '745.57']  peak 916 MiB  tem
+trained-fused        p2 v5  ctx   1024    687.43 tok/s  1.455 ms  trials ['645.58', '688.44', '686.94', '686.92']  peak 916 MiB  tem
+trained-lf3f         p2 v5  ctx   1024    633.64 tok/s  1.578 ms  trials ['591.52', '639.20', '621.02', '640.70']  peak 916 MiB  tem
+trained-s2           p2 v5  ctx   1024    585.61 tok/s  1.708 ms  trials ['549.39', '590.12', '575.57', '591.15']  peak 918 MiB  tem
+vram-trained-fused   p2 v5  ctx   1024    758.65 tok/s  1.318 ms  trials ['705.53', '758.47', '757.91', '759.59']  peak 1438 MiB  te
+vram-trained         p2 v5  ctx   1024    668.67 tok/s  1.496 ms  trials ['613.17', '669.55', '668.22', '668.24']  peak 1438 MiB  te
+skliar-fused-nb      p2 v5  ctx   1024    744.77 tok/s  1.343 ms  trials ['707.67', '744.51', '745.28', '744.52']  peak 916 MiB  tem
+skliar-fused         p2 v5  ctx   1024    708.63 tok/s  1.411 ms  trials ['661.61', '707.70', '708.10', '710.10']  peak 916 MiB  tem
+skliar-lf3f          p2 v5  ctx   1024    639.13 tok/s  1.565 ms  trials ['601.00', '644.20', '627.54', '645.64']  peak 916 MiB  tem
+skliar-s2            p2 v5  ctx   1024    594.75 tok/s  1.681 ms  trials ['550.59', '595.19', '593.28', '595.78']  peak 918 MiB  tem
+vram-skliar-fused    p2 v5  ctx   1024    769.78 tok/s  1.299 ms  trials ['731.25', '769.52', '770.60', '769.21']  peak 1438 MiB  te
+vram-skliar          p2 v5  ctx   1024    675.92 tok/s  1.479 ms  trials ['640.91', '677.36', '675.93', '674.48']  peak 1438 MiB  te
+ours-fused-nb        p2 v5  ctx   1024    769.16 tok/s  1.300 ms  trials ['731.84', '767.33', '770.69', '769.45']  peak 916 MiB  tem
+ours-fused           p2 v5  ctx   1024    707.96 tok/s  1.413 ms  trials ['665.43', '707.93', '704.46', '711.50']  peak 916 MiB  tem
+ours-lf3f            p2 v5  ctx   1024    660.02 tok/s  1.515 ms  trials ['614.37', '665.21', '649.76', '665.10']  peak 916 MiB  tem
+ours-s2              p2 v5  ctx   1024    611.79 tok/s  1.635 ms  trials ['556.17', '612.78', '612.54', '610.06']  peak 1186 MiB  te
+vram-ours-fused      p2 v5  ctx   1024    786.49 tok/s  1.271 ms  trials ['713.28', '786.41', '786.03', '787.02']  peak 1438 MiB  te
+vram-ours            p2 v5  ctx   1024    691.39 tok/s  1.446 ms  trials ['641.54', '691.46', '690.86', '691.86']  peak 1438 MiB  te
+vram-stock           p2 v5  ctx   1024    646.20 tok/s  1.548 ms  trials ['606.01', '647.11', '646.07', '645.41']  peak 1438 MiB  
+### pass 2 done 09:30:17
+vram-stock           p3 v1  ctx   1024    646.81 tok/s  1.546 ms  trials ['581.51', '646.59', '647.68', '646.15']  peak 1438 MiB  
+vram-ours            p3 v1  ctx   1024    690.96 tok/s  1.447 ms  trials ['654.31', '691.42', '690.29', '691.16']  peak 1438 MiB  te
+vram-ours-fused      p3 v1  ctx   1024    787.07 tok/s  1.271 ms  trials ['740.01', '786.25', '787.14', '787.81']  peak 1438 MiB  te
+ours-s2              p3 v1  ctx   1024    606.70 tok/s  1.648 ms  trials ['569.96', '611.05', '597.94', '611.12']  peak 918 MiB  tem
+ours-lf3f            p3 v1  ctx   1024    658.70 tok/s  1.518 ms  trials ['622.16', '666.99', '643.07', '666.05']  peak 916 MiB  tem
+ours-fused           p3 v1  ctx   1024    706.21 tok/s  1.416 ms  trials ['663.10', '706.40', '705.42', '706.80']  peak 916 MiB  tem
+ours-fused-nb        p3 v1  ctx   1024    767.99 tok/s  1.302 ms  trials ['727.60', '770.20', '765.26', '768.50']  peak 916 MiB  tem
+vram-skliar          p3 v1  ctx   1024    676.26 tok/s  1.479 ms  trials ['635.52', '675.91', '676.59', '676.27']  peak 1438 MiB  te
+vram-skliar-fused    p3 v1  ctx   1024    765.44 tok/s  1.306 ms  trials ['719.88', '765.19', '764.73', '766.39']  peak 1438 MiB  te
+skliar-s2            p3 v1  ctx   1024    586.14 tok/s  1.706 ms  trials ['555.00', '592.00', '574.93', '591.48']  peak 918 MiB  tem
+skliar-lf3f          p3 v1  ctx   1024    635.69 tok/s  1.573 ms  trials ['587.56', '640.25', '625.26', '641.55']  peak 916 MiB  tem
+skliar-fused         p3 v1  ctx   1024    705.40 tok/s  1.418 ms  trials ['651.53', '704.81', '705.59', '705.79']  peak 916 MiB  tem
+skliar-fused-nb      p3 v1  ctx   1024    743.12 tok/s  1.346 ms  trials ['697.48', '743.42', '741.82', '744.14']  peak 916 MiB  tem
+vram-trained         p3 v1  ctx   1024    667.95 tok/s  1.497 ms  trials ['629.49', '668.39', '667.18', '668.28']  peak 1438 MiB  te
+vram-trained-fused   p3 v1  ctx   1024    760.56 tok/s  1.315 ms  trials ['685.61', '760.19', '761.20', '760.28']  peak 1438 MiB  te
+trained-s2           p3 v1  ctx   1024    584.87 tok/s  1.710 ms  trials ['555.49', '591.11', '570.99', '592.52']  peak 918 MiB  tem
+trained-lf3f         p3 v1  ctx   1024    634.40 tok/s  1.576 ms  trials ['588.28', '641.61', '621.69', '639.90']  peak 916 MiB  tem
+trained-fused        p3 v1  ctx   1024    682.24 tok/s  1.466 ms  trials ['641.95', '690.08', '666.33', '690.32']  peak 916 MiB  tem
+trained-fused-nb     p3 v1  ctx   1024    735.81 tok/s  1.359 ms  trials ['703.08', '742.73', '743.12', '721.59']  peak 916 MiB  tem
+vram-stock           p3 v2  ctx   1024    647.90 tok/s  1.543 ms  trials ['614.22', '646.93', '648.59', '648.18']  peak 1438 MiB  
+vram-ours            p3 v2  ctx   1024    691.38 tok/s  1.446 ms  trials ['650.62', '690.22', '692.56', '691.36']  peak 1438 MiB  te
+vram-ours-fused      p3 v2  ctx   1024    788.96 tok/s  1.267 ms  trials ['747.88', '789.72', '788.60', '788.57']  peak 1438 MiB  te
+ours-s2              p3 v2  ctx   1024    607.81 tok/s  1.645 ms  trials ['572.39', '612.29', '598.69', '612.45']  peak 918 MiB  tem
+ours-lf3f            p3 v2  ctx   1024    659.28 tok/s  1.517 ms  trials ['614.06', '667.19', '642.42', '668.21']  peak 916 MiB  tem
+ours-fused           p3 v2  ctx   1024    701.27 tok/s  1.426 ms  trials ['659.26', '706.87', '689.57', '707.36']  peak 916 MiB  tem
+ours-fused-nb        p3 v2  ctx   1024    755.71 tok/s  1.323 ms  trials ['726.31', '768.88', '732.91', '765.33']  peak 916 MiB  tem
+vram-skliar          p3 v2  ctx   1024    674.61 tok/s  1.482 ms  trials ['620.08', '675.16', '673.90', '674.76']  peak 1438 MiB  te
+vram-skliar-fused    p3 v2  ctx   1024    764.91 tok/s  1.307 ms  trials ['719.77', '766.78', '763.85', '764.10']  peak 1438 MiB  te
+skliar-s2            p3 v2  ctx   1024    589.13 tok/s  1.697 ms  trials ['552.70', '593.25', '579.96', '594.19']  peak 918 MiB  tem
+skliar-lf3f          p3 v2  ctx   1024    640.16 tok/s  1.562 ms  trials ['600.13', '640.66', '639.83', '640.00']  peak 916 MiB  tem
+skliar-fused         p3 v2  ctx   1024    702.45 tok/s  1.424 ms  trials ['666.41', '711.36', '688.69', '707.30']  peak 916 MiB  tem
+skliar-fused-nb      p3 v2  ctx   1024    736.10 tok/s  1.359 ms  trials ['710.88', '746.76', '716.74', '744.81']  peak 916 MiB  tem
+vram-trained         p3 v2  ctx   1024    667.21 tok/s  1.499 ms  trials ['618.83', '667.11', '667.46', '667.06']  peak 1438 MiB  te
+vram-trained-fused   p3 v2  ctx   1024    755.51 tok/s  1.324 ms  trials ['713.71', '753.37', '758.92', '754.25']  peak 1438 MiB  te
+trained-s2           p3 v2  ctx   1024    585.88 tok/s  1.707 ms  trials ['546.38', '591.19', '576.44', '590.00']  peak 918 MiB  tem
+trained-lf3f         p3 v2  ctx   1024    633.03 tok/s  1.580 ms  trials ['596.64', '640.63', '616.96', '641.51']  peak 916 MiB  tem
+trained-fused        p3 v2  ctx   1024    675.39 tok/s  1.481 ms  trials ['644.74', '686.17', '654.37', '685.62']  peak 916 MiB  tem
+trained-fused-nb     p3 v2  ctx   1024    740.23 tok/s  1.351 ms  trials ['703.56', '739.35', '740.39', '740.96']  peak 916 MiB  tem
+vram-stock           p3 v3  ctx   1024    646.07 tok/s  1.548 ms  trials ['596.20', '646.30', '645.80', '646.13']  peak 1438 MiB  
+vram-ours            p3 v3  ctx   1024    687.41 tok/s  1.455 ms  trials ['637.26', '686.76', '688.50', '686.99']  peak 1438 MiB  te
+vram-ours-fused      p3 v3  ctx   1024    789.15 tok/s  1.267 ms  trials ['744.40', '787.84', '790.08', '789.53']  peak 1438 MiB  te
+ours-s2              p3 v3  ctx   1024    611.08 tok/s  1.636 ms  trials ['573.01', '611.74', '609.34', '612.17']  peak 918 MiB  tem
+ours-lf3f            p3 v3  ctx   1024    659.01 tok/s  1.517 ms  trials ['622.31', '667.06', '643.17', '666.79']  peak 916 MiB  tem
+ours-fused           p3 v3  ctx   1024    701.28 tok/s  1.426 ms  trials ['667.97', '707.88', '686.16', '709.79']  peak 916 MiB  tem
+ours-fused-nb        p3 v3  ctx   1024    767.55 tok/s  1.303 ms  trials ['727.53', '766.82', '767.70', '768.14']  peak 916 MiB  tem
+vram-skliar          p3 v3  ctx   1024    677.96 tok/s  1.475 ms  trials ['642.24', '678.01', '677.70', '678.17']  peak 1438 MiB  te
+vram-skliar-fused    p3 v3  ctx   1024    768.75 tok/s  1.301 ms  trials ['695.81', '768.43', '768.12', '769.69']  peak 1438 MiB  te
+skliar-s2            p3 v3  ctx   1024    585.16 tok/s  1.709 ms  trials ['554.11', '590.23', '576.55', '588.72']  peak 918 MiB  tem
+skliar-lf3f          p3 v3  ctx   1024    630.02 tok/s  1.587 ms  trials ['592.57', '635.02', '620.53', '634.52']  peak 916 MiB  tem
+skliar-fused         p3 v3  ctx   1024    696.62 tok/s  1.435 ms  trials ['660.39', '703.66', '681.82', '704.38']  peak 916 MiB  tem
+skliar-fused-nb      p3 v3  ctx   1024    741.73 tok/s  1.348 ms  trials ['704.94', '741.43', '741.69', '742.06']  peak 916 MiB  tem
+vram-trained         p3 v3  ctx   1024    668.13 tok/s  1.497 ms  trials ['634.24', '667.83', '668.66', '667.88']  peak 1438 MiB  te
+vram-trained-fused   p3 v3  ctx   1024    759.26 tok/s  1.317 ms  trials ['714.85', '758.01', '760.55', '759.22']  peak 1438 MiB  te
+trained-s2           p3 v3  ctx   1024    584.84 tok/s  1.710 ms  trials ['550.26', '590.77', '574.29', '589.47']  peak 918 MiB  tem
+trained-lf3f         p3 v3  ctx   1024    637.22 tok/s  1.569 ms  trials ['596.55', '642.06', '626.91', '642.67']  peak 916 MiB  tem
+trained-fused        p3 v3  ctx   1024    681.30 tok/s  1.468 ms  trials ['645.25', '688.50', '668.72', '686.68']  peak 916 MiB  tem
+trained-fused-nb     p3 v3  ctx   1024    732.27 tok/s  1.366 ms  trials ['703.19', '740.63', '714.22', '741.96']  peak 916 MiB  tem
+vram-stock           p3 v4  ctx   1024    646.97 tok/s  1.546 ms  trials ['613.85', '646.53', '647.32', '647.05']  peak 1438 MiB  
+vram-ours            p3 v4  ctx   1024    690.69 tok/s  1.448 ms  trials ['646.86', '689.46', '691.58', '691.04']  peak 1438 MiB  te
+vram-ours-fused      p3 v4  ctx   1024    787.00 tok/s  1.271 ms  trials ['706.00', '787.65', '785.79', '787.57']  peak 1438 MiB  te
+ours-s2              p3 v4  ctx   1024    603.17 tok/s  1.658 ms  trials ['570.77', '609.57', '590.82', '609.14']  peak 918 MiB  tem
+ours-lf3f            p3 v4  ctx   1024    661.45 tok/s  1.512 ms  trials ['617.73', '665.54', '651.86', '666.94']  peak 916 MiB  tem
+ours-fused           p3 v4  ctx   1024    699.35 tok/s  1.430 ms  trials ['663.05', '705.48', '686.10', '706.48']  peak 916 MiB  tem
+ours-fused-nb        p3 v4  ctx   1024    768.18 tok/s  1.302 ms  trials ['725.33', '767.34', '768.32', '768.88']  peak 916 MiB  tem
+vram-skliar          p3 v4  ctx   1024    677.54 tok/s  1.476 ms  trials ['638.93', '676.44', '678.39', '677.81']  peak 1438 MiB  te
+vram-skliar-fused    p3 v4  ctx   1024    769.51 tok/s  1.300 ms  trials ['728.66', '769.90', '769.88', '768.76']  peak 1438 MiB  te
+skliar-s2            p3 v4  ctx   1024    583.28 tok/s  1.714 ms  trials ['552.28', '587.71', '574.15', '587.98']  peak 918 MiB  tem
+skliar-lf3f          p3 v4  ctx   1024    631.53 tok/s  1.583 ms  trials ['594.27', '637.67', '617.51', '639.41']  peak 916 MiB  tem
+skliar-fused         p3 v4  ctx   1024    692.07 tok/s  1.445 ms  trials ['656.80', '701.77', '673.03', '701.42']  peak 916 MiB  tem
+skliar-fused-nb      p3 v4  ctx   1024    732.24 tok/s  1.366 ms  trials ['702.07', '741.70', '715.05', '739.96']  peak 916 MiB  tem
+vram-trained         p3 v4  ctx   1024    667.75 tok/s  1.498 ms  trials ['609.28', '668.14', '667.38', '667.72']  peak 1438 MiB  te
+vram-trained-fused   p3 v4  ctx   1024    756.42 tok/s  1.322 ms  trials ['719.66', '756.78', '755.22', '757.25']  peak 1438 MiB  te
+trained-s2           p3 v4  ctx   1024    588.83 tok/s  1.698 ms  trials ['554.75', '592.72', '580.34', '593.43']  peak 918 MiB  tem
+trained-lf3f         p3 v4  ctx   1024    634.29 tok/s  1.577 ms  trials ['599.31', '640.70', '621.75', '640.41']  peak 916 MiB  tem
+trained-fused        p3 v4  ctx   1024    683.46 tok/s  1.463 ms  trials ['643.50', '685.31', '681.56', '683.51']  peak 916 MiB  tem
+trained-fused-nb     p3 v4  ctx   1024    739.37 tok/s  1.353 ms  trials ['692.86', '739.18', '739.24', '739.68']  peak 916 MiB  tem
+vram-stock           p3 v5  ctx   1024    645.55 tok/s  1.549 ms  trials ['612.90', '645.57', '645.89', '645.20']  peak 1438 MiB  
+vram-ours            p3 v5  ctx   1024    688.75 tok/s  1.452 ms  trials ['643.99', '687.71', '688.84', '689.72']  peak 1438 MiB  te
+vram-ours-fused      p3 v5  ctx   1024    787.33 tok/s  1.270 ms  trials ['741.25', '786.40', '786.67', '788.92']  peak 1438 MiB  te
+ours-s2              p3 v5  ctx   1024    601.76 tok/s  1.662 ms  trials ['567.93', '588.16', '608.01', '609.10']  peak 918 MiB  tem
+ours-lf3f            p3 v5  ctx   1024    659.69 tok/s  1.516 ms  trials ['619.28', '664.15', '648.77', '666.13']  peak 916 MiB  tem
+ours-fused           p3 v5  ctx   1024    701.56 tok/s  1.425 ms  trials ['666.20', '709.67', '686.66', '708.36']  peak 916 MiB  tem
+ours-fused-nb        p3 v5  ctx   1024    767.73 tok/s  1.303 ms  trials ['725.49', '768.54', '766.32', '768.34']  peak 916 MiB  tem
+vram-skliar          p3 v5  ctx   1024    676.81 tok/s  1.478 ms  trials ['644.90', '676.79', '676.76', '676.89']  peak 1438 MiB  te
+vram-skliar-fused    p3 v5  ctx   1024    770.61 tok/s  1.298 ms  trials ['718.67', '767.88', '771.62', '772.34']  peak 1438 MiB  te
+skliar-s2            p3 v5  ctx   1024    590.41 tok/s  1.694 ms  trials ['553.60', '595.45', '581.29', '594.50']  peak 918 MiB  tem
+skliar-lf3f          p3 v5  ctx   1024    637.22 tok/s  1.569 ms  trials ['599.48', '642.63', '627.47', '641.55']  peak 916 MiB  tem
+skliar-fused         p3 v5  ctx   1024    702.96 tok/s  1.423 ms  trials ['661.84', '709.53', '690.45', '708.89']  peak 916 MiB  tem
+skliar-fused-nb      p3 v5  ctx   1024    733.07 tok/s  1.364 ms  trials ['706.58', '741.39', '715.87', '741.94']  peak 916 MiB  tem
+vram-trained         p3 v5  ctx   1024    668.44 tok/s  1.496 ms  trials ['633.82', '668.29', '669.10', '667.93']  peak 1438 MiB  te
+vram-trained-fused   p3 v5  ctx   1024    757.33 tok/s  1.320 ms  trials ['702.76', '758.51', '757.85', '755.64']  peak 1438 MiB  te
+trained-s2           p3 v5  ctx   1024    589.53 tok/s  1.696 ms  trials ['553.24', '594.71', '580.40', '593.49']  peak 918 MiB  tem
+trained-lf3f         p3 v5  ctx   1024    637.11 tok/s  1.570 ms  trials ['595.51', '641.82', '627.37', '642.13']  peak 916 MiB  tem
+trained-fused        p3 v5  ctx   1024    680.78 tok/s  1.469 ms  trials ['644.22', '687.68', '688.00', '666.68']  peak 916 MiB  tem
+trained-fused-nb     p3 v5  ctx   1024    742.10 tok/s  1.348 ms  trials ['707.02', '742.26', '742.17', '741.88']  peak 916 MiB  tem
+### pass 3 done 09:34:44
+### SPEED_DONE 09:34:44
