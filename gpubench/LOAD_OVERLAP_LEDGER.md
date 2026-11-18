@@ -828,6 +828,7 @@ unfused path, all in VRAM and streamed; routing equal to the Python references (
 | exposed load | 0.094 / 0.102 | 0.840 / 0.933 |
 | MoE total | 0.395 / 0.439 | 2.424 / 2.517 |
 | Skliar slower at the MoE layers (X) | **+11.1 %**: 9.1 points routing kernel, 2.0 points load pattern | **+3.8 %**, all load pattern |
+| the same with Skliar's own routing kernel timed (O4-4) | as above (it already ran `k_skliar`) | **+8.8 %**: 5.8 points routing kernel, 2.9 points load pattern; +4.6 % of the token |
 | MoE share of our token | 30 % | 52 % |
 | op against its memory-bound floor | 18.4 us per layer against 14.7: 25 % above | 30.9 against 28.2: 10 % above |
 | first load against a later one (pinned) | 0.100 against 0.104 to 0.141 ms: not cheaper | 0.737 against 1.05 to 1.19 ms: 34 % cheaper |
@@ -841,6 +842,8 @@ What the table says, plainly:
   is 10 %.
 - At 1.26 B most of what separates the two methods is Skliar's routing step (9.1 of the 11.1 points at the
   MoE layers), which is the method's own per-token work and not its load pattern.
+  The 11 B column above leaves that step out, because both of its arms ran our routing kernel. O4-4 adds
+  it: 8.8 % at the MoE layers, so 11.1 % and 3.8 % are not the comparison to make.
 - **A load is not hidden.** At 1.26 B the first load costs what a later one costs; at 11 B it is a third
   cheaper, as it already was with the op off (0.655 against 1.09 to 1.13 ms). Once the layer's own work
   runs near the memory-bound rate it is no longer than one load (step 0: ratio 22), so there is nothing
@@ -916,3 +919,80 @@ op is 1.390 ms (30.9 us per layer; it reads 11.94 MB per layer, 28.2 us at 424 G
 
 Pod `8xcjjlxgekub1c` ran 10:40 to 12:19 UTC for this part, 1.65 h, about $1.14; about $4.9 for everything in
 this ledger. It is stopped; its disk is wiped at each stop.
+
+## O4-4 -- 11 B with Skliar's own routing kernel in the timed path (2026-11-18, 17:39 to 18:03 UTC)
+
+**Why.** In O4-1 both 11 B arms ran our routing kernel, so the 3.8 % at the MoE layers is the load pattern
+alone. At 1.26 B the routing step is 9.1 of the 11.1 points. Read side by side, 11.1 and 3.8 look like an
+advantage that shrinks with model size, when the second number is missing a term. This entry measures
+that term.
+
+**What ran.** Same file (Q4_0, sha `84cd3c92`, regenerated on the pod and equal to O4-1's), same engine
+tree `71b82131` with no code change, so the O4-1 gate stands. `TEMPORAL_FUSED=1`, streamed (`-ncmoe 48`),
+P1-12 protocol, GPU NUMA node, 3 passes of 8 repetitions, arm order alternated. Script
+`gpubench/overlap/big11b_skliar_kernel.sh`, rows in `results/overlap/engine_fused/big11b_skliar_kernel/`.
+Random weights, loads imposed, timing only.
+
+The Skliar arm sets `LLAMA_TEMPORAL_ROUTE=skliar` (C = 18, J = 1, lambda 0.739453125) together with
+`TEMPORAL_SWAP_HIST`. `k_skliar` then runs on the 192 logits of every layer-token and does all of its own
+work (max and min for the running-mean bias, the best outside expert and the weakest cached one, exchange
+rounds while an expert still enters, forced top-1, slot bookkeeping). The imposed swap list replaces the
+one it wrote, as it does for our kernel in the other arm. Both arms pay the same extra launch for that.
+
+| arm | tok/s, mean (passes) | ms per token |
+|---|---|---|
+| ours: our kernel, exactly one load | 218.2 (223.5 / 215.8 / 215.4) | 4.583 |
+| Skliar: `k_skliar`, loads from the 1.26 B histogram (mean 0.9955) | 208.7 (212.4 / 206.4 / 207.3) | 4.793 |
+| Skliar-shaped loads on our kernel (the O4-1 arm) | 210.5 (206.6 / 212.7 / 212.2) | 4.751 |
+| no bytes, our kernel | 266.7 (269.9 / 264.9 / 265.2) | 3.750 |
+| no bytes, `k_skliar` | 257.1 (258.1 / 256.2 / 257.0) | 3.890 |
+| no bytes, `k_skliar` with lambda 10^6 (forced top-1 only) | 256.0 (257.0 / 254.5 / 256.6) | 3.906 |
+| no bytes, routing kernel replaced by an empty launch | 280.6 (279.9 / 281.8 / 280.0) | 3.564 |
+| no bytes, op launches skipped | 419.0 (419.3 / 418.6 / 419.3) | 2.387 |
+
+**Ours against Skliar, end to end: +4.6 %** (per pass 5.2, 4.6, 3.9).
+
+| MoE layers, ms per token over 45 layers | ours | Skliar |
+|---|---|---|
+| fused op (no bytes minus op skipped) | 1.364 | 1.364 |
+| routing kernel beyond an empty launch | 0.186 (4.1 us per layer) | 0.326 (7.2 us per layer) |
+| exposed load (arm minus its no-bytes arm) | 0.833 | 0.903 |
+| total | 2.383 | 2.593 |
+| share of the token | 52 % | 54 % |
+
+**Skliar is 8.8 % slower at the MoE layers** (per pass 10.6, 8.6, 7.4): 5.8 points routing kernel, 2.9
+points load pattern. The routing-kernel difference is 3.1 us per layer here and 2.8 us per layer at
+1.26 B, so it is about a fixed cost per layer. It is a smaller share at 11 B because the op and the load
+are larger.
+
+**Does random-weight routing over- or undercharge `k_skliar`?** It undercharges, by a small amount. The
+kernel's fixed part runs on every layer-token; exchange rounds run only when an expert enters on merit. On
+the random logits its own selection changes on 1.5 % of layer-tokens (own-load histogram 294910, 4409,
+107, 4 for 0 to 3 loads). On the 1.26 B plain MoE 79 % of layer-tokens load at least one expert
+(16413, 50220, 7956, 2391, 732, 186, 96, 6). So the 0.326 ms is the kernel with almost no exchange
+rounds. Two checks:
+- lambda 10^6, where nothing can enter on merit, costs the same within noise (0.342 against 0.326 ms). The
+  measured cost is the floor.
+- Lowering lambda makes the random logits exchange experts (`rounds.log`, no bytes, 2 alternated passes).
+  At lambda 0 `k_skliar` makes 1.18 exchanges per layer-token (62 % of layer-tokens load) and the token
+  costs 0.062 ms more than at lambda 0.739; at 0.44 exchanges per layer-token it costs 0.030 ms more.
+
+Both ways, then. With both kernels at their floor, as measured: 8.8 % at the MoE layers, 4.6 % of the
+token. Charging `k_skliar` the 0.062 ms for about one exchange per layer-token gives 0.388 ms for its
+routing kernel, 11.4 % at the MoE layers and 5.9 % of the token. The second pair is an upper figure and
+favours us: our kernel also sits at its floor here (its selection is static on random logits too) and I
+did not price its one swap per layer-token at these shapes. At 1.26 B on real logits it costs 4.8 us per
+layer against 4.1 here. Quote 8.8 % and 4.6 %.
+
+**Session notes.**
+- Pass 1 ran fast for its first arms (ours 223.5, then 215.8 and 215.4), which is why the per-pass
+  percentages fall from 5.2 to 3.9. The three-pass mean with that spread is the number.
+- The O4-1 arm reproduces: Skliar-shaped loads on our kernel had one noisy pass (206.6, sd 8.7); on the
+  other two ours is +1.5 % against O4-1's +2.0 %. Our routing kernel is 0.186 ms against 0.194 there, the op
+  1.364 against 1.390.
+- What went wrong. The pod took 12 minutes to produce a container after the resume. The fresh disk had no
+  cmake and the pod's outbound network was down for part of the hour, so the build failed silently twice
+  until a cmake wheel was uploaded. My first setup script went on to the quantise step without checking
+  that the build had finished and then deleted the intermediate model, which cost one regeneration. The
+  first timing rows came 51 minutes after the request, not 30.
+- Pod `8xcjjlxgekub1c`: container up 17:00, stopped 18:04 UTC, about $0.85. Disk wiped again.

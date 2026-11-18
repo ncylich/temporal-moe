@@ -1,0 +1,8 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 48541 MiB):
+  Device 0: NVIDIA RTX A6000, compute capability 8.6, VMM: yes, VRAM: 48541 MiB
+[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=18 + CPU pool
+[temporal-route2] mode=skliar K=18 E=192 C=18 lambda=0.300 J=1 nocopy=1
+[temporal-fused] one fused op per MoE layer on single-token steps: D=1024 F=384 FS=0 K=18 skip=0
+temporal-route2: mode=skliar layers=45 decode_layer_tokens=126630 loads=16783 loads_per_layer_token=0.1325 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.300 J=1 hist=[122868,897,98,261,483,607,567,457,258,86,31,14,2,1,0,0,0,0,0]
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
+temporal-cuda: layers=45 slot swap-ins decided on single-token steps=19081
