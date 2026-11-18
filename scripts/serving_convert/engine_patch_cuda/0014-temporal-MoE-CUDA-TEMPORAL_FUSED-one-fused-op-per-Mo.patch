@@ -1,4 +1,4 @@
-From 94c849917ef462316ec19b164049404d548537a9 Mon Sep 17 00:00:00 2001
+From 5f4777fefa2b04fb4cd6cd3982cc4195cbcecde9 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 18 Nov 2026 00:45:43 -0800
 Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED, one fused op per MoE layer
@@ -13,10 +13,10 @@ ops stay ordinary graph nodes. Q4_0 experts with glm4moe's shapes only; other mo
  ggml/src/ggml-cuda/ggml-cuda.cu |   7 +-
  ggml/src/ggml-cuda/temporal.cu  | 234 +++++++++++++++++++++++++++++++-
  ggml/src/ggml-cuda/temporal.cuh |   5 +
- src/llama-graph.cpp             |  47 +++++++
+ src/llama-graph.cpp             |  48 +++++++
  src/llama-graph.h               |   4 +
  src/models/glm4-moe.cpp         |  12 ++
- 6 files changed, 304 insertions(+), 5 deletions(-)
+ 6 files changed, 305 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
 index bb562d44..77d54b6c 100644
@@ -330,7 +330,7 @@ index 2bb55f5f..55d9c9f2 100644
  // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
  // batched GEMM per expert. Decode (n_tokens==1) is untouched.
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index eb02cb59..6f1cdddb 100644
+index eb02cb59..0519d727 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1798,6 +1798,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
@@ -346,7 +346,7 @@ index eb02cb59..6f1cdddb 100644
  ggml_tensor * llm_graph_context::build_moe_ffn(
           ggml_tensor * cur,
           ggml_tensor * gate_inp,
-@@ -1991,10 +1997,51 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -1991,10 +1997,52 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
          cb(weights, "ffn_moe_weights_scaled", il);
      }
  
@@ -356,7 +356,8 @@ index eb02cb59..6f1cdddb 100644
 +    static const bool tm_fused_env = getenv("TEMPORAL_FUSED") && atoi(getenv("TEMPORAL_FUSED"));
 +    static const bool tm_fused_wfold = !(getenv("TEMPORAL_FUSED_NOFOLD") && atoi(getenv("TEMPORAL_FUSED_NOFOLD")));
 +    const bool tm_fold_w = tm_fused_env && tm_fused_wfold && n_tokens == 1 && tm_trained && il >= 0 && selected_experts_in == nullptr
-+        && hparams.n_expert_groups <= 1 && probs_in == nullptr && exp_probs_b == nullptr && logits && logits->type == GGML_TYPE_F32
++        && hparams.n_expert_groups <= 1 && probs_in == nullptr && logits && logits->type == GGML_TYPE_F32   // (exp_probs_b only biases the
++                                                                             // stock selection, which the routing op replaces; the weights never see it)
 +        && gating_op == LLAMA_EXPERT_GATING_FUNC_TYPE_SOFTMAX && (w_scale == 0.0f || w_scale == 1.0f)
 +        && n_expert > 128 && n_expert <= 256 && n_expert_used <= 32 && arch != LLM_ARCH_GROVEMOE && tm_fused_shexp[0];
      //call early so that topk-moe can be used
