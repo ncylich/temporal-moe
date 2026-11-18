@@ -628,7 +628,7 @@ blocks-first scheduling; in the engine it is about 65 %. The harness had a short
 (one tensor per block, one host read per thread) and a 384-wide shared expert; the engine version reads
 gate and up in sequence in each loading thread. The harness was not updated to the engine op.
 
-## O3-3 -- Not done or not verified (Part 3, so far)
+## O3-3 -- Not done or not verified after round 1 (see O3-7 for the state at the end)
 
 - Rounds beyond 1. Idea 4 (gate-weight ops into the routing kernel) is the largest remaining item inside the
   MoE layer; the attention path is the largest in the token and is outside this task.
@@ -640,3 +640,104 @@ gate and up in sequence in each loading thread. The harness was not updated to t
 - A first decode token after a prompt loads all 18 slots through the op; this was exercised by the gates
   (every chunk of the perplexity run starts that way) and not timed separately.
 - The fused op was not run with CUDA graphs disabled except in the routing gate.
+
+## O3-4 -- Round 2 (engine tree `69ea7224`): gate weights computed inside the op
+
+**Profile going in** (round 1): op 0.243 ms of a 1.282 ms token; outside it, per MoE layer, the router matmul,
+softmax, routing op, gather and for the trained model sum, clamp, divide: 4 to 7 small launches.
+
+**Five ideas, ranked.**
+1. Compute the gate weights (softmax over the 192 logits, gather at the selection, and for the trained
+   model the renormalisation) in one extra block of the op's first launch. Expected 2 % (plain MoE, two
+   launches fewer per layer) to 5 % (trained, five fewer). The block reproduces the `soft_max` kernel's
+   reduction for this size (256 threads: a shuffle reduction per warp, then one over the eight warp sums),
+   `get_rows`, `sum_rows` (the 18 values in the first warp), `clamp` and `div`.
+2. One host read per thread for a loading expert. Expected 1 to 2 % streamed. Not done: gate and up of the
+   same 32 rows have to be in one block (their SwiGLU is quantised there), which leaves 1,800 vectors for
+   1,024 threads.
+3. Leaner down launch. Expected 1 to 2 %. Not done.
+4. One read per Q4_0 block in the gate/up launch (round 3).
+5. Router matmul and routing decision inside the op. Rejected for now: the routing kernels and the F32
+   matmul would have to be reproduced bit for bit, exact logit ties included, for about 2 %.
+
+Implemented 1. Gates pass (`r2/fused_gates_r2.log`): 42.6913 / 40.0690 / 22.7367 everywhere, routing 1,287 of
+1,287. Captured graph nodes for the trained model: 376 without the fold, 311 with it.
+
+**Went wrong.** The first build of this round (tree `ae2778db`) timed the same as round 1. The fold's
+condition excluded models with a selection-bias tensor (`ffn_exp_probs_b`), which this model has, so it was
+never taken and the old nodes stayed. Caught by comparing captured node counts with and without the fold
+(390 and 390). The bias only enters the stock top-k selection, which the routing op replaces; the weights
+never see it, so the condition was wrong and was removed.
+
+## O3-5 -- Round 3 (engine tree `624bde80`): one weight read per Q4_0 block
+
+In `mul_mat_vec_q` each of two neighbouring lanes reads the same Q4_0 block and uses half of it. In the
+gate/up launch even lanes now read block x/2 and odd lanes block 16 + x/2, both halves, and each pair swaps
+one half by a shuffle: the same values added in the same order with half the block reads. Expected under 2 %.
+Gates pass (`r3/fused_gates_r3.log`), same values.
+
+## O3-6 -- Versions, engine, P1-9 protocol (tok/s; 15 runs per arm; the number that counts)
+
+| version | what changed | all in VRAM: trained / ours / Skliar | streamed: trained / ours / Skliar | no bytes: trained / ours / Skliar | ours against Skliar, streamed |
+|---|---|---|---|---|---|
+| switch off (same day) | | 669.3 / 691.1 / 676.8 | 587.5 / 607.8 / 588.4 | | +3.3 % |
+| Part 1 best (order+fuse) | | | 634.9 / 660.8 / 635.9 | | +3.9 % |
+| round 0, `389c246c` | fused op, three launches | 758.8 / 787.8 / 768.3 | 682.7 / 703.5 / 701.0 | 738.2 / 763.9 / 739.5 | +0.4 % |
+| round 1, `c82a1081` | two launches; loading blocks first; down launch one wave | 770.7 / 802.9 / 780.7 | 704.2 / 727.9 / 700.5 | 752.5 / 780.0 / 752.3 | +3.9 % |
+| round 2, `69ea7224` | gate weights inside the op | 824.4 / 825.4 / 806.1 | 744.7 / 746.2 / 720.7 | 802.2 / 804.3 / 776.7 | +3.5 % |
+| round 3, `624bde80` | one read per Q4_0 block | **829.4 / 829.3 / 808.9** | **750.5 / 753.4 / 724.1** | 805.0 / 806.5 / 781.3 | **+4.0 %** |
+
+Stock top-k with everything in VRAM: 647.4. sd over the three pass means: at most 2.6 tok/s through round 2,
+up to 4 in round 3 (12 for one profiling arm). Skliar at 0.9972 loads per decoded token-layer streamed
+(1.0014 in VRAM), ours 1.0000, in every version; same binary and settings for both rules.
+
+- **Trained model, 18 slots streamed: 587.5 to 750.5 tok/s, +27.7 %.** Our rule on the plain MoE +24.0 %,
+  Skliar +23.1 %. All in VRAM: +23.9 %, +20.0 %, +19.5 %.
+- Streamed with 18 slots is 12 % faster than the unfused engine with every expert in VRAM (750.5 against
+  669.3 for the trained model) and 16 % faster than stock top-k in VRAM. Streamed keeps 0.905 of fused
+  all-in-VRAM (trained), 0.908 (ours), 0.895 (Skliar); it was 0.877 before.
+- **Gain per round, streamed** (trained / ours / Skliar): round 1 +3.1 / +3.5 / -0.1 %; round 2 +5.8 / +2.5 /
+  +2.9 %; round 3 +0.8 / +1.0 / +0.5 %.
+- **Ours against Skliar at matched loads: +4.0 % streamed** (pass ratios in round 3: 4.6, 3.4, 4.1), +2.5 %
+  with everything in VRAM. In ms per token Skliar is behind by 0.054 streamed and 0.030 in VRAM, so 0.030 is
+  its routing kernel and 0.024 is load shape, 1.8 us per MoE layer. Against the MoE part of our token (op
+  0.239 ms plus exposed load 0.087 ms) the load-shape cost is 7 %, and 17 % with the routing kernel. It is
+  not the 10 % of a token that was expected.
+- **Exposed load time** (streamed minus no bytes, ms per token; trained / ours / Skliar): round 0 0.110 /
+  0.112 / 0.074; round 1 0.091 / 0.092 / 0.098; round 2 0.096 / 0.097 / 0.100; round 3 0.090 / 0.087 / 0.101.
+  One load costs about 7 us per layer of the roughly 11 us a full load takes (step 0): a third is hidden.
+- **Profile, round 3** (ours, no bytes): token 1.240 ms; gate/up launch (with the gate-weight block) 0.146 ms,
+  11.2 us per layer; down launch 0.093 ms, 7.1 us per layer; outside the op 1.001 ms.
+- **Distance from the floor.** The op reads 6.22 MB per layer. At step 0's per-layer compute rate
+  (424 GB/s) that is 14.7 us; the op takes 18.4, 25 % above. The two launches move their bytes at about
+  430 and 360 GB/s, so what is above the floor is mostly the two launches themselves.
+
+## O3-7 -- Why iteration on the op stops here, and what is not done
+
+- **The op is 19 % of the token and within 25 % of its floor.** Taking it all the way to the floor would
+  save 3.7 us per layer, 0.048 ms, 3.9 % of the token. No further round on the op can reach 5 %.
+- **The other 81 % (1.00 ms) is outside the op**: attention with `-fa 0` at 1k context (this model's head
+  size has no CUDA flash-attention kernel, G1-2), the router matmul and routing op (two launches per
+  layer), norms, residual adds and the output head. With the op free the token would run at 999 tok/s.
+  These were not profiled individually and are outside "one fused kernel per MoE layer"; attention is the
+  next place to look and needs its own task.
+- **The load is not hidden beyond a third**, in the engine. Step 0's ratio said the load is about as long
+  as the layer's memory-bound work; with the op now at that rate there is no more window to put it under,
+  and the loading threads pay two link round trips (gate, then up) before they can compute. Starting the
+  read earlier would need the routing decision earlier, which the model does not allow.
+- **Ground rules.** O3-0's list holds for every round. Round 2 adds one point to item 9: the gate weights
+  are computed by the op and not by the engine's softmax, gather and renormalisation kernels, in those
+  kernels' reduction order, checked by the perplexity gate for all three arms (the trained arm exercises
+  the renormalisation).
+- **Not done.** Routing-equality was gated for ours and Skliar on the plain MoE only, as before. The op
+  supports the 1.26 B shapes only (Q4_0, n_embd up to 896, expert width up to 192, 128 to 256 experts for
+  the weight fold). CUDA graphs off was exercised only by the routing gate. The harness of Part 2 was not
+  rebuilt around the engine op and its fused numbers stay superseded. Qwen3.5 was not run in any part.
+  The first decode token after a prompt (all 18 slots loaded through the op) is exercised by the gates and
+  not timed. Rounds 1 to 3 changed our arm's and Skliar's exposed load differently (O3-2), from the same
+  code; I did not chase why Skliar's rose in round 1 beyond the two-reads explanation, which is untested.
+
+## O3-8 -- Pod and cost (Part 3)
+
+Pod `8xcjjlxgekub1c` ran 08:41 to 10:38 UTC, 1.95 h, about $1.35, and is stopped. Its disk is wiped at every
+stop, so each session re-uploaded the engine base archive and both model files. All three parts: about $3.8.
