@@ -112,6 +112,15 @@ if [ "${PROBE:-0}" = "1" ]; then
     --save "$OUT/probe_junk_ckpt" 2>&1 | tee "$OUT/probe.log"
   exit 0
 fi
+if [ "${EVALONLY:-0}" = "1" ]; then
+  # Re-evaluate the trained checkpoint on the validation and test splits, one card. Weights
+  # are frozen (lr 0) across the two iterations Megatron needs before its end-of-run evals.
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
+    --finetune --train-iters 2 --lr 0 --min-lr 0 --lr-wsd-decay-iters 1 --save-interval 100000 \
+    --save "$OUT/eval_junk_ckpt" 2>&1 | tee "$OUT/evalonly.log"
+  exit 0
+fi
 # NPROC>1: Megatron data parallel on NPROC cards. Global batch, iteration count and schedule are
 # unchanged (each rank runs 1024/(MICRO_BATCH*NPROC) micro-batches per step), so FLOPs are too.
 "$PY" -m torch.distributed.run --nproc_per_node=${NPROC:-1} --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
