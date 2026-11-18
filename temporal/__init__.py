@@ -27,4 +27,5 @@ from .ablation_mechanisms import (
     auxfree_trigger_scores,
     coherence_bce_loss,
     cosmoes_bles_loss,
+    sticky_routing_loss,
 )

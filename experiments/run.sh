@@ -347,7 +347,7 @@ else
   # then the identical pretrain loop). Same model args; only the expert selection differs.
   ENTRY=pretrain_gpt.py
   [ "${TEMPORAL:-0}" = "1" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
-  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
+  "$PY" -m torch.distributed.run --nproc_per_node=${NPROC:-1} --rdzv-endpoint=localhost:${RDZV_PORT:-29510} $ENTRY \
     "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
     2>&1 | tee "$OUT/train.log"
 fi

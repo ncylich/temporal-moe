@@ -95,6 +95,20 @@ LOG_ARGS=(
 ENTRY=pretrain_gpt.py
 [ "$MODE" = "temporal" ] && ENTRY=$ROOT/temporal/pretrain_temporal.py
 cd Megatron-LM
-"$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
+if [ "${PROBE:-0}" = "1" ]; then
+  # Router probe (same as run.sh PROBE): load CKPT, record raw router logits on the first
+  # micro-batch. One card always, and --save goes to a throwaway dir so the few --finetune
+  # iterations never land next to the trained checkpoint.
+  export ROUTER_LOG_OUT=$OUT/router_log.pt
+  "$PY" -m torch.distributed.run --nproc_per_node=1 --rdzv-endpoint=localhost:${RDZV_PORT:-29520} \
+    $ROOT/analysis/probes/router_probe.py \
+    "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
+    --finetune --train-iters 6 --lr-wsd-decay-iters 1 --save-interval 100000 --eval-iters 1 \
+    --save "$OUT/probe_junk_ckpt" 2>&1 | tee "$OUT/probe.log"
+  exit 0
+fi
+# NPROC>1: Megatron data parallel on NPROC cards. Global batch, iteration count and schedule are
+# unchanged (each rank runs 1024/(MICRO_BATCH*NPROC) micro-batches per step), so FLOPs are too.
+"$PY" -m torch.distributed.run --nproc_per_node=${NPROC:-1} --rdzv-endpoint=localhost:${RDZV_PORT:-29520} $ENTRY \
   "${MODEL_ARGS[@]}" "${INFRA_ARGS[@]}" "${TRAIN_ARGS[@]}" "${DATA_ARGS[@]}" "${LOG_ARGS[@]}" $EXTRA_ARGS \
   2>&1 | tee "$OUT/train.log"

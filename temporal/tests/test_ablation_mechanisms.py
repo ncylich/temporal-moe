@@ -10,7 +10,7 @@ coherence BCE loss (the latter absorbed from the former test_coherence_loss.py).
 No Megatron, no GPU — CPU torch only.
 Run: $PY -m pytest temporal/tests/test_ablation_mechanisms.py
 """
-import os, sys
+import os, sys, math
 import torch
 import pytest
 
@@ -645,3 +645,25 @@ def test_higher_retention_lowers_loss():
     coherent = torch.where(m, 3.0, -3.0)                          # prefers resident every token
     churny = torch.tensor([[[3.0, 3.0, -3.0, -3.0]], [[-3.0, -3.0, 3.0, 3.0]]])  # flips away
     assert coherence_bce_loss(coherent, m).item() < coherence_bce_loss(churny, m).item()
+
+
+def test_sticky_routing_loss_matches_eq9_by_hand():
+    """Eq. 9 of arXiv:2607.08780 on a hand example, plus its limits and gradient path."""
+    from temporal.ablation_mechanisms import sticky_routing_loss
+    # S=3, B=1, E=2. Gates: [.5,.5] -> [.5,.5] -> softmax([ln3, 0]) = [.75,.25].
+    lg = torch.tensor([[[0.0, 0.0]], [[0.0, 0.0]], [[math.log(3.0), 0.0]]], requires_grad=True)
+    loss = sticky_routing_loss(lg)
+    # pair 1: 0; pair 2: (.25)^2 + (.25)^2 = .125; mean over the 2 pairs = .0625
+    assert abs(loss.item() - 0.0625) < 1e-6
+    loss.backward()
+    assert lg.grad[1].abs().sum() > 0 and lg.grad[2].abs().sum() > 0   # no stop-gradient
+    assert lg.grad[0].abs().sum() == 0                                 # token 0 sits at a zero-distance pair
+    # constant routing costs nothing; alternating one-hot gates reach the upper bound 2
+    const = torch.randn(1, 4, 8).expand(16, 4, 8)
+    assert sticky_routing_loss(const).item() < 1e-10
+    flip = torch.full((6, 2, 4), -50.0); flip[0::2, :, 0] = 50.0; flip[1::2, :, 1] = 50.0
+    assert abs(sticky_routing_loss(flip).item() - 2.0) < 1e-5
+    # batch mean: a constant row and a flipping row average to 1
+    mix = flip.clone(); mix[:, 1] = mix[0, 1]
+    assert abs(sticky_routing_loss(mix).item() - 1.0) < 1e-5
+    assert sticky_routing_loss(torch.zeros(1, 2, 4)).item() == 0.0

@@ -819,11 +819,26 @@ def temporal_forward(self, input: torch.Tensor):
     # Injected exactly like its siblings above so it composes with the same sweep tooling.
     cos_lam = float(os.environ.get("COSMOES_LAMBDA", "0"))
     if cos_lam > 0 and self.training:
+        _announce_once("cosmoes", cos_lam)
         from megatron.core.transformer.moe.moe_utils import (
             MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
         cos = ab.cosmoes_bles_loss(logits, k, float(os.environ.get("COSMOES_TAU", "1.0")))
         logits = MoEAuxLossAutoScaler.apply(logits, cos_lam * cos)
         save_to_aux_losses_tracker("cosmoes_loss", cos.detach(),
+                                   self.layer_number, self.config.num_layers)
+    # Sticky Routing (Kayyam, arXiv:2607.08780), Eq. 9-11: squared L2 distance between
+    # consecutive tokens' full-softmax gate vectors, averaged over the MoE layers (Eq. 10),
+    # hence the division by the MoE layer count. Injected like its siblings above.
+    sticky_lam = float(os.environ.get("STICKY_LAMBDA", "0"))
+    if sticky_lam > 0 and self.training:
+        _announce_once("sticky", sticky_lam)
+        from megatron.core.transformer.moe.moe_utils import (
+            MoEAuxLossAutoScaler, save_to_aux_losses_tracker)
+        n_moe = sum(self.config.moe_layer_freq) if isinstance(
+            self.config.moe_layer_freq, (list, tuple)) else self.config.num_layers
+        sticky = ab.sticky_routing_loss(logits)
+        logits = MoEAuxLossAutoScaler.apply(logits, sticky_lam * sticky / n_moe)
+        save_to_aux_losses_tracker("sticky_loss", sticky.detach(),
                                    self.layer_number, self.config.num_layers)
     ant_lam = float(os.environ.get("ANTICIPATORY_LAMBDA", "0"))
     if ant_lam > 0 and self.training:
@@ -883,6 +898,19 @@ def temporal_forward(self, input: torch.Tensor):
     return probs, routing_map
 
 
+_ANNOUNCED = set()
+
+
+def _announce_once(name: str, lam: float) -> None:
+    """Print once per process that an auxiliary routing loss is live, with the rank, so a
+    multi-card train.log shows the loss applied on every data-parallel rank."""
+    if name in _ANNOUNCED:
+        return
+    _ANNOUNCED.add(name)
+    rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
+    print(f"[temporal] {name} loss active on rank {rank} (lambda={lam})", flush=True)
+
+
 def banner_knobs() -> str:
     """The env-knob suffix of the install banner (pure — reads only os.environ; unit-tested)."""
     tau = os.environ.get("TEMPORAL_RHO", "0"); beta = os.environ.get("TEMPORAL_EMA_BETA", "1.0")
@@ -912,6 +940,10 @@ def banner_knobs() -> str:
     if float(os.environ.get("BURSTY_LAMBDA", "0")) > 0:
         knobs += (f", bursty(lambda={os.environ.get('BURSTY_LAMBDA')}, "
                   f"window={os.environ.get('BURSTY_WINDOW', '32')})")
+    if float(os.environ.get("COSMOES_LAMBDA", "0")) > 0:
+        knobs += f", cosmoes(lambda={os.environ.get('COSMOES_LAMBDA')})"
+    if float(os.environ.get("STICKY_LAMBDA", "0")) > 0:
+        knobs += f", sticky(lambda={os.environ.get('STICKY_LAMBDA')})"
     if float(os.environ.get("ANTICIPATORY_LAMBDA", "0")) > 0:
         knobs += (f", anticipatory(lambda={os.environ.get('ANTICIPATORY_LAMBDA')}, "
                   f"gamma={os.environ.get('ANTICIPATORY_GAMMA', '0.5')})")

@@ -356,6 +356,25 @@ def cosmoes_bles_loss(logits: torch.Tensor, k: int, tau: float = 1.0) -> torch.T
     return H_norm * L_norm
 
 
+def sticky_routing_loss(logits: torch.Tensor) -> torch.Tensor:
+    """Sticky Routing consistency loss, Eq. 9 of arXiv:2607.08780 (one layer's term).
+
+        L_cons^(l) = 1/(T-1) * sum_{t=2..T} || g_t - g_{t-1} ||_2^2,   g_t = softmax(l_t)
+
+    g is the full softmax over all experts, before top-k and with no renormalisation, no
+    temperature and no stop-gradient (the paper backpropagates through both tokens of a
+    pair). Mean over consecutive token pairs and over the batch; the squared norm sums over
+    experts, so the value lies in [0, 2]. Eq. 10 averages this over the MoE layers, which
+    the caller does by dividing the weight by the number of MoE layers. Core term only: the
+    windowed anchor variant (their Eq. 12) is not implemented. Layout is seq-first [S, B, E].
+    """
+    S, B, E = logits.shape
+    if S < 2:
+        return logits.sum() * 0.0
+    g = torch.softmax(logits.float(), dim=-1)
+    return (g[1:] - g[:-1]).pow(2).sum(-1).mean()
+
+
 def remoe_reuse_loss(logits: torch.Tensor, k: int, gamma: float = 0.9) -> torch.Tensor:
     """ReMoE recency-bias reuse objective (Zhu et al., arXiv:2605.27081), reimplemented.
 
