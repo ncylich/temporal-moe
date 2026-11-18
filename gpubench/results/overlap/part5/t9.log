@@ -1,0 +1,33 @@
+BUILT in 47s tree-dirty=8
+ppl vram   Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches
+ppl stream Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches
+base one    243.40 tok/s  4.1085 ms  (median 243.90, sd 1.61) loads 1.0000  wall 22s
+base sk     229.57 tok/s  4.3561 ms  (median 229.97, sd 1.64) loads 0.9938  wall 22s
+base vram   299.32 tok/s  3.3409 ms  (median 299.67, sd 1.21)  wall 13s
+base total wall 57s fill=1024 reps=16
+nq one    245.60 tok/s  4.0717 ms  (median 246.19, sd 1.69) loads 1.0000  wall 22s
+nq sk     230.55 tok/s  4.3375 ms  (median 230.33, sd 1.00) loads 0.9938  wall 22s
+nq vram   297.53 tok/s  3.3610 ms  (median 297.76, sd 1.48)  wall 13s
+nq total wall 57s fill=1024 reps=16
+nq-rev vram   298.33 tok/s  3.3520 ms  (median 298.50, sd 1.51)  wall 13s
+nq-rev sk     229.09 tok/s  4.3652 ms  (median 228.91, sd 1.05) loads 0.9938  wall 22s
+nq-rev one    242.86 tok/s  4.1175 ms  (median 242.89, sd 1.13) loads 1.0000  wall 22s
+nq-rev total wall 57s fill=1024 reps=16
+base-rev vram   290.35 tok/s  3.4441 ms  (median 290.51, sd 0.73)  wall 13s
+base-rev sk     225.52 tok/s  4.4342 ms  (median 225.89, sd 1.46) loads 0.9938  wall 22s
+base-rev one    238.76 tok/s  4.1883 ms  (median 238.88, sd 1.14) loads 1.0000  wall 22s
+base-rev total wall 57s fill=1024 reps=16
+T9_DONE
+decode vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches swaps_per_layer_token=0.9998 
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 rep 1:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches swaps_per_layer_token=0.9998 
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 rep 2:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches swaps_per_layer_token=0.9998 
+skliar vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches loads_per_layer_token=0.9845 
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 rep 1:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches loads_per_layer_token=0.9845 
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 rep 2:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches loads_per_layer_token=0.9845 
+trained vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches swaps_per_layer_token=0.9999 
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 rep 1:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches swaps_per_layer_token=0.9999 
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 rep 2:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches swaps_per_layer_token=0.9999 
+GATES_DONE
+T9G_DONE

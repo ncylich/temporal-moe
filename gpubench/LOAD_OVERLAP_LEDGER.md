@@ -1113,3 +1113,28 @@ Ground rules 1 to 8 of Part 3 hold as before: same model, weights as stored, bit
 route known before the router, batch 1, the load inside the timed region, one kernel path for both rules.
 **Changes relative to the engine's computation:** none in arithmetic. Q, K and V are computed in one launch
 and in a different node order; the down tensor of a loaded expert reaches its slot one launch earlier.
+
+## O5-5 -- Kept: the residual add in the op, and the attention norm in the quantise launch (patch 0016)
+
+- `TEMPORAL_FUSED_ADD=1`: the add of the residual stream after the MoE op is done by the op's down launch,
+  one float add per element with the same operands. 11 B, base, new, new, base, tok/s: ours 240.0 to 242.0
+  (+0.8 %), Skliar 227.0 to 228.9 (+0.8 %), all resident 293.4 to 296.4 (+1.0 %). An add launch is cheap,
+  so this removes less than the 1.5 us per layer of the others.
+- `TEMPORAL_QKV=2`: the RMS norm in front of the Q/K/V projections is computed by the launch that quantises
+  their input. The new kernel reduces the sum of squares as the stock norm kernel does (same block size,
+  same reduction call) and quantises as the stock quantise kernel does. Ours 241.1 to 244.2 (+1.3 %), Skliar
+  227.5 to 229.8 (+1.0 %), all resident 294.8 to 297.9 (+1.1 %).
+
+Gates with everything on (`TEMPORAL_QKV=2 TEMPORAL_FUSED=3 TEMPORAL_FUSED_ADD=1`), engine tree `9238ff10`:
+11 B perplexity 203452.6772 +/- 8384.03596 all in VRAM and streamed; 1.26 B equal in every digit, all in VRAM
+and streamed twice: ours-plain 42.6913 +/- 2.98935, Skliar 40.0690 +/- 2.84434, trained 22.7367 +/- 1.50944.
+Routing equality against the Python reference not rerun (no routing kernel touched).
+
+Running total against patch 0014 on the 11 B model, chaining the pairs: ours about +12 %, Skliar about +11 %,
+all resident about +10 %. The 1.26 B speed rows have not been rerun with 0016.
+
+Where the 11 B token is now (ours, about 4.09 ms): MoE op 1.36, first load 0.62, routing kernel 0.19, output
+projection over the vocabulary 0.21 (127 MB read, memory-bound), the rest attention and the router matmul at
+about 12 launches per layer. The two models differ in the attention middle (`TEMPORAL_GRAPHDUMP`): the 11 B
+model has q and k norms and flash attention; the 1.26 B model has neither and runs attention as two matmuls,
+a softmax and a copy, because flash attention has no CUDA kernel for head size 16.

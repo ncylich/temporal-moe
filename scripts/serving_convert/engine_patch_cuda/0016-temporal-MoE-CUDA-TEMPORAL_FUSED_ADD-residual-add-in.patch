@@ -1,0 +1,359 @@
+From 47ad04fd8a0977e3fecc475f097d2e2be5e1b80b Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 18 Nov 2026 12:06:58 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED_ADD, residual add in the
+ fused op; TEMPORAL_QKV=2, attention norm in the launch that quantises the
+ Q/K/V input
+
+TEMPORAL_FUSED_ADD=1: the ADD of the residual stream that follows the fused MoE op is done by the op's
+down launch (one float add per element, same operands) when it is the next node and the op's only consumer.
+
+TEMPORAL_QKV=2: as 1, and the RMS norm and weight that produce the projections' input are computed by the
+launch that quantises it (rms_norm_mul_q8_1: the sum of squares is reduced as rms_norm_f32 reduces it, the
+quantisation is quantize_q8_1's).
+
+TEMPORAL_GRAPHDUMP=n (debugging): print the first n nodes of the first single-token graph.
+
+All off by default.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu | 62 +++++++++++++++++++++++++----
+ ggml/src/ggml-cuda/mmvq.cu      | 20 ++++++++--
+ ggml/src/ggml-cuda/mmvq.cuh     |  4 +-
+ ggml/src/ggml-cuda/norm.cu      | 70 +++++++++++++++++++++++++++++++++
+ ggml/src/ggml-cuda/norm.cuh     |  4 ++
+ ggml/src/ggml-cuda/temporal.cu  |  9 +++--
+ ggml/src/ggml-cuda/temporal.cuh |  3 +-
+ 7 files changed, 155 insertions(+), 17 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 5765d206..a98b8b4a 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -3343,12 +3343,30 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph
+ 
+     ggml_tensor * node = cgraph->nodes[i];
+ 
++    // temporal, TEMPORAL_FUSED_ADD=1: the residual ADD that follows the fused MoE op is done by the op's down launch
++    // (one float add per element, same operands). Only when the ADD is the next node and the op's only consumer.
++    static const int tm_fadd = [](){const char*e=getenv("TEMPORAL_FUSED_ADD");return e?atoi(e):0;}();
++    if (tm_fadd && node->op == GGML_OP_CUSTOM && ggml_cuda_temporal_fused_op(node) && node->ne[1] == 1 && i + 1 < cgraph->n_nodes) {
++        ggml_tensor * add = cgraph->nodes[i + 1];
++        const ggml_tensor * other = add->src[0] == node ? add->src[1] : add->src[0];
++        bool ok = add->op == GGML_OP_ADD && (add->flags & GGML_TENSOR_FLAG_COMPUTE) && (add->src[0] == node) != (add->src[1] == node) &&
++                  other->type == GGML_TYPE_F32 && add->type == GGML_TYPE_F32 && ggml_are_same_shape(other, node) &&
++                  ggml_are_same_shape(add, node) && ggml_is_contiguous(other) && ggml_is_contiguous(add);
++        for (int j = i + 2; ok && j < cgraph->n_nodes; ++j)
++            for (int s = 0; s < GGML_MAX_SRC; ++s) if (cgraph->nodes[j]->src[s] == node || cgraph->nodes[j]->view_src == node) ok = false;
++        if (ok) {
++            ggml_cuda_temporal_fused(cuda_ctx->stream(), node, (float *) add->data, (const float *) other->data);
++            static bool said = false; if (!said) { said = true; fprintf(stderr, "temporal-fused-add: residual add of %s done by the fused op\n", add->name); }
++            return 1;
++        }
++    }
++
+     // temporal, TEMPORAL_QKV=1: two or three consecutive MUL_MAT nodes of one quantised type and width (the first
+     // with the most rows) on the
+     // same single input vector (the Q, K and V projections, which llama-graph.cpp then places next to each
+     // other) run as one quantisation of the vector and one launch. Same row arithmetic as the stock kernel.
+     static const int tm_qkv = [](){const char*e=getenv("TEMPORAL_QKV");return e?atoi(e):0;}();
+-    if (tm_qkv && node->op == GGML_OP_MUL_MAT) {
++    if (tm_qkv) {
+         const int cc = ggml_cuda_info().devices[cuda_ctx->device].cc;
+         const auto ok = [&](const ggml_tensor * t) {
+             const ggml_tensor * a = t->src[0], * b = t->src[1];
+@@ -3359,21 +3377,42 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph
+                    ggml_cuda_should_use_mmvq(a->type, cc, b->ne[1]) &&
+                    !ggml_cuda_should_use_mmvf(a->type, cc, a->ne, a->nb, b->ne[1]);
+         };
+-        if (ok(node)) {
+-            const ggml_tensor * w[3] = { node->src[0] }; ggml_tensor * d[3] = { node }; int n = 1;
+-            while (n < 3 && i + n < cgraph->n_nodes) {
+-                ggml_tensor * t = cgraph->nodes[i + n];
+-                if (!ok(t) || t->src[1] != node->src[1] || t->src[0]->type != node->src[0]->type ||
+-                    t->src[0]->ne[0] != node->src[0]->ne[0] || t->src[0]->ne[1] > node->src[0]->ne[1] ||
+-                    t->src[0]->nb[0] != node->src[0]->nb[0] || t->src[0]->nb[1] != node->src[0]->nb[1]) break;
++        // the projections starting at node k: how many, their matrices and destinations
++        const auto collect = [&](int k, const ggml_tensor ** w, ggml_tensor ** d) {
++            ggml_tensor * first = cgraph->nodes[k];
++            if (!ok(first)) return 0;
++            w[0] = first->src[0]; d[0] = first; int n = 1;
++            while (n < 3 && k + n < cgraph->n_nodes) {
++                ggml_tensor * t = cgraph->nodes[k + n];
++                if (!ok(t) || t->src[1] != first->src[1] || t->src[0]->type != first->src[0]->type ||
++                    t->src[0]->ne[0] != first->src[0]->ne[0] || t->src[0]->ne[1] > first->src[0]->ne[1] ||
++                    t->src[0]->nb[0] != first->src[0]->nb[0] || t->src[0]->nb[1] != first->src[0]->nb[1]) break;
+                 w[n] = t->src[0]; d[n] = t; n++;
+             }
++            return n;
++        };
++        const ggml_tensor * w[3]; ggml_tensor * d[3];
++        if (node->op == GGML_OP_MUL_MAT) {
++            const int n = collect(i, w, d);
+             if (n >= 2) {
+                 ggml_cuda_mul_mat_vec_q_multi(*cuda_ctx, w, node->src[1], d, n);
+                 static bool said = false; if (!said) { said = true; fprintf(stderr, "temporal-qkv: %d projections of %s in one launch\n", n, node->name); }
+                 return n - 1;
+             }
+         }
++        // =2: the RMS norm and weight that produce the projections' input are computed by the launch that quantises it
++        if (tm_qkv >= 2 && node->op == GGML_OP_RMS_NORM && i + 3 < cgraph->n_nodes && ggml_cuda_can_fuse(cgraph, i, { GGML_OP_RMS_NORM, GGML_OP_MUL }, {})) {
++            const ggml_tensor * mul = cgraph->nodes[i + 1];
++            const ggml_tensor * wt = mul->src[0] == node ? mul->src[1] : mul->src[0];
++            const ggml_tensor * x = node->src[0];
++            const int n = collect(i + 2, w, d);
++            if (n >= 2 && d[0]->src[1] == mul && x->type == GGML_TYPE_F32 && wt->type == GGML_TYPE_F32 && ggml_nelements(x) == x->ne[0] &&
++                ggml_nelements(wt) == x->ne[0] && ggml_is_contiguous(x) && ggml_is_contiguous(wt) && x->ne[0] % 32 == 0 && x->ne[0] <= 1024) {
++                ggml_cuda_mul_mat_vec_q_multi(*cuda_ctx, w, mul, d, n, node);
++                static bool said = false; if (!said) { said = true; fprintf(stderr, "temporal-qkv: norm, quantisation and %d projections of %s in two launches\n", n, d[0]->name); }
++                return n + 1;
++            }
++        }
+     }
+ 
+     // gated_delta_net -> cpy: scatter recurrent-state snapshots into the cache
+@@ -4227,6 +4266,13 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
+             // round trip, so read it as a ranking.
+             static const int opprof = [](){const char*e=getenv("TEMPORAL_OPPROF");return e?atoi(e):0;}();
+             bool prof_on = false;
++            // TEMPORAL_GRAPHDUMP=n (debugging): print the first n nodes of the first single-token graph
++            { static int gdump = [](){const char*e=getenv("TEMPORAL_GRAPHDUMP");return e?atoi(e):0;}();
++              bool one = false; for (int i = 0; i < cgraph->n_nodes; i++) if (cgraph->nodes[i]->op == GGML_OP_GET_ROWS) { one = cgraph->nodes[i]->ne[1] == 1; break; }
++              if (gdump && one) { for (int i = 0; i < cgraph->n_nodes && i < gdump; i++) { const ggml_tensor * t = cgraph->nodes[i];
++                  fprintf(stderr, "graphdump %3d %-12s %-22s %s [%lld,%lld,%lld,%lld] %s <-", i, ggml_op_name(t->op), t->name, ggml_type_name(t->type),
++                          (long long) t->ne[0], (long long) t->ne[1], (long long) t->ne[2], (long long) t->ne[3], (t->flags & GGML_TENSOR_FLAG_COMPUTE) ? "" : "(nocompute)");
++                  for (int k = 0; k < GGML_MAX_SRC && t->src[k]; ++k) fprintf(stderr, " %s", t->src[k]->name); fprintf(stderr, "\n"); } gdump = 0; } }
+             if (opprof) { for (int i = 0; i < cgraph->n_nodes; i++) if (cgraph->nodes[i]->op == GGML_OP_GET_ROWS) { prof_on = cgraph->nodes[i]->ne[1] == 1; break; }
+                           if (prof_on) g_opprof_graphs++; }
+             for (int i = 0; i < cgraph->n_nodes; i++) {
+diff --git a/ggml/src/ggml-cuda/mmvq.cu b/ggml/src/ggml-cuda/mmvq.cu
+index 2c216e62..60efeb2e 100644
+--- a/ggml/src/ggml-cuda/mmvq.cu
++++ b/ggml/src/ggml-cuda/mmvq.cu
+@@ -1,4 +1,5 @@
+ #include "mmvq.cuh"
++#include "norm.cuh"
+ #include "quantize.cuh"
+ #include "unary.cuh"
+ #include "vecdotq.cuh"
+@@ -481,6 +482,7 @@ static constexpr __host__ __device__ int calc_rows_per_block(int ncols_dst, int
+ // (measured: the whole token 26 % slower with the switch off).
+ struct mmvq_multi { const void * vx[3]; float * dst[3]; uint32_t nrows[3]; int n; };
+ static const mmvq_multi * g_mmvq_multi = nullptr;
++static const void * g_mmvq_preq = nullptr;   // the input vector already quantised to Q8_1 (TEMPORAL_QKV=2)
+ template <ggml_type type, int ncols_dst, bool has_fusion, bool small_k = false>
+ __launch_bounds__(calc_nwarps(type, ncols_dst, get_device_table_id())*ggml_cuda_get_physical_warp_size(), 1)
+ static __global__ void mul_mat_vec_q(
+@@ -1244,7 +1246,7 @@ void ggml_cuda_mul_mat_vec_q(
+         const int64_t s11 = src1->nb[1] / ts_src1;
+         const int64_t s12 = src1->nb[2] / ts_src1;
+         const int64_t s13 = src1->nb[3] / ts_src1;
+-        quantize_row_q8_1_cuda(src1_d, nullptr, src1_q8_1.get(), src0->type, ne10, s11, s12, s13, ne10_padded, ne11, ne12, ne13, stream);
++        if (!g_mmvq_preq) quantize_row_q8_1_cuda(src1_d, nullptr, src1_q8_1.get(), src0->type, ne10, s11, s12, s13, ne10_padded, ne11, ne12, ne13, stream);
+     }
+ 
+     const int64_t s01 = src0->nb[1] / ts_src0;
+@@ -1270,14 +1272,14 @@ void ggml_cuda_mul_mat_vec_q(
+     const int64_t ids_stride = ids ? ids->nb[1] / ggml_type_size(ids->type) : 0;
+ 
+     mul_mat_vec_q_switch_type(
+-        src0->data, src0->type, src1_q8_1.get(), ids_d, fusion_local, dst_d, ne00,
++        src0->data, src0->type, g_mmvq_preq ? g_mmvq_preq : src1_q8_1.get(), ids_d, fusion_local, dst_d, ne00,
+         ne01,              ncols_dst,     s01, stride_col_y,     stride_col_dst,
+         ne02, nchannels_y, nchannels_dst, s02, stride_channel_y, stride_channel_dst,
+         ne03,              ne3,           s03, s13,              s3,               ids_stride, stream);
+ }
+ 
+ void ggml_cuda_mul_mat_vec_q_multi(ggml_backend_cuda_context & ctx, const ggml_tensor ** src0s, const ggml_tensor * src1,
+-                                   ggml_tensor ** dsts, int n) {
++                                   ggml_tensor ** dsts, int n, const ggml_tensor * norm) {
+     GGML_ASSERT(n >= 2 && n <= 3);
+     mmvq_multi m{}; m.n = n;
+     for (int c = 0; c < n; ++c) {
+@@ -1289,7 +1291,17 @@ void ggml_cuda_mul_mat_vec_q_multi(ggml_backend_cuda_context & ctx, const ggml_t
+         m.vx[c] = src0s[c]->data; m.dst[c] = (float *) dsts[c]->data;
+     }
+     g_mmvq_multi = &m;
+-    ggml_cuda_mul_mat_vec_q(ctx, src0s[0], src1, nullptr, dsts[0], nullptr);
++    if (norm) {
++        // src1 is norm * weight: one launch computes it and its quantisation, the matmuls read the latter
++        const int64_t ne10_padded = GGML_PAD(src1->ne[0], MATRIX_ROW_PADDING);
++        ggml_cuda_pool_alloc<char> q(ctx.pool(), ne10_padded * sizeof(block_q8_1) / QK8_1);
++        ggml_cuda_rms_norm_mul_q8_1(ctx, norm, src1, q.get(), ne10_padded);
++        g_mmvq_preq = q.get();
++        ggml_cuda_mul_mat_vec_q(ctx, src0s[0], src1, nullptr, dsts[0], nullptr);
++        g_mmvq_preq = nullptr;
++    } else {
++        ggml_cuda_mul_mat_vec_q(ctx, src0s[0], src1, nullptr, dsts[0], nullptr);
++    }
+     g_mmvq_multi = nullptr;
+ }
+ 
+diff --git a/ggml/src/ggml-cuda/mmvq.cuh b/ggml/src/ggml-cuda/mmvq.cuh
+index ca255649..37dde08d 100644
+--- a/ggml/src/ggml-cuda/mmvq.cuh
++++ b/ggml/src/ggml-cuda/mmvq.cuh
+@@ -19,5 +19,7 @@ void ggml_cuda_op_mul_mat_vec_q(
+ 
+ // temporal: TEMPORAL_QKV. n (2 or 3) matrices of one type and shape times the same single vector, as one
+ // quantisation of the vector and one launch. Row arithmetic is that of ggml_cuda_mul_mat_vec_q.
++// norm (TEMPORAL_QKV=2): src1 is the product of this RMS_NORM node and a weight and has not been computed yet; it is
++// computed and quantised in one launch.
+ void ggml_cuda_mul_mat_vec_q_multi(ggml_backend_cuda_context & ctx, const ggml_tensor ** src0s, const ggml_tensor * src1,
+-                                   ggml_tensor ** dsts, int n);
++                                   ggml_tensor ** dsts, int n, const ggml_tensor * norm = nullptr);
+diff --git a/ggml/src/ggml-cuda/norm.cu b/ggml/src/ggml-cuda/norm.cu
+index 09d9f3a7..7a425ab1 100644
+--- a/ggml/src/ggml-cuda/norm.cu
++++ b/ggml/src/ggml-cuda/norm.cu
+@@ -1,4 +1,5 @@
+ #include "norm.cuh"
++#include "quantize.cuh"
+ #include <cstdint>
+ 
+ template <int block_size>
+@@ -499,6 +500,75 @@ void ggml_cuda_op_rms_norm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+     rms_norm_f32_cuda(src0_d, dst_d, ne00, ne01, ne02, ne03, s01, s02, s03, eps, stream);
+ }
+ 
++// temporal, TEMPORAL_QKV=2: rms_norm * weight of one row, written to dst as rms_norm_f32<block_size, true> writes it,
++// and the same values quantised to Q8_1 as quantize_q8_1 does (a warp holds 32 consecutive columns in both), so the
++// matmuls that follow need no quantise launch. ncols_pad: the padded length quantize_q8_1 would have filled.
++template <int block_size>
++static __global__ void rms_norm_mul_q8_1(const float * x, float * dst, const int ncols, const float eps, const float * mul,
++                                         block_q8_1 * y, const int ncols_pad) {
++    ggml_cuda_pdl_lc();
++    const int tid = threadIdx.x;
++    float tmp = 0.0f; // partial sum for thread in warp
++
++    ggml_cuda_pdl_sync();
++    for (int col = tid; col < ncols; col += block_size) {
++        const float xi = x[col];
++        tmp += xi * xi;
++    }
++
++    extern __shared__ float s_sum[];
++    tmp = block_reduce<block_reduce_method::SUM, block_size>(tmp, s_sum);
++
++    const float mean = tmp / ncols;
++    const float scale = rsqrtf(mean + eps);
++
++    for (int col = tid; col < ncols_pad; col += block_size) {
++        float xi = 0.0f;
++        if (col < ncols) {
++            dst[col] = scale * x[col] * mul[col];
++            xi = dst[col];
++        }
++        float amax = fabsf(xi);
++        float sum = xi;
++
++        amax = warp_reduce_max<QK8_1>(amax);
++        sum  = warp_reduce_sum<QK8_1>(sum);
++
++        const float  d = amax / 127.0f;
++        const int8_t q = amax == 0.0f ? 0 : roundf(xi / d);
++
++        y[col / QK8_1].qs[col % QK8_1] = q;
++        if (col % QK8_1 == 0) {
++            y[col / QK8_1].ds = make_half2(d, sum);
++        }
++    }
++}
++
++void ggml_cuda_rms_norm_mul_q8_1(ggml_backend_cuda_context & ctx, const ggml_tensor * norm, const ggml_tensor * mul_tensor,
++                                 void * vy, int64_t ncols_pad) {
++    const ggml_tensor * src = norm->src[0];
++    const ggml_tensor * w   = mul_tensor->src[0] == norm ? mul_tensor->src[1] : mul_tensor->src[0];
++    float eps = 0.0f;
++    memcpy(&eps, norm->op_params, sizeof(float));
++    const int ncols = (int) src->ne[0];
++    GGML_ASSERT(src->type == GGML_TYPE_F32 && w->type == GGML_TYPE_F32 && mul_tensor->type == GGML_TYPE_F32);
++    GGML_ASSERT(ggml_nelements(src) == ncols && ggml_nelements(w) == ncols && ncols % QK8_1 == 0 && ncols_pad % QK8_1 == 0);
++    const dim3 blocks_num(1, 1, 1);
++    // same block size as rms_norm_mul_f32_cuda picks, so the sum of squares is reduced in the same order
++    if (ncols < 1024) {
++        const dim3 block_dims(256, 1, 1);
++        const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params{blocks_num, block_dims, 32 * sizeof(float), ctx.stream()};
++        ggml_cuda_kernel_launch(rms_norm_mul_q8_1<256>, launch_params, (const float *) src->data, (float *) mul_tensor->data, ncols, eps,
++                                (const float *) w->data, (block_q8_1 *) vy, (int) ncols_pad);
++    } else {
++        GGML_ASSERT(ncols == 1024 && ncols_pad == 1024);
++        const dim3 block_dims(1024, 1, 1);
++        const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params{blocks_num, block_dims, 32 * sizeof(float), ctx.stream()};
++        ggml_cuda_kernel_launch(rms_norm_mul_q8_1<1024>, launch_params, (const float *) src->data, (float *) mul_tensor->data, ncols, eps,
++                                (const float *) w->data, (block_q8_1 *) vy, (int) ncols_pad);
++    }
++}
++
+ void ggml_cuda_op_rms_norm_fused(ggml_backend_cuda_context & ctx, ggml_tensor * dst, ggml_tensor * mul_tensor) {
+     const ggml_tensor * rms_norm_src = (ggml_tensor *) dst->src[0];
+     float eps = 0.0f;
+diff --git a/ggml/src/ggml-cuda/norm.cuh b/ggml/src/ggml-cuda/norm.cuh
+index a74f6376..c9f8ca0e 100644
+--- a/ggml/src/ggml-cuda/norm.cuh
++++ b/ggml/src/ggml-cuda/norm.cuh
+@@ -16,3 +16,7 @@ void ggml_cuda_op_rms_norm_fused_add(ggml_backend_cuda_context & ctx,
+ void ggml_cuda_op_rms_norm_back(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
+ 
+ void ggml_cuda_op_l2_norm(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
++
++// temporal, TEMPORAL_QKV=2: rms_norm * weight of one row into mul_tensor->data, and its Q8_1 quantisation into vy
++void ggml_cuda_rms_norm_mul_q8_1(ggml_backend_cuda_context & ctx, const ggml_tensor * norm, const ggml_tensor * mul_tensor,
++                                 void * vy, int64_t ncols_pad);
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index ba017269..5caa80ad 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -1365,6 +1365,7 @@ struct TFB {
+     float * y;
+     size_t be; int D, F, FS, K;
+     int cpv;        // 16-byte vectors covering one down row
++    const float * res;   // TEMPORAL_FUSED_ADD: the layer's residual stream, added to the op's output here (the ADD node after the op)
+ };
+ constexpr int TFB_C = 224;                                                 // most compute threads (Q4_0 blocks one output row reads); the
+                                                                            // threads past the compute threads move loaded experts' rows
+@@ -1411,7 +1412,9 @@ __global__ void k_tf_b(TFB B) {                                            // on
+     if (i == 0) {
+         float s2 = __fmul_rn(part[0], B.wgt[0]);
+         for (int c = 1; c < B.K; ++c) s2 = __fadd_rn(s2, __fmul_rn(part[c], B.wgt[c]));
+-        B.y[r] = B.FS ? __fadd_rn(s2, part[B.K]) : s2;
++        float o = B.FS ? __fadd_rn(s2, part[B.K]) : s2;
++        if (B.res) o = __fadd_rn(o, B.res[r]);                               // y may be the same buffer as res: element r only
++        B.y[r] = o;
+     }
+ }
+ bool ggml_cuda_temporal_fused_op(const ggml_tensor * t) {
+@@ -1419,7 +1422,7 @@ bool ggml_cuda_temporal_fused_op(const ggml_tensor * t) {
+     return ggml_cuda_temporal_fused_on() && ggml_cuda_temporal_route_op_on() && t->type == GGML_TYPE_F32
+         && t->src[5] && t->src[3] && t->src[3]->type == GGML_TYPE_Q4_0 && t->src[5]->type == GGML_TYPE_Q4_0 && t->src[1] && t->src[1]->type == GGML_TYPE_I32;
+ }
+-void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst) {
++void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst, float * out, const float * res) {
+     const ggml_tensor * x = dst->src[0], * ids = dst->src[1], * wgt = dst->src[2];
+     const ggml_tensor * W[3] = { dst->src[3], dst->src[4], dst->src[5] }, * Sx[3] = { dst->src[6], dst->src[7], dst->src[8] };
+     const int D = (int) x->ne[0], F = (int) W[0]->ne[1], FS = Sx[0] ? (int) Sx[0]->ne[1] : 0, K = (int) ids->ne[0], GR = F / 32;
+@@ -1468,7 +1471,7 @@ void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst) {
+         k_tf_a<<<K * GR, 1024, 0, stream>>>(A1);
+     }
+     B.aq = aq; B.wgt = fold ? wbuf : (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
+-    B.SD = Sx[2] ? (const uint8_t *) Sx[2]->data : nullptr; B.y = (float *) dst->data; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K; B.cpv = cpv;
++    B.SD = Sx[2] ? (const uint8_t *) Sx[2]->data : nullptr; B.y = out ? out : (float *) dst->data; B.res = res; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K; B.cpv = cpv;
+     if (two) { B.poolD = nullptr; if (tr_nocopy() != 2) cudaStreamWaitEvent(stream, Lp->ev[2], 0); }
+     if (dn_in_a) B.poolD = nullptr;
+     if (!(skip & 2)) k_tf_b<<<D, bt, 0, stream>>>(B);
+diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
+index 55d9c9f2..b1e6c994 100644
+--- a/ggml/src/ggml-cuda/temporal.cuh
++++ b/ggml/src/ggml-cuda/temporal.cuh
+@@ -21,7 +21,8 @@ extern "C" int ggml_cuda_temporal_split_ids(const void* src0_data, int pass, int
+ // TEMPORAL_FUSED: the fused MoE-layer op (shared expert, routed experts, weighting, sum), see temporal.cu
+ int  ggml_cuda_temporal_fused_on();
+ bool ggml_cuda_temporal_fused_op(const ggml_tensor * t);
+-void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst);
++// out/res (TEMPORAL_FUSED_ADD): write op + res to out instead of the op to dst->data (the residual add that follows the op)
++void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst, float * out = nullptr, const float * res = nullptr);
+ 
+ // ===== EXPERT-MAJOR STREAMING PREFILL support (default path for n_tokens>1 under unified) =====
+ // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
+-- 
+2.50.0
+

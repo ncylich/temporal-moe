@@ -1,0 +1,22 @@
+BUILT in 47s tree-dirty=6
+ppl vram   Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-fused-add: residual add of l_out-0 done by the fused op
+ppl stream Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-fused-add: residual add of l_out-0 done by the fused op
+base one    242.97 tok/s  4.1158 ms  (median 243.09, sd 1.07) loads 1.0000  wall 22s
+base sk     229.52 tok/s  4.3570 ms  (median 229.88, sd 1.52) loads 0.9938  wall 22s
+base vram   297.58 tok/s  3.3604 ms  (median 297.96, sd 1.28)  wall 13s
+base total wall 57s fill=1024 reps=16
+fadd one    242.79 tok/s  4.1188 ms  (median 243.51, sd 1.17) loads 1.0000  wall 22s
+fadd sk     228.81 tok/s  4.3704 ms  (median 229.42, sd 1.69) loads 0.9938  wall 23s
+fadd vram   297.85 tok/s  3.3574 ms  (median 298.56, sd 1.72)  wall 13s
+fadd total wall 58s fill=1024 reps=16
+fadd-rev vram   294.93 tok/s  3.3906 ms  (median 295.36, sd 1.49)  wall 13s
+fadd-rev sk     228.98 tok/s  4.3671 ms  (median 229.42, sd 1.10) loads 0.9938  wall 22s
+fadd-rev one    241.30 tok/s  4.1441 ms  (median 241.86, sd 1.06) loads 1.0000  wall 22s
+fadd-rev total wall 57s fill=1024 reps=16
+base-rev vram   289.43 tok/s  3.4551 ms  (median 289.26, sd 1.37)  wall 13s
+base-rev sk     224.52 tok/s  4.4539 ms  (median 224.45, sd 1.17) loads 0.9938  wall 23s
+base-rev one    237.17 tok/s  4.2163 ms  (median 237.17, sd 1.19) loads 1.0000  wall 22s
+base-rev total wall 58s fill=1024 reps=16
+T8_DONE
