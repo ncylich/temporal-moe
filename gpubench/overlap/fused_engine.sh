@@ -49,12 +49,16 @@ for a in "ours|$MOE|ours" "skliar|$MOE|skliar" "trained|$TM|trained"; do
    "$n-lf3f|$M|${arm}_stream|TEMPORAL_LOAD_FIRST=3 TEMPORAL_UNIFIED_FUSE=1"
    "$n-fused|$M|${arm}_stream|TEMPORAL_FUSED=1"
    "$n-fused-nb|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1"
+   "$n-fused-skipA|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1 TEMPORAL_FUSED_SKIP=1"
+   "$n-fused-skipB|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1 TEMPORAL_FUSED_SKIP=2"
+   "$n-fused-skipAB|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1 TEMPORAL_FUSED_SKIP=3"
   )
 done
 for p in $(seq 1 $NP); do
   ORDER=$(seq 0 $((${#ARMS[@]} - 1))); [ $((p % 2)) = 0 ] && ORDER=$(seq $((${#ARMS[@]} - 1)) -1 0)
   for v in 1 2 3 4 5; do for i in $ORDER; do
     IFS='|' read -r label M arm X <<< "${ARMS[$i]}"
+    [ -n "${ONLY:-}" ] && ! [[ $label =~ $ONLY ]] && continue
     printf "%-20s p%d v%d " $label $p $v
     python3 $R/released/run_released.py --bin $BIN --nmoe 14 --C 18 --lam $LAM --tokens $O/tok_v$v --out $O/${OUTFILE:-speed_fused.jsonl} --fa 0 \
        --prefix "taskset -c $CPUS" --ctx 1024 --model $M --tag $label --note "pass $p row $((600 + v))" --env TEMPORAL_SHEXP_FIRST=1 $X --arms $arm | cut -c16-120

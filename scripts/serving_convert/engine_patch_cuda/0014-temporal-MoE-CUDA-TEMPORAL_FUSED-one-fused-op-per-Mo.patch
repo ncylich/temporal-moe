@@ -1,4 +1,4 @@
-From 2f911b669b567110ff124d79efa82ca7af1acf00 Mon Sep 17 00:00:00 2001
+From 6096ded65765154f5b5a8dd4e0a35b6384d051ef Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 18 Nov 2026 00:45:43 -0800
 Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED, one fused op per MoE layer
@@ -11,12 +11,12 @@ copy kernels, events or second stream are involved. The router, the softmax, the
 ops stay ordinary graph nodes. Q4_0 experts with glm4moe's shapes only; other models keep the old path.
 ---
  ggml/src/ggml-cuda/ggml-cuda.cu |   7 +-
- ggml/src/ggml-cuda/temporal.cu  | 188 +++++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu  | 194 +++++++++++++++++++++++++++++++-
  ggml/src/ggml-cuda/temporal.cuh |   5 +
  src/llama-graph.cpp             |  34 ++++++
  src/llama-graph.h               |   4 +
  src/models/glm4-moe.cpp         |  12 ++
- 6 files changed, 245 insertions(+), 5 deletions(-)
+ 6 files changed, 251 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
 index bb562d44..77d54b6c 100644
@@ -44,7 +44,7 @@ index bb562d44..77d54b6c 100644
              switch (ggml_get_unary_op(op)) {
                  case GGML_UNARY_OP_ABS:
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index dffd6614..7db0c21c 100644
+index dffd6614..6a10bb1a 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -49,6 +49,10 @@ static int tr_slots();
@@ -84,21 +84,20 @@ index dffd6614..7db0c21c 100644
          cudaEventRecord(T->fork, stream);
          cudaStreamWaitEvent(g_copy, T->fork, 0);
          for (int w = 0; w < 3; ++w) {
-@@ -1192,3 +1197,182 @@ void ggml_cuda_temporal_route_reset() {
+@@ -1192,3 +1197,188 @@ void ggml_cuda_temporal_route_reset() {
      }
      CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
  }
 +
-+// ===== TEMPORAL_FUSED: the MoE layer after the gate weights, as three launches =====
++// ===== TEMPORAL_FUSED: the MoE layer after the gate weights, as two launches =====
 +// Replaces, for one token: the shared expert (gate, up, SwiGLU, down), the routed experts (gate, up, SwiGLU,
 +// down), experts * weights, the sum over experts and + shared. Same model, same Q4_0 weights, same slots. The
 +// selected experts, the swap list and the gate weights are inputs, written by the engine's own router,
 +// softmax, routing op and gate-weight ops earlier in the graph; nothing here knows a load before they ran.
-+//   A   gate and up products of every routed expert and of the shared expert: one block per 32 rows of one
-+//       tensor, one warp per row, one lane per Q4_0 block. Each block quantises the layer input itself (Q8_1,
-+//       as mul_mat_vec_q's input). The blocks of an expert being loaded first move their part of the gate or
-+//       up tensor from the host-mapped pool into the slot, one 16-byte read per thread, then compute from it.
-+//   A2  SwiGLU and Q8_1 quantisation of the activations.
++//   A   gate and up products, SwiGLU and Q8_1 activations of every routed expert and of the shared expert: one
++//       block per 32 rows of an expert, one warp per row. Each block quantises the layer input itself (Q8_1,
++//       as mul_mat_vec_q's input). The blocks of an expert being loaded come first in the grid and first move
++//       their part of the gate and up tensors from the host-mapped pool into the slot, then compute from it.
 +//   B   down products, experts * gate weights, sum over experts in selection order, + shared: one block per
 +//       output row. The down row of an expert being loaded is moved from the pool by extra threads of the same
 +//       block while the other experts' products are computed; its own products follow.
@@ -134,44 +133,52 @@ index dffd6614..7db0c21c 100644
 +    const uint8_t * W[3]; const int * ids; const uint8_t * pool[3];        // gate, up, (down unused here)
 +    const int * swp_e, * swp_s, * nswp;
 +    const uint8_t * SG, * SU;
-+    float * gu, * sg, * su;
++    block_q8_1 * aq;
 +    size_t be; int D, F, FS, K;
 +};
++// One block per 32 rows of one expert: gate rows, up rows, SwiGLU, and the Q8_1 block of those 32 activations.
++// Routed positions are taken in the order "experts being loaded first", so their blocks are scheduled first
++// and their reads start with the launch.
 +__global__ void k_tf_a(TFA A) {
-+    __shared__ block_q8_1 xq[32];
++    __shared__ block_q8_1 xq[32]; __shared__ float act[32]; __shared__ int s_c, s_e;
 +    const int lane = threadIdx.x & 31, row = threadIdx.x >> 5, blk = blockIdx.x;
-+    const int DB = A.D / 32, GR = A.F / 32, NR = A.K * GR * 2;
++    const int DB = A.D / 32, GR = A.F / 32, NR = A.K * GR;
 +    if (row < DB) tf_quant_lane(A.x[32 * row + lane], xq + row);
-+    __syncthreads();
-+    if (blk >= NR) {                                                       // shared expert: gate or up, 32 rows
-+        const int sb = blk - NR, w = sb & 1, r = (sb >> 1) * 32 + row;
-+        const float a = tf_row(w ? A.SU : A.SG, r * DB, xq, DB);
-+        if (lane == 0) (w ? A.su : A.sg)[r] = a;
-+        return;
++    if (threadIdx.x == 1023 && blk < NR) {                                 // which position this block computes, and its load
++        const int p = blk / GR, ns = A.pool[0] ? min(*A.nswp, A.K) : 0;
++        int c = -1, e = -1, k = 0;
++        for (int j = 0; j < A.K && ns; ++j) {
++            int m = -1; for (int q = 0; q < ns; ++q) if (A.swp_s[q] == A.ids[j]) m = q;
++            if (m >= 0) { if (k == p) { c = j; e = A.swp_e[m]; } k++; }
++        }
++        if (c < 0) for (int j = 0; j < A.K; ++j) {
++            bool inc = false; for (int q = 0; q < ns; ++q) inc |= A.swp_s[q] == A.ids[j];
++            if (!inc) { if (k == p) c = j; k++; }
++        }
++        s_c = c; s_e = e;
 +    }
-+    const int w = blk % 2, g = (blk / 2) % GR, c = blk / (2 * GR), slot = A.ids[c];
-+    if (A.pool[0]) {                                                       // streamed: is this position's expert being loaded?
-+        int e = -1; const int ns = min(*A.nswp, A.K);
-+        for (int k = 0; k < ns; ++k) if (A.swp_s[k] == slot) e = A.swp_e[k];
-+        if (e >= 0) {
++    __syncthreads();
++    const void * G, * U; int kb0, q;
++    if (blk >= NR) {                                                       // shared expert, rows 32*g .. 32*g+31
++        const int g = blk - NR;
++        G = A.SG; U = A.SU; kb0 = (g * 32 + row) * DB; q = NR + g;
++    } else {
++        const int g = blk % GR, c = s_c, slot = A.ids[c];
++        if (s_e >= 0) {                                                    // host pool -> slot: this block's part of gate and of up
 +            const int NV = (int) (A.be / 16 / GR);
 +            if ((int) threadIdx.x < NV) {
-+                const size_t o = (size_t) g * NV + threadIdx.x;
-+                ((uint4 *) A.W[w])[(size_t) slot * (A.be / 16) + o] = ((const uint4 *) A.pool[w])[(size_t) e * (A.be / 16) + o];
++                const size_t so = (size_t) slot * (A.be / 16) + (size_t) g * NV + threadIdx.x, eo = (size_t) s_e * (A.be / 16) + (size_t) g * NV + threadIdx.x;
++                const uint4 vg = ((const uint4 *) A.pool[0])[eo], vu = ((const uint4 *) A.pool[1])[eo];
++                ((uint4 *) A.W[0])[so] = vg; ((uint4 *) A.W[1])[so] = vu;
 +            }
 +            __syncthreads();
 +        }
++        G = A.W[0]; U = A.W[1]; kb0 = slot * (int) (A.be / sizeof(block_q4_0)) + (g * 32 + row) * DB; q = c * GR + g;
 +    }
-+    const int r = g * 32 + row;
-+    const float a = tf_row(A.W[w], slot * (int) (A.be / sizeof(block_q4_0)) + r * DB, xq, DB);
-+    if (lane == 0) A.gu[((size_t) w * A.K + c) * A.F + r] = a;
-+}
-+__global__ void k_tf_a2(const float * __restrict__ gu, const float * __restrict__ sg, const float * __restrict__ su, block_q8_1 * __restrict__ aq, int nrouted, int KF) {
-+    const int q = blockIdx.x, i = threadIdx.x;                             // one warp = one Q8_1 block of activations
-+    float g, u;
-+    if (q < nrouted) { g = gu[(size_t) q * 32 + i]; u = gu[(size_t) KF + (size_t) q * 32 + i]; }
-+    else             { g = sg[(q - nrouted) * 32 + i]; u = su[(q - nrouted) * 32 + i]; }
-+    tf_quant_lane(u * ggml_cuda_op_silu_single(g), aq + q);
++    const float gv = tf_row(G, kb0, xq, DB), uv = tf_row(U, kb0, xq, DB);
++    if (lane == 0) act[row] = uv * ggml_cuda_op_silu_single(gv);
++    __syncthreads();
++    if (row == 0) tf_quant_lane(act[lane], A.aq + q);
 +}
 +struct TFB {
 +    const block_q8_1 * aq; const float * wgt;
@@ -181,7 +188,8 @@ index dffd6614..7db0c21c 100644
 +    float * y;
 +    size_t be; int D, F, FS, K;
 +};
-+constexpr int TFB_C = 160, TFB_T = TFB_C + 32;                             // compute threads, copy threads
++constexpr int TFB_C = 160, TFB_T = 160;                                    // most compute threads; threads per block (the ones past the
++                                                                           // compute threads move loaded experts' rows, 8 per expert)
 +static __device__ float tf_tree(float * l) {                               // the 32-lane xor-shuffle reduction, done by one thread
 +    for (int o = 16; o > 0; o >>= 1) for (int x = 0; x < 32; ++x) if (!(x & o)) l[x] = __fadd_rn(l[x], l[x ^ o]);
 +    return l[0];
@@ -198,12 +206,12 @@ index dffd6614..7db0c21c 100644
 +        if (!late) { a0 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 0); a1 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 2); }
 +    } else if (i < NQ) {
 +        a0 = vec_dot_q4_0_q8_1(B.SD, B.aq + i, r * SB + (i - NRQ), 0); a1 = vec_dot_q4_0_q8_1(B.SD, B.aq + i, r * SB + (i - NRQ), 2);
-+    } else if (i >= TFB_C) {
++    } else if (i - NQ < 8 * ((TFB_T - NQ) / 8)) {
 +        // the 16-byte vectors covering row r of each loaded expert's down tensor, pool -> slot, one read per
 +        // thread; vectors on a row boundary are written by both neighbouring rows with the same bytes
-+        const int j = i - TFB_C, vi = j % 8;
++        const int j = i - NQ, vi = j % 8, ncp = (TFB_T - NQ) / 8;
 +        const size_t first = (size_t) r * RB / 16, last = ((size_t) r * RB + RB - 1) / 16;
-+        for (int k = j / 8; k < ns; k += 4)
++        for (int k = j / 8; k < ns; k += ncp)
 +            if (first + vi <= last) ((uint4 *) B.Dn)[(size_t) B.swp_s[k] * (B.be / 16) + first + vi] = ((const uint4 *) B.poolD)[(size_t) B.swp_e[k] * (B.be / 16) + first + vi];
 +    }
 +    __syncthreads();
@@ -237,14 +245,14 @@ index dffd6614..7db0c21c 100644
 +    const ggml_tensor * x = dst->src[0], * ids = dst->src[1], * wgt = dst->src[2];
 +    const ggml_tensor * W[3] = { dst->src[3], dst->src[4], dst->src[5] }, * Sx[3] = { dst->src[6], dst->src[7], dst->src[8] };
 +    const int D = (int) x->ne[0], F = (int) W[0]->ne[1], FS = (int) Sx[0]->ne[1], K = (int) ids->ne[0], GR = F / 32;
-+    GGML_ASSERT(x->ne[1] == 1 && D % 32 == 0 && D <= 896 && F % 32 == 0 && F <= 192 && FS % 32 == 0 && FS / 32 <= 48 && K * GR + FS / 32 <= TFB_C && K <= 64);
-+    static float * gu = nullptr, * sg = nullptr, * su = nullptr; static block_q8_1 * aq = nullptr; static int cap = 0;
-+    if (!gu) {
-+        CUDA_CHECK(cudaMalloc(&gu, (size_t) 2 * 64 * 192 * sizeof(float))); CUDA_CHECK(cudaMalloc(&sg, 4096 * sizeof(float))); CUDA_CHECK(cudaMalloc(&su, 4096 * sizeof(float)));
-+        CUDA_CHECK(cudaMalloc(&aq, TFB_C * sizeof(block_q8_1))); cap = 1;
-+        fprintf(stderr, "[temporal-fused] one fused op per MoE layer on single-token steps: D=%d F=%d FS=%d K=%d\n", D, F, FS, K);
++    GGML_ASSERT(x->ne[1] == 1 && D % 32 == 0 && D <= 896 && F % 32 == 0 && F <= 192 && FS % 32 == 0 && FS / 32 <= 48 && K * GR + FS / 32 + 8 <= TFB_T && K <= 64);
++    static block_q8_1 * aq = nullptr;
++    // TEMPORAL_FUSED_SKIP (profiling, output wrong): 1 = do not launch A, 2 = do not launch B
++    static const int skip = [](){const char*e=getenv("TEMPORAL_FUSED_SKIP");return e?atoi(e):0;}();
++    if (!aq) {
++        CUDA_CHECK(cudaMalloc(&aq, TFB_C * sizeof(block_q8_1))); CUDA_CHECK(cudaMemset(aq, 0, TFB_C * sizeof(block_q8_1)));
++        fprintf(stderr, "[temporal-fused] one fused op per MoE layer on single-token steps: D=%d F=%d FS=%d K=%d skip=%d\n", D, F, FS, K, skip);
 +    }
-+    GGML_ASSERT(FS <= 4096);
 +    TFA A; memset(&A, 0, sizeof A); TFB B; memset(&B, 0, sizeof B);
 +    auto it = g_tptr.find(W[0]->data);
 +    if (it != g_tptr.end()) {                                              // streamed: slots, pool, the routing op's swap list
@@ -258,14 +266,12 @@ index dffd6614..7db0c21c 100644
 +        A.ids = (const int *) ids->data; A.be = W[0]->nb[2];
 +    }
 +    A.x = (const float *) x->data; A.SG = (const uint8_t *) Sx[0]->data; A.SU = (const uint8_t *) Sx[1]->data;
-+    A.gu = gu; A.sg = sg; A.su = su; A.D = D; A.F = F; A.FS = FS; A.K = K;
-+    k_tf_a<<<K * GR * 2 + (FS / 32) * 2, 1024, 0, stream>>>(A);
-+    k_tf_a2<<<K * GR + FS / 32, 32, 0, stream>>>(gu, sg, su, aq, K * GR, K * F);
++    A.aq = aq; A.D = D; A.F = F; A.FS = FS; A.K = K;
++    if (!(skip & 1)) k_tf_a<<<K * GR + FS / 32, 1024, 0, stream>>>(A);
 +    B.aq = aq; B.wgt = (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
 +    B.SD = (const uint8_t *) Sx[2]->data; B.y = (float *) dst->data; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K;
-+    k_tf_b<<<D, TFB_T, 0, stream>>>(B);
++    if (!(skip & 2)) k_tf_b<<<D, TFB_T, 0, stream>>>(B);
 +    CUDA_CHECK(cudaGetLastError());
-+    (void) cap;
 +}
 diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
 index 2bb55f5f..55d9c9f2 100644
@@ -284,7 +290,7 @@ index 2bb55f5f..55d9c9f2 100644
  // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
  // batched GEMM per expert. Decode (n_tokens==1) is untouched.
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index eb02cb59..776265bf 100644
+index eb02cb59..d8fcf60c 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1798,6 +1798,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
@@ -306,7 +312,7 @@ index eb02cb59..776265bf 100644
  
 +    // TEMPORAL_FUSED=1 (CUDA, single-token steps, routing op on the device): everything after the gate weights
 +    // -- shared expert, routed experts, weighting, sum over experts, + shared -- is one custom op that the CUDA
-+    // backend runs as three launches (ggml_cuda_temporal_fused). The router, the softmax, the routing op and the
++    // backend runs as two launches (ggml_cuda_temporal_fused). The router, the softmax, the routing op and the
 +    // gate-weight ops above stay ordinary nodes, so the selection, the loads and the weights are the engine's.
 +    // Inputs: x, selected ids, gate weights, the routed gate/up/down tensors, the shared gate/up/down tensors.
 +    {
