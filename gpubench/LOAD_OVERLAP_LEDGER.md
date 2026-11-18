@@ -1314,5 +1314,22 @@ Ours against Skliar on the 1.26 B plain MoE read +3.2 %, +3.4 % and +2.8 % for p
 today and +4.0 %, +4.4 % and +4.8 % after. The absolute difference between the rules is about 0.047 ms per
 token throughout; the percentage rises because the token got shorter.
 
-Launches per layer on the 1.26 B model: 14 this morning's count after patch 0017, 11 now. Remaining items
-are as in O5-8, except attention on this model, which is now one launch near its memory floor.
+Launches per layer on the 1.26 B model: 14 after patch 0017, 11 with patch 0018. What is left is the list in
+O5-8, except attention on this model, which is now one launch near its memory floor.
+
+## O5-12 -- Pod, cost, and what was not done in Part 5
+
+- Pod `8xcjjlxgekub1c`: container up 18:24, stopped 22:59 UTC on 2026-11-18, about $3.20. Its disk is wiped
+  at each stop. The engine tree on the pod at the end was `2e897e1b`, the tree patches 0001 to 0018 produce.
+- Setup notes for the next start, each of which cost time today: the resume took 12 minutes to produce a
+  container both times; the fresh disk has no cmake (a wheel uploaded from here works offline); the pod's
+  outbound network drops for minutes at a time, so the tokenizer files for the random 11 B model were
+  uploaded from here; a "is my job already running" test with `pgrep -f` matches the SSH command that runs
+  it.
+- Not done: routing equality against the Python reference for patches 0015 to 0018 (no routing kernel is
+  touched; the `temporal` package was not on the pod); the 11 B model in its original mixed-format file
+  (O4-2, still the user's decision); the router fusion and the other items of O5-8; Qwen3.5.
+- Seven tries, five kept (Q/K/V in one launch; the loaded expert's down copy in the first launch; the
+  residual add and the attention norm folds; RoPE, cache writes and q/k norms in one launch; the
+  single-token attention kernel), two dropped (copy blocks at the front with a second launch; splitting the
+  down copy), plus the 26 % slowdown from a by-value kernel argument struct that a control build caught.
