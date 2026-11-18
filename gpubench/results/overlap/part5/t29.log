@@ -1,0 +1,39 @@
+BUILT in 47s tree-dirty=13
+0.09.452.306 I Final estimate: PPL = 26.3667 +/- 2.80324
+temporal-attn1-check:  256 cached positions: 3598 attention calls, kernel taken in 3598 | K.Q at unmasked positions: 0 of 23027900 values differ from the stock op | attention output: 0 of 2878400 values differ
+temporal-attn1-check:  512 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 68902400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check:  768 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 114777600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1024 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 160652800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1280 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 206528000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1536 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 252403200 values differ from the stock op | attention output: 0 of 2867200 values differ
+0.09.372.328 I Final estimate: PPL = 44.2665 +/- 5.02731
+temporal-attn1-check:  256 cached positions: 3598 attention calls, kernel taken in 3598 | K.Q at unmasked positions: 0 of 23027900 values differ from the stock op | attention output: 0 of 2878400 values differ
+temporal-attn1-check:  512 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 68902400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check:  768 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 114777600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1024 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 160652800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1280 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 206528000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1536 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 252403200 values differ from the stock op | attention output: 0 of 2867200 values differ
+T29C_DONE
+decode vram, patch 0014 op only:  Final estimate: PPL = 42.6913 +/- 2.98935 swaps_per_layer_token=0.9998 swaps_per_layer_token=0.0000 
+decode vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qk
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1 rep 1:  Final estimate: PPL = 42.6913 +/- 2.98935 tem
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1 rep 2:  Final estimate: PPL = 42.6913 +/- 2.98935 tem
+skliar vram, patch 0014 op only:  Final estimate: PPL = 40.0690 +/- 2.84434 loads_per_layer_token=0.9845 swaps_per_layer_token=0.0000 
+skliar vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qk
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1 rep 1:  Final estimate: PPL = 40.0690 +/- 2.84434 tem
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1 rep 2:  Final estimate: PPL = 40.0690 +/- 2.84434 tem
+trained vram, patch 0014 op only:  Final estimate: PPL = 22.7367 +/- 1.50944 swaps_per_layer_token=0.9999 swaps_per_layer_token=0.0000 
+trained vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-q
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1 rep 1:  Final estimate: PPL = 22.7367 +/- 1.50944 te
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1 rep 2:  Final estimate: PPL = 22.7367 +/- 1.50944 te
+GATES_DONE
+T29G_DONE
+d-base-a ours 855.0 tok/s (1.1696 ms, n=3) | skliar 813.3 tok/s (1.2295 ms, n=3) | trained 843.2 tok/s (1.1859 ms, n=3)
+d-new-a ours 966.8 tok/s (1.0343 ms, n=3) | skliar 923.8 tok/s (1.0825 ms, n=3) | trained 959.0 tok/s (1.0428 ms, n=3)
+d-new-b ours 974.5 tok/s (1.0262 ms, n=3) | skliar 935.0 tok/s (1.0695 ms, n=3) | trained 964.3 tok/s (1.0371 ms, n=3)
+d-base-b ours 852.8 tok/s (1.1726 ms, n=3) | skliar 823.0 tok/s (1.2151 ms, n=3) | trained 859.3 tok/s (1.1637 ms, n=3)
+dv-base-a ours 925.8 tok/s (1.0802 ms, n=3) | skliar 899.7 tok/s (1.1115 ms, n=3) | trained 924.4 tok/s (1.0818 ms, n=3)
+dv-new-a ours 1070.4 tok/s (0.9342 ms, n=3) | skliar 1035.4 tok/s (0.9658 ms, n=3) | trained 1066.5 tok/s (0.9377 ms, n=3)
+dv-new-b ours 1071.6 tok/s (0.9332 ms, n=3) | skliar 1027.8 tok/s (0.9730 ms, n=3) | trained 1066.5 tok/s (0.9377 ms, n=3)
+dv-base-b ours 932.1 tok/s (1.0728 ms, n=3) | skliar 904.3 tok/s (1.1058 ms, n=3) | trained 927.1 tok/s (1.0786 ms, n=3)
+T29_DONE

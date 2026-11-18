@@ -1,0 +1,8 @@
+BUILT in 48s tree-dirty=13
+s-base-1 ours 943.0 tok/s (1.0605 ms, n=2) | skliar 916.9 tok/s (1.0907 ms, n=2) | trained 945.2 tok/s (1.0580 ms, n=2)
+s-attn-1 ours 948.7 tok/s (1.0540 ms, n=2) | skliar 916.5 tok/s (1.0911 ms, n=2) | trained 949.9 tok/s (1.0527 ms, n=2)
+s-skip-1 ours 1463.7 tok/s (0.6832 ms, n=2) | skliar 1421.7 tok/s (0.7034 ms, n=2) | trained 1492.6 tok/s (0.6700 ms, n=2)
+s-base-2 ours 946.4 tok/s (1.0566 ms, n=2) | skliar 912.9 tok/s (1.0954 ms, n=2) | trained 938.8 tok/s (1.0652 ms, n=2)
+s-attn-2 ours 944.1 tok/s (1.0592 ms, n=2) | skliar 912.1 tok/s (1.0964 ms, n=2) | trained 944.8 tok/s (1.0585 ms, n=2)
+s-skip-2 ours 1475.4 tok/s (0.6778 ms, n=2) | skliar 1415.2 tok/s (0.7066 ms, n=2) | trained 1472.2 tok/s (0.6792 ms, n=2)
+T18_DONE

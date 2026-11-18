@@ -1,0 +1,10 @@
+BUILT in 48s tree-dirty=13
+p-skip-1 ours 1479.8 tok/s (0.6758 ms, n=1) | trained 1494.7 tok/s (0.6690 ms, n=1)
+p-ph1-1 ours 951.6 tok/s (1.0508 ms, n=1) | trained 943.8 tok/s (1.0595 ms, n=1)
+p-ph12-1 ours 948.5 tok/s (1.0543 ms, n=1) | trained 947.7 tok/s (1.0551 ms, n=1)
+p-all-1 ours 949.0 tok/s (1.0537 ms, n=1) | trained 945.2 tok/s (1.0579 ms, n=1)
+p-skip-2 ours 1447.4 tok/s (0.6909 ms, n=1) | trained 1472.2 tok/s (0.6793 ms, n=1)
+p-ph1-2 ours 944.3 tok/s (1.0590 ms, n=1) | trained 939.9 tok/s (1.0639 ms, n=1)
+p-ph12-2 ours 936.5 tok/s (1.0678 ms, n=1) | trained 941.7 tok/s (1.0619 ms, n=1)
+p-all-2 ours 928.0 tok/s (1.0776 ms, n=1) | trained 935.5 tok/s (1.0690 ms, n=1)
+T19_DONE

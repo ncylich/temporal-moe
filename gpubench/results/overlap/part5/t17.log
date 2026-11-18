@@ -1,0 +1,9 @@
+a-base-a ours 858.3 tok/s (1.1650 ms, n=3) | skliar 823.0 tok/s (1.2151 ms, n=3) | trained 855.4 tok/s (1.1690 ms, n=3)
+a-new-a ours 849.6 tok/s (1.1770 ms, n=3) | skliar 816.0 tok/s (1.2255 ms, n=3) | trained 854.7 tok/s (1.1700 ms, n=3)
+a-new-b ours 858.4 tok/s (1.1649 ms, n=3) | skliar 823.1 tok/s (1.2149 ms, n=3) | trained 860.8 tok/s (1.1618 ms, n=3)
+a-base-b ours 852.9 tok/s (1.1724 ms, n=3) | skliar 818.6 tok/s (1.2216 ms, n=3) | trained 853.2 tok/s (1.1720 ms, n=3)
+av-base-a ours 937.3 tok/s (1.0669 ms, n=3) | skliar 907.5 tok/s (1.1019 ms, n=3) | trained 931.6 tok/s (1.0734 ms, n=3)
+av-new-a ours 933.9 tok/s (1.0707 ms, n=3) | skliar 910.6 tok/s (1.0981 ms, n=3) | trained 936.7 tok/s (1.0676 ms, n=3)
+av-new-b ours 935.6 tok/s (1.0688 ms, n=3) | skliar 909.8 tok/s (1.0991 ms, n=3) | trained 936.2 tok/s (1.0681 ms, n=3)
+av-base-b ours 930.9 tok/s (1.0743 ms, n=3) | skliar 910.3 tok/s (1.0986 ms, n=3) | trained 941.9 tok/s (1.0616 ms, n=3)
+T17_DONE

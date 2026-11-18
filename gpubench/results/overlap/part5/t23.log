@@ -1,0 +1,16 @@
+BUILT in 48s tree-dirty=13
+skip9: "avg_ts": 1404.875639
+host-only12: "avg_ts": 923.704118
+memset11: "avg_ts": 908.171530
+tiny10: "avg_ts": 907.141642
+empty5: "avg_ts": 915.953836
+full: "avg_ts": 933.059561
+base: "avg_ts": 912.273276
+skip9: "avg_ts": 1475.056636
+host-only12: "avg_ts": 916.217208
+memset11: "avg_ts": 915.627748
+tiny10: "avg_ts": 919.311817
+empty5: "avg_ts": 933.687534
+full: "avg_ts": 914.624579
+base: "avg_ts": 915.943082
+T23_DONE

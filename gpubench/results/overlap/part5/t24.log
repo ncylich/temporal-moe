@@ -1,0 +1,10 @@
+BUILT in 49s tree-dirty=13
+temporal-attn1: K.Q, softmax, V.softmax and the copy of kqv_out-0 in one launch
+temporal-attn1: not taken, check at line 578 (nd 16 nkv 1024 nh 50)
+temporal-attn1: not taken, check at line 578 (nd 16 nkv 1024 nh 50)
+temporal-attn1: not taken, check at line 578 (nd 16 nkv 1024 nh 50)
+temporal-attn1: not taken, check at line 585 (nd 16 nkv 1280 nh 50)
+temporal-attn1: not taken, check at line 585 (nd 16 nkv 1280 nh 50)
+temporal-attn1: not taken, check at line 585 (nd 16 nkv 1280 nh 50)
+    "avg_ts": 914.964029,
+T24_DONE

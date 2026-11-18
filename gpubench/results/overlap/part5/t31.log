@@ -1,0 +1,12 @@
+g-base-a ours 750.6 tok/s (1.3323 ms, n=3) | skliar 728.9 tok/s (1.3719 ms, n=3) | trained 745.5 tok/s (1.3413 ms, n=3)
+g-new-a ours 972.6 tok/s (1.0282 ms, n=3) | skliar 920.5 tok/s (1.0863 ms, n=3) | trained 991.8 tok/s (1.0083 ms, n=3)
+g-new-b ours 976.8 tok/s (1.0238 ms, n=3) | skliar 939.0 tok/s (1.0649 ms, n=3) | trained 985.0 tok/s (1.0152 ms, n=3)
+g-base-b ours 745.9 tok/s (1.3406 ms, n=3) | skliar 726.2 tok/s (1.3770 ms, n=3) | trained 743.8 tok/s (1.3444 ms, n=3)
+gv-base-a ours 822.9 tok/s (1.2152 ms, n=3) | skliar 801.6 tok/s (1.2475 ms, n=3) | trained 822.0 tok/s (1.2165 ms, n=3)
+gv-new-a ours 1088.5 tok/s (0.9187 ms, n=3) | skliar 1053.5 tok/s (0.9493 ms, n=3) | trained 1086.5 tok/s (0.9204 ms, n=3)
+gv-new-b ours 1093.3 tok/s (0.9147 ms, n=3) | skliar 1054.3 tok/s (0.9485 ms, n=3) | trained 1088.7 tok/s (0.9185 ms, n=3)
+gv-base-b ours 823.9 tok/s (1.2138 ms, n=3) | skliar 802.6 tok/s (1.2459 ms, n=3) | trained 828.7 tok/s (1.2067 ms, n=3)
+T31_DONE
+11B ppl stream all on: Final estimate: PPL = 203452.6772 +/- 8384.03596
+0
+T31B_DONE

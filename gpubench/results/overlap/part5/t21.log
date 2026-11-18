@@ -1,0 +1,10 @@
+BUILT in 48s tree-dirty=13
+r-skip-1 ours 1488.7 tok/s (0.6717 ms, n=1) | trained 1496.6 tok/s (0.6682 ms, n=1)
+r-stop5-1 ours 955.2 tok/s (1.0469 ms, n=1) | trained 949.8 tok/s (1.0529 ms, n=1)
+r-stop6-1 ours 944.4 tok/s (1.0588 ms, n=1) | trained 941.3 tok/s (1.0623 ms, n=1)
+r-stop1-1 ours 942.7 tok/s (1.0607 ms, n=1) | trained 943.3 tok/s (1.0602 ms, n=1)
+r-skip-2 ours 1490.0 tok/s (0.6711 ms, n=1) | trained 1463.3 tok/s (0.6834 ms, n=1)
+r-stop5-2 ours 937.3 tok/s (1.0669 ms, n=1) | trained 936.7 tok/s (1.0675 ms, n=1)
+r-stop6-2 ours 943.0 tok/s (1.0604 ms, n=1) | trained 930.2 tok/s (1.0750 ms, n=1)
+r-stop1-2 ours 931.4 tok/s (1.0737 ms, n=1) | trained 895.2 tok/s (1.1170 ms, n=1)
+T21_DONE

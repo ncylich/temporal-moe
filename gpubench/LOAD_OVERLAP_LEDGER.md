@@ -1223,3 +1223,96 @@ At 1.26 B the same list holds with one addition: attention there is four launche
 and a copy) because flash attention has no CUDA kernel for head size 16. A single-token attention kernel
 would remove three launches from 14, but the K.Q matmul goes through a path whose summation order I have
 not checked I can reproduce, so I have not started it.
+
+## O5-9 -- Dropped: splitting the loaded expert's down copy between the two launches
+
+Idea: the first launch should copy only the share of the down tensor that arrives while the loaded expert's
+rows are computed, and the down launch the rest. Two base, new, new, base pairs on the 11 B model gave -0.020
+and +0.010 ms per token, and a sweep of the share from 25 % to 100 % is flat. The first load is at this
+structure's floor (12.9 us per layer). Diff in `part5/rejected_tail_fraction.diff`.
+
+## O5-10 -- Kept: attention for one token as one launch on the 1.26 B path (`TEMPORAL_ATTN1=1`, patch 0018)
+
+**What was found.** The 1.26 B model has 16-dimensional heads, for which flash attention has no CUDA kernel,
+so attention is four stock ops: K.Q, a masked softmax, V.softmax, a copy. A timing switch that skips them
+takes the all-resident token from 1.06 ms to 0.68 ms: attention was 0.38 ms, 36 % of the token and more than
+the fused MoE op. Almost all of it is K.Q. Up to 512 cached positions the engine uses its vector kernel for
+K.Q. Beyond that a size check sends it to cuBLAS (batched SGEMM on a float copy of K), 27 us per layer. The
+cost therefore appears only at depth, which is where the protocol measures (1,024 tokens).
+
+**The kernel.** One launch, one block of 1,024 threads per head, three phases, each writing the buffer the
+stock op would have written:
+1. K.Q, one thread per cached position, in the order of whichever stock path would have run (see below).
+2. The masked softmax: the stock kernel's body, called with this block as its block.
+3. V.softmax in the vector kernel's order: per-thread sums in half precision, warp sums, then the warp sums
+   reduced by one warp. A warp of this block plays each of the stock block's warps in turn.
+
+**Bit-identical, including the cuBLAS case.** cuBLAS's summation order is not documented. I tried ten orders
+against its result on real K and Q. One matches in every value: two chains of fused multiply-adds, over
+columns 0 to 7 and 8 to 15, then one add. The kernel uses that order where the stock engine would call
+cuBLAS and declines unless the head has 16 dimensions, so any other head size beyond 512 positions runs the
+stock path.
+
+Check (`TEMPORAL_ATTN1_CHECK=1`): the stock ops and the kernel on the same inputs, both 1.26 B models,
+21,518 attention calls each, cache sizes 256 to 1,536 positions (`part5/t29.log`):
+
+| cached positions | stock K.Q path | K.Q values differing (unmasked) | output values differing |
+|---|---|---|---|
+| 256, 512 | vector kernel | 0 of 91.9 million | 0 of 5.7 million |
+| 768, 1,024, 1,280, 1,536 | cuBLAS | 0 of 734 million | 0 of 11.5 million |
+
+The kernel was taken in every call. Perplexity gates with everything on (`TEMPORAL_QKV=2 TEMPORAL_FUSED=3
+TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=1`), engine tree `2e897e1b`: equal in every digit,
+all in VRAM and streamed twice, ours-plain 42.6913 +/- 2.98935, Skliar 40.0690 +/- 2.84434, trained
+22.7367 +/- 1.50944. The 11 B model is unaffected: the kernel never triggers there (flash attention), and
+its perplexity is unchanged with the switch on. Routing equality against the Python reference not rerun.
+
+Speed, 1.26 B, rows 601 to 603, base, new, new, base, on top of patches 0015 to 0017, tok/s: trained
+streamed 851.2 to 961.6 (+13.0 %), ours-plain 853.9 to 970.6 (+13.7 %), Skliar 818.1 to 929.4 (+13.6 %); all
+resident 925.7 to 1,066.5, 927.3 to 1,071.0, 902.0 to 1,031.6.
+
+Where the kernel's time goes, per layer: K.Q 8.8 us, softmax 1.9, V.softmax 6.2. K and V are 2 MB each per
+layer at this depth, about 5 us each at the GPU's memory rate, so the kernel is near its memory floor.
+
+**What went wrong, all three mine.**
+- The first version reproduced only the vector-kernel case, and its eligibility check declined every timed
+  graph without saying so. The numbers did not move, and I spent about two hours on why "an empty launch
+  costs 27 us" before logging which check failed. The kernel now reports once when it is taken.
+- With the cuBLAS case allowed but summed in the vector kernel's order, perplexity moved: 42.6913 to
+  42.5883, 40.0690 to 40.2930, 22.7367 to 22.6983. K.Q then differs from cuBLAS by rounding only (largest
+  difference 9.8e-7 on softmax outputs up to 1.0) and routing flips carry that into perplexity. I reported
+  that version upward as an open question and did not put it in a patch. Finding cuBLAS's order closed it.
+- My check tool compared against the softmax's output instead of K.Q (the softmax runs in place over K.Q's
+  buffer) and re-read a Q buffer that the stock ops had already overwritten, because the allocator gives the
+  attention output Q's memory. The second point is also a real hazard for a kernel whose blocks run at the
+  same time, so the kernel now tests every output against every input for overlap, accepts only the case
+  where the output has Q's layout at Q's address, and leaves the final copy to the stock op when its buffer
+  is the softmax's.
+
+**Changes relative to the engine's computation:** none in arithmetic or in any value written. Four launches
+become one; where the stock engine calls cuBLAS for K.Q, the same sums are formed by this kernel.
+
+## O5-11 -- Part 5 result with patch 0018 (replaces the 1.26 B rows of O5-7)
+
+Patch 0014 against patches 0015 to 0018, everything on, one job, base, new, new, base, rows 601 to 603
+(`part5/t31.log`):
+
+| 1.26 B, tok/s (ms per token) | patch 0014 | 0015 to 0018 | |
+|---|---|---|---|
+| trained model, streamed, 18 slots | 744.6 (1.343) | **988.4** (1.012) | +32.7 % |
+| plain MoE, ours, streamed | 748.2 (1.337) | **974.7** (1.026) | +30.3 % |
+| plain MoE, Skliar, streamed | 727.5 (1.375) | **929.7** (1.076) | +27.8 % |
+| ours against Skliar, streamed | +2.8 % | +4.8 % | |
+| trained model, all resident | 825.3 (1.212) | 1,087.6 (0.920) | +31.8 % |
+| plain MoE, ours / Skliar, all resident | 823.4 / 802.1 | 1,090.9 / 1,053.9 | +32.5 % / +31.4 % |
+
+The 11 B rows of O5-7 stand (257.4, 244.1, 322.6 tok/s; +17.2 %, +16.8 %, +19.6 %; ours against Skliar
++5.4 %). For scale: the trained 1.26 B model streamed with 18 slots is at 988 tok/s; the stock engine with
+every expert in VRAM was 647 (O3-6) and the fused op alone brought the streamed model to 748.
+
+Ours against Skliar on the 1.26 B plain MoE read +3.2 %, +3.4 % and +2.8 % for patch 0014 in three jobs
+today and +4.0 %, +4.4 % and +4.8 % after. The absolute difference between the rules is about 0.047 ms per
+token throughout; the percentage rises because the token got shorter.
+
+Launches per layer on the 1.26 B model: 14 this morning's count after patch 0017, 11 now. Remaining items
+are as in O5-8, except attention on this model, which is now one launch near its memory floor.

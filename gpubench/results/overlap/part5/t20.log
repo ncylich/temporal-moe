@@ -1,0 +1,12 @@
+BUILT in 52s tree-dirty=13
+q-skip-1 ours 1449.5 tok/s (0.6899 ms, n=1) | trained 1444.3 tok/s (0.6924 ms, n=1)
+q-ph1nok-1 ours 932.6 tok/s (1.0722 ms, n=1) | trained 937.0 tok/s (1.0673 ms, n=1)
+q-ph1-1 ours 939.5 tok/s (1.0644 ms, n=1) | trained 938.7 tok/s (1.0653 ms, n=1)
+q-all-1 ours 945.8 tok/s (1.0573 ms, n=1) | trained 946.4 tok/s (1.0567 ms, n=1)
+q-base-1 ours 954.1 tok/s (1.0482 ms, n=1) | trained 942.7 tok/s (1.0608 ms, n=1)
+q-skip-2 ours 1473.7 tok/s (0.6786 ms, n=1) | trained 1484.8 tok/s (0.6735 ms, n=1)
+q-ph1nok-2 ours 939.1 tok/s (1.0649 ms, n=1) | trained 941.5 tok/s (1.0621 ms, n=1)
+q-ph1-2 ours 941.8 tok/s (1.0618 ms, n=1) | trained 944.1 tok/s (1.0592 ms, n=1)
+q-all-2 ours 941.5 tok/s (1.0621 ms, n=1) | trained 939.6 tok/s (1.0642 ms, n=1)
+q-base-2 ours 952.3 tok/s (1.0501 ms, n=1) | trained 931.6 tok/s (1.0734 ms, n=1)
+T20_DONE

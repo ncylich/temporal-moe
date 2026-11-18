@@ -1,0 +1,12 @@
+ctx1024_base.ctx
+ctx1024_base.gen
+ctx1024_ours.ctx
+ctx1024_ours.gen
+base: "avg_ts": 884.524721 captures 1 last [graphdbg] REPLAY #192 attn1 0
+skip: "avg_ts": 1456.466740 captures 1 last [graphdbg] REPLAY #192 attn1 1
+stop5: "avg_ts": 907.784487 captures 1 last [graphdbg] REPLAY #192 attn1 1
+attn: "avg_ts": 897.919758 captures 1 last [graphdbg] REPLAY #192 attn1 1
+base-nograph: "avg_ts": 802.107081 captures 0 last  attn1 0
+skip-nograph: "avg_ts": 1279.807401 captures 0 last  attn1 1
+attn-nograph: "avg_ts": 799.403019 captures 0 last  attn1 1
+T22_DONE

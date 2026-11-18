@@ -1,0 +1,22 @@
+BUILT in 50s tree-dirty=13
+c-base-a ours 840.5 tok/s (1.1898 ms, n=2) | skliar 816.9 tok/s (1.2241 ms, n=2) | trained 863.1 tok/s (1.1586 ms, n=2)
+c-new-a ours 983.7 tok/s (1.0166 ms, n=2) | skliar 927.0 tok/s (1.0787 ms, n=2) | trained 974.6 tok/s (1.0260 ms, n=2)
+c-new-b ours 979.2 tok/s (1.0213 ms, n=2) | skliar 924.3 tok/s (1.0819 ms, n=2) | trained 979.7 tok/s (1.0208 ms, n=2)
+c-base-b ours 860.6 tok/s (1.1620 ms, n=2) | skliar 826.4 tok/s (1.2100 ms, n=2) | trained 862.4 tok/s (1.1596 ms, n=2)
+T25A_DONE
+decode vram, patch 0014 op only:  Final estimate: PPL = 42.6913 +/- 2.98935 swaps_per_layer_token=0.9998 swaps_per_layer_token=0.0000 
+decode vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2:  Final estimate: PPL = 42.5883 +/- 2.98422 temporal-qk
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2 rep 1:  Final estimate: PPL = 42.5883 +/- 2.98422 tem
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2 rep 2:  Final estimate: PPL = 42.5883 +/- 2.98422 tem
+skliar vram, patch 0014 op only:  Final estimate: PPL = 40.0690 +/- 2.84434 loads_per_layer_token=0.9845 swaps_per_layer_token=0.0000 
+skliar vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2:  Final estimate: PPL = 40.2930 +/- 2.85677 temporal-qk
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2 rep 1:  Final estimate: PPL = 40.2930 +/- 2.85677 tem
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2 rep 2:  Final estimate: PPL = 40.2930 +/- 2.85677 tem
+trained vram, patch 0014 op only:  Final estimate: PPL = 22.7367 +/- 1.50944 swaps_per_layer_token=0.9999 swaps_per_layer_token=0.0000 
+trained vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2:  Final estimate: PPL = 22.6983 +/- 1.50566 temporal-q
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2 rep 1:  Final estimate: PPL = 22.6983 +/- 1.50566 te
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 TEMPORAL_ATTN1=2 rep 2:  Final estimate: PPL = 22.6983 +/- 1.50566 te
+GATES_DONE
+      1 temporal-attn1: K.Q in the vector kernel's order where the stock engine uses cuBLAS (nkv 768)
+      1 temporal-attn1: K.Q, softmax, V.softmax and the copy of kqv_out-0 in one launch
+T25_DONE

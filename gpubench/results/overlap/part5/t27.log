@@ -1,0 +1,10 @@
+BUILT in 49s tree-dirty=13
+temporal-attn1: K.Q, softmax, V.softmax and the copy of kqv_out-0 in one launch
+temporal-attn1: K.Q in the vector kernel's order where the stock engine uses cuBLAS (nkv 768)
+0.15.340.826 I Final estimate: PPL = 27.7153 +/- 3.54425
+temporal-attn1-check: candidate orders, unmasked K.Q values differing from the stock result of 236083200 (nkv > 512): [30] 236083200 [31] 236083200 [32] 236083200 [33] 236083200 [34] 236083200 [35] 236083200 [36] 236083200 [37] 236083200 [38] 236083200 [39] 236083200
+temporal-attn1-check: nkv  256: 3084 calls | output given the stock K.Q: 2447996 of 2467200 values differ | K.Q at unmasked positions: 0 of 19738200 differ, largest difference 0, largest |K.Q| 1, mean relative difference 0 | output with its own K.Q: 0 of 2467200 differ, largest difference 0, largest |output| 4.73
+temporal-attn1-check: nkv  512: 3072 calls | output given the stock K.Q: 2457599 of 2457600 values differ | K.Q at unmasked positions: 0 of 59059200 differ, largest difference 0, largest |K.Q| 1, mean relative difference 0 | output with its own K.Q: 0 of 2457600 differ, largest difference 0, largest |output| 5.24
+temporal-attn1-check: nkv  768: 3072 calls | output given the stock K.Q: 2457599 of 2457600 values differ | K.Q at unmasked positions: 66935325 of 98380800 differ, largest difference 9.83e-07, largest |K.Q| 1, mean relative difference 2.7e-07 | output with its own K.Q: 189162 of 2457600 differ, largest difference 0.00195, largest |output| 5.56
+temporal-attn1-check: nkv 1024: 3072 calls | output given the stock K.Q: 2457599 of 2457600 values differ | K.Q at unmasked positions: 93724475 of 137702400 differ, largest difference 9.54e-07, largest |K.Q| 1, mean relative difference 2.9e-07 | output with its own K.Q: 233932 of 2457600 differ, largest difference 0.000488, largest |output| 5.93
+T27_DONE

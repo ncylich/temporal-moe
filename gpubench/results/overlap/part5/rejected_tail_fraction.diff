@@ -1,0 +1,69 @@
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index 5caa80ad..8c1e4274 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -1267,6 +1267,7 @@ struct TFA {
+     const float * lg; const int * eids; float * wgt; int E, normw;        // gate weights from the router logits (lg null: not here)
+     int pass;       // -1: every position, loading ones copied here; 0: positions not being loaded; 1: only those being loaded
+     int tail;       // TEMPORAL_FUSED=3: this many blocks at the end of the launch copy the down tensor of the experts being loaded
++    long tailv;     // ... its first tailv 16-byte vectors; the down launch copies the rows after them
+ };
+ // One block per 32 rows of one expert: gate rows, up rows, SwiGLU, and the Q8_1 block of those 32 activations.
+ // Routed positions are taken in the order "experts being loaded first", so their blocks are scheduled first
+@@ -1279,10 +1280,11 @@ __global__ void k_tf_a(TFA A) {
+         // host pool -> slot for the down tensor of every expert being loaded, for the launch after this one. These
+         // blocks are last in the launch: they start as the resident experts' blocks finish, when the link has
+         // delivered gate and up and would idle while the loaded experts' rows are computed.
+-        const long nv = (long) (A.be / 16), n = (long) A.tail * 1024; const int ns = min(*A.nswp, A.K);
++        const long nv = A.tailv, n = (long) A.tail * 1024; const int ns = min(*A.nswp, A.K);
++        const long nve = (long) (A.be / 16);
+         for (int k = 0; k < ns; ++k)
+             for (long v = (long) (blk - ((int) gridDim.x - A.tail)) * 1024 + threadIdx.x; v < nv; v += n)
+-                ((uint4 *) A.W[2])[(size_t) A.swp_s[k] * nv + v] = ((const uint4 *) A.pool[2])[(size_t) A.swp_e[k] * nv + v];
++                ((uint4 *) A.W[2])[(size_t) A.swp_s[k] * nve + v] = ((const uint4 *) A.pool[2])[(size_t) A.swp_e[k] * nve + v];
+         return;
+     }
+     if (A.lg && blk == NR + A.FS / 32) {
+@@ -1365,6 +1367,7 @@ struct TFB {
+     float * y;
+     size_t be; int D, F, FS, K;
+     int cpv;        // 16-byte vectors covering one down row
++    int r0;              // TEMPORAL_FUSED=3: rows below r0 of a loaded expert's down tensor were copied by the first launch
+     const float * res;   // TEMPORAL_FUSED_ADD: the layer's residual stream, added to the op's output here (the ADD node after the op)
+ };
+ constexpr int TFB_C = 224;                                                 // most compute threads (Q4_0 blocks one output row reads); the
+@@ -1382,10 +1385,11 @@ __global__ void k_tf_b(TFB B) {                                            // on
+     if (i < NRQ) {
+         b = i % GR; slot = B.ids[i / GR];
+         for (int k = 0; k < ns; ++k) late |= B.swp_s[k] == slot;
++        late = late && r >= B.r0;
+         if (!late) { a0 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 0); a1 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 2); }
+     } else if (i < NQ) {
+         a0 = vec_dot_q4_0_q8_1(B.SD, B.aq + i, r * SB + (i - NRQ), 0); a1 = vec_dot_q4_0_q8_1(B.SD, B.aq + i, r * SB + (i - NRQ), 2);
+-    } else if (i - NQ < B.cpv * (((int) blockDim.x - NQ) / B.cpv)) {
++    } else if (r >= B.r0 && i - NQ < B.cpv * (((int) blockDim.x - NQ) / B.cpv)) {
+         // the 16-byte vectors covering row r of each loaded expert's down tensor, pool -> slot, one read per
+         // thread; vectors on a row boundary are written by both neighbouring rows with the same bytes
+         const int j = i - NQ, vi = j % B.cpv, ncp = ((int) blockDim.x - NQ) / B.cpv;
+@@ -1463,7 +1467,11 @@ void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst, float * ou
+     const bool dn_in_a = ggml_cuda_temporal_fused_on() == 3 && A.pool[0] != nullptr;
+     TU * Lp = it != g_tptr.end() ? &g_L[it->second.first] : nullptr;
+     A.pass = two ? 0 : -1;
+-    A.tail = dn_in_a ? ntail : 0;
++    // TEMPORAL_FUSED_TAILFRAC (percent, default 100): the share of the down tensor's rows the first launch copies
++    static const int tailfrac = [](){const char*e=getenv("TEMPORAL_FUSED_TAILFRAC");return e?atoi(e):100;}();
++    const int r0 = dn_in_a ? (int) ((long) D * tailfrac / 100) : 0;
++    A.tail = dn_in_a && r0 > 0 ? ntail : 0;
++    A.tailv = ((long) r0 * GR * 18 + 15) / 16;                                // vectors covering rows [0, r0)
+     if (!(skip & 1)) k_tf_a<<<K * GR + FS / 32 + (fold ? 1 : 0) + A.tail, 1024, 0, stream>>>(A);
+     if (two && !(skip & 1)) {
+         TFA A1 = A; A1.pass = 1; A1.lg = nullptr;
+@@ -1473,7 +1481,7 @@ void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst, float * ou
+     B.aq = aq; B.wgt = fold ? wbuf : (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
+     B.SD = Sx[2] ? (const uint8_t *) Sx[2]->data : nullptr; B.y = out ? out : (float *) dst->data; B.res = res; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K; B.cpv = cpv;
+     if (two) { B.poolD = nullptr; if (tr_nocopy() != 2) cudaStreamWaitEvent(stream, Lp->ev[2], 0); }
+-    if (dn_in_a) B.poolD = nullptr;
++    if (dn_in_a) { B.r0 = r0; if (r0 >= D) B.poolD = nullptr; }
+     if (!(skip & 2)) k_tf_b<<<D, bt, 0, stream>>>(B);
+     CUDA_CHECK(cudaGetLastError());
+ }

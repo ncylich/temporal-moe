@@ -1,0 +1,18 @@
+BUILT in 49s tree-dirty=11
+opprof: 513 single-token graphs, 2813.6 us per token summed over ops
+opprof:     495.1 us/token   13.0 launches/token  FUSED+CUSTOM ffn_out- [f32]
+opprof:     475.0 us/token   14.0 launches/token  MUL_MAT kq- [f16]
+opprof:     457.7 us/token   28.0 launches/token  FUSED+RMS_NORM norm- [f32]
+opprof:     224.9 us/token   14.0 launches/token  FUSED+MUL_MAT node_ [q4_0]
+opprof:     196.3 us/token   14.0 launches/token  MUL_MAT kqv- [f16]
+opprof:     192.6 us/token   13.0 launches/token  CUSTOM ffn_moe_route- [f32]
+opprof:     179.9 us/token   14.0 launches/token  SOFT_MAX kq_soft_max- [f32]
+opprof:     165.8 us/token   14.0 launches/token  CONT kqv_out- [f32]
+opprof:     161.3 us/token   14.0 launches/token  FUSED+ROPE Qcur- [f32]
+opprof:     158.5 us/token   13.0 launches/token  MUL_MAT ffn_moe_logits- [f16]
+opprof:      49.0 us/token    1.0 launches/token  MUL_MAT result_output [q4_0]
+opprof:      18.8 us/token    1.0 launches/token  FUSED+MUL_MAT ffn_out- [q4_0]
+opprof:      13.8 us/token    1.0 launches/token  GLU ffn_swiglu- [f32]
+opprof:      12.9 us/token    1.0 launches/token  GET_ROWS node_ [f32]
+opprof:      11.9 us/token    1.0 launches/token  FUSED+RMS_NORM norm [f32]
+T15_DONE
