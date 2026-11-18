@@ -70,7 +70,10 @@ drivers in `gpubench/released/`.
 | `TEMPORAL_BENCH_CTX`, `TEMPORAL_BENCH_GEN` | `llama-bench` fills the context and feeds the decode steps from token files (real text) instead of random tokens |
 | `TEMPORAL_SWAP_HIST=w0,w1,...` (0012) | timing only, like `TEMPORAL_SWAP_N`: each layer-token copies n cold experts, n drawn on the device from the weights (w_n for n loads); `0,1` is exactly one load; realised counts are printed at exit as `temporal-swap-hist:` |
 | `TEMPORAL_SHEXP_FIRST=1` (0007) | orders Qwen3.5's shared expert or Gemma4's dense MLP between the router and the routed experts, so the copies run under it; same ops, same result |
+| `TEMPORAL_LOAD_FIRST=1` / `2` / `3` (0013, engine tree `bcf3fe54`) | streamed, routing op on the device, single-token steps; forces `TEMPORAL_ROUTE_SLOTS=2`. All values: the routing op (which starts the copies) is ordered right after the router logits, and `glm4moe`'s shared expert between it and the routed experts (`TEMPORAL_SHEXP_FIRST` does not do that for `glm4moe`). `1`: the routed experts run as two passes, experts already in their slots first with no wait, incoming experts after their copies, gate/up fused; `2`: the same unfused; `3`: order only (combine with `TEMPORAL_UNIFIED_FUSE=1`). Same values as the single pass. 0013 also makes `TEMPORAL_SWAP_N` / `TEMPORAL_SWAP_HIST` work on the routing-op path and `TEMPORAL_ROUTE_NOCOPY=1` apply to `k_route`. Results: `gpubench/LOAD_OVERLAP_LEDGER.md` |
 
 Patch 0006 also carries an earlier `TEMPORAL_SHEXP_FIRST` for `qwen35moe` that puts the shared expert before
 the router; 0007 replaces it. `gpubench/build_engine.sh` builds the server without its web UI
 (`-DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF`), whose asset step fails offline.
+With `ENGINE_BASE_TGZ=<git archive of 43bec5f3>` the script builds without a route to GitHub (the base tree
+hash is checked).

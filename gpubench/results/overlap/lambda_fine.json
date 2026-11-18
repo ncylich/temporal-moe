@@ -1,0 +1,70 @@
+{
+ "best": {
+  "lambda": 0.739453125,
+  "loads_per_layer_token": 1.0013846153846153,
+  "loads": 26036,
+  "layer_tokens": 26000
+ },
+ "trace": [
+  {
+   "lambda": 0.6,
+   "loads_per_layer_token": 1.6710769230769231,
+   "loads": 43448,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.9,
+   "loads_per_layer_token": 0.7717307692307692,
+   "loads": 20065,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.75,
+   "loads_per_layer_token": 0.9742692307692308,
+   "loads": 25331,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.675,
+   "loads_per_layer_token": 1.2316923076923076,
+   "loads": 32024,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.7125,
+   "loads_per_layer_token": 1.0831538461538461,
+   "loads": 28162,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.73125,
+   "loads_per_layer_token": 1.0249615384615385,
+   "loads": 26649,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.740625,
+   "loads_per_layer_token": 0.9962307692307693,
+   "loads": 25902,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.7359374999999999,
+   "loads_per_layer_token": 1.0083076923076923,
+   "loads": 26216,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.73828125,
+   "loads_per_layer_token": 1.0021153846153845,
+   "loads": 26055,
+   "layer_tokens": 26000
+  },
+  {
+   "lambda": 0.739453125,
+   "loads_per_layer_token": 1.0013846153846153,
+   "loads": 26036,
+   "layer_tokens": 26000
+  }
+ ]
+}

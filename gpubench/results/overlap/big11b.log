@@ -1,0 +1,65 @@
+skliar hist 16413,50220,7956,2391,732,186,96,6
+p1-ceiling: 209.30 tok/s (sd 0.93) peak 7154 MiB 
+p1-ceiling-route: 216.26 tok/s (sd 0.98) peak 7154 MiB 
+p1-pin0-s2: 203.10 tok/s (sd 1.09) peak 1378 MiB 
+p1-pin1-s2: 174.41 tok/s (sd 0.90) peak 1378 MiB 
+p1-pin2-s2: 140.96 tok/s (sd 0.49) peak 1648 MiB 
+p1-pin3-s2: 118.98 tok/s (sd 0.48) peak 1378 MiB 
+p1-one-s2: 173.73 tok/s (sd 0.78) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p1-skliar-s2: 170.22 tok/s (sd 0.90) peak 1378 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p1-pin0-s2f: 199.85 tok/s (sd 1.18) peak 1376 MiB 
+p1-pin1-s2f: 160.22 tok/s (sd 0.60) peak 1376 MiB 
+p1-pin2-s2f: 132.04 tok/s (sd 0.51) peak 1376 MiB 
+p1-pin3-s2f: 112.80 tok/s (sd 0.51) peak 1376 MiB 
+p1-one-s2f: 158.96 tok/s (sd 0.74) peak 1376 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p1-skliar-s2f: 159.17 tok/s (sd 0.52) peak 1376 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p1-pin0-lf1: 186.29 tok/s (sd 1.37) peak 1378 MiB 
+p1-pin1-lf1: 169.58 tok/s (sd 0.90) peak 1378 MiB 
+p1-pin2-lf1: 142.40 tok/s (sd 0.52) peak 1378 MiB 
+p1-pin3-lf1: 122.20 tok/s (sd 0.33) peak 1378 MiB 
+p1-one-lf1: 168.91 tok/s (sd 0.84) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p1-skliar-lf1: 165.01 tok/s (sd 0.80) peak 1378 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+### pass 1 done 06:43:38
+p2-skliar-lf1: 165.01 tok/s (sd 0.78) peak 1378 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p2-one-lf1: 168.61 tok/s (sd 0.75) peak 1624 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p2-pin3-lf1: 122.17 tok/s (sd 0.46) peak 1378 MiB 
+p2-pin2-lf1: 142.60 tok/s (sd 0.66) peak 1378 MiB 
+p2-pin1-lf1: 169.74 tok/s (sd 0.91) peak 1378 MiB 
+p2-pin0-lf1: 186.01 tok/s (sd 0.65) peak 1378 MiB 
+p2-skliar-s2f: 158.97 tok/s (sd 0.68) peak 1376 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p2-one-s2f: 159.24 tok/s (sd 0.82) peak 1376 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p2-pin3-s2f: 112.65 tok/s (sd 0.34) peak 1376 MiB 
+p2-pin2-s2f: 131.91 tok/s (sd 0.23) peak 1376 MiB 
+p2-pin1-s2f: 160.23 tok/s (sd 0.36) peak 1376 MiB 
+p2-pin0-s2f: 200.34 tok/s (sd 0.87) peak 1376 MiB 
+p2-skliar-s2: 170.22 tok/s (sd 0.84) peak 1378 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p2-one-s2: 173.35 tok/s (sd 0.89) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p2-pin3-s2: 119.04 tok/s (sd 0.49) peak 1378 MiB 
+p2-pin2-s2: 141.12 tok/s (sd 0.58) peak 1378 MiB 
+p2-pin1-s2: 174.05 tok/s (sd 0.95) peak 1378 MiB 
+p2-pin0-s2: 201.25 tok/s (sd 1.01) peak 1378 MiB 
+p2-ceiling-route: 211.49 tok/s (sd 1.41) peak 7154 MiB 
+p2-ceiling: 200.80 tok/s (sd 1.06) peak 7422 MiB 
+### pass 2 done 07:00:24
+p3-ceiling: 200.86 tok/s (sd 0.92) peak 7154 MiB 
+p3-ceiling-route: 211.80 tok/s (sd 0.86) peak 7154 MiB 
+p3-pin0-s2: 200.98 tok/s (sd 0.92) peak 1378 MiB 
+p3-pin1-s2: 174.64 tok/s (sd 0.73) peak 1378 MiB 
+p3-pin2-s2: 141.58 tok/s (sd 0.45) peak 1378 MiB 
+p3-pin3-s2: 119.26 tok/s (sd 0.42) peak 1378 MiB 
+p3-one-s2: 173.57 tok/s (sd 0.88) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p3-skliar-s2: 170.12 tok/s (sd 0.90) peak 1378 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p3-pin0-s2f: 200.31 tok/s (sd 0.87) peak 1376 MiB 
+p3-pin1-s2f: 160.07 tok/s (sd 0.70) peak 1376 MiB 
+p3-pin2-s2f: 132.00 tok/s (sd 0.39) peak 1376 MiB 
+p3-pin3-s2f: 112.92 tok/s (sd 0.36) peak 1376 MiB 
+p3-one-s2f: 159.22 tok/s (sd 0.57) peak 1376 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p3-skliar-s2f: 159.31 tok/s (sd 0.66) peak 1376 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+p3-pin0-lf1: 186.03 tok/s (sd 0.87) peak 1378 MiB 
+p3-pin1-lf1: 169.23 tok/s (sd 0.69) peak 1378 MiB 
+p3-pin2-lf1: 142.55 tok/s (sd 0.53) peak 1378 MiB 
+p3-pin3-lf1: 122.41 tok/s (sd 0.44) peak 1646 MiB 
+p3-one-lf1: 168.62 tok/s (sd 1.26) peak 1378 MiB layer_tokens=299565 loads=299565 counts=0,299565
+p3-skliar-lf1: 165.14 tok/s (sd 0.83) peak 1378 MiB layer_tokens=299565 loads=298206 counts=62904,193263,30579,8959,2799,680,355,26
+### pass 3 done 07:17:10
+RUN_DONE

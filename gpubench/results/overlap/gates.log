@@ -1,0 +1,57 @@
+### gate: batch-1 perplexity, 4 x 1024 tokens 05:52:56
+stock: Final estimate: PPL = 22.6868 +/- 1.49370
+decode vram: Final estimate: PPL = 42.6913 +/- 2.98935
+decode stream load_first 0 rep 1: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 0 rep 2: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 3 rep 1: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 3 rep 2: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 2 rep 1: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 2 rep 2: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 1 rep 1: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+decode stream load_first 1 rep 2: Final estimate: PPL = 42.6913 +/- 2.98935 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|
+skliar vram: Final estimate: PPL = 40.0690 +/- 2.84434
+skliar stream load_first 0 rep 1: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 0 rep 2: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 3 rep 1: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 3 rep 2: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 2 rep 1: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 2 rep 2: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 1 rep 1: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+skliar stream load_first 1 rep 2: Final estimate: PPL = 40.0690 +/- 2.84434 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|
+trained vram: Final estimate: PPL = 22.7367 +/- 1.50944
+trained stream load_first 0 rep 1: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 0 rep 2: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 3 rep 1: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 3 rep 2: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 2 rep 1: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 2 rep 2: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 1 rep 1: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+trained stream load_first 1 rep 2: Final estimate: PPL = 22.7367 +/- 1.50944 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|
+### gate: engine routing equals decode_state.py / cache_bias.py, switch at 1 05:56:58
+Traceback (most recent call last):
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 113, in <module>
+    main()
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 44, in main
+    import decode_state as DS
+  File "/workspace/rel/repo/analysis/residency/decode_state.py", line 26, in <module>
+    from temporal.temporal_router import (  # noqa: E402
+  File "/workspace/rel/repo/temporal/__init__.py", line 9, in <module>
+    from .temporal_router import (
+  File "/workspace/rel/repo/temporal/temporal_router.py", line 29, in <module>
+    from . import ablation_mechanisms as ab
+ImportError: cannot import name 'ablation_mechanisms' from partially initialized module 'temporal' (most likely due to a circular import) (/workspace/rel/repo/temporal/__init__.py)
+load_first 1 ours_stream: 
+Traceback (most recent call last):
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 113, in <module>
+    main()
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 44, in main
+    import decode_state as DS
+  File "/workspace/rel/repo/analysis/residency/decode_state.py", line 26, in <module>
+    from temporal.temporal_router import (  # noqa: E402
+  File "/workspace/rel/repo/temporal/__init__.py", line 9, in <module>
+    from .temporal_router import (
+  File "/workspace/rel/repo/temporal/temporal_router.py", line 29, in <module>
+    from . import ablation_mechanisms as ab
+ImportError: cannot import name 'ablation_mechanisms' from partially initialized module 'temporal' (most likely due to a circular import) (/workspace/rel/repo/temporal/__init__.py)
+load_first 1 skliar_stream: 
+### GATES_DONE 05:57:12

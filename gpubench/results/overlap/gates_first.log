@@ -1,0 +1,169 @@
+### gate: batch-1 perplexity, 4 x 1024 tokens 05:23:25
+stock: Final estimate: PPL = 22.6868 +/- 1.49370
+decode vram: Final estimate: PPL = 42.6913 +/- 2.98935
+decode stream load_first 0 rep 1: FAILED
+0.01.203.743 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.900.939 I perplexity: 1.70 seconds per pass - ETA 0.07.744.616 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 0 rep 2: FAILED
+0.01.260.179 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.197.166 I perplexity: 1.94 seconds per pass - ETA 0.08.120.548 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 3 rep 1: FAILED
+0.01.254.694 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.151.841 I perplexity: 1.90 seconds per pass - ETA 0.08.523.280 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 3 rep 2: FAILED
+0.01.270.061 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.161.853 I perplexity: 1.89 seconds per pass - ETA 0.08.804.887 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 2 rep 1: FAILED
+0.01.179.627 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.222.733 I perplexity: 2.04 seconds per pass - ETA 0.08.927.117 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 2 rep 2: FAILED
+0.01.320.321 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.315.242 I perplexity: 1.99 seconds per pass - ETA 0.08.874.769 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 1 rep 1: FAILED
+0.01.336.826 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.040.223 I perplexity: 1.70 seconds per pass - ETA 0.07.852.376 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+decode stream load_first 1 rep 2: FAILED
+0.01.280.887 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.981.556 I perplexity: 1.70 seconds per pass - ETA 0.07.817.403 I Final estimate: PPL = 42.6913 +/- 2.98935
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53186 swaps_per_layer_token=0.9998|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54356|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar vram: Final estimate: PPL = 40.0690 +/- 2.84434
+skliar stream load_first 0 rep 1: FAILED
+0.01.229.464 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.999.822 I perplexity: 1.77 seconds per pass - ETA 0.08.001.427 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 0 rep 2: FAILED
+0.01.345.363 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.131.961 I perplexity: 1.79 seconds per pass - ETA 0.08.123.767 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 3 rep 1: FAILED
+0.01.209.852 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.900.953 I perplexity: 1.69 seconds per pass - ETA 0.07.684.313 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 3 rep 2: FAILED
+0.01.178.112 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.859.418 I perplexity: 1.68 seconds per pass - ETA 0.07.708.070 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 2 rep 1: FAILED
+0.01.170.266 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.022.556 I perplexity: 1.85 seconds per pass - ETA 0.08.283.467 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 2 rep 2: FAILED
+0.01.263.916 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.112.034 I perplexity: 1.85 seconds per pass - ETA 0.08.377.161 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 1 rep 1: FAILED
+0.01.350.061 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.105.568 I perplexity: 1.76 seconds per pass - ETA 0.08.055.822 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+skliar stream load_first 1 rep 2: FAILED
+0.01.242.096 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.978.026 I perplexity: 1.74 seconds per pass - ETA 0.07.935.497 I Final estimate: PPL = 40.0690 +/- 2.84434
+temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lambda=0.739 J=1 hist=[11836,33640,5337,1694,522,126,31,9,1,0,0,0,0,0,0,0,0,0,0]
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route2: mode=skliar layers=13 decode_layer_tokens=53196 loads=52371 loads_per_layer_token=0.9845 prompt_layer_tokens=0 cold_decode=0 C=18 lam|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=53405|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained vram: Final estimate: PPL = 22.7367 +/- 1.50944
+trained stream load_first 0 rep 1: FAILED
+0.01.290.811 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.054.172 I perplexity: 1.76 seconds per pass - ETA 0.08.119.148 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 0 rep 2: FAILED
+0.01.332.023 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.089.891 I perplexity: 1.76 seconds per pass - ETA 0.08.158.535 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 3 rep 1: FAILED
+0.01.319.226 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.335.902 I perplexity: 2.02 seconds per pass - ETA 0.08.942.950 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 3 rep 2: FAILED
+0.01.292.871 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.976.775 I perplexity: 1.68 seconds per pass - ETA 0.07.789.291 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 2 rep 1: FAILED
+0.01.330.115 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.209.834 I perplexity: 1.88 seconds per pass - ETA 0.08.532.700 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 2 rep 2: FAILED
+0.01.317.645 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.172.581 I perplexity: 1.85 seconds per pass - ETA 0.08.496.447 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 1 rep 1: FAILED
+0.01.266.064 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.03.030.779 I perplexity: 1.76 seconds per pass - ETA 0.08.074.568 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+trained stream load_first 1 rep 2: FAILED
+0.01.195.789 I perplexity: calculating perplexity over 4 chunks, n_ctx=1024, batch_size=1, n_seq=1
+0.02.967.535 I perplexity: 1.77 seconds per pass - ETA 0.08.082.411 I Final estimate: PPL = 22.7367 +/- 1.50944
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999
+temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000 | temporal-route-cuda: trained min_logit, layers=13 layer_tokens=53261 cold_fills=65 swaps=53192 swaps_per_layer_token=0.9999|temporal-cuda: layers=13 slot swap-ins decided on single-token steps=54362|temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000|
+### gate: engine routing equals decode_state.py / cache_bias.py, switch at 1 05:27:21
+Traceback (most recent call last):
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 113, in <module>
+    main()
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 44, in main
+    import decode_state as DS
+  File "/workspace/rel/repo/analysis/residency/decode_state.py", line 26, in <module>
+    from temporal.temporal_router import (  # noqa: E402
+ModuleNotFoundError: No module named 'temporal'
+load_first 1 ours_stream: 
+Traceback (most recent call last):
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 113, in <module>
+    main()
+  File "/workspace/rel/repo/gpubench/released/route_check.py", line 44, in main
+    import decode_state as DS
+  File "/workspace/rel/repo/analysis/residency/decode_state.py", line 26, in <module>
+    from temporal.temporal_router import (  # noqa: E402
+ModuleNotFoundError: No module named 'temporal'
+load_first 1 skliar_stream: 
+### GATES_DONE 05:27:36

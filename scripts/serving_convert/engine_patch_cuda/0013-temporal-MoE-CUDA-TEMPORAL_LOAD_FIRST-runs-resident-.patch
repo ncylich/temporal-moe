@@ -1,0 +1,441 @@
+From 74ee34e896ff0a702cb835d93359184563d92c49 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Tue, 17 Nov 2026 21:02:30 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_LOAD_FIRST runs resident experts
+ under the copies and incoming experts after them
+
+Off by default. With the switch on (streamed path, routing op on the device, single-token steps):
+- the routing op, which starts the expert copies, is ordered right after the router logits;
+- glm4moe's shared expert is expanded between the routing op and the routed experts (TEMPORAL_SHEXP_FIRST
+  never did that for this architecture, build_moe_ffn expands the routed experts itself);
+- the routed experts run as two passes over the same selection: pass A computes the experts already in
+  their slots and waits for nothing, pass B computes the experts being loaded after their copies and its
+  down projection writes into pass A's output. The routing kernels (k_route, k_route2, k_skliar) write one
+  slot-id list per pass with the other pass's positions negative, and mul_mat_vec_q skips those blocks.
+  Every expert is computed once at its own position, so values and summation order are unchanged.
+- 1 keeps gate/up fusion (single-token ops only), 2 runs unfused, 3 changes the order only.
+- TEMPORAL_SWAP_N=n and TEMPORAL_SWAP_HIST on the routing-op path force n cold copies per layer-token (timing only), with the
+  positions computed from the overwritten slots treated as incoming.
+- TEMPORAL_ROUTE_NOCOPY=1 (copy kernels launched with an empty list, timing control) also applies to k_route.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu | 21 +++++++-
+ ggml/src/ggml-cuda/mmvq.cu      |  5 ++
+ ggml/src/ggml-cuda/temporal.cu  | 88 ++++++++++++++++++++++++++++++---
+ ggml/src/ggml-cuda/temporal.cuh |  5 ++
+ src/llama-graph.cpp             | 68 +++++++++++++++++++++++++
+ src/models/glm4-moe.cpp         | 22 ++++++++-
+ 6 files changed, 199 insertions(+), 10 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index ae4dfa27..bb562d44 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -1593,7 +1593,7 @@ static bool ggml_cuda_should_fuse_mul_mat(const ggml_tensor * ffn_up,
+     // TEMPORAL_UNIFIED_FUSE=1 keeps the bias-free gate/up/GLU fusion: the fused call site remaps the ids
+     // itself (below, "unified + fused"). Everything else under unified stays unfused.
+     if (ggml_cuda_temporal_unified()) {
+-        static int fuse=[](){const char*s=getenv("TEMPORAL_UNIFIED_FUSE");return s?atoi(s):0;}();
++        static int fuse=[](){const char*s=getenv("TEMPORAL_UNIFIED_FUSE");return s?atoi(s):0;}() || ggml_cuda_temporal_load_first() == 1;
+         if (!fuse || ffn_up_bias || ffn_gate_bias || ffn_up_scale || ffn_gate_scale || ggml_cuda_temporal_router_early()) {
+             return false;
+         }
+@@ -2047,6 +2047,14 @@ static void ggml_cuda_mul_mat_id_impl(ggml_backend_cuda_context & ctx, ggml_tens
+     // Phase-3b UNIFIED: if src0 is a registered R-slot expert tensor, remap the selected-expert ids
+     // [0,n_expert) -> slot [0,R) before the GEMM (so the mmvq indexes the R-slot VRAM tensor validly).
+     ggml_tensor tu_ids_tensor;
++    int32_t * tu_split = nullptr;
++    if (ggml_cuda_temporal_unified() && ids != nullptr && ids->type == GGML_TYPE_I32 &&
++            ggml_cuda_temporal_split_ids(src0->data, strstr(dst->name, "_inc") != nullptr, (int) ids->ne[0], (int) ids->ne[1],
++                                         &tu_split, ctx.stream())) {
++        tu_ids_tensor = *ids;          // TEMPORAL_LOAD_FIRST: this pass's slot ids, other positions negative
++        tu_ids_tensor.data = tu_split;
++        ids = &tu_ids_tensor;
++    } else
+     if (ggml_cuda_temporal_unified() && ids != nullptr && ids->type == GGML_TYPE_I32) {
+         const int stride1 = (int) (ids->nb[1] / sizeof(int32_t));
+         int32_t * shared = nullptr;
+@@ -3828,6 +3836,17 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph
+             // mul_mat_id hook does for the unfused ops. Gate first (it runs the residency scan and issues
+             // the three swap copies, then waits its own), then up (waits its own copy).
+             ggml_tensor tu_ids_tensor;
++            int32_t * tu_split = nullptr;
++            if (op == GGML_OP_MUL_MAT_ID && ggml_cuda_temporal_unified() && ids != nullptr && ids->type == GGML_TYPE_I32 &&
++                    ggml_cuda_temporal_split_ids(gate->src[0]->data, strstr(glu->name, "_inc") != nullptr, (int) ids->ne[0],
++                                                 (int) ids->ne[1], &tu_split, cuda_ctx->stream())) {
++                // TEMPORAL_LOAD_FIRST: one pass of the split; pass B waits for the gate copy above, the up copy here
++                ggml_cuda_temporal_split_ids(up->src[0]->data, strstr(glu->name, "_inc") != nullptr, (int) ids->ne[0],
++                                             (int) ids->ne[1], &tu_split, cuda_ctx->stream());
++                tu_ids_tensor      = *ids;
++                tu_ids_tensor.data = tu_split;
++                ids                = &tu_ids_tensor;
++            } else
+             if (op == GGML_OP_MUL_MAT_ID && ggml_cuda_temporal_unified() && ids != nullptr && ids->type == GGML_TYPE_I32) {
+                 const int stride1 = (int) (ids->nb[1] / sizeof(int32_t));
+                 int32_t * shared = nullptr;
+diff --git a/ggml/src/ggml-cuda/mmvq.cu b/ggml/src/ggml-cuda/mmvq.cu
+index e18ada53..0c551835 100644
+--- a/ggml/src/ggml-cuda/mmvq.cu
++++ b/ggml/src/ggml-cuda/mmvq.cu
+@@ -514,6 +514,11 @@ static __global__ void mul_mat_vec_q(
+     channel_x  = ncols_dst == 1 && ids ? ids[channel_dst]                     : fastdiv(channel_dst, channel_ratio);
+     channel_y  = ncols_dst == 1 && ids ? fastmodulo(channel_dst, nchannels_y) : channel_dst;
+     sample_dst = blockIdx.z;
++    // temporal streaming, TEMPORAL_LOAD_FIRST: a negative id marks an expert position that belongs to the
++    // other pass (resident experts first, incoming experts after their copy); its blocks write nothing
++    if (ncols_dst == 1 && ids && (int32_t) channel_x < 0) {
++        return;
++    }
+ 
+     const uint32_t sample_x    = fastdiv(sample_dst, sample_ratio);
+     const uint32_t sample_y    = sample_dst;
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index 8a753bca..dffd6614 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -22,6 +22,7 @@ struct TU {
+     cudaEvent_t fork = nullptr;                              // fork point on compute stream
+     unsigned long long *d_ncopy = nullptr;                   // swap copies issued by k_residency (cumulative)
+     int32_t *remap_ids = nullptr; int64_t remap_words = 0;   // persistent remapped-ids buffer, shared gate/up/down
++    int32_t *split_ids = nullptr;                            // TEMPORAL_LOAD_FIRST: [0,K) pass A slot ids, [K,2K) pass B
+ };
+ static std::vector<TU> g_L;
+ static std::unordered_map<const void*, std::pair<int,int>> g_tptr;
+@@ -42,6 +43,12 @@ static int tu_overlap() { static int v=[](){ if (getenv("TEMPORAL_UNIFIED_NOOVER
+ // GEMMs wait; 2 = that kernel on the compute stream right after the residency scan, no events at all.
+ static int tu_lean() { static int v=[](){const char*s=getenv("TEMPORAL_UNIFIED_LEAN");return s?atoi(s):0;}(); return v; }
+ static int tr_slots();
++// TEMPORAL_LOAD_FIRST (streamed, routing op on; forces TEMPORAL_ROUTE_SLOTS=2): 1 = the routed experts of a
++// single token run as two passes, resident experts first with no wait, incoming experts after their copies
++// (gate/up fusion kept); 2 = the same, unfused; 3 = graph order only (routing op and copies first, shared
++// expert next), single pass. Off by default.
++int ggml_cuda_temporal_load_first() { static int v=[](){const char*s=getenv("TEMPORAL_LOAD_FIRST");return s?atoi(s):0;}();
++                                      return ggml_cuda_temporal_unified() ? v : 0; }
+ int ggml_cuda_temporal_route_op_on();
+ int ggml_cuda_temporal_route_mode();
+ static int tr_nocopy();
+@@ -214,6 +221,30 @@ __global__ void k_force_hist(int* swp_e, int* swp_s, int* nswp, const unsigned*
+     if (i < n) { swp_e[i] = (int)((base + (unsigned)i) % (unsigned)E); swp_s[i] = i % R; }
+     if (i == 0) *nswp = n;
+ }
++// TEMPORAL_SWAP_N / TEMPORAL_SWAP_HIST on the routing-op path (TEMPORAL_ROUTE_SLOTS=2, timing only, output
++// wrong): the routing kernel's swap list is replaced by n cold experts copied into slots 0..n-1 (n pinned, or
++// drawn per layer-token from the histogram as in k_force_hist), and for the two-pass split the positions
++// computed from those slots are the incoming ones.
++__global__ void k_force_route(int* swp_e, int* swp_s, int* nswp, int n_pin, int E, int K, const int32_t* remap, int32_t* split,
++                              const unsigned* cum, int ncum) {
++    const int i = threadIdx.x;
++    __shared__ unsigned base; __shared__ int n;
++    if (i == 0) {
++        int m = n_pin;
++        if (cum) {
++            unsigned x = atomicAdd(&g_hist_step, 1u) + 0x9E3779B9u;
++            x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
++            m = 0; while (m < ncum - 1 && x > cum[m]) m++;
++            atomicAdd(&g_hist_cnt[m < 31 ? m : 31], 1ull);
++        }
++        if (m > K) m = K;
++        n = m; base = atomicAdd(&g_hist_base, (unsigned)m);
++    }
++    __syncthreads();
++    if (i < n) { swp_e[i] = (int)((base + (unsigned)i) % (unsigned)E); swp_s[i] = i; }
++    if (i == 0) *nswp = n;
++    if (split && i < K) { const int sl = remap[i]; const bool inc = sl < n; split[i] = inc ? -1 : sl; split[K+i] = inc ? sl : -1; }
++}
+ __global__ void k_hist_read(unsigned long long* out) { for (int i = 0; i < 32; ++i) out[i] = g_hist_cnt[i]; }
+ static unsigned* g_hist_cum = nullptr; static int g_hist_n = 0;
+ static void tu_hist_report() {
+@@ -366,6 +397,21 @@ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int
+     return is_prime ? 2 : 1;   // 2 = prime: caller skips the expert GEMM (copy already issued)
+ }
+ 
++// TEMPORAL_LOAD_FIRST=1|2: slot ids for one pass of a single-token expert op on a registered slot tensor.
++// pass 0 (resident experts) waits for nothing; pass 1 (incoming experts) waits for this tensor's copy, which
++// the routing op issued. Returns 0 when the split does not apply (the caller then takes the single-pass hook).
++extern "C" int ggml_cuda_temporal_split_ids(const void* src0_data, int pass, int n_used, int n_tokens,
++                                            int32_t** ids_out_ptr, cudaStream_t stream) {
++    const int lf = ggml_cuda_temporal_load_first();
++    if (!(lf == 1 || lf == 2) || n_tokens != 1 || !ggml_cuda_temporal_route_op_on()) return 0;
++    auto it = g_tptr.find(src0_data); if (it==g_tptr.end()) return 0;
++    TU& L = g_L[it->second.first]; const int which = it->second.second;
++    if (!L.split_ids || n_used != L.R) return 0;
++    if (pass == 1 && !(ggml_cuda_temporal_route_mode() >= 2 && tr_nocopy() == 2)) cudaStreamWaitEvent(stream, L.ev[which], 0);
++    *ids_out_ptr = L.split_ids + (pass ? n_used : 0);
++    return 1;
++}
++
+ // ===== EXPERT-MAJOR STREAMING PREFILL support =====
+ int ggml_cuda_temporal_slotinfo(const void* src0_data, void** slot_base, const void** pool_host,
+                                 size_t* bytes_per_expert, int* n_expert, int* R) {
+@@ -408,6 +454,7 @@ int ggml_cuda_temporal_route_mode();
+ // TEMPORAL_ROUTE_SLOTS (0 = slots and copies at the expert op, as the trained mode's default) overrides it
+ static int tr_slots() { static int v=[](){const char*s=getenv("TEMPORAL_ROUTE_SLOTS");
+                             return s ? atoi(s) : (ggml_cuda_temporal_route_mode()>=2 ? 2 : 0);}();
++                        if (ggml_cuda_temporal_load_first()) return 2;
+                         return v && ggml_cuda_temporal_unified(); }
+ // TEMPORAL_ROUTE_NOCOPY (released-model modes, timing controls, output wrong): 1 = copy kernels launched
+ // with an empty swap list (no bytes moved); 2 = no copy kernels, no events, nothing waited on.
+@@ -444,7 +491,7 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+                         // TEMPORAL_ROUTE_SLOTS (streamed, single token): this kernel also keeps the VRAM slots,
+                         // replacing k_residency. vslot[j] = slot holding window position j; null = off.
+                         int* vslot, int* vvalid, int* swp_e, int* swp_s, int* nswp, int32_t* remap,
+-                        unsigned long long* ncopy, int free_prefill) {
++                        unsigned long long* ncopy, int free_prefill, int32_t* split, int nocopy) {
+     extern __shared__ int sh[];                           // [0,E) logits, [E,2E) resident flag
+     float* x = (float*) sh; int* in = sh + E;
+     __shared__ unsigned long long s_nom, s_wst; __shared__ int s_cold;
+@@ -508,7 +555,11 @@ __global__ void k_route(const float* __restrict__ lg, size_t stride, int n_token
+     }
+     __syncthreads();
+     for (int j=tid; j<K; j+=nt) remap[j]=vslot[j];
+-    if (tid==0) { const int ns = s_ns < 0 ? K : s_ns; *nswp=ns; *ncopy+=ns; *vvalid=1; }
++    if (split) for (int j=tid; j<K; j+=nt) {              // the newcomer sits at window position K-1
++        const bool inc = s_ns < 0 || (s_ns == 1 && j == K-1);
++        split[j] = inc ? -1 : vslot[j]; split[K+j] = inc ? vslot[j] : -1;
++    }
++    if (tid==0) { const int ns = s_ns < 0 ? K : s_ns; *nswp = nocopy ? 0 : ns; *ncopy+=ns; *vvalid=1; }   // nocopy: timing control
+ }
+ 
+ static void tr_report() {
+@@ -637,7 +688,7 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+                          int * st, int * win, int * last, long long * tnow, double * dsum, unsigned long long * dn,
+                          unsigned long long * hist, unsigned long long * cnt, int32_t * __restrict__ out, int * tokl,
+                          int * sloth, int * svalid, int * swp_e, int * swp_s, int * nswp, int32_t * remap,
+-                         unsigned long long * ncopy, int nocopy) {
++                         unsigned long long * ncopy, int nocopy, int32_t * split) {
+     extern __shared__ float sh2[];
+     float * x = sh2; float * z = sh2 + E; int * lu = (int *) (sh2 + 2*E); int * tmp = lu + E;
+     __shared__ int s_ids[TR2_MAXK], s_win[TR2_MAXK], s_state, s_loads;
+@@ -819,6 +870,13 @@ __global__ void k_route2(const float * __restrict__ lg, size_t stride, int n_tok
+         }
+         *nswp = nocopy ? 0 : ns; *ncopy += ns; *svalid = 1;
+     }
++    if (split) {                                              // a position is incoming iff its expert had no slot
++        __syncthreads();
++        for (int j = tid; j < K; j += nt) {
++            const bool inc = !s_sv || s_found[j] < 0;
++            split[j] = inc ? -1 : remap[j]; split[K + j] = inc ? remap[j] : -1;
++        }
++    }
+ }
+ 
+ // skliar, one decoded token, C = K: the kernel of the trained rule (k_route) with skliar's selection. The
+@@ -830,7 +888,7 @@ __global__ void k_skliar(const float * __restrict__ lg, int E, int K, float lam,
+                          int * st, int * win, long long * tnow, double * dsum, unsigned long long * dn,
+                          unsigned long long * hist, unsigned long long * cnt, int32_t * __restrict__ out, int * tokl,
+                          int * sloth, int * svalid, int * swp_e, int * swp_s, int * nswp, int32_t * remap,
+-                         unsigned long long * ncopy, int nocopy) {
++                         unsigned long long * ncopy, int nocopy, int32_t * split) {
+     extern __shared__ int shk[];                          // [0,E) logits; [E,2E) 0 outside, 1 cached, 2 admitted now, 3 evicted now
+     float * x = (float *) shk; int * in = shk + E;
+     __shared__ unsigned long long s_a, s_b, s_c, s_d; __shared__ float s_bias;
+@@ -923,6 +981,13 @@ __global__ void k_skliar(const float * __restrict__ lg, int E, int K, float lam,
+         }
+         *nswp = nocopy ? 0 : ns; *ncopy += ns; *svalid = 1;
+     }
++    if (split) {                                              // a position is incoming iff its expert had no slot
++        __syncthreads();
++        for (int j = tid; j < K; j += nt) {
++            const bool inc = !s_sv || s_found[j] < 0;
++            split[j] = inc ? -1 : remap[j]; split[K + j] = inc ? remap[j] : -1;
++        }
++    }
+ }
+ 
+ static void tr2_report() {
+@@ -1002,6 +1067,7 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+             if (T->remap_ids) cudaFree(T->remap_ids);
+             CUDA_CHECK(cudaMalloc(&T->remap_ids, K*sizeof(int32_t))); T->remap_words = K;
+         }
++        if (!T->split_ids && ggml_cuda_temporal_load_first()) CUDA_CHECK(cudaMalloc(&T->split_ids, 2*K*sizeof(int32_t)));
+     }
+     if (g2.dump && g2.ntokl < n_tokens) { if (g2.tokl) cudaFree(g2.tokl); CUDA_CHECK(cudaMalloc(&g2.tokl, n_tokens*sizeof(int))); g2.ntokl = n_tokens; }
+     // TEMPORAL_CB_K2=1 keeps single skliar tokens on k_route2
+@@ -1011,14 +1077,18 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+             g2.win + (size_t) L*K, g2.tnow + L, g2.dsum + L, g2.dn + L, g2.hist + (size_t) L*(K+1), g2.cnt + (size_t) L*4,
+             (int32_t *) dst->data, g2.dump ? g2.tokl : nullptr, sl ? g2.sloth + (size_t) L*K : nullptr, g2.svalid + L,
+             sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr, sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr,
+-            sl ? T->d_ncopy : nullptr, tr_nocopy());
++            sl ? T->d_ncopy : nullptr, tr_nocopy(), sl ? T->split_ids : nullptr);
+     else
+     k_route2<<<1, 256, (size_t) 4*E*sizeof(float), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K, mode,
+             g2.C, g2.lam, g2.J, tr2_fullsel(), g2.st + L, g2.win + (size_t) L*K, g2.last + (size_t) L*E, g2.tnow + L, g2.dsum + L, g2.dn + L,
+             g2.hist + (size_t) L*(K+1), g2.cnt + (size_t) L*4, (int32_t *) dst->data, g2.dump ? g2.tokl : nullptr,
+             sl ? g2.sloth + (size_t) L*K : nullptr, g2.svalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
+-            sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr, tr_nocopy());
++            sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr, tr_nocopy(),
++            sl ? T->split_ids : nullptr);
+     CUDA_CHECK(cudaGetLastError());
++    if (sl && tr_slots() == 2 && n_tokens == 1 && (tu_swap_n() >= 0 || tu_swap_hist() > 0))
++        k_force_route<<<1, K, 0, stream>>>(T->d_swp_e, T->d_swp_s, T->d_nswp, tu_swap_n(), E, K, T->remap_ids, T->split_ids,
++                                           tu_swap_hist() > 0 ? g_hist_cum : nullptr, g_hist_n);
+     if (sl && tr_slots() == 2 && n_tokens == 1 && tr_nocopy() != 2) {   // copies start at the router; =1 leaves them to the expert op
+         cudaEventRecord(T->fork, stream);
+         cudaStreamWaitEvent(g_copy, T->fork, 0);
+@@ -1070,12 +1140,16 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+         if (T->remap_ids) cudaFree(T->remap_ids);
+         CUDA_CHECK(cudaMalloc(&T->remap_ids, K*sizeof(int32_t))); T->remap_words = K;
+     }
++    if (sl && !T->split_ids && ggml_cuda_temporal_load_first()) CUDA_CHECK(cudaMalloc(&T->split_ids, 2*K*sizeof(int32_t)));
+     k_route<<<1, 256, (size_t)2*E*sizeof(int), stream>>>((const float *) lg->data, lg->nb[1]/sizeof(float), n_tokens, E, K,
+             g_tr_k + L, g_tr_win + (size_t)L*K, g_tr_cnt + (size_t)L*3, (int32_t *) dst->data,
+             sl ? g_tr_vslot + (size_t)L*K : nullptr, g_tr_vvalid + L, sl ? T->d_swp_e : nullptr, sl ? T->d_swp_s : nullptr,
+             sl ? T->d_nswp : nullptr, sl ? T->remap_ids : nullptr, sl ? T->d_ncopy : nullptr,
+-            ggml_cuda_temporal_route_mode() == 2);
++            ggml_cuda_temporal_route_mode() == 2, sl ? T->split_ids : nullptr, tr_nocopy() == 1);
+     CUDA_CHECK(cudaGetLastError());
++    if (sl && tr_slots() == 2 && n_tokens == 1 && (tu_swap_n() >= 0 || tu_swap_hist() > 0))
++        k_force_route<<<1, K, 0, stream>>>(T->d_swp_e, T->d_swp_s, T->d_nswp, tu_swap_n(), E, K, T->remap_ids, T->split_ids,
++                                           tu_swap_hist() > 0 ? g_hist_cum : nullptr, g_hist_n);
+     // TEMPORAL_ROUTE_SLOTS=2: the swap list exists now, so start the copies here instead of at the gate
+     // GEMM. They run on the copy stream under whatever the graph has between the router and the routed
+     // experts (gate weights, and the shared expert when the graph puts it first).
+diff --git a/ggml/src/ggml-cuda/temporal.cuh b/ggml/src/ggml-cuda/temporal.cuh
+index 89bca201..2bb55f5f 100644
+--- a/ggml/src/ggml-cuda/temporal.cuh
++++ b/ggml/src/ggml-cuda/temporal.cuh
+@@ -13,6 +13,11 @@ void ggml_cuda_temporal_register(const void* rslot_data, const void* pool_host,
+ extern "C" int ggml_cuda_temporal_unified_remap(const void* src0_data, const int32_t* ids_in, int32_t** ids_out_ptr,
+                                                 int n_used, int n_tokens, int stride1, cudaStream_t stream);
+ 
++// TEMPORAL_LOAD_FIRST: two-pass routed experts (resident first, incoming after their copies), see temporal.cu
++int  ggml_cuda_temporal_load_first();
++extern "C" int ggml_cuda_temporal_split_ids(const void* src0_data, int pass, int n_used, int n_tokens,
++                                            int32_t** ids_out_ptr, cudaStream_t stream);
++
+ // ===== EXPERT-MAJOR STREAMING PREFILL support (default path for n_tokens>1 under unified) =====
+ // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
+ // batched GEMM per expert. Decode (n_tokens==1) is untouched.
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index fbf544b5..eb02cb59 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1934,6 +1934,16 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+                 &lg, 1, ggml_temporal_route, 1, (void *)(intptr_t) il);
+         cb(selected_experts, "ffn_moe_route", il);
+     }
++    // TEMPORAL_LOAD_FIRST (streamed, single token): the routing op, which starts the expert copies, is
++    // ordered right after the router logits, before the gate-weight ops. 1 = also split the routed experts
++    // into a resident pass and an incoming pass (below); 2 = the same without gate/up fusion; 3 = order only.
++    static const int tm_lf = (getenv("TEMPORAL_UNIFIED") && atoi(getenv("TEMPORAL_UNIFIED")) && getenv("TEMPORAL_LOAD_FIRST"))
++        ? atoi(getenv("TEMPORAL_LOAD_FIRST")) : 0;
++    const bool tm_lf_here = tm_lf && n_tokens == 1 && tm_trained && il >= 0 && selected_experts_in == nullptr
++        && hparams.n_expert_groups <= 1;
++    if (tm_lf_here) {
++        ggml_build_forward_expand(gf, selected_experts);
++    }
+     if (tm_tp_here) {
+         ggml_tensor * src = tm_trained ? selected_experts : cur;
+         selected_experts = ggml_custom_4d(ctx0, GGML_TYPE_I32, n_expert_used, n_tokens, 1, 1,
+@@ -1985,6 +1995,64 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     ggml_build_forward_expand(gf, weights);
+     if (tm_after_router) { ggml_build_forward_expand(gf, tm_after_router); tm_after_router = nullptr; }
+ 
++    // TEMPORAL_LOAD_FIRST=1|2: the routed experts run in two passes over the same selection. Pass A computes
++    // the experts already in their VRAM slots and waits for nothing, so it runs while the copies started at the
++    // routing op are in flight; pass B computes the experts being loaded, after their copies. The backend
++    // gives each pass a slot-id list with the other pass's positions negative (skipped), so every expert is
++    // computed once, by the same kernel, at its own position, and pass B's down projection writes into pass
++    // A's output. Same values and same summation order as the single pass.
++    if (tm_lf_here && (tm_lf == 1 || tm_lf == 2) && up_exps && gate_exps && down_exps && !gate_up_exps
++            && type_op == LLM_FFN_SILU && !up_exps_b && !gate_exps_b && !down_exps_b
++            && !up_exps_s && !gate_exps_s && !down_exps_s && !weight_before_ffn && loras->empty()
++            && !(hparams.swiglu_clamp_exp[il] > 1e-6f)
++            && ggml_is_quantized(up_exps->type) && ggml_is_quantized(gate_exps->type) && ggml_is_quantized(down_exps->type)) {
++        ggml_tensor * x3 = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
++        // pass A: resident experts
++        ggml_tensor * up_a = ggml_mul_mat_id(ctx0, up_exps, x3, selected_experts);
++        cb(up_a, "ffn_moe_up", il);
++        ggml_tensor * gate_a = ggml_mul_mat_id(ctx0, gate_exps, x3, selected_experts);
++        cb(gate_a, "ffn_moe_gate", il);
++        ggml_tensor * act_a = ggml_swiglu_split(ctx0, gate_a, up_a);
++        cb(act_a, "ffn_moe_swiglu", il);
++        ggml_tensor * down_a = ggml_mul_mat_id(ctx0, down_exps, act_a, selected_experts);
++        cb(down_a, "ffn_moe_down", il);
++        ggml_build_forward_expand(gf, down_a);
++        // pass B: incoming experts ("_inc" in the name tells the backend which pass a node is)
++        ggml_tensor * up_b = ggml_mul_mat_id(ctx0, up_exps, x3, selected_experts);
++        cb(up_b, "ffn_moe_up_inc", il);
++        ggml_tensor * gate_b = ggml_mul_mat_id(ctx0, gate_exps, x3, selected_experts);
++        cb(gate_b, "ffn_moe_gate_inc", il);
++        ggml_tensor * act_b = ggml_swiglu_split(ctx0, gate_b, up_b);
++        cb(act_b, "ffn_moe_swiglu_inc", il);
++        ggml_tensor * down_b = ggml_view_tensor(ctx0, down_a);     // in place: fills pass A's skipped positions
++        down_b->op     = GGML_OP_MUL_MAT_ID;
++        down_b->src[0] = down_exps;
++        down_b->src[1] = act_b;
++        down_b->src[2] = selected_experts;
++        down_b->src[3] = down_a;                                   // orders pass A first and keeps its buffer
++        cb(down_b, "ffn_moe_down_inc", il);
++        ggml_build_forward_expand(gf, down_b);
++
++        ggml_tensor * experts = ggml_mul(ctx0, down_b, weights);
++        cb(experts, "ffn_moe_weighted", il);
++        ggml_build_forward_expand(gf, experts);
++        ggml_tensor * cur_experts[LLAMA_MAX_EXPERTS] = { nullptr };
++        for (uint32_t i = 0; i < hparams.n_expert_used; ++i) {
++            cur_experts[i] = ggml_view_2d(ctx0, experts, n_embd, n_tokens, experts->nb[2], i*experts->nb[1]);
++            ggml_build_forward_expand(gf, cur_experts[i]);
++        }
++        ggml_tensor * moe_out = cur_experts[0];
++        for (uint32_t i = 1; i < hparams.n_expert_used; ++i) {
++            moe_out = ggml_add(ctx0, moe_out, cur_experts[i]);
++            ggml_build_forward_expand(gf, moe_out);
++        }
++        if (hparams.n_expert_used == 1) {
++            moe_out = ggml_cont(ctx0, moe_out);
++        }
++        cb(moe_out, "ffn_moe_out", il);
++        return moe_out;
++    }
++
+     // temporal two-pass split: run the FFN twice through the *same* mul_mat_id kernel --
+     // once for the K-1 resident experts (never stalls) and once for the 1 new expert
+     // (waits only for the leftover fetch time). weights are already normalized over the
+diff --git a/src/models/glm4-moe.cpp b/src/models/glm4-moe.cpp
+index 138d08ac..fdde9a65 100644
+--- a/src/models/glm4-moe.cpp
++++ b/src/models/glm4-moe.cpp
+@@ -234,6 +234,24 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+                     LLM_FFN_SILU, LLM_FFN_PAR, il);
+             cb(cur, "ffn_out", il);
+         } else {
++            // TEMPORAL_LOAD_FIRST (streamed): the shared expert is built first and handed to build_moe_ffn,
++            // which expands it between the routing op and the routed experts. (TEMPORAL_SHEXP_FIRST below
++            // does not do that for this architecture: build_moe_ffn has expanded the routed experts by
++            // the time it returns, so the shared expert still follows them.)
++            static const bool tm_lf = getenv("TEMPORAL_UNIFIED") && atoi(getenv("TEMPORAL_UNIFIED"))
++                && getenv("TEMPORAL_LOAD_FIRST") && atoi(getenv("TEMPORAL_LOAD_FIRST"));
++            ggml_tensor * shared_early = nullptr;
++            if (tm_lf && n_tokens == 1) {
++                shared_early = build_ffn(cur,
++                        model.layers[il].ffn_up_shexp,   NULL, NULL,
++                        model.layers[il].ffn_gate_shexp, NULL, NULL,
++                        model.layers[il].ffn_down_shexp, NULL, NULL,
++                        NULL,
++                        LLM_FFN_SILU, LLM_FFN_PAR, il);
++                cb(shared_early, "ffn_shexp_out", il);
++                tm_after_router = shared_early;
++            }
++
+             // Process routed experts using existing MoE infrastructure
+             ggml_tensor * routed_out = build_moe_ffn(cur,
+                     model.layers[il].ffn_gate_inp,
+@@ -249,13 +267,13 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+             cb(routed_out, "ffn_moe_out", il);
+ 
+             // Process shared expert on original input
+-            ggml_tensor * shared_out = build_ffn(cur,
++            ggml_tensor * shared_out = shared_early ? shared_early : build_ffn(cur,
+                     model.layers[il].ffn_up_shexp,   NULL, NULL,
+                     model.layers[il].ffn_gate_shexp, NULL, NULL,
+                     model.layers[il].ffn_down_shexp, NULL, NULL,
+                     NULL,
+                     LLM_FFN_SILU, LLM_FFN_PAR, il);
+-            cb(shared_out, "ffn_shexp_out", il);
++            if (!shared_early) cb(shared_out, "ffn_shexp_out", il);
+ 
+             // TEMPORAL_SHEXP_FIRST=1: put the shared expert's nodes right after the router (whose
+             // nodes build_moe_ffn already expanded) and before the routed experts. Same ops, same
+-- 
+2.50.0
+
