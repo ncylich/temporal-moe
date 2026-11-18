@@ -269,6 +269,118 @@ after the prompt 143 against 269 ms. Fit over the Skliar-shaped tokens: ms = 43.
   with the governor pinned, on an older build and the earlier random-swap policy. Peak RSS (3.7 to 4.4 GB,
   rising run to run) is set by the prefill of the 5.9 GB model and was not controlled.
 
+## S1-7 -- Where the shared expert runs, and moving it into the load's overlap window (2026-11-17)
+
+Asked by the review session: the paper's bandwidth condition counts the shared expert in the computation that
+hides a load, and the CUDA path has `TEMPORAL_SHEXP_FIRST` for that. The CPU patches had no equivalent.
+
+**Where it sat.** After the wait, hiding nothing. In `src/models/glm4-moe.cpp` (the trained model and the
+plain MoE are both `glm4moe`) the layer calls `build_moe_ffn` (line 237 before this change), which builds the
+route op, the window op (`ffn_moe_window`, queues the reads), the resident sub-pass, the wait and the
+new-expert sub-pass (`src/llama-graph.cpp`, `one_pass` and the `tm_tail` loop) and returns their sum. Only
+then is the shared expert built (`build_ffn` on `ffn_*_shexp`, line 251) and added. The CPU backend runs
+nodes in graph order. Node order of layer 1 on a one-token graph, printed from the built graph on the host:
+
+| switch | route | window | shared expert (gate, up, down) | routed sum `ffn_moe_out` | `ffn_out` |
+|---|---|---|---|---|---|
+| off | 61 | 62 | 124, 125, 127 | 123 | 128 |
+| on | 61 | 62 | 69, 70, 72 | 127 | 128 |
+
+**Change (patch 0004, engine commit `5f992263`, tree `cacc843b`).** `LLAMA_TEMPORAL_SHEXP_FIRST=1`, off by
+default. `llm_graph_context::tm_after_router` is a node that `build_moe_ffn` expands right after the window op
+and the gate weights, before the resident sub-pass; with the switch on, `glm4-moe.cpp` builds the shared
+expert first and hands it over as that node. Same ops, same add (`routed + shared`), as CUDA patch 0007. It
+is keyed on the architecture, not on the routing mode, so the trained rule, Skliar, our decode-time rule and
+the stock path all get it. The shared expert is 1,152 wide against 576 for a routed expert, so it adds about
+two experts' worth of compute to the 17 residents that already ran under the read.
+
+**Skliar's bias.** S1-5 ran lambda 0.7207 at 1.029 loads per decoded token-layer. Lambda was moved until the
+loads on the timed texts and protocol (five texts, 3 x 128 decoded tokens, 24,960 token-layers) were within
+0.5 % of 1.000, counted on the phone with every expert in RAM (routing does not depend on where the experts
+are, gate below): 0.7275 gives 1.0062, 0.7294 gives 1.0050, 0.7370 gives 0.9815, **0.7310 gives 1.0022**
+(25,014 loads). The timed streamed runs reproduce 25,014 exactly, switch off and on. Per text the loads still
+range from 0.957 to 1.137.
+
+**Gates, switch on, timing binary, lambda 0.7310** (`results/pixel_skliar/run_gates_shexp.sh`, tags `g3on`,
+`g3off`; these runs were made hot and are not timing rows):
+
+| check | Skliar on the plain MoE | trained model |
+|---|---|---|
+| pool on flash equals every expert in RAM, 64-bit hash of each decoded token's logits, 385 tokens x 5 texts | equal on all | equal on all |
+| switch on equals switch off, pool on flash, same hashes | equal on all | equal on all |
+| a second streamed run equals the first | equal on all | not run |
+| routing equals `cache_bias.py` | texts 1, 3, 4: 5,005 of 5,005 decoded steps by whole-sequence replay; texts 2 and 5: per-step check 4,991 of 4,992 each, the other one an exact logit tie, loads equal | not applicable (trained rule, unchanged path) |
+
+The perplexity form of the flash-equals-RAM gate was not run (the earlier attempt in this ledger was too slow and too hot on
+this phone); bit-identical logits on every decoded token imply it.
+
+**Timing** (21:39 to 22:40, `results/pixel_skliar/run_timing_shexp.sh`, rows tagged `sx0` = off and `sx1` =
+on). Protocol of S1-5: context 1,024, the five texts, 128 tokens, 3 repetitions, cool gate and 60 s rest
+before every run, one binary. Per text the three arms run in turn, each off and on back to back, and the
+off/on order flips on every other text. 30 runs, none void: big-core cap at rating in all, no swap, skin at
+most 34.0 C at the start, slowest token 61 ms. The trained arm here is the trained model on the same five
+real texts as Skliar (S1-5 timed it on llama-bench's random tokens).
+
+| arm | switch | tok/s, mean of 5 texts [min, max] | ms per token | loads per decoded token-layer | p95 token ms | slowest token ms | ms per token blocked on fetches |
+|---|---|---|---|---|---|---|---|
+| trained, pool on flash | off | 32.36 [31.64, 32.75] | 30.90 | 1.000 | 36.8 | 56.8 | 6.64 |
+| trained, pool on flash | on | 33.67 [33.56, 33.90] | 29.70 | 1.000 | 35.3 | 50.4 | 5.65 |
+| Skliar, pool on flash | off | 32.54 [32.04, 32.89] | 30.73 | 1.002 | 37.6 | 61.1 | 6.15 |
+| Skliar, pool on flash | on | 33.30 [32.59, 34.12] | 30.03 | 1.002 | 36.7 | 61.3 | 5.64 |
+| plain MoE, stock top-k, all in RAM | off | 48.09 [48.02, 48.18] | 20.79 | | 20.9 | 22.5 | 0 |
+| plain MoE, stock top-k, all in RAM | on | 48.10 [48.01, 48.17] | 20.79 | | 20.9 | 23.4 | 0 |
+
+p95, slowest and blocked time are over tokens after the first of each repetition. "Blocked on fetches" is the
+time compute thread 0 spent waiting for an expert that was not yet in RAM.
+
+| | text 1 | text 2 | text 3 | text 4 | text 5 | mean of paired differences [min, max] |
+|---|---|---|---|---|---|---|
+| trained, on against off | +3.9 % | +3.9 % | +2.9 % | +6.2 % | +3.3 % | **+4.05 % [+2.9, +6.2]** |
+| Skliar, on against off | +0.1 % | +1.5 % | +3.8 % | +1.7 % | +4.6 % | **+2.32 % [+0.1, +4.6]** |
+| all in RAM, on against off | -0.0 % | +0.3 % | -0.1 % | -0.2 % | +0.1 % | +0.02 % [-0.2, +0.3] |
+| trained against Skliar, switch off | -0.8 % | -1.2 % | +1.0 % | -1.3 % | -0.5 % | **-0.56 % [-1.3, +1.0]** |
+| trained against Skliar, switch on | +2.9 % | +1.2 % | +0.1 % | +3.1 % | -1.6 % | **+1.14 % [-1.6, +3.1]** |
+
+Skliar's per-token line (token time against the token's loads over 13 layers, tokens after the first of each
+repetition): off ms = 24.06 + 0.491 x loads, on ms = 23.41 + 0.485 x loads. The trained rule loads 13 experts
+on every token, so it has no line; at 13 loads Skliar's lines give 30.44 ms off and 29.72 ms on, against 30.68
+and 29.45 ms measured for the trained model.
+
+Skliar's tokens by the largest number of experts one layer loaded (ms per token, off / on): 1: 28.41 / 27.91;
+2: 30.28 / 29.15; 3: 31.72 / 31.14; 4: 33.52 / 33.03; 5+: 35.35 / 35.19.
+
+- **Measured.** The switch makes the streamed trained model 4.1 % faster (1.2 ms per token) and streamed
+  Skliar 2.3 % faster (0.7 ms). With everything in RAM it changes nothing, so the gain is overlap and not a
+  cheaper graph. The time blocked on fetches falls by 0.99 ms per token for the trained model and 0.51 ms for
+  Skliar.
+- **Measured.** The cost per load did not fall: 0.491 to 0.485 ms. The intercept fell by 0.65 ms.
+- **Measured.** Trained against Skliar at matched loads stays inside the spread over texts with either
+  setting: -0.6 % off, +1.1 % on, and the sign changes between texts in both. The switch moved the comparison
+  by 1.7 points toward the trained model. Five texts do not separate the two arms.
+- **Derived.** Why the intercept and not the slope: the shared expert buys a fixed slice of time per layer
+  that has something to wait for, not per expert loaded, and the number of such layers varies little from
+  token to token. Why the trained model gains more: it waits in all 13 layers of every token, Skliar in about
+  80 % of them (a fifth of its token-layers load nothing), and where a Skliar layer loads several experts the
+  wait is longer than the shared expert. The per-class table agrees: the gain is largest on tokens whose
+  worst layer loads one or two experts and near zero at five or more.
+- **Measured.** The load is still not hidden on this phone at this size. With the switch on, thread 0 is
+  blocked 5.6 ms per token (0.43 ms per layer), and the streamed arms take 29.7 to 30.0 ms per token against
+  20.8 ms with everything in RAM.
+- Sanity against S1-5: Skliar off at 1.002 loads 32.54 tok/s (S1-5 at 1.029 loads: 32.20); trained off on
+  real text 32.36 (S1-5 on random tokens: 32.60; prior ledger 32.91); all in RAM 48.09 (prior ledger 48.11).
+
+What went wrong and how it was caught:
+- The host shortcut for matching lambda failed. The host build with every expert in RAM and no two-pass
+  graph reported 0.089 loads per token-layer at lambda 0.7207, where the phone and the earlier host file
+  (`results/pixel_skliar/host/`) give about 1.0. It was caught by comparing with the phone's own log line for
+  the same text before any lambda was chosen. The cause was not found; lambda was matched on the phone instead
+  (rows tagged `lam*-quick`), and the timed runs confirm the count.
+- The whole-sequence routing replay reported FAIL on texts 2 and 5, as it did in S1-4 for other texts. The
+  per-step check (`results/pixel_skliar/stepcheck_v2_g3on.json`, `_v5_`) shows one exact logit tie each and
+  no real difference.
+- The peak RSS of the trained model on real text is 848 MB, against 762 MB for the same model on random
+  tokens in S1-5. Not investigated; it is the same with the switch off and on.
+
 ## Not verified
 
 - The stalls of S1-3 are not fully explained. The timed rows are free of them, but only cool runs are.
@@ -285,14 +397,21 @@ after the prompt 143 against 269 ms. Fit over the Skliar-shaped tokens: ms = 43.
   peak RSS includes the prefill.
 - Accuracy is not part of this ledger (P1-10 has it); the engine was checked for routing equality and
   flash-equals-RAM only.
+- S1-7: the switch was timed at context 1,024 on five texts only, one run per text and setting, on the 1.26 B
+  models. The 11 B model was not touched: the switch is in `glm4-moe.cpp` only, and that model's architecture
+  (`qwen3moe` by its file name) was not checked. The trained
+  model's all-in-RAM arm, our decode-time rule and `trained_deploy` on random tokens were not re-timed with
+  the switch. Placing the shared expert elsewhere (for example split around the resident sub-pass) was not
+  tried. Why the host build reports 0.089 loads per token-layer for Skliar without the two-pass graph is open.
 - `rows.jsonl` holds every run of the session, including smoke, exploration, diagnostic and gate runs made
-  hot; only rows tagged `t2` are results.
+  hot; only rows tagged `t2` (S1-5), `big1` (S1-6), `sx0` and `sx1` (S1-7) are results.
 
 ## Files
 
 `run_pixel_skliar.py` (driver: `time`, `gate`, `dump`), `pixel_skliar_stepcheck.py`, `pixel_skliar_ties.py`,
 `pixel_skliar_summary.py`, `pixel_skliar_gate_ppl.py` (abandoned gate). Under `results/pixel_skliar/`:
-`rows.jsonl`, `summary_t2.md`, `run_timing_t2.log`, `logs/` (full output per run), `toklog/` (per-token
+`rows.jsonl`, `summary_t2.md`, `run_timing_t2.log`, `summary_shexp.md`, `run_timing_shexp.sh` and `.log`,
+`run_gates_shexp.sh` and `.log` (S1-7; tables by `pixel_skliar_shexp.py`), `logs/` (full output per run), `toklog/` (per-token
 times), `gates/`, `host/`, `tokens/`.
 
 Note on the driver: after the timed runs, an edit to `run_pixel_skliar.py`'s docstring deleted its header block

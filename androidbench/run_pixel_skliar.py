@@ -9,6 +9,7 @@ The arms other than skliar_stream and trained_deploy were used for gates and exp
     sh results/pixel_skliar/run_timing.sh                                  # the timed rows (tag t2)
     python3 run_pixel_skliar.py gate --texts 1 2 3 4 5 --reps 3 --env TEMPORAL_BENCH_REPREFILL=0
     python3 run_pixel_skliar.py dump --texts 1 --arms skliar_stream        # routing dump for the check scripts
+    sh results/pixel_skliar/run_gates_shexp.sh; sh results/pixel_skliar/run_timing_shexp.sh   # S1-7, shared expert first
 """
 import argparse, json, os, re, subprocess, time
 
@@ -20,7 +21,7 @@ OUT = os.path.join(HERE, "results", "pixel_skliar")
 BENCH = "llama-bench-skliar"
 GGUF = "moe_fine_1e19-full-q4_0.gguf"
 SIDE = "moe_fine_1e19-full-q4_0-repacked.bin"
-K, E, LAM = 18, 192, "0.7207"
+K, E, LAM = 18, 192, os.environ.get("LAM", "0.7207")      # LAM=<lambda> overrides Skliar's bias (ledger S1-7)
 CTX = int(os.environ.get("CTX", "1024"))
 SK = f"LLAMA_TEMPORAL_ROUTE=skliar TEMPORAL_CB_C={K} TEMPORAL_CB_LAMBDA={LAM} TEMPORAL_CB_J=1"
 
@@ -39,6 +40,9 @@ ARMS = {
     "trained_deploy":  (K, "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained"),
 }
 TRAINED = ("fine_1e19-q4_0.gguf", "fine_1e19-q4_0-repacked.bin")
+# S1-7: the trained model on the same five real texts as the Skliar arm, pool on flash and (gate) all in RAM
+ARMS["trainedtext_stream"] = (K, "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained")
+ARMS["trainedtext_ram2p"] = (E, "LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained")
 # The 11 B random-weight model of CTX_DESIGNPOINT_2026-08-24.md (45 MoE layers, 192 experts, 18 active). Its
 # router is not meaningful, so loads are imposed (LLAMA_TEMPORAL_ROUTE=replay): one per layer per token, or
 # drawn from Skliar's measured histogram on the 1.26 B model (the timed rows of ledger S1-5).
@@ -78,8 +82,8 @@ def wait_cool(timeout_s=3600):
 def run(arm, v, reps, ngen, tag, extra="", dump=False, cool=True):
     R, route = ARMS[arm]
     name = f"{arm}_v{v}_{tag}"
-    trained = arm.startswith("trained") or arm.startswith("big")      # llama-bench's random tokens
-    gguf, side = BIG if arm.startswith("big") else TRAINED if trained else (GGUF, SIDE)
+    trained = arm == "trained_deploy" or arm.startswith("big")        # llama-bench's random tokens
+    gguf, side = BIG if arm.startswith("big") else TRAINED if arm.startswith("trained") else (GGUF, SIDE)
     text = "" if trained else (f"TEMPORAL_BENCH_CTX=tok/ctx1024_v{v}.ctx TEMPORAL_BENCH_GEN=tok/ctx1024_v{v}.gen "
                                f"TEMPORAL_BENCH_REPREFILL=1 TEMPORAL_ROUTE_HIST=_hist.json ")
     env = (f"LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE={side} "

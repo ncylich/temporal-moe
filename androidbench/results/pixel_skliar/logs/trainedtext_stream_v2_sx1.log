@@ -1,0 +1,11 @@
+LLAMA_TEMPORAL_REPACK=1 LLAMA_TEMPORAL_REPACK_FILE=fine_1e19-q4_0-repacked.bin LLAMA_TEMPORAL_ODIRECT=1 LLAMA_TEMPORAL_MADV_FREE=1 LLAMA_TEMPORAL_R=18 LLAMA_TEMPORAL_SPLIT=2 LLAMA_TEMPORAL_FETCH_THREADS=6 LLAMA_TEMPORAL_SPIN_US=5000 LLAMA_TEMPORAL_FETCHPROF=1 LLAMA_TEMPORAL_TWOPASS=1 LLAMA_TEMPORAL_ROUTE=trained TEMPORAL_BENCH_CTX=tok/ctx1024_v2.ctx TEMPORAL_BENCH_GEN=tok/ctx1024_v2.gen TEMPORAL_BENCH_REPREFILL=1 TEMPORAL_ROUTE_HIST=_hist.json TEMPORAL_BENCH_TOKLOG=_tok.csv TEMPORAL_BENCH_REPREFILL=0 LLAMA_TEMPORAL_SHEXP_FIRST=1
+temporal-pool: active, R=18 swap_prob=0.000 odirect=1 workers=6 sibling=1 split=2
+llama-bench: TEMPORAL_BENCH_GEN = tok/ctx1024_v2.gen (128 tokens)
+temporal-pool: O_DIRECT bounce path (off%4096=0 dst%4096=1280 len%4096=0) -- costs a memcpy per fetch
+llama-bench: TEMPORAL_BENCH_CTX = tok/ctx1024_v2.ctx (1024 tokens)
+temporal-route: trained min_logit, layers=13 layer_tokens=18317 cold_fills=26 swaps=18291 swaps_per_layer_token=1.0000
+temporal-pool: fetches=21558 fetched_mib=1776.3 evictions=20856 tensors=39 hook_calls=0 hook_miss=0 avg_fetch_us=900.5 qwait_hi_us=344.4 wait_ms=5066.2 odirect=1 workers=6 sibling=1 split=2
+temporal-pool: ENFORCE on, swaps=4992
+PEAKSWAP_KB=0
+PEAKHWM_KB=856468
+MINMAXF7=3105000

@@ -1,0 +1,45 @@
+[21:14:30]   -> 32.12525 tok/s sd 0.244003 trials [31.8726, 32.3596, 32.1436] rss 890.3 MB loads 0.9842 hist [1095, 3221, 449, 149, 54, 14, 9, 1] evictions 21483 wait_ms 5696.1
+[21:14:58]   -> 45.062381 tok/s sd 0.964124 trials [46.1173, 44.8429, 44.227] rss 890.6 MB loads 0.9842 hist [1095, 3221, 449, 149, 54, 14, 9, 1] evictions 0 wait_ms 0.0
+[21:15:20]   -> 27.895053 tok/s sd 1.667659 trials [28.4106, 29.2441, 26.0305] rss 890.2 MB loads 0.9842 hist [1095, 3221, 449, 149, 54, 14, 9, 1] evictions 21483 wait_ms 5419.0  !! VOID
+[21:15:22] gate text 1 skliar: PASS decode 5005/5005 loads_equal 5005 prompt 13302/13312 ties_at_cut 19 invalid_topk 0 flash==ram True repeat True evictions 21483/0
+[21:15:49]   -> 24.856724 tok/s sd 0.604848 trials [24.1668, 25.1078, 25.2956] rss 889.6 MB loads 0.9573 hist [1047, 3311, 472, 127, 32, 3] evictions 21075 wait_ms 5040.8  !! VOID
+[21:16:22]   -> 38.343976 tok/s sd 0.031037 trials [38.3094, 38.3531, 38.3694] rss 890.6 MB loads 0.9573 hist [1047, 3311, 472, 127, 32, 3] evictions 0 wait_ms 0.0  !! VOID
+[21:16:50]   -> 25.018955 tok/s sd 0.495465 trials [24.4716, 25.4368, 25.1485] rss 889.2 MB loads 0.9573 hist [1047, 3311, 472, 127, 32, 3] evictions 21075 wait_ms 5156.7  !! VOID
+[21:16:52] gate text 2 skliar: FAIL decode 4846/5005 loads_equal 4998 prompt 13302/13312 ties_at_cut 17 invalid_topk 0 flash==ram True repeat True evictions 21075/0
+[21:17:18]   -> 24.876652 tok/s sd 0.574909 trials [24.2274, 25.3212, 25.0814] rss 890.5 MB loads 0.9738 hist [1317, 2863, 562, 168, 52, 19, 10, 1] evictions 21327 wait_ms 5190.4  !! VOID
+[21:17:56]   -> 38.361188 tok/s sd 0.057305 trials [38.2954, 38.3998, 38.3884] rss 890.5 MB loads 0.9738 hist [1317, 2863, 562, 168, 52, 19, 10, 1] evictions 0 wait_ms 0.0  !! VOID
+[21:18:22]   -> 25.028377 tok/s sd 0.533974 trials [24.418, 25.409, 25.2581] rss 890.3 MB loads 0.9738 hist [1317, 2863, 562, 168, 52, 19, 10, 1] evictions 21327 wait_ms 5152.4  !! VOID
+[21:18:24] gate text 3 skliar: PASS decode 5005/5005 loads_equal 5005 prompt 13299/13312 ties_at_cut 28 invalid_topk 0 flash==ram True repeat True evictions 21327/0
+[21:18:49]   -> 24.126847 tok/s sd 1.144254 trials [22.8168, 24.9308, 24.6329] rss 890.6 MB loads 1.1372 hist [746, 3280, 627, 242, 74, 18, 4, 1] evictions 23784 wait_ms 5889.2  !! VOID
+[21:19:26]   -> 38.372745 tok/s sd 0.038359 trials [38.3298, 38.4035, 38.385] rss 890.7 MB loads 1.1372 hist [746, 3280, 627, 242, 74, 18, 4, 1] evictions 0 wait_ms 0.0  !! VOID
+[21:19:54]   -> 24.425343 tok/s sd 0.302567 trials [24.3088, 24.7689, 24.1984] rss 890.1 MB loads 1.1372 hist [746, 3280, 627, 242, 74, 18, 4, 1] evictions 23784 wait_ms 5676.2  !! VOID
+[21:19:56] gate text 4 skliar: PASS decode 5005/5005 loads_equal 5005 prompt 13302/13312 ties_at_cut 18 invalid_topk 0 flash==ram True repeat True evictions 23784/0
+[21:20:21]   -> 25.137932 tok/s sd 0.491652 trials [24.5941, 25.2687, 25.551] rss 890.3 MB loads 0.9583 hist [1057, 3323, 440, 125, 34, 8, 5] evictions 21048 wait_ms 5417.3  !! VOID
+[21:21:56]   -> 26.379506 tok/s sd 20.916915 trials [2.22677, 38.4931, 38.4186] rss 890.4 MB loads 0.9583 hist [1057, 3323, 440, 125, 34, 8, 5] evictions 0 wait_ms 0.0  !! VOID
+[21:22:22]   -> 24.890191 tok/s sd 0.743217 trials [24.1252, 25.6095, 24.9359] rss 889.7 MB loads 0.9583 hist [1057, 3323, 440, 125, 34, 8, 5] evictions 21048 wait_ms 5395.0  !! VOID
+[21:22:24] gate text 5 skliar: FAIL decode 4996/5005 loads_equal 5005 prompt 13303/13312 ties_at_cut 22 invalid_topk 0 flash==ram True repeat True evictions 21048/0
+[21:22:24] DONE
+[21:23:01]   -> 18.75337 tok/s sd 9.568311 trials [7.70495, 24.3217, 24.2334] rss 888.6 MB loads 0.9842 hist [1095, 3221, 449, 149, 54, 14, 9, 1] evictions 21483 wait_ms 5849.8  !! VOID
+[21:23:45]   -> 26.452219 tok/s sd 1.576041 trials [27.1985, 27.5165, 24.6416] rss 888.1 MB loads 0.9573 hist [1047, 3311, 472, 127, 32, 3] evictions 21075 wait_ms 5480.8  !! VOID
+[21:24:33]   -> 26.011393 tok/s sd 1.711068 trials [27.7984, 25.8477, 24.3881] rss 888.6 MB loads 0.9738 hist [1317, 2863, 562, 168, 52, 19, 10, 1] evictions 21327 wait_ms 5558.0  !! VOID
+[21:25:18]   -> 26.668094 tok/s sd 1.292875 trials [27.8831, 26.8117, 25.3094] rss 888.7 MB loads 1.1372 hist [746, 3280, 627, 242, 74, 18, 4, 1] evictions 23784 wait_ms 5952.7  !! VOID
+[21:26:00]   -> 27.77805 tok/s sd 1.365324 trials [28.8978, 28.1793, 26.2571] rss 888.9 MB loads 0.9583 hist [1057, 3323, 440, 125, 34, 8, 5] evictions 21048 wait_ms 5601.8  !! VOID
+[21:26:20] DONE
+[21:26:45]   -> 28.339598 tok/s sd 1.756892 trials [30.3082, 27.7797, 26.9309] rss 860.7 MB loads None hist None evictions 21249 wait_ms 4610.3  !! VOID
+[21:27:37]   -> 33.502456 tok/s sd 1.803889 trials [35.5021, 31.9975, 33.0078] rss 890.5 MB loads None hist None evictions 14976 wait_ms 1617.1  !! VOID
+[21:28:18]   -> 29.320496 tok/s sd 1.450688 trials [29.2427, 30.8085, 27.9103] rss 837.4 MB loads None hist None evictions 20856 wait_ms 4651.4  !! VOID
+[21:29:10]   -> 32.892148 tok/s sd 1.419508 trials [34.3232, 32.8687, 31.4845] rss 890.5 MB loads None hist None evictions 14976 wait_ms 1830.0  !! VOID
+[21:29:53]   -> 29.770672 tok/s sd 0.832072 trials [30.4563, 30.0108, 28.845] rss 838.6 MB loads None hist None evictions 20778 wait_ms 4430.3  !! VOID
+[21:30:49]   -> 27.653858 tok/s sd 2.60758 trials [29.1577, 24.6429, 29.161] rss 890.0 MB loads None hist None evictions 14976 wait_ms 2050.7  !! VOID
+[21:31:31]   -> 25.504897 tok/s sd 0.714649 trials [25.8006, 26.0242, 24.6899] rss 857.1 MB loads None hist None evictions 21210 wait_ms 5678.0  !! VOID
+[21:32:25]   -> 32.783906 tok/s sd 1.77828 trials [34.8371, 31.7791, 31.7355] rss 889.8 MB loads None hist None evictions 14976 wait_ms 1728.4  !! VOID
+[21:33:08]   -> 28.787332 tok/s sd 1.204041 trials [29.7647, 29.155, 27.4423] rss 855.6 MB loads None hist None evictions 21228 wait_ms 4419.0  !! VOID
+[21:34:11]   -> 32.273173 tok/s sd 1.882208 trials [34.3631, 31.7449, 30.7116] rss 889.8 MB loads None hist None evictions 14976 wait_ms 1678.4  !! VOID
+[21:34:31] DONE
+[21:34:57]   -> 27.159168 tok/s sd 1.74298 trials [29.161, 26.3386, 25.9779] rss 858.1 MB loads None hist None evictions 21249 wait_ms 5086.9  !! VOID
+[21:35:42]   -> 27.937006 tok/s sd 1.353778 trials [28.957, 28.4529, 26.4011] rss 834.4 MB loads None hist None evictions 20856 wait_ms 4793.2  !! VOID
+[21:36:23]   -> 27.956751 tok/s sd 0.989521 trials [28.4287, 28.622, 26.8196] rss 835.9 MB loads None hist None evictions 20778 wait_ms 5008.9  !! VOID
+[21:37:05]   -> 28.59545 tok/s sd 1.391422 trials [29.1029, 29.6619, 27.0215] rss 855.5 MB loads None hist None evictions 21210 wait_ms 5022.7  !! VOID
+[21:37:49]   -> 28.040447 tok/s sd 1.588784 trials [29.5513, 28.1863, 26.3838] rss 854.0 MB loads None hist None evictions 21228 wait_ms 5354.9  !! VOID
+[21:38:09] DONE
+GATES_DONE

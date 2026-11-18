@@ -1,0 +1,93 @@
+From 5f99226321ae705b4b18349c6a8343850cc57dea Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Tue, 17 Nov 2026 20:55:37 -0800
+Subject: [PATCH] temporal-MoE: LLAMA_TEMPORAL_SHEXP_FIRST orders the shared
+ expert (glm4moe) between the window op and the routed-expert sub-passes
+
+build_moe_ffn expands the routed experts itself, so the shared expert, built after it, ran after the
+wait for the streamed expert. llm_graph_context::tm_after_router is a node build_moe_ffn expands right
+after the window op and the gate weights; with the switch on the shared expert is that node, so reads
+queued by the window op run under it. Same ops and same add order. Off by default.
+---
+ src/llama-graph.cpp     |  1 +
+ src/llama-graph.h       |  4 ++++
+ src/models/glm4-moe.cpp | 20 ++++++++++++++++++--
+ 3 files changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 93f3c252..a072ecd2 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1983,6 +1983,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+ 
+     //call early so that topk-moe can be used
+     ggml_build_forward_expand(gf, weights);
++    if (tm_after_router) { ggml_build_forward_expand(gf, tm_after_router); tm_after_router = nullptr; }
+ 
+     // temporal two-pass split: run the FFN twice through the *same* mul_mat_id kernel --
+     // once for the K-1 resident experts (never stalls) and once for the 1 new expert
+diff --git a/src/llama-graph.h b/src/llama-graph.h
+index 97141ef9..e1f880e7 100644
+--- a/src/llama-graph.h
++++ b/src/llama-graph.h
+@@ -933,6 +933,10 @@ struct llm_graph_context {
+     ggml_context * ctx0 = nullptr;
+     ggml_cgraph  * gf   = nullptr;
+ 
++    // temporal streaming: a node build_moe_ffn expands right after the window op and the gate weights, before
++    // the routed-expert sub-passes (LLAMA_TEMPORAL_SHEXP_FIRST=1), so reads queued by the window op run under it
++    mutable ggml_tensor * tm_after_router = nullptr;
++
+     llm_graph_context(const llm_graph_params & params);
+     virtual ~llm_graph_context() = default;
+ 
+diff --git a/src/models/glm4-moe.cpp b/src/models/glm4-moe.cpp
+index dea30f6c..4429b308 100644
+--- a/src/models/glm4-moe.cpp
++++ b/src/models/glm4-moe.cpp
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ #include "models.h"
+ #include "ggml-cpu.h"   // ggml_temporal_route_trained
+ 
+@@ -233,6 +234,21 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+                     LLM_FFN_SILU, LLM_FFN_PAR, il);
+             cb(cur, "ffn_out", il);
+         } else {
++            // LLAMA_TEMPORAL_SHEXP_FIRST=1: the shared expert is ordered between the window op and the routed
++            // experts (llm_graph_context::tm_after_router). Same ops, same add order.
++            static const bool shexp_first = getenv("LLAMA_TEMPORAL_SHEXP_FIRST") && atoi(getenv("LLAMA_TEMPORAL_SHEXP_FIRST"));
++            ggml_tensor * shexp_early = nullptr;
++            if (shexp_first) {
++                shexp_early = build_ffn(cur,
++                        model.layers[il].ffn_up_shexp,   NULL, NULL,
++                        model.layers[il].ffn_gate_shexp, NULL, NULL,
++                        model.layers[il].ffn_down_shexp, NULL, NULL,
++                        NULL,
++                        LLM_FFN_SILU, LLM_FFN_PAR, il);
++                cb(shexp_early, "ffn_shexp_out", il);
++                tm_after_router = shexp_early;
++            }
++
+             // Process routed experts using existing MoE infrastructure
+             ggml_tensor * routed_out = build_moe_ffn(cur,
+                     model.layers[il].ffn_gate_inp,
+@@ -248,13 +264,13 @@ llama_model_glm4_moe::graph::graph(const llama_model & model, const llm_graph_pa
+             cb(routed_out, "ffn_moe_out", il);
+ 
+             // Process shared expert on original input
+-            ggml_tensor * shared_out = build_ffn(cur,
++            ggml_tensor * shared_out = shexp_early ? shexp_early : build_ffn(cur,
+                     model.layers[il].ffn_up_shexp,   NULL, NULL,
+                     model.layers[il].ffn_gate_shexp, NULL, NULL,
+                     model.layers[il].ffn_down_shexp, NULL, NULL,
+                     NULL,
+                     LLM_FFN_SILU, LLM_FFN_PAR, il);
+-            cb(shared_out, "ffn_shexp_out", il);
++            if (!shexp_early) cb(shared_out, "ffn_shexp_out", il);
+ 
+             // Final output: routed_output + shared_output
+             cur = ggml_add(ctx0, routed_out, shared_out);
+-- 
+2.50.0
+

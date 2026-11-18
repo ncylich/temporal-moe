@@ -72,3 +72,15 @@ Checked: `git am` of `0001` to `0003` on a fresh clone at `43bec5f3` gives tree 
 timed on tree `b1f58983` (commit `d9f0f2d1`), which is this patch without the `replay` mode; the 11 B rows on `536002e3`.
 
 Checks and numbers: `androidbench/PIXEL_SKLIAR_LEDGER.md`.
+
+## Shared expert inside the load's overlap window (patch 0004)
+
+On the CPU path the shared expert of a `glm4moe` layer was built after `build_moe_ffn` returned, so it ran
+after the wait for the streamed expert and hid none of the read. `LLAMA_TEMPORAL_SHEXP_FIRST=1` (off by
+default) builds it right after the window op, which queues the reads, and before the resident sub-pass. Same
+ops and same add order; logits are bit-identical with the switch off and on. It applies to every routing mode
+of a `glm4moe` model. Other architectures are not covered. CUDA has the same switch as
+`TEMPORAL_SHEXP_FIRST` (`../engine_patch_cuda/0007`).
+
+Checked: `git am` of `0001` to `0004` on a fresh worktree at `43bec5f3` gives tree `cacc843b` (local engine
+commit `5f992263`, not pushed to the fork). Numbers: ledger entry S1-7.
