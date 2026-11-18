@@ -34,7 +34,14 @@ PY
 }
 ST="TEMPORAL_UNIFIED=1 LLAMA_TEMPORAL_ROUTE=decode"
 L=("ceiling||" "ceiling-route||LLAMA_TEMPORAL_ROUTE=decode")
-for cfg in "s2|TEMPORAL_ROUTE_SLOTS=2" "s2f|TEMPORAL_ROUTE_SLOTS=2 TEMPORAL_UNIFIED_FUSE=1" "lf1|TEMPORAL_LOAD_FIRST=1"; do
+# CFGS=fused: the fused MoE-layer op of patch 0014 (Q4_0 file only) against the switch off, plus no-bytes controls
+if [ "${CFGS:-}" = fused ]; then
+  L+=("ceiling-fused||LLAMA_TEMPORAL_ROUTE=decode TEMPORAL_FUSED=1" "nb-s2|-ncmoe 48|$ST TEMPORAL_ROUTE_SLOTS=2 TEMPORAL_ROUTE_NOCOPY=1" "nb-f1|-ncmoe 48|$ST TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1")
+  set -- "s2|TEMPORAL_ROUTE_SLOTS=2" "f1|TEMPORAL_FUSED=1"
+else
+  set -- "s2|TEMPORAL_ROUTE_SLOTS=2" "s2f|TEMPORAL_ROUTE_SLOTS=2 TEMPORAL_UNIFIED_FUSE=1" "lf1|TEMPORAL_LOAD_FIRST=1"
+fi
+for cfg in "$@"; do
   c=${cfg%%|*}; X=${cfg#*|}
   for n in 0 1 2 3; do L+=("pin$n-$c|-ncmoe 48|$ST $X TEMPORAL_SWAP_N=$n"); done
   L+=("one-$c|-ncmoe 48|$ST $X TEMPORAL_SWAP_HIST=0,1" "skliar-$c|-ncmoe 48|$ST $X TEMPORAL_SWAP_HIST=$SK")

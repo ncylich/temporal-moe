@@ -741,3 +741,65 @@ up to 4 in round 3 (12 for one profiling arm). Skliar at 0.9972 loads per decode
 
 Pod `8xcjjlxgekub1c` ran 08:41 to 10:38 UTC, 1.95 h, about $1.35, and is stopped. Its disk is wiped at every
 stop, so each session re-uploaded the engine base archive and both model files. All three parts: about $3.8.
+
+## O3-9 -- Round 4 (engine tree `85a66fd0`, then `71b82131`): the copy-stream structure, pinned loads, the MoE split
+
+Asked for after round 2: with a third of a load hidden for both rules, try the structure that hid the load
+completely in patch 0013, and show the pinned 0 to 3 shape in the engine.
+
+**`TEMPORAL_FUSED=2`.** The copies start at the routing op on the copy stream (three copy kernels and events,
+as with the op off). The op's first launch computes the shared expert and the experts already in their slots
+and waits for nothing; a second launch computes the experts being loaded after the gate and up copy events;
+the down launch waits for the down copy event. Gates pass for both modes (`r4/fused_gates_r4.log`: 42.6913 /
+40.0690 / 22.7367 everywhere; routing 1,287 of 1,287).
+
+P1-9 protocol, 15 runs per arm, tok/s (ms per token):
+
+| arm | in-launch load (`=1`) | copy stream (`=2`) | `=1`, no bytes | `=2`, no bytes |
+|---|---|---|---|---|
+| ours, trained model | 747.8 (1.3373) | 676.9 (1.4773) | 803.0 (1.2454) | 762.7 (1.3112) |
+| ours, plain MoE | 750.5 (1.3326) | 676.4 (1.4785) | 807.1 (1.2391) | 762.7 (1.3112) |
+| Skliar, plain MoE | 725.2 (1.3791) | 666.8 (1.4997) | 783.2 (1.2769) | 738.1 (1.3548) |
+
+Pinned loads per layer-token (our kernel, plain MoE, `TEMPORAL_SWAP_N`, timing only), ms per token:
+
+| loads | in-launch (`=1`) | copy stream (`=2`) |
+|---|---|---|
+| 0 | 1.2557 | 1.3356 |
+| 1 | 1.3552 (+0.100) | 1.4930 (+0.157) |
+| 2 | 1.4594 (+0.104) | 1.5674 (+0.074) |
+| 3 | 1.6001 (+0.141) | 1.6291 (+0.062) |
+
+- **The copy-stream structure is rejected.** It costs 0.08 ms per token before any load (copy kernels,
+  events and one more launch on each of 13 layers) and its first load is its most expensive (0.157 ms), not
+  its cheapest: the loading launch has to wait for the whole gate and up copy, and the launch that waits
+  cannot overlap it. It is 10 % slower streamed for every arm.
+- **Neither structure has the shape "first load about free, later loads about full price".** With the
+  in-launch load each of the first two loads costs 0.10 ms per token (7.7 us per layer) and the third 0.14.
+  In patch 0013 the first load was free because the unfused shared expert and resident pass took 30 us or
+  more per layer; the fused op does that work in about 10, which is one load's length (step 0: ratio 22
+  against a window of 23 experts' worth).
+- All-in-VRAM and `=1` rows reproduce round 3 (the kernels are the same): 827.3 / 829.8 / 809.4 in VRAM.
+
+**The MoE layer per token, streamed** (ms). Op: from `TEMPORAL_FUSED_SKIP` (round 3). Routing kernel: the
+token with the kernel replaced by an empty launch (`TEMPORAL_ROUTE_STUB`), against the no-bytes row. Exposed
+load: streamed minus no bytes. The router matmul is in neither total; it is the same for both rules.
+
+| | fused op | routing kernel | exposed load | MoE total | share of the token |
+|---|---|---|---|---|---|
+| ours, plain MoE | 0.239 | 0.062 | 0.094 | 0.395 | 30 % of 1.333 |
+| ours, trained model | 0.239 | 0.063 | 0.092 | 0.394 | 29 % of 1.337 |
+| Skliar, plain MoE | 0.239 | 0.098 | 0.102 | 0.439 | 32 % of 1.379 |
+
+- **At the MoE layers Skliar is 11.1 % slower than our rule** (0.044 ms per token): 9.1 points are its
+  routing kernel (0.036 ms) and 2.0 points its load pattern (0.008 ms). **End to end it is 3.5 % slower**
+  (725.2 against 750.5 tok/s; pass ratios 3.9, 3.0, 3.6), because the MoE layers are 30 % of the token.
+- With everything in VRAM the routing kernels cost 0.037 (ours), 0.037 (trained) and 0.069 ms (Skliar).
+  Skliar's does more per token and that is the method: the maximum and minimum of all 192 logits for the
+  running-mean bias (kept in double precision, as `cache_bias.py` does), the best non-cached and the
+  weakest cached expert, one more exchange round for every further expert that enters, and the forced
+  top-1. Ours is one round with one comparison. Both were brought to the same kernel structure in P1-7; no
+  cheaper exact form of Skliar's step was found tonight, and none was looked for beyond reading it again.
+- **Flash attention** was asked for as the cheapest lever on the other 70 %. It is not available: this
+  model's head size is 16, the CUDA flash-attention kernels have no such head size, and `-fa 1` puts
+  attention on the CPU (G1-2, about 20 tok/s in every arm). Not re-run.
