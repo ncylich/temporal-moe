@@ -1,0 +1,25 @@
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 17906bbe..fa90937d 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -2193,6 +2193,20 @@ TM_THREAD_FN(ggml_tm_worker) {
+             // is pure critical path. This cap was hard-coded to 2, which is exactly why
+             // 2 parts start immediately and the rest ~150 us later. LLAMA_TEMPORAL_SPINNERS.
+             if (tm_add32(&g_tm_spinners, 1) < g_tm_max_spinners) {
++                // LLAMA_TEMPORAL_WORKER_SPIN_US=<us>: poll for that long instead of the fixed loop, so a
++                // worker is still awake when the next layer queues its reads (the gap between two layers'
++                // reads is longer than the fixed loop on small models, and a sleeping worker starts late)
++                static int64_t wspin_ns = -1;
++                if (wspin_ns < 0) { const char * v = getenv("LLAMA_TEMPORAL_WORKER_SPIN_US"); wspin_ns = v ? atol(v) * 1000ll : 0; }
++                if (wspin_ns > 0) {
++                    struct timespec s0, s1; tm_clock(&s0);
++                    for (;;) {
++                        if (tm_load32_relaxed(&g_tm_q_len) > 0) break;
++                        tm_clock(&s1);
++                        if ((int64_t)(s1.tv_sec - s0.tv_sec) * 1000000000ll + (s1.tv_nsec - s0.tv_nsec) > wspin_ns) break;
++                        ggml_thread_cpu_relax();
++                    }
++                } else
+                 for (int i = 0; i < 60000; i++) {   // ~200-400 us of polling
+                     if (tm_load32_relaxed(&g_tm_q_len) > 0) break;
+                 }

@@ -18,7 +18,7 @@ import run_ctx_designpoint as H
 DEV = H.DEV
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "results", "pixel_skliar")
-BENCH = "llama-bench-skliar"
+BENCH = os.environ.get("BENCH", "llama-bench-skliar")
 GGUF = "moe_fine_1e19-full-q4_0.gguf"
 SIDE = "moe_fine_1e19-full-q4_0-repacked.bin"
 K, E, LAM = 18, 192, os.environ.get("LAM", "0.7207")      # LAM=<lambda> overrides Skliar's bias (ledger S1-7)

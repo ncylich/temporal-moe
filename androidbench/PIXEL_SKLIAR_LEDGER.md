@@ -407,6 +407,43 @@ committed.
   compute and a second does not. On this phone at 1.26 B that condition is not met. The rest of the layer
   (1.3 ms of attention and norms) comes before the router and cannot hide the read.
 
+## S1-9 -- What sets the last byte of a load, and two attempts to move it (2026-11-17, 23:10 to 23:35)
+
+Exploration only: quick runs on text 1, 128 tokens, one repetition, no cool gate (Thermal Status 0 and the
+big-core cap at rating throughout; skin 31.7 to 35.1 C), tags `fx-*`, `fy-*`, `fz-*`, and three more traced
+runs. Not timing rows.
+
+From the S1-8 trace of the trained model (572 loads, six reads each, `LLAMA_TEMPORAL_SPLIT=2`): every read
+takes about the same time, 409 to 441 us by start order, but the reads start one after another, at 63, 93,
+132, 200, 275 and 338 us after they are queued. The last byte lands at 812 us; the last read to finish is one
+of the last two to start in 429 of 572 loads. The workers sleep on a condition variable between layers (the
+polling loop after a job lasts 0.2 to 0.4 ms, the gap to the next layer's reads is 1.3 ms), and wake one by
+one. Had all six started with the first, the last byte would land at 639 us.
+
+| setting (trained model, pool on flash, shared expert first) | tok/s, quick runs | later tokens, ms | blocked on fetches, ms per token |
+|---|---|---|---|
+| `SPLIT=2`, six reads per expert (the protocol so far) | 33.73, 33.30, 34.37 (a first cold run: 29.61) | 29.11 | 5.23 |
+| `SPLIT=1`, three reads per expert | 35.66, 35.00, 35.44; on the test binary 34.98, 35.50 | 27.85 | 4.19 |
+| `SPLIT=2`, `SPINNERS=4` / `6` (more workers allowed the existing short poll) | 33.84 / 33.52 | 29.12 / 29.13 | 5.28 / 5.46 |
+| `SPLIT=1`, three workers polling for 3 ms after a job (test build) | 26.53, 27.03 | 36.6 | 11.5 |
+| the same, workers pinned to cores 0 to 3 | 26.93, 27.30 | 35.8 | 11.3 |
+| `SPLIT=2`, six workers polling for 3 ms | 13.80, 14.25 | 70.8 | 40.5 |
+
+| Skliar, lambda 0.7310, same runs | tok/s | later tokens, ms | blocked, ms per token |
+|---|---|---|---|
+| `SPLIT=2` | 33.98, 32.99, 32.77 | 29.31 | 5.46 |
+| `SPLIT=1` | 33.36, 35.04, 33.87 | 28.30 | 4.35 |
+
+- **Measured.** With three reads per expert a load's last byte lands at 742 us instead of 812 and the stall
+  per layer falls from 421 to 318 us (traces). A read of twice the size takes 497 to 537 us instead of about
+  420: most of a read is fixed latency, so fewer, larger reads finish sooner than more, smaller ones that
+  queue for workers. `SPLIT=2` was chosen on the 11 B model, whose slices are 2.5 times larger.
+- **Measured.** Keeping workers awake by polling made it much worse, pinned to the small cores or not. In the
+  trace the reads then start later (90 to 197 us) and take longer (591 to 879 us). Cause not established.
+  The change is not in the patches; the diff is kept as `results/pixel_skliar/rejected_worker_spin.diff`.
+- `SPLIT=1` helps both arms (trained 1.26 ms per token, Skliar 1.01 ms). With it the trained model is 1.6 %
+  ahead of Skliar on later-token time on this one text. These are quick runs, not cool-gated rows.
+
 ## Not verified
 
 - The stalls of S1-3 are not fully explained. The timed rows are free of them, but only cool runs are.
