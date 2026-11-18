@@ -1,0 +1,32 @@
+expert tensor: gate/up 86400 bytes, down 86400 bytes, one load 259200 bytes
+GPU: NVIDIA RTX A6000
+
+(a) compute: batch-1 Q4_0 matrix-vector product over weights in VRAM
+  18 experts, gate shape 192x800, one launch, 1 row(s) per block     6.61 us     235.4 GB/s
+  18 experts, gate shape 192x800, one launch, 2 row(s) per block     6.07 us     256.1 GB/s
+  18 experts, gate shape 192x800, one launch, 4 row(s) per block     5.73 us     271.6 GB/s
+  18 experts, down shape 800x192, one launch                        13.97 us     111.3 GB/s
+  54 expert tensors (one layer's 18 x 3) in one launch              11.00 us     424.0 GB/s
+  2,496 experts (216 MB) in one launch, 1 row(s) per block         522.22 us     413.0 GB/s
+  2,496 experts (216 MB) in one launch, 2 row(s) per block         372.77 us     578.5 GB/s
+  raw read of the same 216 MB (xor of 16-byte vectors)             307.69 us     700.9 GB/s
+  raw read of 18 expert tensors (1.56 MB), one launch                4.45 us     349.4 GB/s
+  an almost empty launch (one block, one row)                        2.06 us
+
+(b) load: one expert from pinned host RAM
+  copy kernel, host-mapped pool, 86,400 bytes, 32 blocks             7.09 us      12.2 GB/s
+  copy kernel, host-mapped pool, 86,400 bytes, 64 blocks             7.09 us      12.2 GB/s
+  copy kernel, host-mapped pool, 86,400 bytes, 128 blocks            7.10 us      12.2 GB/s
+  copy kernel, host-mapped pool, 86,400 bytes, 256 blocks            7.12 us      12.1 GB/s
+  copy kernel, host-mapped pool, 259,200 bytes (one load), 64 blocks    13.71 us      18.9 GB/s
+  copy kernel, host-mapped pool, 259,200 bytes (one load), 256 blocks    13.71 us      18.9 GB/s
+  cudaMemcpyAsync from pinned memory, 259,200 bytes                 11.62 us      22.3 GB/s
+  copy kernel, host-mapped pool, 216 MB                           8092.10 us      26.7 GB/s
+  cudaMemcpyAsync from pinned memory, 216 MB                      8088.79 us      26.7 GB/s
+  matrix-vector product reading one expert straight from host        8.66 us      10.0 GB/s
+  the same for three tensors (one load) in one launch               15.30 us      16.9 GB/s
+
+(c) ratio compute / load, against k - 1 = 17 and 17 + 2 (shared expert) = 19
+  per-layer launches : compute 271.6 GB/s / load 18.9 GB/s = 14.4
+  large launches     : compute 578.5 GB/s / load 26.7 GB/s = 21.7
+  raw read / load    : 700.9 GB/s / 26.7 GB/s = 26.3

@@ -1,0 +1,19 @@
+GPU NVIDIA RTX A6000; 2000 tokens per run, 13 layers, 18 of 192 experts, load = 259200 bytes
+
+trace                                loads           vram   streamed       vram   streamed  max rel diff vs unfused VRAM (unf-str / fus-vram / fus-str)
+                                     per t-l      unfused    unfused      fused      fused
+exactly one load per layer (ours)    1.0000         919.1     1324.4      333.9      424.7  0.0e+00 / 0.0e+00 / 0.0e+00   [min-max us: 918.0-922.7 | 1322.1-1328.3 | 330.1-334.3 | 424.4-425.0]
+Skliar's recorded histogram          1.0023         928.3     1334.6      338.7      434.3  0.0e+00 / 0.0e+00 / 0.0e+00   [min-max us: 927.9-930.3 | 1334.4-1335.1 | 336.9-338.8 | 433.9-435.1]
+pinned 0                             0.0000         936.2     1207.2      342.3      347.4  0.0e+00 / 0.0e+00 / 0.0e+00   [min-max us: 934.1-936.8 | 1206.5-1208.2 | 339.7-344.4 | 347.3-347.8]
+pinned 1                             1.0000         942.4     1349.8      344.9      436.9  0.0e+00 / 0.0e+00 / 0.0e+00   [min-max us: 940.5-942.5 | 1348.8-1351.0 | 342.1-347.2 | 435.1-437.6]
+pinned 2                             2.0000         944.1     1477.4      347.6      561.4  0.0e+00 / 0.0e+00 / 0.0e+00   [min-max us: 942.6-945.0 | 1475.5-1478.6 | 345.9-347.7 | 560.9-561.7]
+pinned 3                             3.0000         957.9     1610.6      348.4      685.4  0.0e+00 / 0.0e+00 / 0.0e+00   [min-max us: 957.0-958.9 | 1608.1-1612.8 | 346.7-349.8 | 685.2-686.1]
+
+microseconds per token (13 MoE layers, no attention), median of 5 repeats of 2000 tokens
+unfused  pinned loads: 0 = 1207.2, 1st +142.6, 2nd +127.5, 3rd +133.3 us per token (10.97, 9.81, 10.25 us per layer); a later load moves at 25.3 GB/s
+unfused  share of the first load hidden (against a later load): -7 %
+unfused  exactly one 1324.4 us, Skliar-shaped (mean 1.0023) 1334.6 us: ours against Skliar +0.77 % (range over repeats +0.46 to +0.98 %)
+fused    pinned loads: 0 = 347.4, 1st +89.5, 2nd +124.4, 3rd +124.0 us per token (6.89, 9.57, 9.54 us per layer); a later load moves at 27.2 GB/s
+fused    share of the first load hidden (against a later load): 28 %
+fused    exactly one 424.7 us, Skliar-shaped (mean 1.0023) 434.3 us: ours against Skliar +2.27 % (range over repeats +2.09 to +2.53 %)
+all in VRAM: unfused 919.1 us, fused 333.9 us per token

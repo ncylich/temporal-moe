@@ -46,6 +46,10 @@ Earlier numbers quoted here come from `PRETRAINED_LEDGER.md` (P1-x), `RELEASED_M
   arm, Skliar included. It does not separate the two rules by more than a point, and computing the resident
   experts under the copy costs more in launches than it hides on both models measured.
 - **Qwen3.5-35B was not run** (O1-8): its pod could not be resumed.
+- **Part 2 (O2-0 to O2-5), layer-level harness with fused kernels, no attention:** compute over load
+  bandwidth is 22 against the 19 the hiding condition needs. Fused kernels run a MoE layer in 26 us against
+  70 for the engine's kernel sequence. The first load costs 4.3 us per layer, the second 7.2, the third 10.7,
+  so the first is 60 % hidden and not free. Ours against Skliar-shaped loads: +3.9 % of the MoE layer.
 
 ## O1-1 -- Order of operations per MoE layer on the streamed path, as patched through 0012
 
@@ -350,3 +354,162 @@ Pod `8xcjjlxgekub1c` ran 04:51 to 07:19 UTC on 2026-11-18, 2.47 h at $0.69/h, ab
 (not terminated; it has no volume, so nothing on it survives). The other three pods from the earlier
 ledgers stayed stopped. A fifth pod, `k425im1s3drxei`, was running at 07:19; it belongs to another session
 and was not touched. Raw output: `gpubench/results/overlap/`; scripts: `gpubench/overlap/`.
+
+# Part 2 -- Is the 1.26 B model memory-bound with fused kernels, and does that separate the rules? (2026-11-18)
+
+Asked after Part 1: the two-pass split loses to its own launches, and a token costs about 1.5 ms against
+a memory-bound floor near 0.2 ms. With the launches gone, is one load per layer comparable to the layer's own
+work, hidden behind the shared and resident experts for our rule and paid in full past the first by Skliar?
+Tested at layer level in a standalone CUDA program: **no engine, no model file, no attention, random
+weights. Nothing in Part 2 is a served-model speed.** Code in `gpubench/fused/`, logs in
+`gpubench/results/overlap/fused/`. Pod `8xcjjlxgekub1c` again, resumed 07:33 UTC.
+
+## O2-0 -- Step 0: compute bandwidth against load bandwidth (`step0_bandwidth.cu`)
+
+Expert tensors of the 1.26 B model: gate and up 192 x 800, down 800 x 192, Q4_0, 86,400 bytes each, 259,200
+bytes per load. The matrix-vector kernel uses llama.cpp's Q4_0 times Q8_1 arithmetic, one warp per row.
+Times are per launch, back to back, median of five batches; an empty launch is 2.1 us.
+
+| measurement | time | rate |
+|---|---|---|
+| (a) one layer's 18 experts x 3 tensors in one launch (4.67 MB) | 11.0 us | 424 GB/s |
+| (a) 18 experts, gate only, one launch (1.56 MB), 1 / 2 / 4 rows per block | 6.6 / 6.1 / 5.7 us | 235 / 256 / 272 GB/s |
+| (a) 18 experts, down only (800 short rows) | 14.0 us | 111 GB/s |
+| (a) 2,496 experts in one launch (216 MB) | 373 us | 578 GB/s |
+| raw read of the same 216 MB | 308 us | 701 GB/s |
+| (b) engine-style copy kernel from the host-mapped pinned pool, one tensor (86,400 bytes) | 7.1 us | 12.2 GB/s |
+| (b) the same, one whole load (259,200 bytes) | 13.7 us | 18.9 GB/s |
+| (b) `cudaMemcpyAsync` from pinned memory, one load | 11.6 us | 22.3 GB/s |
+| (b) copy kernel or `cudaMemcpyAsync`, 216 MB | 8.09 ms | 26.7 GB/s |
+| matrix-vector product reading one load straight from the host pool | 15.3 us | 16.9 GB/s |
+
+(c) Ratio of compute to load bandwidth: 424 / 18.9 = **22.4** at the size of one layer, 578 / 26.7 = **21.7**
+for large transfers, 701 / 26.7 = 26.3 for a raw read. The hiding condition needs it at or below k - 1 = 17,
+or 19 with the shared expert's two experts' worth. So the card sits a little above the condition, not far
+above it: one load takes about as long as the whole layer's memory-bound work (about 12 us against 9 to
+11 us), and can be mostly but not completely hidden. That was a go, with the expected outcome already
+visible. The number that matters at this size is the per-layer one; a 259 KB transfer does not reach the
+link's 26.7 GB/s.
+
+## O2-1 -- Step 1: the harness, and how close its unfused path is to the engine (`harness.cu`)
+
+13 MoE layers with the 1.26 B shapes (192 experts, 18 active, expert width 192, shared expert width 384,
+n_embd 800, Q4_0, random weights), all 192 experts per layer in host-mapped pinned RAM (647 MB), 18 slots per
+layer in VRAM. Per token x = X0[t], then for each layer x = rmsnorm(x + shared(x) + sum of 18 experts / 18);
+the router product is computed for its cost but routing is replayed from a trace. Traces: exactly one load
+per token-layer (ours); a count drawn per token-layer from Skliar's histogram of O1-5 (realised mean 1.0023
+on 26,000 token-layers); pinned 0, 1, 2, 3. Loaded experts are cold (cycled) and victims rotate. 2,000 tokens
+per run, 200 warm-up tokens and slot reset outside the timed region, median of 5 repeats, pinned to the
+GPU's NUMA node. Every run's final activations are compared with the unfused all-in-VRAM path on the same
+trace: **maximum relative difference 0 in every run of the final version** (the fused path reproduces the
+reference bit for bit).
+
+The unfused path issues the engine's kernels one launch per op: 22 launches per layer with everything in
+VRAM (gate/up fused), 28 streamed, with the copies on a second stream behind events as in the engine.
+
+| us per token (13 layers) | harness, unfused | engine, 1.26 B (O1-5, O1-6; whole token with attention) |
+|---|---|---|
+| all in VRAM | 916 | 1,444 |
+| streamed with no load, above all in VRAM | +265 | +136 |
+| a later load | +127 to +136 | +101 to +113 |
+| the first load | +142 | +70 |
+
+The harness's launches are direct, about 3.2 us each, where the engine replays a captured CUDA graph, so its
+per-op overhead is about twice the engine's. A later load costs about the same in both (26 to 28 GB/s). The
+engine's partial hiding of the first load is not reproduced: in the harness the first load costs as much
+as a later one although the shared expert's kernels sit between the copies and the routed experts. I did
+not find out why. The unfused column is therefore a rough stand-in for the engine, good for the order of
+magnitude of launch overhead and for load bandwidth, not for the first-load discount.
+
+## O2-2 -- Step 2: the fused path, what was tried in order
+
+1. **One launch per layer, one block per expert** (`tried_one_launch_per_layer.cu`, `harness1.log`): correct
+   (4e-7 relative), and slower than the unfused path, 81 us per layer against 71. With 20 blocks each
+   thread walks a long chain of dependent memory reads; the kernel is bound by read latency and uses 20 of
+   84 SMs. A load from a single block took 18 us and a second and third concurrent load added 1 us each,
+   which showed the same thing for host reads.
+2. **Three launches, every read one step deep** (`harness2.log`): bit-identical, 31 us per layer. The first
+   load cost twice a later one (17.9 against 8.3 us per layer). Its rows read 18-byte Q4_0 blocks straight
+   from the host pool, four reads in sequence per thread, and each read is a link round trip of about 1.8 us.
+3. **Copy first, then compute, in the incoming expert's blocks** (`harness3.log`, `harness4.log`): first
+   load 7.4 then 6.9 us per layer against 9.6 to 10 for later ones, 24 to 28 % hidden. Going to one host
+   read per thread needed a fourth launch (SwiGLU and quantisation on their own).
+4. **Load split across two windows** (`harness5.log`): gate and up tensors move under the gate/up launch,
+   the down tensor under the down launch. First load 6.6, second 7.6, third 10.4 us per layer.
+5. **Incoming experts' blocks first in the grid, down launch sized to one wave** (`harness8.log`, final).
+   On the way (`harness6.log`, `harness7.log`) the gate/up launch went from 12 to 58 us with no load.
+   Bisected to one change: the kernel's argument struct holding two-entry pointer arrays instead of
+   three-entry ones, with the kernel body unchanged. I have no explanation; the three-entry layout is kept
+   and the file says so.
+
+Why four launches and not one: an expert's activations must all exist before its down projection, and every
+output row before the norm, and the blocks of one launch cannot wait for each other. A grid-wide barrier
+exists (cooperative groups); `gridsync_cost.cu` measures it at 0.7 us per barrier with 84 blocks of 1,024
+threads and 1.6 to 3.5 us with 500 to 1,300 smaller blocks, and the occupancy limit is 16 blocks per SM. So
+a one-launch layer with three barriers is buildable at about 4 us of overhead against about 9 us for four
+launches. It was not built.
+
+## O2-3 -- Result: unfused against fused, pinned loads, ours against Skliar
+
+Final version, `harness8.log`. us per MoE layer (token time / 13), median of 5 repeats; the range over
+repeats is at most 0.4 us per layer for every cell. **Layer-level numbers with no attention in them.**
+
+| arm | unfused (engine's kernel sequence) | fused (four launches) |
+|---|---|---|
+| all in VRAM | 70.4 | 26.4 |
+| streamed, pinned 0 loads | 92.2 | 27.5 |
+| streamed, pinned 1 | 103.2 (+10.9) | 31.8 (+4.3) |
+| streamed, pinned 2 | 113.7 (+10.5) | 39.1 (+7.2) |
+| streamed, pinned 3 | 123.5 (+9.8) | 49.7 (+10.7) |
+| streamed, exactly one load per layer (ours) | 101.3 | 30.9 |
+| streamed, Skliar's histogram (mean 1.0023) | 102.2 | 32.1 |
+| Skliar slower than ours by | 0.9 us, +0.9 % (+0.8 to +1.3 over repeats) | 1.2 us, +3.9 % (+3.6 to +4.6) |
+
+Each fused launch alone, back to back (`parts7.log`, includes about 1.8 us for an id upload): gate/up with
+0 / 1 / 2 / 3 incoming experts 12.3 / 14.6 / 20.4 / 27.0 us, down 9.8 / 11.3 / 14.0 / 18.1 us, SwiGLU 2.4,
+norm 2.8, empty launch 2.0.
+
+- **Fused is 2.7 times faster than the unfused sequence with everything in VRAM** (26.4 against 70.4 us per
+  layer) and 3.3 times streamed with one load (30.9 against 101.3). It is not at the memory-bound floor of
+  step 0 (9 to 13 us): about 8 us of the 26 is the four launches themselves.
+- **Compute and load rates in the fused path.** A layer reads about 5.9 MB of weights in about 18 us of
+  kernel time, 330 GB/s. A third load moves at 24 GB/s (10.7 us).
+- **Share of load time hidden.** First load: 60 % (4.3 of 10.7 us). Second: 32 %. Third: none.
+- **Stop condition of step 2: met.** The first load is not near free. It costs 40 % of a full load, and the
+  second load is not at full price either, so the pinned curve is a ramp (4.3, 7.2, 10.7) and not the step
+  the hypothesis needs (0, 10, 10).
+- **Ours against Skliar-shaped loads at equal mean: +3.9 % of the MoE layer**, 1.2 us per layer, 15 us per
+  token. Weighting the pinned curve by the histogram predicts 0.8 us; the measured gap is larger, and
+  Skliar's drawn mean is 0.23 % above 1, which accounts for 0.02 us of it.
+- Skliar's routing step is not in the harness. In the engine it costs Skliar about 0.03 ms per token (2.5 us
+  per MoE layer, O1-5), twice the load-shape effect measured here.
+- For scale: 15 us per token is about 1 % of the engine's 1.5 ms token, and would be 2 to 3 % of a token
+  whose MoE part ran at this fused speed with attention unchanged.
+
+**Why the first load is not free.** The load is as long as the windows. One load needs about 6.5 us of
+link time for gate and up plus a round trip of about 2 us, against a gate/up launch of 10.3 us, and 3.2 us
+plus 2 for down against a 7.8 us launch. In isolation that costs 2.3 + 1.5 = 3.8 us, in the token loop 4.3.
+Step 0 said as much: compute over load bandwidth is 22, the condition is 19. Making the kernels faster
+shortens the windows and exposes more of the load, not less; a longer window (the whole layer, with the
+incoming expert computed last) needs the one-launch kernel of O2-2.
+
+## O2-4 -- Not done or not verified (Part 2)
+
+- Step 3, the engine port, was not approved and not started.
+- The one-launch layer with grid-wide barriers (the only way found to make the whole layer the window) was
+  costed (O2-2) and not built. Aligned 16-byte weight reads, several rows per warp, CUDA graph capture of
+  the harness loop, and a speculative prefetch into a spare slot were not tried. The prefetch hit rate
+  cannot be read from this session's files: the routing dumps were deleted after the gates.
+- A real fused kernel needs the router's decision before it can start a load. The harness replays routing,
+  so its fused path has no routing launch; the engine would need one more launch per layer or a barrier.
+- The harness's unfused path does not reproduce the engine's first-load discount (O2-1), reason not found.
+- The 5x slowdown from the argument-struct layout (O2-2, item 5) is unexplained, so the gate/up launch's
+  12 us may not be what this kernel can do.
+- Skliar's trace is drawn independently per token-layer from a histogram; bursts aligned across the layers
+  of a token and its routing-kernel cost are not in it. Loaded experts are always cold.
+- One GPU, one set of shapes, Q4_0 only, 2,000 tokens.
+
+## O2-5 -- Pod and cost (Part 2)
+
+Pod `8xcjjlxgekub1c` ran 07:33 to 08:39 UTC on 2026-11-18, 1.1 h at $0.69/h, about $0.76, and is stopped.
+Both parts together about $2.46.

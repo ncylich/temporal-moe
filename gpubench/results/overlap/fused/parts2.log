@@ -1,0 +1,21 @@
+GPU NVIDIA RTX A6000; 2000 tokens per run, 13 layers, 18 of 192 experts, load = 259200 bytes
+
+each launch alone, back to back, layer 0 (median of 5 x 3000)
+  empty launch                                                  1.97 us
+  A (gate/up/SwiGLU, router), 0 incoming                       12.42 us
+  B (down, sum), 0 incoming                                     8.59 us
+  the id upload alone (pageable memcpy), 0                      1.72 us
+  A (gate/up/SwiGLU, router), 1 incoming                       19.69 us
+  B (down, sum), 1 incoming                                     8.59 us
+  the id upload alone (pageable memcpy), 1                      1.69 us
+  A (gate/up/SwiGLU, router), 2 incoming                       29.58 us
+  B (down, sum), 2 incoming                                     9.24 us
+  the id upload alone (pageable memcpy), 2                      1.73 us
+  A (gate/up/SwiGLU, router), 3 incoming                       39.30 us
+  B (down, sum), 3 incoming                                     8.59 us
+  the id upload alone (pageable memcpy), 3                      1.71 us
+  C (norm, quantise)                                            2.84 us
+  engine-style copy kernel, one tensor of one expert (0)        7.00 us
+  engine-style copy kernel, one tensor of one expert (1)        7.00 us
+  engine-style copy kernel, one tensor of one expert (2)        7.00 us
+  one copy kernel for a whole load (3 tensors)                 13.47 us

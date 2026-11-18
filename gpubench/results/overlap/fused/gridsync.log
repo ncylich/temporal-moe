@@ -1,0 +1,10 @@
+GPU NVIDIA RTX A6000, 84 SMs, cooperative launch supported
+blocks of   32 threads, grid   336 (limit  1344):  0 sync 3.37 us  1 sync 4.37 us  2 sync 5.26 us  4 sync 7.08 us  8 sync 10.72 us  => 0.92 us per barrier
+blocks of   32 threads, grid  1344 (limit  1344):  0 sync 3.75 us  1 sync 7.32 us  2 sync 10.92 us  4 sync 17.91 us  8 sync 31.91 us  => 3.52 us per barrier
+blocks of  128 threads, grid   252 (limit  1008):  0 sync 3.09 us  1 sync 3.88 us  2 sync 4.47 us  4 sync 5.89 us  8 sync 8.74 us  => 0.71 us per barrier
+blocks of  128 threads, grid  1008 (limit  1008):  0 sync 3.59 us  1 sync 6.48 us  2 sync 9.29 us  4 sync 14.95 us  8 sync 26.36 us  => 2.85 us per barrier
+blocks of  256 threads, grid   126 (limit   504):  0 sync 3.04 us  1 sync 3.79 us  2 sync 4.46 us  4 sync 5.76 us  8 sync 8.53 us  => 0.69 us per barrier
+blocks of  256 threads, grid   504 (limit   504):  0 sync 3.27 us  1 sync 4.49 us  2 sync 6.09 us  4 sync 9.30 us  8 sync 15.70 us  => 1.55 us per barrier
+blocks of 1024 threads, grid    21 (limit    84):  0 sync 1.98 us  1 sync 2.30 us  2 sync 3.03 us  4 sync 4.60 us  8 sync 7.61 us  => 0.70 us per barrier
+blocks of 1024 threads, grid    84 (limit    84):  0 sync 1.98 us  1 sync 2.33 us  2 sync 3.05 us  4 sync 4.60 us  8 sync 7.73 us  => 0.72 us per barrier
+ordinary launch, 84 blocks of 1024 threads: 1.91 us
