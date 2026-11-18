@@ -859,6 +859,16 @@ What the table says, plainly:
   Q4_K_M file has Q4_K gate and up and Q8_0 down, each of which would need its own row routine in
   `mul_mat_vec_q`'s order. A load is 663,552 bytes here against about 860 kB in P1-12, so these rows are
   not comparable with O1-7 or P1-12. Unfused and fused are compared on this same file.
+- **Same expert quantisation as the phone and laptop 11 B rows, not the same file.** Those rows use
+  `qwen3moe-rand-fine-Q4pure.gguf` (uniform Q4_0, 648 KiB per expert, sha `d8a3bdf4...`; `laptopbench/PLAN.md`,
+  `androidbench/ANDROID_OPTIM_PROGRESS.md` on branch `laptop`). The file here is the same recipe (seed 0)
+  put through `llama-quantize ... Q4_0` on the pod: its experts are Q4_0 at the same 648 KiB (663,552 bytes)
+  per load, but its hash differs (`84cd3c92...`), so some non-expert tensor differs in type; I did not find
+  out which. The 4090 and A6000 rows of P1-12 and O1-7 use the Q4_K_M file.
+- **Direction of the format's effect:** a load is 23 % smaller than in the Q4_K_M file, and the down
+  projection reads 221 kB per expert instead of 418 kB, so both the load and the layer's own work shrink. In
+  the Q4_K_M rows of O1-7 one load was 0.78 ms of a 5.7 ms token (14 %) with the switch off; here it is
+  0.655 of 5.29 (12 %). The load's share of the token is a little lower in this format.
 - The op was generalised for it (1,024 hidden, 384-wide experts, no shared expert, 256-thread blocks in the
   down launch) and the 1.26 B gate was rerun on that build (trained, streamed: 22.7367).
 - **Gate:** batch-1 perplexity on 2 x 1,024 tokens, `LLAMA_TEMPORAL_ROUTE=decode`: 190,523.7715 +/- 3,826.59732
