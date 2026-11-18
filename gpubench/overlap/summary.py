@@ -32,7 +32,7 @@ for lab in order:
             m = re.search(r"temporal-route-cuda: .*layer_tokens=(\d+) cold_fills=(\d+) swaps=(\d+)", l)
             if m: lt += int(m.group(1)) - int(m.group(2)); ld += int(m.group(3))
     hs = ""
-    if hist: t = sum(hist); hs = " / ".join(f"{100*x/t:.1f}" for x in (hist[0], hist[1], hist[2], sum(hist[3:])))
+    if hist and sum(hist): t = sum(hist); hs = " / ".join(f"{100*x/t:.1f}" for x in (hist[0], hist[1], hist[2], sum(hist[3:])))
     out[lab] = {"tok_s": mean(ts), "ms": mean(1000 / t for t in ts), "pass": pm, "n": len(ts), "loads": ld / lt if lt else None}
     print(f"| {lab} | {len(ts)} | {mean(ts):.1f} | {mean(1000/t for t in ts):.4f} | {' / '.join(f'{x:.1f}' for x in pm)} | "
           f"{(stdev(pm) if len(pm) > 1 else 0):.2f} | {min(ts):.1f} to {max(ts):.1f} | {(f'{ld/lt:.4f}' if lt else '')} | {hs} | {max(r['vram_peak_mib'] for r in R)} |")
