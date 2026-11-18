@@ -1,0 +1,1 @@
+[run] flame38m_g3_cosmoes0.03_1e18 mode=temporal grain=3 ffn=1368 num_experts=192 topk=18 moe_ffn=58 shared=352 iters=2121 gb=1024 mb=32 lr=3e-4 WSD(decay=212) evict=min_logit tok=pythia-12b(50k)

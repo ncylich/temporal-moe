@@ -1,0 +1,10 @@
+  block_data_path ................................. None
+  data_path ....................................... ['1.0', '/workspace/temporal-moe/data/dclm_tokenized/part11_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part04_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part06_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part10_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part08_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part02_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part03_text_document', '1.0', '/workspace/tem
+  evidence_data_path .............................. None
+  test_data_path .................................. None
+  titles_data_path ................................ None
+  train_data_path ................................. None
+  valid_data_path ................................. None
+  successfully loaded checkpoint from /workspace/temporal-moe/results/phase0/runs/flame38m_g3_temporal/ckpt [ t 1/1, p 1/1 ] at iteration 0
+ validation loss at iteration 2 on validation set | lm loss value: 3.979100E+00 | lm loss PPL: 5.346886E+01 | 
+ validation loss at iteration 2 on test set | lm loss value: 3.976817E+00 | lm loss PPL: 5.334694E+01 | 

@@ -1,0 +1,11 @@
+  block_data_path ................................. None
+  data_path ....................................... ['1.0', '/workspace/temporal-moe/data/dclm_tokenized/part11_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part04_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part06_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part10_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part08_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part02_text_document', '1.0', '/workspace/temporal-moe/data/dclm_tokenized/part03_text_document', '1.0', '/workspace/tem
+  evidence_data_path .............................. None
+  test_data_path .................................. None
+  titles_data_path ................................ None
+  train_data_path ................................. None
+  valid_data_path ................................. None
+  successfully loaded checkpoint from /workspace/temporal-moe/results/phase0/runs/flame38m_g3_temporal/ckpt [ t 1/1, p 1/1 ] at iteration 0
+ validation loss at iteration 6 on validation set | lm loss value: 4.971907E+00 | lm loss PPL: 1.443018E+02 | 
+ validation loss at iteration 6 on test set | lm loss value: 4.968226E+00 | lm loss PPL: 1.437717E+02 | 
+[probe] saved /workspace/temporal-moe/results/phase0/runs/flame38m_g3_temporal/router_log.pt: 8 MoE layers, logits (2048, 32, 192), k=18, temporal=False

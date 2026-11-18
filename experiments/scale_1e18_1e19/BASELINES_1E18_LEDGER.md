@@ -134,3 +134,118 @@ not a robust 1e16 statement. The rule was applied as written.
 - Sticky 5: `METHOD=sticky LAMBDA=5 GPUS=0,1 baselines_1e18.sh`, started 07:28 UTC.
 - Both: seed 1234, the reference's 12 shards and order, 2,121 iterations, global batch
   1024, micro-batch 32 per rank.
+
+## B6. Results at 1e18 (fine grain, 18 of 192, seed 1234, same split)
+
+Test BPB is each run's end-of-run test eval (50 batches of 1,024 sequences), the same eval
+as the reference rows. BPB tax is against the standard MoE of the same seed and split
+(1.3461). Loads and effective experts come from one probe (`router_probe.py` on the first
+training micro-batch, then `cosmoes_metrics.py`), run tonight on all four checkpoints.
+
+| model | test BPB | BPB tax over standard MoE | loads / token-layer | effective experts (of 192) |
+|---|---|---|---|---|
+| temporal (ours) | 1.3354 | -0.80% | 1.00 served (raw demand 11.35) | 183.1 |
+| standard MoE | 1.3461 | -- | 13.85 | 190.7 |
+| CoSMoEs BlES, weight 0.03 | 1.4089 | +4.67% | 9.35 | 165.1 |
+| sticky routing, weight 5 | 1.3612 | +1.13% | 10.83 | 189.5 |
+
+Test CE in nats: temporal 3.976762, standard MoE 4.008667, CoSMoEs 4.195695, sticky
+4.053793. The paper's seed table reports three-seed means for the first two rows (1.3339
+and 1.3478); against the mean MoE the taxes are -1.03%, +4.53% and +1.00%.
+
+- **CoSMoEs: worse than ours on both axes.** 0.0735 BPB above ours and 0.0628 above the
+  standard MoE, about twenty times the 0.003 seed spread, and above the dense floor
+  (1.3911). It needs 9.35 loads per token-layer against our 1.00, and its effective pool
+  falls to 165 of 192 with 13 experts neglected per layer on average. Its tax grew from
+  +3.2% at 1e16 to +4.67% here at the same weight.
+- **Sticky routing: worse than ours on both axes.** 0.0258 BPB above ours (about eight
+  times the seed spread) and 0.0151 above the standard MoE. It needs 10.83 loads per
+  token-layer against our 1.00. The pool stays in use (189.5 effective experts, none
+  neglected). The 1e16 margin over ours was noise-sized (B4); at 1e18 it is not, because
+  our model moves below the standard MoE at this budget while sticky stays above it.
+- Neither loss bounds the demanded set. The lowest demand reached is 9.35 experts per
+  token-layer, and our own model's raw demand (11.35) is in the same range as both
+  baselines. The 1.00 in our row comes from the residency rule, which the two losses do
+  not have.
+
+Checks on these numbers:
+
+- One-card re-evaluation with frozen weights (`EVALONLY=1`) of each two-card checkpoint:
+  CoSMoEs test CE 4.195698 against the run's own 4.195695, sticky 4.053793 against
+  4.053793. The two-card runs' test numbers are not an artifact of two-rank evaluation.
+- The same re-evaluation on the published references: standard MoE 4.008724 against the
+  recorded 4.008667, temporal 3.976817 against 3.976762.
+- First logged losses against the one-card reference log (10.81400, 10.44734): CoSMoEs
+  10.81355, 10.44825; sticky 10.81393, 10.44745.
+- No NaN or skipped iterations in either run. Both logs print the loss as active on rank 0
+  and rank 1.
+
+Raw material: `results/ablations/baselines_1e18.csv`,
+`experiments/scale_1e18_1e19/baselines_1e18_logs/` (filtered train logs, run metadata, eval
+and probe lines, per-run probe metrics, the pod's `pip freeze --local`).
+
+## B7. What went wrong and how it was caught
+
+- **Run time at 1e16 was misjudged.** The plan assumed a 1e16 run takes about 10 minutes.
+  A fine-grain cell takes 36 minutes alone on one card (0.97 s per iteration, the same as
+  the recorded sweep's own logs). Caught when the first status check showed 2.0 s per
+  iteration with three jobs on a card. I first read that as a sharing penalty, killed the
+  round and relaunched one job per card, then saw the same 0.95 s per iteration alone and
+  checked the recorded logs. Sharing a card gives about 1.4 times the throughput of running
+  serially, so the remaining jobs were added back alongside. Net cost about 8 minutes of
+  restarts, and the 1e16 round took 75 minutes instead of the 20 planned.
+- **Four jobs died with their launcher.** Killing the launcher script to change the queue
+  also killed its four running children. Caught on the next status check (their iteration
+  counters had stopped at 110) and relaunched detached. About 5 minutes of four cards lost.
+- **The two-card BlES cell at 1e16 was dropped.** It was meant to check the auxiliary loss
+  on two ranks against the recorded 1e16 BlES number. With runs at 36 minutes it would have
+  delayed the 1e18 starts, and the recorded number is on a different split anyway. The
+  per-rank log line and the 1e18 loss parity stand in for it.
+- **The recorded 1e16 split cannot be reproduced.** The recorded sweep used 24 tok16k
+  shards and 12 are published. Caught by reading the `data_path` line of the recorded
+  logs. The 1e16 table in B4 carries its own references for that reason, and the CoSMoEs
+  weight rests on the older table, which was not re-run on tonight's split.
+- **Shard order.** `find` returned the 1e18 shards in a different order and count than the
+  reference logs. Caught the same way, before any run, and fixed with `SHARDS`.
+- **One 1e16 process aborted at exit.** `g3_sticky0.5_1e16` received SIGABRT during
+  teardown, after its test eval and checkpoint save, so the cell script stopped before the
+  probe. Caught by the missing metrics line. The probe was run by hand on the saved
+  checkpoint. The abort did not recur.
+- **TransformerEngine build.** The first build failed in under a minute because cmake
+  could not find `cudnn.h`. Rebuilt with `CUDNN_PATH` pointing at the pip `nvidia/cudnn`
+  directory; 25 minutes.
+- **Pod price.** Four H200s were only available on the secure tier at $21.16 per hour
+  (community tier, $14.36, had no stock). The pod ran from 05:18 to 11:29 UTC, about $131.
+  The pod's SSH daemon was not running at boot and had to be started through the gateway.
+
+## B8. Not done or not verified
+
+- One seed per baseline. The 0.003 seed spread quoted is from the reference rows.
+- The baselines trained on two cards and the references on one. The evidence that this
+  does not matter is in B3 and B6; a one-card repeat of either baseline was not run.
+- The baselines went through the patched router at R=E and the standard MoE reference
+  through stock `pretrain_gpt.py`. A no-loss run through the patched path at 1e18 was not
+  made. At 1e16 the earlier sweep treated the two as the same model, and the first-step
+  losses here agree with the stock reference to three decimals.
+- Sticky routing was implemented from the paper's HTML text (Eq. 9 to 11). Batch
+  aggregation is not stated there and is taken as a mean. The paper's experiments use 4
+  experts with top-2; nothing here reproduces its numbers in its own setting.
+- The CoSMoEs weight was chosen from the paper's 1e16 table, measured on a different split
+  and TransformerEngine build than tonight's cells.
+- Loads are router demand on one fixed batch of 32 sequences, not a measurement in a
+  serving engine.
+- The weights were chosen so that each baseline is worse than ours at 1e16. Matched-quality
+  points (BlES 0.01, sticky 0.5) and heavier points (BlES 0.1, sticky 50) were not run at
+  1e18.
+
+## B9. Pod state
+
+Pod `k425im1s3drxei` (`h200x4-baselines-1e18`) was stopped at 11:29 UTC and shows EXITED.
+It was not terminated. Its 250 GB volume at `/workspace` holds the repository checkout at
+this branch with the built venv (TransformerEngine and apex), both corpora
+(`data/dclm_tokenized`, `data/tok16k_full`), and under `results/phase0/runs/` the two new
+1e18 checkpoints (`flame38m_g3_cosmoes0.03_1e18`, `flame38m_g3_sticky5_1e18`, 1.6 GB each
+with their router logs), the two reference checkpoints, and every 1e16 cell of B3 and B4.
+A rerun needs only `METHOD=... LAMBDA=... GPUS=... bash
+experiments/scale_1e18_1e19/baselines_1e18.sh` after the pod is started; the SSH daemon may
+need `service ssh start` through the gateway first.
