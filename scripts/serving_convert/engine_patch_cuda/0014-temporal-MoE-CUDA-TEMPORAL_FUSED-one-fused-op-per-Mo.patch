@@ -1,4 +1,4 @@
-From 6096ded65765154f5b5a8dd4e0a35b6384d051ef Mon Sep 17 00:00:00 2001
+From 94c849917ef462316ec19b164049404d548537a9 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 18 Nov 2026 00:45:43 -0800
 Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED, one fused op per MoE layer
@@ -11,12 +11,12 @@ copy kernels, events or second stream are involved. The router, the softmax, the
 ops stay ordinary graph nodes. Q4_0 experts with glm4moe's shapes only; other models keep the old path.
 ---
  ggml/src/ggml-cuda/ggml-cuda.cu |   7 +-
- ggml/src/ggml-cuda/temporal.cu  | 194 +++++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu  | 234 +++++++++++++++++++++++++++++++-
  ggml/src/ggml-cuda/temporal.cuh |   5 +
- src/llama-graph.cpp             |  34 ++++++
+ src/llama-graph.cpp             |  47 +++++++
  src/llama-graph.h               |   4 +
  src/models/glm4-moe.cpp         |  12 ++
- 6 files changed, 251 insertions(+), 5 deletions(-)
+ 6 files changed, 304 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
 index bb562d44..77d54b6c 100644
@@ -44,7 +44,7 @@ index bb562d44..77d54b6c 100644
              switch (ggml_get_unary_op(op)) {
                  case GGML_UNARY_OP_ABS:
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index dffd6614..6a10bb1a 100644
+index dffd6614..e4526a57 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -49,6 +49,10 @@ static int tr_slots();
@@ -84,7 +84,7 @@ index dffd6614..6a10bb1a 100644
          cudaEventRecord(T->fork, stream);
          cudaStreamWaitEvent(g_copy, T->fork, 0);
          for (int w = 0; w < 3; ++w) {
-@@ -1192,3 +1197,188 @@ void ggml_cuda_temporal_route_reset() {
+@@ -1192,3 +1197,228 @@ void ggml_cuda_temporal_route_reset() {
      }
      CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
  }
@@ -135,6 +135,7 @@ index dffd6614..6a10bb1a 100644
 +    const uint8_t * SG, * SU;
 +    block_q8_1 * aq;
 +    size_t be; int D, F, FS, K;
++    const float * lg; const int * eids; float * wgt; int E, normw;        // gate weights from the router logits (lg null: not here)
 +};
 +// One block per 32 rows of one expert: gate rows, up rows, SwiGLU, and the Q8_1 block of those 32 activations.
 +// Routed positions are taken in the order "experts being loaded first", so their blocks are scheduled first
@@ -143,6 +144,38 @@ index dffd6614..6a10bb1a 100644
 +    __shared__ block_q8_1 xq[32]; __shared__ float act[32]; __shared__ int s_c, s_e;
 +    const int lane = threadIdx.x & 31, row = threadIdx.x >> 5, blk = blockIdx.x;
 +    const int DB = A.D / 32, GR = A.F / 32, NR = A.K * GR;
++    if (A.lg && blk == NR + A.FS / 32) {
++        // the gate weights: softmax over the E router logits, gathered at the selected experts, and (normw) divided
++        // by their clamped sum. Same operations and the same summation order as the soft_max (block of 256 threads),
++        // get_rows, sum_rows (first warp holds the K values), clamp and div kernels this replaces.
++        __shared__ float ev[256]; __shared__ float sv[8]; __shared__ float s_m;
++        const int t = threadIdx.x;
++        if (t < 256) ev[t] = t < A.E ? A.lg[t] : -INFINITY;
++        __syncthreads();
++        if (t == 0) { float m = -INFINITY; for (int i = 0; i < A.E; ++i) m = max(m, ev[i]); s_m = m; }
++        __syncthreads();
++        float e = 0.0f;
++        if (t < 256) {
++            if (t < A.E) e = expf(ev[t] - s_m);
++            const float ws = warp_reduce_sum(e);
++            if (lane == 0) sv[row] = ws;
++        }
++        __syncthreads();
++        if (t < 256) ev[t] = e;
++        if (t < 32) { const float tot = warp_reduce_sum(lane < 8 ? sv[lane] : 0.0f); if (t == 0) s_m = tot; }
++        __syncthreads();
++        if (t < 32) {
++            const float inv_sum = 1.0f / s_m;
++            float p = lane < A.K ? ev[A.eids[lane]] * inv_sum : 0.0f;
++            if (A.normw) {
++                float sum = warp_reduce_sum(p);
++                sum = sum < 6.103515625e-5f ? 6.103515625e-5f : sum;
++                p = p / sum;
++            }
++            if (lane < A.K) A.wgt[lane] = p;
++        }
++        return;
++    }
 +    if (row < DB) tf_quant_lane(A.x[32 * row + lane], xq + row);
 +    if (threadIdx.x == 1023 && blk < NR) {                                 // which position this block computes, and its load
 +        const int p = blk / GR, ns = A.pool[0] ? min(*A.nswp, A.K) : 0;
@@ -246,11 +279,14 @@ index dffd6614..6a10bb1a 100644
 +    const ggml_tensor * W[3] = { dst->src[3], dst->src[4], dst->src[5] }, * Sx[3] = { dst->src[6], dst->src[7], dst->src[8] };
 +    const int D = (int) x->ne[0], F = (int) W[0]->ne[1], FS = (int) Sx[0]->ne[1], K = (int) ids->ne[0], GR = F / 32;
 +    GGML_ASSERT(x->ne[1] == 1 && D % 32 == 0 && D <= 896 && F % 32 == 0 && F <= 192 && FS % 32 == 0 && FS / 32 <= 48 && K * GR + FS / 32 + 8 <= TFB_T && K <= 64);
-+    static block_q8_1 * aq = nullptr;
++    static block_q8_1 * aq = nullptr; static float * wbuf = nullptr;
++    ggml_custom_op_params cp; memcpy(&cp, dst->op_params, sizeof(cp));
++    const intptr_t ud = (intptr_t) cp.userdata; const bool fold = (ud >> 17) & 1, normw = (ud >> 16) & 1;
 +    // TEMPORAL_FUSED_SKIP (profiling, output wrong): 1 = do not launch A, 2 = do not launch B
 +    static const int skip = [](){const char*e=getenv("TEMPORAL_FUSED_SKIP");return e?atoi(e):0;}();
 +    if (!aq) {
 +        CUDA_CHECK(cudaMalloc(&aq, TFB_C * sizeof(block_q8_1))); CUDA_CHECK(cudaMemset(aq, 0, TFB_C * sizeof(block_q8_1)));
++        CUDA_CHECK(cudaMalloc(&wbuf, 64 * sizeof(float)));
 +        fprintf(stderr, "[temporal-fused] one fused op per MoE layer on single-token steps: D=%d F=%d FS=%d K=%d skip=%d\n", D, F, FS, K, skip);
 +    }
 +    TFA A; memset(&A, 0, sizeof A); TFB B; memset(&B, 0, sizeof B);
@@ -267,8 +303,12 @@ index dffd6614..6a10bb1a 100644
 +    }
 +    A.x = (const float *) x->data; A.SG = (const uint8_t *) Sx[0]->data; A.SU = (const uint8_t *) Sx[1]->data;
 +    A.aq = aq; A.D = D; A.F = F; A.FS = FS; A.K = K;
-+    if (!(skip & 1)) k_tf_a<<<K * GR + FS / 32, 1024, 0, stream>>>(A);
-+    B.aq = aq; B.wgt = (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
++    if (fold) {
++        GGML_ASSERT(wgt->type == GGML_TYPE_F32 && wgt->ne[0] > 128 && wgt->ne[0] <= 256 && K <= 32);
++        A.lg = (const float *) wgt->data; A.eids = (const int *) ids->data; A.wgt = wbuf; A.E = (int) wgt->ne[0]; A.normw = normw;
++    }
++    if (!(skip & 1)) k_tf_a<<<K * GR + FS / 32 + (fold ? 1 : 0), 1024, 0, stream>>>(A);
++    B.aq = aq; B.wgt = fold ? wbuf : (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
 +    B.SD = (const uint8_t *) Sx[2]->data; B.y = (float *) dst->data; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K;
 +    if (!(skip & 2)) k_tf_b<<<D, TFB_T, 0, stream>>>(B);
 +    CUDA_CHECK(cudaGetLastError());
@@ -290,7 +330,7 @@ index 2bb55f5f..55d9c9f2 100644
  // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
  // batched GEMM per expert. Decode (n_tokens==1) is untouched.
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index eb02cb59..d8fcf60c 100644
+index eb02cb59..6f1cdddb 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1798,6 +1798,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
@@ -306,7 +346,21 @@ index eb02cb59..d8fcf60c 100644
  ggml_tensor * llm_graph_context::build_moe_ffn(
           ggml_tensor * cur,
           ggml_tensor * gate_inp,
-@@ -1995,6 +2001,34 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -1991,10 +1997,51 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+         cb(weights, "ffn_moe_weights_scaled", il);
+     }
+ 
++    // TEMPORAL_FUSED: when the gate weights are a plain softmax over the router logits (optionally renormalised
++    // over the selection), the fused op computes them itself in its first launch, in the softmax, gather and
++    // sum/clamp/divide kernels' own order; those nodes are then not expanded into the graph
++    static const bool tm_fused_env = getenv("TEMPORAL_FUSED") && atoi(getenv("TEMPORAL_FUSED"));
++    static const bool tm_fused_wfold = !(getenv("TEMPORAL_FUSED_NOFOLD") && atoi(getenv("TEMPORAL_FUSED_NOFOLD")));
++    const bool tm_fold_w = tm_fused_env && tm_fused_wfold && n_tokens == 1 && tm_trained && il >= 0 && selected_experts_in == nullptr
++        && hparams.n_expert_groups <= 1 && probs_in == nullptr && exp_probs_b == nullptr && logits && logits->type == GGML_TYPE_F32
++        && gating_op == LLAMA_EXPERT_GATING_FUNC_TYPE_SOFTMAX && (w_scale == 0.0f || w_scale == 1.0f)
++        && n_expert > 128 && n_expert <= 256 && n_expert_used <= 32 && arch != LLM_ARCH_GROVEMOE && tm_fused_shexp[0];
+     //call early so that topk-moe can be used
++    if (tm_fold_w) ggml_build_forward_expand(gf, selected_experts); else
      ggml_build_forward_expand(gf, weights);
      if (tm_after_router) { ggml_build_forward_expand(gf, tm_after_router); tm_after_router = nullptr; }
  
@@ -328,13 +382,16 @@ index eb02cb59..d8fcf60c 100644
 +                && !(hparams.swiglu_clamp_exp[il] > 1e-6f)
 +                && n_embd % 32 == 0 && n_embd <= 896 && gate_exps->ne[1] % 32 == 0 && gate_exps->ne[1] <= 256 && sh[0]->ne[1] % 32 == 0
 +                && gate_exps->ne[1] <= 192 && n_expert_used * (gate_exps->ne[1] / 32) + sh[0]->ne[1] / 32 <= 160) {
-+            ggml_tensor * args[9] = { cur, selected_experts, weights, gate_exps, up_exps, down_exps, sh[0], sh[1], sh[2] };
-+            ggml_tensor * fused = ggml_custom_4d(ctx0, GGML_TYPE_F32, n_embd, n_tokens, 1, 1, args, 9, ggml_temporal_fused_cpu, 1, (void *)(intptr_t) il);
++            // source 2 is the gate weights, or (userdata bit 17) the router logits; bit 16: renormalise over the selection
++            ggml_tensor * args[9] = { cur, selected_experts, tm_fold_w ? logits : weights, gate_exps, up_exps, down_exps, sh[0], sh[1], sh[2] };
++            const intptr_t ud = (intptr_t) il | (norm_w ? ((intptr_t) 1 << 16) : 0) | (tm_fold_w ? ((intptr_t) 1 << 17) : 0);
++            ggml_tensor * fused = ggml_custom_4d(ctx0, GGML_TYPE_F32, n_embd, n_tokens, 1, 1, args, 9, ggml_temporal_fused_cpu, 1, (void *) ud);
 +            cb(fused, "ffn_moe_fused", il);
 +            sh[0] = sh[1] = sh[2] = nullptr;
 +            tm_fused_done = true;
 +            return fused;
 +        }
++        GGML_ASSERT(!tm_fold_w && "TEMPORAL_FUSED: gate weights were folded but the fused op was not built");
 +        sh[0] = sh[1] = sh[2] = nullptr;
 +    }
 +
