@@ -23,5 +23,8 @@ export CUDA_VISIBLE_DEVICES=$GPUS
 export NPROC=$(echo "$GPUS" | tr ',' '\n' | wc -l | tr -d ' ')
 export GRAIN=3 MICRO_BATCH=${MICRO_BATCH:-32} TEMPORAL_EVICT=min_logit TEMPORAL_RESIDENCY_R=192
 export RUN_NAME=${RUN_NAME:-flame38m_g3_${METHOD}${LAMBDA}_1e18}
+# The 12 shards, in the order the seed-1234 references (flame38m_g3_moe, flame38m_g3_temporal)
+# logged in their train.log data_path, so train, validation and test splits are theirs.
+export SHARDS=${SHARDS:-"11 04 06 10 08 02 03 07 09 05 01 00"}
 export RDZV_PORT=${RDZV_PORT:-$((29560 + ${GPUS%%,*}))}
 exec bash "$(dirname "${BASH_SOURCE[0]}")/flame38m_run.sh"

@@ -47,6 +47,11 @@ echo "[run] $RUN_NAME mode=$MODE grain=$GRAIN ffn=$FFN num_experts=$NUM_EXPERTS 
 DATA_DIR=${DATA_DIR:-$ROOT/data/dclm_tokenized}
 DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
   -exec sh -c '[ -f "${1%.bin}.idx" ] && printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
+# SHARDS="11 04 ...": pin the shard list and its order. find returns filesystem order, and
+# --split 90,5,5 cuts the concatenation by index, so the order decides the train/test split.
+if [ -n "${SHARDS:-}" ]; then
+  DATA_PATH=$(for s in $SHARDS; do printf "1.0 %s " "$DATA_DIR/part${s}_text_document"; done | sed 's/ $//')
+fi
 [ -z "$DATA_PATH" ] && { echo "ERROR: no tokenized .bin in $DATA_DIR"; exit 1; }
 
 export OMP_NUM_THREADS=16 TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true CUDA_DEVICE_MAX_CONNECTIONS=1 WANDB_MODE=disabled

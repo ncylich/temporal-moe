@@ -107,6 +107,11 @@ echo "[run] shape=$SHAPE H=$H L=$L ffn=$FFN moe_ffn=$MOE_FFN grain=$GRAIN num_ex
 # ---- data (FLAME-style: weight 1.0 per tokenized .bin shard) ----
 DATA_PATH=$(find "$DATA_DIR" -type f -name '*_text_document.bin' \
   -exec sh -c '[ -f "${1%.bin}.idx" ] && printf "1.0 %s " "${1%.bin}"' _ {} \; | sed 's/ $//')
+# SHARDS="11 04 ...": pin the shard list and its order. find returns filesystem order, and
+# --split 90,5,5 cuts the concatenation by index, so the order decides the train/test split.
+if [ -n "${SHARDS:-}" ]; then
+  DATA_PATH=$(for s in $SHARDS; do printf "1.0 %s " "$DATA_DIR/part${s}_text_document"; done | sed 's/ $//')
+fi
 if [ -z "$DATA_PATH" ]; then echo "ERROR: no tokenized part*_text_document.bin in $DATA_DIR"; exit 1; fi
 
 export OMP_NUM_THREADS=16

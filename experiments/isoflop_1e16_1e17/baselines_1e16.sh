@@ -15,6 +15,9 @@ GPUS=${GPUS:-0}
 export TOKENIZER_MODEL=$ROOT/data/tok16k DATA_DIR=$ROOT/data/tok16k_full
 export CE_FUSION=1 BPB_DIVISOR=2.7568 EVAL_AT_END=1 EXTRA_ARGS="--no-rope-fusion"
 export GRAIN=3 SHAPE=s0 TARGET_FLOPS=1e16 PEAK_LR=3e-3 WARMUP_FRAC=0.05 GLOBAL_BATCH=256 SEED=1234
+# The recorded CoSMoEs sweep trained on 24 tok16k shards; only parts 00-11 are published, so
+# these cells use those 12 in a fixed order and carry their own same-split references.
+export SHARDS=${SHARDS:-"05 11 10 06 09 07 08 03 02 04 01 00"}
 export RUN_NAME=$NAME RDZV_PORT=${RDZV_PORT:-$((29510 + ${GPUS%%,*}))}
 export TEMPORAL=1 TEMPORAL_EVICT=min_logit TEMPORAL_RESIDENCY_R=192
 case $METHOD in
