@@ -1333,3 +1333,40 @@ O5-8, except attention on this model, which is now one launch near its memory fl
   residual add and the attention norm folds; RoPE, cache writes and q/k norms in one launch; the
   single-token attention kernel), two dropped (copy blocks at the front with a second launch; splitting the
   down copy), plus the 26 % slowdown from a by-value kernel argument struct that a control build caught.
+
+## O5-13 -- The MoE split on the 1.26 B models with the Part 5 build (23:23 to 23:30 UTC)
+
+Asked for during Part 5 and not measured before the pod was stopped, so the pod was resumed for it
+(container up 23:02, stopped 23:31 UTC, about $0.35). The engine was rebuilt from the patch files and gave
+tree `2e897e1b`, which also shows that patches 0001 to 0018 apply and build from the base commit.
+
+Real text, rows 601 and 602, streamed with 18 slots, P1-9 protocol. Four arms per model, run in order and
+then reversed (`gpubench/overlap/split_small.sh`, rows in `part5/split_small/`): as served; no bytes moved;
+no bytes and the op's launches skipped; routing kernel replaced by an empty launch. op = no bytes minus op
+skipped, routing kernel = no bytes minus stub, exposed load = as served minus no bytes. ms per token.
+
+| everything on (0015 to 0018) | token | op | routing kernel | exposed load | MoE | share of token |
+|---|---|---|---|---|---|---|
+| ours, plain MoE | 1.040 (961.8 tok/s) | 0.256 | 0.056 | 0.088 | 0.400 | 38.5 % |
+| Skliar, plain MoE | 1.085 (922.0) | 0.262 | 0.105 | 0.085 | 0.452 | 41.7 % |
+| trained model | 1.035 (966.1) | 0.264 | 0.071 | 0.079 | 0.414 | 40.0 % |
+
+| attention kernel off (0015 to 0017) | token | op | routing kernel | exposed load | MoE | share of token |
+|---|---|---|---|---|---|---|
+| ours, plain MoE | 1.180 (847.2 tok/s) | 0.260 | 0.062 | 0.071 | 0.393 | 33.2 % |
+| Skliar, plain MoE | 1.231 (812.6) | 0.263 | 0.103 | 0.080 | 0.446 | 36.3 % |
+| trained model | 1.184 (844.9) | 0.259 | 0.057 | 0.077 | 0.393 | 33.2 % |
+
+Skliar is 4.3 % behind ours on the token in both builds, and 13.0 % and 13.7 % behind at the MoE layers.
+
+What these rows can carry. The op is the same work for both rules on the same model and reads 0.003 to
+0.006 ms apart, so each component is good to about 0.005 to 0.01 ms.
+- Solid: Skliar is 0.045 to 0.050 ms per token behind ours, and 0.042 to 0.049 ms of that is its routing
+  kernel (0.103 to 0.105 against 0.056 to 0.062). That is 11 to 12 of the 13 points.
+- Not resolved at this model size: the load pattern's part. It reads +0.009 ms in one build and -0.003 in
+  the other. O4-0 gave 2.0 points; these rows neither confirm nor contradict it, and it should not be quoted
+  as a number from here.
+- The MoE share of the token was 30 % with patch 0014 (O4-0) and is 38 to 40 % now, because the rest of the
+  token shrank. The op and the routing kernels themselves did not change in Part 5.
+- Skliar's own loads on these two rows are 0.988 and 0.960 per decoded token-layer (0.997 over the five rows
+  its lambda was matched on). Ours is 1 by rule.
