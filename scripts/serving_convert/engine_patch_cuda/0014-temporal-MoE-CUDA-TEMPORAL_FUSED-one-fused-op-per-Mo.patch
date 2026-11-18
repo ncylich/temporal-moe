@@ -1,4 +1,4 @@
-From 5f4777fefa2b04fb4cd6cd3982cc4195cbcecde9 Mon Sep 17 00:00:00 2001
+From a59f9341b3a1100fc15bf35304647ebc7aa1db12 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 18 Nov 2026 00:45:43 -0800
 Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED, one fused op per MoE layer
@@ -11,12 +11,12 @@ copy kernels, events or second stream are involved. The router, the softmax, the
 ops stay ordinary graph nodes. Q4_0 experts with glm4moe's shapes only; other models keep the old path.
 ---
  ggml/src/ggml-cuda/ggml-cuda.cu |   7 +-
- ggml/src/ggml-cuda/temporal.cu  | 234 +++++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu  | 238 +++++++++++++++++++++++++++++++-
  ggml/src/ggml-cuda/temporal.cuh |   5 +
  src/llama-graph.cpp             |  48 +++++++
  src/llama-graph.h               |   4 +
  src/models/glm4-moe.cpp         |  12 ++
- 6 files changed, 305 insertions(+), 5 deletions(-)
+ 6 files changed, 309 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
 index bb562d44..77d54b6c 100644
@@ -44,7 +44,7 @@ index bb562d44..77d54b6c 100644
              switch (ggml_get_unary_op(op)) {
                  case GGML_UNARY_OP_ABS:
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index dffd6614..e4526a57 100644
+index dffd6614..4cb32b81 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -49,6 +49,10 @@ static int tr_slots();
@@ -84,7 +84,7 @@ index dffd6614..e4526a57 100644
          cudaEventRecord(T->fork, stream);
          cudaStreamWaitEvent(g_copy, T->fork, 0);
          for (int w = 0; w < 3; ++w) {
-@@ -1192,3 +1197,228 @@ void ggml_cuda_temporal_route_reset() {
+@@ -1192,3 +1197,232 @@ void ggml_cuda_temporal_route_reset() {
      }
      CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
  }
@@ -119,13 +119,17 @@ index dffd6614..e4526a57 100644
 +    q->qs[lane] = v;
 +    if (lane == 0) q->ds = make_half2(d, sum);
 +}
-+// one row of nblk Q4_0 blocks times nblk Q8_1 blocks; called by all 32 lanes of a warp; nblk <= 48
++// one row of nblk Q4_0 blocks times nblk Q8_1 blocks; called by all 32 lanes of a warp; nblk <= 32.
++// In mul_mat_vec_q lane x adds half x%2 of block x/2 and half x%2 of block 16 + x/2. Here each lane reads one
++// whole block (even lanes block x/2, odd lanes block 16 + x/2), computes both halves, and the pair swaps the
++// half the other lane needs with one shuffle: the same values added in the same order, half the block reads.
 +static __device__ __forceinline__ float tf_row(const void * W, int kbx0, const block_q8_1 * y, int nblk) {
-+    const int x = threadIdx.x & 31, h = 2 * (x & 1);
-+    float a = 0.0f;
-+    if ((x >> 1) < nblk) a = vec_dot_q4_0_q8_1(W, y + (x >> 1), kbx0 + (x >> 1), h);
-+#pragma unroll
-+    for (int yy = 1; yy < 3; ++yy) { const int kb = 16 * yy + (x >> 1); if (kb < nblk) a = __fadd_rn(a, vec_dot_q4_0_q8_1(W, y + kb, kbx0 + kb, h)); }
++    const int x = threadIdx.x & 31, kb = (x & 1) ? 16 + (x >> 1) : (x >> 1);
++    float h0 = 0.0f, h1 = 0.0f;
++    if (kb < nblk) { h0 = vec_dot_q4_0_q8_1(W, y + kb, kbx0 + kb, 0); h1 = vec_dot_q4_0_q8_1(W, y + kb, kbx0 + kb, 2); }
++    // even lane keeps its half 0 and needs the odd lane's half 0; odd lane keeps its half 1 and needs the even lane's
++    const float other = __shfl_xor_sync(0xFFFFFFFFu, (x & 1) ? h0 : h1, 1);
++    const float a = (x & 1) ? __fadd_rn(other, h1) : __fadd_rn(h0, other);
 +    return warp_reduce_sum(a);
 +}
 +struct TFA {
