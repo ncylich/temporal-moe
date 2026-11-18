@@ -21,6 +21,7 @@ if [ $WHAT != speed ]; then
     echo "$mode vram fused:   $(PPL $E TEMPORAL_FUSED=1 $C)"
     echo "$mode stream unfused (slots 2): $(PPL $E TEMPORAL_UNIFIED=1 TEMPORAL_ROUTE_SLOTS=2 $C -ncmoe 14)"
     for rep in 1 2; do echo "$mode stream fused rep $rep: $(PPL $E TEMPORAL_UNIFIED=1 TEMPORAL_FUSED=1 $C -ncmoe 14)"; done
+    for rep in 1 2; do echo "$mode stream fused mode 2 rep $rep: $(PPL $E TEMPORAL_UNIFIED=1 TEMPORAL_FUSED=2 $C -ncmoe 14)"; done
   done
   echo "### routing equality, fused streamed $(date -u +%T)"
   stop() { [ -f "$1.pid" ] || return 0; kill -INT "$(cat "$1.pid")" 2>/dev/null; for i in $(seq 1 60); do kill -0 "$(cat "$1.pid")" 2>/dev/null || { rm -f "$1.pid"; return 0; }; sleep 1; done; kill -9 "$(cat "$1.pid")" 2>/dev/null; rm -f "$1.pid"; }
@@ -52,6 +53,18 @@ for a in "ours|$MOE|ours" "skliar|$MOE|skliar" "trained|$TM|trained"; do
    "$n-fused-skipA|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1 TEMPORAL_FUSED_SKIP=1"
    "$n-fused-skipB|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1 TEMPORAL_FUSED_SKIP=2"
    "$n-fused-skipAB|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_NOCOPY=1 TEMPORAL_FUSED_SKIP=3"
+   "$n-fused-stub|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_STUB=1"
+   "vram-$n-fused-stub|$M|${arm}_vram|TEMPORAL_FUSED=1 TEMPORAL_ROUTE_STUB=1"
+   "$n-fused2|$M|${arm}_stream|TEMPORAL_FUSED=2"
+   "$n-fused2-nb|$M|${arm}_stream|TEMPORAL_FUSED=2 TEMPORAL_ROUTE_NOCOPY=1"
+   "$n-f1-pin0|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_SWAP_N=0"
+   "$n-f1-pin1|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_SWAP_N=1"
+   "$n-f1-pin2|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_SWAP_N=2"
+   "$n-f1-pin3|$M|${arm}_stream|TEMPORAL_FUSED=1 TEMPORAL_SWAP_N=3"
+   "$n-f2-pin0|$M|${arm}_stream|TEMPORAL_FUSED=2 TEMPORAL_SWAP_N=0"
+   "$n-f2-pin1|$M|${arm}_stream|TEMPORAL_FUSED=2 TEMPORAL_SWAP_N=1"
+   "$n-f2-pin2|$M|${arm}_stream|TEMPORAL_FUSED=2 TEMPORAL_SWAP_N=2"
+   "$n-f2-pin3|$M|${arm}_stream|TEMPORAL_FUSED=2 TEMPORAL_SWAP_N=3"
   )
 done
 for p in $(seq 1 $NP); do
