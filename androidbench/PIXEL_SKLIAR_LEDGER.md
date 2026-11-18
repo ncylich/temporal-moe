@@ -381,6 +381,32 @@ What went wrong and how it was caught:
 - The peak RSS of the trained model on real text is 848 MB, against 762 MB for the same model on random
   tokens in S1-5. Not investigated; it is the same with the switch off and on.
 
+## S1-8 -- Why the gap to Skliar is small: per-layer trace (2026-11-17, 22:53)
+
+One traced 48-token run per arm and switch setting (`LLAMA_TEMPORAL_TRACE=1`, text 1, no cool gate, tracing
+overhead included, so these are structure and not benchmark rows; tags `tr0`, `tr1`). 572 layer-tokens per
+arm after dropping the first five tokens. Page: `results/pixel_skliar/load_timeline.html` (built by
+`make_load_timeline.py`; numbers in `load_timeline_stats.json`). The traces themselves (23 MB each) are not
+committed.
+
+| per layer, shared expert first | trained | Skliar |
+|---|---|---|
+| thread 0 computing the 17 residents | 0.21 ms | 0.22 ms |
+| one expert's read, queued to last byte | 0.81 ms | 0.93 ms |
+| stall, mean over all layers | 0.42 ms | 0.47 ms |
+| stall by loads in the layer (share of layers) | 1: 0.42 (100 %) | 0: 0 (25 %), 1: 0.49 (60 %), 2: 0.89 (9 %), 3: 1.13 (4 %), 4+: 2.04 (2 %) |
+
+- **Measured.** One load does not fit under the layer's routed compute: the read takes about four times as
+  long, so every layer that loads stalls, with one load or several.
+- **Measured.** The stall is roughly proportional to the loads in the layer (1.8 times one load for two, 2.3
+  for three), and a quarter of Skliar's layers load nothing. At equal average loads the average stall is then
+  about equal: 0.47 against 0.42 ms per layer, 0.65 ms per token (0.45 ms with the shared expert after the wait).
+- **Measured, not explained.** That remainder is not the bursts: a single load stalls Skliar's run 0.49 ms
+  against 0.42 ms, because its individual reads take longer (475 against 423 us). Different model files.
+- **Derived.** A cap of one load per layer buys throughput only where one load hides under the layer's
+  compute and a second does not. On this phone at 1.26 B that condition is not met. The rest of the layer
+  (1.3 ms of attention and norms) comes before the router and cannot hide the read.
+
 ## Not verified
 
 - The stalls of S1-3 are not fully explained. The timed rows are free of them, but only cool runs are.
