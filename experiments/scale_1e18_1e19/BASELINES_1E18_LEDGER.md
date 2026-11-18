@@ -89,7 +89,7 @@ once on one card and once on two with the same global batch.
   and 10.44825. Sticky run: 10.81393 at iteration 5.
 
 Verdict: two-card training accepted. A dedicated two-card BlES cell at 1e16 was planned
-and dropped for time (see B6).
+and dropped for time (see B7).
 
 ## B4. Sticky routing sweep at 1e16 (fine grain, one card each, seed 1234)
 
@@ -153,13 +153,13 @@ Test CE in nats: temporal 3.976762, standard MoE 4.008667, CoSMoEs 4.195695, sti
 4.053793. The paper's seed table reports three-seed means for the first two rows (1.3339
 and 1.3478); against the mean MoE the taxes are -1.03%, +4.53% and +1.00%.
 
-- **CoSMoEs: worse than ours on both axes.** 0.0735 BPB above ours and 0.0628 above the
+- CoSMoEs is worse than ours on both axes. It lands 0.0735 BPB above ours and 0.0628 above the
   standard MoE, about twenty times the 0.003 seed spread, and above the dense floor
   (1.3911). It needs 9.35 loads per token-layer against our 1.00, and its effective pool
   falls to 165 of 192 with 13 experts neglected per layer on average. Its tax grew from
   +3.2% at 1e16 to +4.67% here at the same weight.
-- **Sticky routing: worse than ours on both axes.** 0.0258 BPB above ours (about eight
-  times the seed spread) and 0.0151 above the standard MoE. It needs 10.83 loads per
+- Sticky routing is also worse than ours on both axes. It lands 0.0258 BPB above ours
+  (about eight times the seed spread) and 0.0151 above the standard MoE, and it needs 10.83 loads per
   token-layer against our 1.00. The pool stays in use (189.5 effective experts, none
   neglected). The 1e16 margin over ours was noise-sized (B4); at 1e18 it is not, because
   our model moves below the standard MoE at this budget while sticky stays above it.
@@ -186,35 +186,35 @@ and probe lines, per-run probe metrics, the pod's `pip freeze --local`).
 
 ## B7. What went wrong and how it was caught
 
-- **Run time at 1e16 was misjudged.** The plan assumed a 1e16 run takes about 10 minutes.
+- Run time at 1e16 was misjudged. The plan assumed a 1e16 run takes about 10 minutes.
   A fine-grain cell takes 36 minutes alone on one card (0.97 s per iteration, the same as
-  the recorded sweep's own logs). Caught when the first status check showed 2.0 s per
+  the recorded sweep's own logs). I noticed when the first status check showed 2.0 s per
   iteration with three jobs on a card. I first read that as a sharing penalty, killed the
   round and relaunched one job per card, then saw the same 0.95 s per iteration alone and
   checked the recorded logs. Sharing a card gives about 1.4 times the throughput of running
   serially, so the remaining jobs were added back alongside. Net cost about 8 minutes of
   restarts, and the 1e16 round took 75 minutes instead of the 20 planned.
-- **Four jobs died with their launcher.** Killing the launcher script to change the queue
-  also killed its four running children. Caught on the next status check (their iteration
+- Four jobs died with their launcher. Killing the launcher script to change the queue
+  also killed its four running children. The next status check showed it (their iteration
   counters had stopped at 110) and relaunched detached. About 5 minutes of four cards lost.
-- **The two-card BlES cell at 1e16 was dropped.** It was meant to check the auxiliary loss
+- The two-card BlES cell at 1e16 was dropped. It was meant to check the auxiliary loss
   on two ranks against the recorded 1e16 BlES number. With runs at 36 minutes it would have
   delayed the 1e18 starts, and the recorded number is on a different split anyway. The
   per-rank log line and the 1e18 loss parity stand in for it.
-- **The recorded 1e16 split cannot be reproduced.** The recorded sweep used 24 tok16k
-  shards and 12 are published. Caught by reading the `data_path` line of the recorded
+- The recorded 1e16 split cannot be reproduced, because the recorded sweep used 24 tok16k
+  shards and 12 are published. I caught this by reading the `data_path` line of the recorded
   logs. The 1e16 table in B4 carries its own references for that reason, and the CoSMoEs
   weight rests on the older table, which was not re-run on tonight's split.
-- **Shard order.** `find` returned the 1e18 shards in a different order and count than the
-  reference logs. Caught the same way, before any run, and fixed with `SHARDS`.
-- **One 1e16 process aborted at exit.** `g3_sticky0.5_1e16` received SIGABRT during
+- `find` returned the 1e18 shards in a different order and count than the reference logs.
+  This was caught the same way, before any run, and fixed with `SHARDS`.
+- One 1e16 process aborted at exit. `g3_sticky0.5_1e16` received SIGABRT during
   teardown, after its test eval and checkpoint save, so the cell script stopped before the
-  probe. Caught by the missing metrics line. The probe was run by hand on the saved
-  checkpoint. The abort did not recur.
-- **TransformerEngine build.** The first build failed in under a minute because cmake
+  probe. The missing metrics line gave it away, and I ran the probe by hand on the saved
+  checkpoint. No other run aborted this way.
+- The first TransformerEngine build failed in under a minute because cmake
   could not find `cudnn.h`. Rebuilt with `CUDNN_PATH` pointing at the pip `nvidia/cudnn`
   directory; 25 minutes.
-- **Pod price.** Four H200s were only available on the secure tier at $21.16 per hour
+- Four H200s were only available on the secure tier at $21.16 per hour
   (community tier, $14.36, had no stock). The pod ran from 05:18 to 11:29 UTC, about $131.
   The pod's SSH daemon was not running at boot and had to be started through the gateway.
 
