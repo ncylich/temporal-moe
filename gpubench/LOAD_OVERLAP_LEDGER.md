@@ -803,3 +803,106 @@ load: streamed minus no bytes. The router matmul is in neither total; it is the 
 - **Flash attention** was asked for as the cheapest lever on the other 70 %. It is not available: this
   model's head size is 16, the CUDA flash-attention kernels have no such head size, and `-fa 1` puts
   attention on the CPU (G1-2, about 20 tok/s in every arm). Not re-run.
+
+# Part 4 -- Final numbers of the night (2026-11-18, pod stopped 12:19 UTC)
+
+## O4-0 -- Summary table
+
+Same binary (engine patch 0014, tree `71b82131`), same switch (`TEMPORAL_FUSED=1`) and same kernels for
+both rules. Gates pass on both models: batch-1 perplexity of the fused path equal in every digit to the
+unfused path, all in VRAM and streamed; routing equal to the Python references (1.26 B).
+
+| | 1.26 B, real weights and real routing | 11 B, random weights, loads imposed |
+|---|---|---|
+| file | trained and plain 1e19 models, Q4_0 | `qwen3moe-rand-fine`, **Q4_0 requantisation** (sha `84cd3c92`) |
+| Skliar's loads per token-layer | 0.997 (its own routing, lambda 0.739453125) | 0.9955 (drawn per token-layer from the 1.26 B histogram) |
+| **End to end, tok/s** | | |
+| all in VRAM, unfused / fused | trained 669.3 / 827.3; ours-plain 691.1 / 829.8; Skliar 676.8 / 809.4 | 235.9 / 267.9 |
+| streamed, switch off | trained 587.5; ours-plain 607.8; Skliar 588.4 | exactly one 187.8; Skliar-shaped 184.3 |
+| streamed, fused | trained **747.8**; ours-plain **750.5**; Skliar **725.2** | exactly one **216.1**; Skliar-shaped **211.9** |
+| ours against Skliar, fused streamed (Y) | **+3.5 %** (passes 3.9, 3.0, 3.6); trained against Skliar +3.1 % | **+2.0 %** (passes 2.5, 1.4, 2.1) |
+| of which load pattern | +0.6 % of the token | +2.0 % (both arms run the same routing kernel) |
+| **MoE layers, ms per token, ours / Skliar** | | |
+| fused op | 0.239 / 0.239 | 1.390 / 1.390 |
+| routing kernel | 0.062 / 0.098 | 0.194 / 0.194 |
+| exposed load | 0.094 / 0.102 | 0.840 / 0.933 |
+| MoE total | 0.395 / 0.439 | 2.424 / 2.517 |
+| Skliar slower at the MoE layers (X) | **+11.1 %**: 9.1 points routing kernel, 2.0 points load pattern | **+3.8 %**, all load pattern |
+| MoE share of our token | 30 % | 52 % |
+| op against its memory-bound floor | 18.4 us per layer against 14.7: 25 % above | 30.9 against 28.2: 10 % above |
+| first load against a later one (pinned) | 0.100 against 0.104 to 0.141 ms: not cheaper | 0.737 against 1.05 to 1.19 ms: 34 % cheaper |
+
+What the table says, plainly:
+- **The fused op is the result of the night**: the trained model streamed with 18 slots goes from 587.5 to
+  747.8 tok/s (+27 %), bit-identical, and is faster than the unfused engine with every expert in VRAM. On
+  the 11 B shapes it gives +15 % streamed and +14 % in VRAM.
+- **The one-load bound is worth 2.0 % (1.26 B) and 3.8 % (11 B) at the MoE layers against Skliar's load
+  pattern, and 0.6 % and 2.0 % of the token.** Both grow from the small model to the large one. Neither
+  is 10 %.
+- At 1.26 B most of what separates the two methods is Skliar's routing step (9.1 of the 11.1 points at the
+  MoE layers), which is the method's own per-token work and not its load pattern.
+- **A load is not hidden.** At 1.26 B the first load costs what a later one costs; at 11 B it is a third
+  cheaper, as it already was with the op off (0.655 against 1.09 to 1.13 ms). Once the layer's own work
+  runs near the memory-bound rate it is no longer than one load (step 0: ratio 22), so there is nothing
+  to hide the load under, and layers with no load save a whole load. Skliar's 21 % of empty layers
+  then pay for most of its multi-load layers.
+
+## O4-1 -- 11 B model: what was run
+
+- **Random weights; loads imposed, not routed; timing only; no quality number.** Protocol of P1-12
+  (`llama-bench -ngl 99 -fa 1 -ub 1 -b 1 -d 1024 -n 128 -r 8`, streamed `-ncmoe 48`), pinned to the GPU's NUMA
+  node, three passes with the order reversed in the middle pass, `gpubench/overlap/big11b.sh` with
+  `CFGS=fused`. Every routed arm has `LLAMA_TEMPORAL_ROUTE=decode`; loads are forced on the routing-op path
+  with `TEMPORAL_SWAP_N` or `TEMPORAL_SWAP_HIST` (histogram `16413,50220,7956,2391,732,186,96,6`).
+- **The file is a Q4_0 requantisation** of the regenerated random model (5,981,886,720 bytes; the Q4_K_M
+  file regenerated next to it has P1-12's sha `af987fed`). The fused op is exact for Q4_0 only; the
+  Q4_K_M file has Q4_K gate and up and Q8_0 down, each of which would need its own row routine in
+  `mul_mat_vec_q`'s order. A load is 663,552 bytes here against about 860 kB in P1-12, so these rows are
+  not comparable with O1-7 or P1-12. Unfused and fused are compared on this same file.
+- The op was generalised for it (1,024 hidden, 384-wide experts, no shared expert, 256-thread blocks in the
+  down launch) and the 1.26 B gate was rerun on that build (trained, streamed: 22.7367).
+- **Gate:** batch-1 perplexity on 2 x 1,024 tokens, `LLAMA_TEMPORAL_ROUTE=decode`: 190,523.7715 +/- 3,826.59732
+  for unfused and fused, in VRAM and streamed. With random weights this checks only that the four paths
+  compute the same thing.
+
+tok/s (ms per token), mean of three passes; sd over passes at most 1.2 tok/s for streamed rows, about 6 for
+the all-in-VRAM rows (their first pass is about 4 % faster than the other two):
+
+| arm | switch off (slots 2) | fused |
+|---|---|---|
+| all in VRAM, stock top-k | 224.3 (4.461) | |
+| all in VRAM, routing op | 235.9 (4.240) | 267.9 (3.735) |
+| streamed, no bytes | 220.1 (4.544) | 264.1 (3.787) |
+| pinned 0 | 215.8 (4.635) | 258.0 (3.877) |
+| pinned 1 | 189.0 (5.290), +0.655 | 216.7 (4.614), +0.737 |
+| pinned 2 | 155.7 (6.423), +1.133 | 176.6 (5.664), +1.049 |
+| pinned 3 | 133.1 (7.515), +1.092 | 145.8 (6.857), +1.193 |
+| exactly one load | 187.8 (5.326) | 216.1 (4.627) |
+| Skliar-shaped, mean 0.9955 | 184.3 (5.426) | 211.9 (4.720) |
+| exactly one against Skliar-shaped | +1.9 % | +2.0 % |
+
+Profile (fused, no bytes, two passes, `prof11.log`): token 3.790 ms; without the gate/up launch 2.933;
+without the down launch 3.328; without both 2.400; routing kernel replaced by an empty launch 3.596. So the
+op is 1.390 ms (30.9 us per layer; it reads 11.94 MB per layer, 28.2 us at 424 GB/s) and the routing kernel
+0.194 ms. One load exposed is 0.840 ms, 18 % of the token and more than half the op.
+
+## O4-2 -- Asked for and not delivered
+
+- **The corrected standalone harness.** The MoE-layer rows above are measured in the engine (op, routing
+  kernel and load each isolated by a switch), not in a harness. The Part 2 harness was not rebuilt and its
+  fused numbers stay superseded. An "all in VRAM / one / Skliar / pinned 0 to 3 in microseconds per layer"
+  table at layer level exists only as engine tokens: divide the ms rows by 13 or 45 layers.
+- **The 11 B model in its P1-12 file format** (Q4_K_M). See O4-1.
+- **A structure in which the first load is about free.** Two were measured in the engine (in-launch read,
+  copy stream); neither has it, and the reason given in O3-9 and O4-0 is physical, not a missing
+  optimisation that I can name.
+- **Flash attention** for the 1.26 B model (no CUDA kernel for head size 16).
+- Round 1's rise in Skliar's exposed load (0.074 to 0.098 ms) is attributed to the two sequential host
+  reads per loading thread and to several loading experts sharing the first scheduling wave; that
+  explanation was not tested by an experiment.
+- Qwen3.5 was not run in any part.
+
+## O4-3 -- Pod and cost
+
+Pod `8xcjjlxgekub1c` ran 10:40 to 12:19 UTC for this part, 1.65 h, about $1.14; about $4.9 for everything in
+this ledger. It is stopped; its disk is wiped at each stop.

@@ -1,0 +1,21 @@
+p1-nb: "avg_ts": 259.838777
+"avg_ts": 264.997418
+p1-skipA: "avg_ts": 336.689043
+"avg_ts": 341.156826
+p1-skipB: "avg_ts": 293.296760
+"avg_ts": 300.073365
+p1-skipAB: "avg_ts": 406.501930
+"avg_ts": 416.467373
+p1-stub: "avg_ts": 272.792076
+"avg_ts": 277.813856
+p2-nb: "avg_ts": 258.594632
+"avg_ts": 262.731779
+p2-skipA: "avg_ts": 336.467127
+"avg_ts": 340.773273
+p2-skipB: "avg_ts": 293.259016
+"avg_ts": 300.894069
+p2-skipAB: "avg_ts": 408.926598
+"avg_ts": 416.712162
+p2-stub: "avg_ts": 273.114740
+"avg_ts": 278.329840
+PROF_DONE

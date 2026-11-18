@@ -1,0 +1,5 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 48541 MiB):
+  Device 0: NVIDIA RTX A6000, compute capability 8.6, VMM: yes, VRAM: 48541 MiB
+[temporal-fused] one fused op per MoE layer on single-token steps: D=1024 F=384 FS=0 K=18 skip=0
+temporal-route-cuda: trained min_logit, layers=45 layer_tokens=299565 cold_fills=135 swaps=179332 swaps_per_layer_token=0.5989
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
