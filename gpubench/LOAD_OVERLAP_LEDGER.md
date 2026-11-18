@@ -1138,3 +1138,88 @@ projection over the vocabulary 0.21 (127 MB read, memory-bound), the rest attent
 about 12 launches per layer. The two models differ in the attention middle (`TEMPORAL_GRAPHDUMP`): the 11 B
 model has q and k norms and flash attention; the 1.26 B model has neither and runs attention as two matmuls,
 a softmax and a copy, because flash attention has no CUDA kernel for head size 16.
+
+## O5-6 -- Kept: RoPE of Q and K, the cache writes and the q/k norms in one launch (`TEMPORAL_ROPE_PAIR`, patch 0017)
+
+Between the projections and attention the engine launched, per layer: RoPE on Q, RoPE on K fused with its
+write into the KV cache, V's write into the cache, and on the 11 B model a norm for Q and a norm for K
+before those. All of it is a few hundred floats.
+
+- `=1`: one launch does both RoPEs and both cache writes. The stock `rope_norm` and `rope_neox` kernels were
+  turned into bodies that the stock kernels and the new one both call, so Q and K get the stock arithmetic.
+  11 B, base, new, new, base, tok/s: ours 243.5 to 248.8 (+2.1 %), Skliar 230.0 to 236.2 (+2.7 %), all
+  resident 298.8 to 308.4 (+3.2 %). It triggers on the 1.26 B graph too.
+- `=2` (11 B graph only; the 1.26 B model has no q/k norms): the model code places both norms before both
+  RoPEs, and the launch first computes each row's norm into the buffer RoPE reads, with the stock norm
+  kernel's reduction. Ours 249.3 to 256.8 (+3.0 %), Skliar 236.0 to 241.1 (+2.2 %), all resident 307.1 to
+  317.1 (+3.2 %). The first build did not trigger because a reshape node sits between the two norms; the
+  log line that names what was fused showed it.
+
+Gates, engine tree `660081f3`, everything on (`TEMPORAL_QKV=2 TEMPORAL_FUSED=3 TEMPORAL_FUSED_ADD=1
+TEMPORAL_ROPE_PAIR=2`): 11 B perplexity 203452.6772 +/- 8384.03596 all in VRAM and streamed; 1.26 B equal in
+every digit all in VRAM and streamed twice (ours-plain 42.6913 +/- 2.98935, Skliar 40.0690 +/- 2.84434,
+trained 22.7367 +/- 1.50944). Routing equality against the Python reference not rerun.
+
+## O5-7 -- Part 5 result: patch 0014 against patches 0015 to 0017, one job per model
+
+Base, new, new, base in one job (`part5/t12.log`). 11 B: 16 repetitions of 128 tokens per arm per pass.
+1.26 B: real text, rows 601 to 603, P1-9 protocol, 3 runs per cell per pass.
+
+| tok/s (ms per token) | patch 0014 | 0015 to 0017, everything on | |
+|---|---|---|---|
+| 11 B, ours, one load, streamed | 219.5 (4.556) | **257.4** (3.886) | +17.2 % |
+| 11 B, Skliar with `k_skliar`, loads imposed, streamed | 208.9 (4.787) | **244.1** (4.097) | +16.8 % |
+| 11 B, all resident | 269.7 (3.708) | **322.6** (3.100) | +19.6 % |
+| 11 B, ours against Skliar | +5.1 % | +5.4 % | |
+| 1.26 B trained model, streamed | 738.0 (1.355) | **845.4** (1.183) | +14.6 % |
+| 1.26 B plain MoE, ours, streamed | 735.9 (1.359) | **845.1** (1.183) | +14.8 % |
+| 1.26 B plain MoE, Skliar, streamed | 712.7 (1.403) | **812.8** (1.230) | +14.0 % |
+| 1.26 B, ours against Skliar, streamed | +3.2 % | +4.0 % | |
+| 1.26 B trained model, all resident | 820.1 (1.219) | 929.2 (1.076) | +13.3 % |
+| 1.26 B plain MoE, ours / Skliar, all resident | 819.7 / 798.2 | 927.0 / 902.8 | +13.1 % / +13.1 % |
+
+For scale: the trained 1.26 B model streamed with 18 slots now decodes at 845 tok/s. The stock engine with
+every expert in VRAM was 647 (O3-6).
+
+11 B split with everything on (ours, ms per token over 45 layers; same switches as O4-4):
+
+| | patch 0014 (O4-4) | now |
+|---|---|---|
+| fused op (no bytes minus op skipped) | 1.364 | 1.389 (30.9 us per layer) |
+| routing kernel beyond an empty launch, ours / Skliar | 0.186 / 0.326 | 0.209 / 0.312 |
+| first load (pinned 1 minus pinned 0) | 0.737 (O4-1) | 0.581 (12.9 us per layer) |
+| second / third load | 1.05 / 1.19 | 1.140 / 1.118 (25 us per layer) |
+| everything outside the MoE op and the routing kernel | about 2.2 | 1.598 (35.5 us per layer) |
+| MoE share of ours' token | 52 % | 57 % |
+
+Skliar is 0.211 ms per token behind ours now: 0.104 routing kernel and 0.107 load pattern, 9.7 % of ours'
+MoE time and 5.4 % of the token. The op and the routing kernels did not change in this part (the two rows
+differ from O4-4 by session drift). What changed is the first load and everything outside the op.
+
+**Launches per layer, 11 B: 23 before, 11 now** (norm + quantise; Q/K/V; norms + RoPE + cache writes; flash
+attention; quantise; output projection with its residual add; MoE-input norm; router matmul; routing kernel;
+fused op, two). 1.26 B: 14 now, because it has no flash attention kernel.
+
+## O5-8 -- What is left, with the arithmetic
+
+Per layer of the 11 B model, ours, one load: 86 us.
+- **Fused op, 30.9 us.** It reads 11.94 MB per layer; at 424 GB/s that is 28.2 us. 9 % above the
+  memory-bound floor. Not touched in this part.
+- **First load, 12.9 us exposed.** The link delivers 24 GB/s in any launch shape (O5-2), so one expert is
+  27.6 us of link time, the same length as the whole resident op (27.4 us). The first launch cannot end
+  before gate and up have arrived and the loaded expert's rows are computed: 18.5 + about 5 us against 17.9
+  of resident work. The down bytes need 9 us more and now run mostly under that. Floor in this structure 9 to
+  11 us; 2 to 4 us are left. A second or third load in a layer costs 25 us, the link time, and nothing in
+  the kernel can change that. A faster link is the only thing that moves these numbers by much.
+- **Routing kernel, 4.6 us** (ours; 6.9 us for `k_skliar`), plus the router matmul and the MoE-input norm in
+  front of it, three launches in a row on 192 logits. One launch could do the three. It needs the stock
+  matmul's summation order reproduced; about 3 us per layer, 3.5 % of the token. This is the next thing I
+  would do.
+- **Attention, about 25 us in six launches.** Flash attention reads 2 MB of cache per layer. The input
+  quantisation for the output projection is the one cheap launch left (about 1.5 us).
+- **Output projection over the vocabulary, 0.21 ms per token.** 127 MB read, memory-bound.
+
+At 1.26 B the same list holds with one addition: attention there is four launches (two matmuls, a softmax
+and a copy) because flash attention has no CUDA kernel for head size 16. A single-token attention kernel
+would remove three launches from 14, but the K.Q matmul goes through a path whose summation order I have
+not checked I can reproduce, so I have not started it.

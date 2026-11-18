@@ -1,0 +1,35 @@
+BUILT in 47s tree-dirty=11
+ppl vram base Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-rope-pair: RoPE of Q and K and the cache write of V in one launch
+ppl vram   Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-rope-pair: norms and RoPE of Q and K and the cache write of V in one launch
+ppl stream Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-rope-pair: norms and RoPE of Q and K and the cache write of V in one launch
+decode vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projections of
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 rep 1:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projec
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 rep 2:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projec
+skliar vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projections of
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 rep 1:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projec
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 rep 2:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projec
+trained vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 projections o
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 rep 1:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 proje
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2 rep 2:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 proje
+GATES_DONE
+T11G_DONE
+base one    250.72 tok/s  3.9886 ms  (median 251.00, sd 1.23) loads 1.0000  wall 22s
+base sk     237.02 tok/s  4.2190 ms  (median 237.21, sd 1.12) loads 0.9938  wall 23s
+base vram   309.06 tok/s  3.2357 ms  (median 308.98, sd 1.11)  wall 13s
+base total wall 57s fill=1024 reps=16
+rp one    257.87 tok/s  3.8779 ms  (median 257.88, sd 0.75) loads 1.0000  wall 21s
+rp sk     242.20 tok/s  4.1288 ms  (median 241.83, sd 1.49) loads 0.9938  wall 22s
+rp vram   317.15 tok/s  3.1530 ms  (median 316.85, sd 1.23)  wall 13s
+rp total wall 55s fill=1024 reps=16
+rp-rev vram   316.98 tok/s  3.1547 ms  (median 317.19, sd 0.96)  wall 13s
+rp-rev sk     240.07 tok/s  4.1654 ms  (median 240.26, sd 1.36) loads 0.9938  wall 22s
+rp-rev one    255.69 tok/s  3.9110 ms  (median 256.03, sd 0.81) loads 1.0000  wall 22s
+rp-rev total wall 57s fill=1024 reps=16
+base-rev vram   305.26 tok/s  3.2759 ms  (median 305.56, sd 0.85)  wall 13s
+base-rev sk     235.00 tok/s  4.2554 ms  (median 235.13, sd 0.66) loads 0.9938  wall 22s
+base-rev one    247.88 tok/s  4.0342 ms  (median 248.28, sd 1.15) loads 1.0000  wall 22s
+base-rev total wall 56s fill=1024 reps=16
+T11_DONE

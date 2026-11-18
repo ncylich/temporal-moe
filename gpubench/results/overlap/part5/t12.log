@@ -1,0 +1,35 @@
+p14 one    223.05 tok/s  4.4832 ms  (median 223.21, sd 1.32) loads 1.0000  wall 22s
+p14 sk     211.75 tok/s  4.7225 ms  (median 212.04, sd 1.11) loads 0.9938  wall 23s
+p14 vram   273.55 tok/s  3.6557 ms  (median 273.93, sd 1.43)  wall 14s
+p14 total wall 59s fill=1024 reps=16
+all one    258.69 tok/s  3.8656 ms  (median 258.58, sd 1.17) loads 1.0000  wall 22s
+all sk     245.29 tok/s  4.0768 ms  (median 245.50, sd 1.44) loads 0.9938  wall 22s
+all vram   323.29 tok/s  3.0932 ms  (median 323.54, sd 1.45)  wall 12s
+all total wall 56s fill=1024 reps=16
+all-rev vram   321.86 tok/s  3.1070 ms  (median 322.31, sd 1.03)  wall 12s
+all-rev sk     242.94 tok/s  4.1162 ms  (median 242.99, sd 1.11) loads 0.9938  wall 21s
+all-rev one    256.04 tok/s  3.9056 ms  (median 256.25, sd 1.48) loads 1.0000  wall 22s
+all-rev total wall 55s fill=1024 reps=16
+p14-rev vram   266.01 tok/s  3.7593 ms  (median 265.70, sd 0.98)  wall 14s
+p14-rev sk     206.16 tok/s  4.8506 ms  (median 206.11, sd 0.99) loads 0.9938  wall 23s
+p14-rev one    216.05 tok/s  4.6286 ms  (median 215.82, sd 1.17) loads 1.0000  wall 23s
+p14-rev total wall 60s fill=1024 reps=16
+T12A_DONE
+f-base-a ours 728.8 tok/s (1.3721 ms, n=3) | skliar 710.0 tok/s (1.4084 ms, n=3) | trained 738.0 tok/s (1.3551 ms, n=3)
+f-new-a ours 837.2 tok/s (1.1944 ms, n=3) | skliar 813.2 tok/s (1.2296 ms, n=3) | trained 840.9 tok/s (1.1892 ms, n=3)
+f-new-b ours 853.0 tok/s (1.1723 ms, n=3) | skliar 812.4 tok/s (1.2309 ms, n=3) | trained 849.9 tok/s (1.1766 ms, n=3)
+f-base-b ours 743.0 tok/s (1.3458 ms, n=3) | skliar 715.5 tok/s (1.3977 ms, n=3) | trained 738.0 tok/s (1.3551 ms, n=3)
+fv-base-a ours 820.0 tok/s (1.2195 ms, n=3) | skliar 798.5 tok/s (1.2523 ms, n=3) | trained 821.7 tok/s (1.2171 ms, n=3)
+fv-new-a ours 931.1 tok/s (1.0740 ms, n=3) | skliar 901.9 tok/s (1.1088 ms, n=3) | trained 929.9 tok/s (1.0754 ms, n=3)
+fv-new-b ours 922.9 tok/s (1.0835 ms, n=3) | skliar 903.6 tok/s (1.1066 ms, n=3) | trained 928.4 tok/s (1.0771 ms, n=3)
+fv-base-b ours 819.4 tok/s (1.2203 ms, n=3) | skliar 797.8 tok/s (1.2535 ms, n=3) | trained 818.6 tok/s (1.2217 ms, n=3)
+T12_DONE
+all-pin0 one    308.61 tok/s  3.2404 ms  (median 308.88, sd 2.44)  wall 14s
+all-pin1 one    261.71 tok/s  3.8210 ms  (median 262.69, sd 1.83)  wall 15s
+all-pin2 one    201.57 tok/s  4.9611 ms  (median 201.90, sd 1.02)  wall 16s
+all-pin3 one    164.51 tok/s  6.0786 ms  (median 164.74, sd 0.55)  wall 17s
+all-nb one    312.95 tok/s  3.1954 ms  (median 313.42, sd 2.75)  wall 14s
+all-skipAB one    553.42 tok/s  1.8069 ms  (median 552.13, sd 5.86)  wall 13s
+all-stub one    334.80 tok/s  2.9869 ms  (median 334.70, sd 2.42)  wall 14s
+all-nb sk     303.12 tok/s  3.2990 ms  (median 303.45, sd 2.01)  wall 14s
+T12C_DONE

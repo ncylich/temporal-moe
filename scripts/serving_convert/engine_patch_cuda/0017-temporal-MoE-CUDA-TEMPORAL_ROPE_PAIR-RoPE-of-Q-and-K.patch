@@ -1,0 +1,381 @@
+From 77a2d48ed06754e778bde6d168a7c6f6a5a5957c Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Wed, 18 Nov 2026 12:31:56 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_ROPE_PAIR, RoPE of Q and K, the
+ cache writes and (=2) the q/k norms in one launch
+
+TEMPORAL_ROPE_PAIR=1: ROPE (Q), ROPE + VIEW + SET_ROWS (K into the KV cache) and SET_ROWS (V into the
+cache) run as one launch. The stock rope_norm / rope_neox kernels become bodies shared with the new
+kernel, so Q and K get the stock arithmetic; V is k_set_rows' cast.
+
+TEMPORAL_ROPE_PAIR=2: qwen3moe places the q and k norms before both RoPEs in the graph, and the launch
+first computes each row's RMS norm * weight (rms_norm_f32<256, true>'s arithmetic and reduction) into
+the buffer RoPE then reads.
+
+Off by default.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu |  45 ++++++++
+ ggml/src/ggml-cuda/rope.cu      | 196 ++++++++++++++++++++++++++++++--
+ ggml/src/ggml-cuda/rope.cuh     |   5 +
+ src/models/qwen3moe.cpp         |  14 ++-
+ 4 files changed, 248 insertions(+), 12 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index a98b8b4a..59439595 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -3343,6 +3343,51 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph
+ 
+     ggml_tensor * node = cgraph->nodes[i];
+ 
++    // temporal, TEMPORAL_ROPE_PAIR=1: ROPE (Q), then after nodes that compute nothing ROPE + VIEW + SET_ROWS (K into the
++    // cache), then after more such nodes optionally SET_ROWS (V into the cache): one launch for all of it.
++    static const int tm_rpair = [](){const char*e=getenv("TEMPORAL_ROPE_PAIR");return e?atoi(e):0;}();
++    if (tm_rpair && (node->op == GGML_OP_ROPE || node->op == GGML_OP_RMS_NORM)) {
++        const auto skip_noop = [&](int k) { while (k < cgraph->n_nodes && (ggml_cuda_is_view_or_noop(cgraph->nodes[k]) ||
++                                                   !(cgraph->nodes[k]->flags & GGML_TENSOR_FLAG_COMPUTE))) k++; return k; };
++        // iq: the node of Q's ROPE. Returns the index of the last node done, or -1.
++        const auto try_pair = [&](int iq, const ggml_tensor * norm_q, const ggml_tensor * norm_k) {
++            if (iq >= cgraph->n_nodes || cgraph->nodes[iq]->op != GGML_OP_ROPE) return -1;
++            const int j = skip_noop(iq + 1);
++            if (j + 2 >= cgraph->n_nodes || cgraph->nodes[j]->op != GGML_OP_ROPE ||
++                !ggml_cuda_can_fuse(cgraph, j, { GGML_OP_ROPE, GGML_OP_VIEW, GGML_OP_SET_ROWS }, {})) return -1;
++            const int k = skip_noop(j + 3); ggml_tensor * set_v = nullptr;
++            if (k < cgraph->n_nodes && cgraph->nodes[k]->op == GGML_OP_SET_ROWS) set_v = cgraph->nodes[k];
++            for (int pass = 0; pass < 2; ++pass) {                    // with V's cache write, else without it
++                if (ggml_cuda_op_rope_pair(*cuda_ctx, cgraph->nodes[iq], cgraph->nodes[j], cgraph->nodes[j + 2], set_v, norm_q, norm_k)) {
++                    static bool said = false; if (!said) { said = true; fprintf(stderr, "temporal-rope-pair: %sRoPE of Q and K%s in one launch\n",
++                                                                                norm_q ? "norms and " : "", set_v ? " and the cache write of V" : ""); }
++                    return set_v ? k : j + 2;
++                }
++                if (!set_v) break;
++                set_v = nullptr;
++            }
++            return -1;
++        };
++        if (node->op == GGML_OP_ROPE) {
++            const int last = try_pair(i, nullptr, nullptr);
++            if (last >= 0) return last - i;
++        } else if (tm_rpair >= 2 && i + 4 < cgraph->n_nodes && ggml_cuda_can_fuse(cgraph, i, { GGML_OP_RMS_NORM, GGML_OP_MUL }, {})) {
++            // =2: [RMS_NORM, MUL] of Q, [RMS_NORM, MUL] of K, then the two ROPEs that read them (nodes that compute
++            // nothing may sit between)
++            const int i2 = skip_noop(i + 2);
++            if (i2 + 1 < cgraph->n_nodes && cgraph->nodes[i2]->op == GGML_OP_RMS_NORM && ggml_cuda_can_fuse(cgraph, i2, { GGML_OP_RMS_NORM, GGML_OP_MUL }, {})) {
++                const int iq = skip_noop(i2 + 2);
++                if (iq < cgraph->n_nodes && cgraph->nodes[iq]->op == GGML_OP_ROPE && cgraph->nodes[iq]->src[0] == cgraph->nodes[i + 1]) {
++                    const int jk = skip_noop(iq + 1);
++                    if (jk < cgraph->n_nodes && cgraph->nodes[jk]->src[0] == cgraph->nodes[i2 + 1]) {
++                        const int last = try_pair(iq, node, cgraph->nodes[i2]);
++                        if (last >= 0) return last - i;
++                    }
++                }
++            }
++        }
++    }
++
+     // temporal, TEMPORAL_FUSED_ADD=1: the residual ADD that follows the fused MoE op is done by the op's down launch
+     // (one float add per element, same operands). Only when the ADD is the next node and the op's only consumer.
+     static const int tm_fadd = [](){const char*e=getenv("TEMPORAL_FUSED_ADD");return e?atoi(e):0;}();
+diff --git a/ggml/src/ggml-cuda/rope.cu b/ggml/src/ggml-cuda/rope.cu
+index e20a5cb6..62c6f93c 100644
+--- a/ggml/src/ggml-cuda/rope.cu
++++ b/ggml/src/ggml-cuda/rope.cu
+@@ -41,7 +41,7 @@ static __device__ void rope_yarn(
+ }
+ 
+ template <bool forward, bool has_ff, typename T, typename D>
+-static __global__ void rope_norm(const T *            x,
++static __device__ __forceinline__ void rope_norm_body(const T *            x,
+                                  D *                  dst,
+                                  const int            ne00,
+                                  const int            ne01,
+@@ -61,14 +61,14 @@ static __global__ void rope_norm(const T *            x,
+                                  const float          theta_scale,
+                                  const float *        freq_factors,
+                                  const int64_t *      row_indices,
+-                                 const int            set_rows_stride) {
+-    const int i0 = 2*(blockDim.y*blockIdx.y + threadIdx.y);
++                                 const int            set_rows_stride,
++                                 const int            row_dst,
++                                 const int            i0) {
+ 
+     if (i0 >= ne00) {
+         return;
+     }
+ 
+-    const int row_dst = blockDim.x*blockIdx.x + threadIdx.x;
+ 
+     const uint32_t i3 = row_dst / (ne01 * ne02);
+     const uint32_t i2 = (row_dst - i3 * ne01 * ne02) / ne01;
+@@ -113,7 +113,7 @@ static __global__ void rope_norm(const T *            x,
+ }
+ 
+ template <bool forward, bool has_ff, typename T, typename D>
+-static __global__ void rope_neox(const T *            x,
++static __global__ void rope_norm(const T *            x,
+                                  D *                  dst,
+                                  const int            ne00,
+                                  const int            ne01,
+@@ -134,14 +134,40 @@ static __global__ void rope_neox(const T *            x,
+                                  const float *        freq_factors,
+                                  const int64_t *      row_indices,
+                                  const int            set_rows_stride) {
+-    ggml_cuda_pdl_lc();
+-    const int i0 = 2*(blockDim.y*blockIdx.y + threadIdx.y);
++    rope_norm_body<forward, has_ff, T, D>(x, dst, ne00, ne01, ne02, s01, s02, s03, s1, s2, s3, n_dims, pos, freq_scale, ext_factor,
++        attn_factor, corr_dims, theta_scale, freq_factors, row_indices, set_rows_stride,
++        blockDim.x*blockIdx.x + threadIdx.x, 2*(blockDim.y*blockIdx.y + threadIdx.y));
++}
++
++template <bool forward, bool has_ff, typename T, typename D>
++static __device__ __forceinline__ void rope_neox_body(const T *            x,
++                                 D *                  dst,
++                                 const int            ne00,
++                                 const int            ne01,
++                                 const int            ne02,
++                                 const int            s01,
++                                 const int            s02,
++                                 const int            s03,
++                                 const int            s1,
++                                 const int            s2,
++                                 const int            s3,
++                                 const int            n_dims,
++                                 const int32_t *      pos,
++                                 const float          freq_scale,
++                                 const float          ext_factor,
++                                 const float          attn_factor,
++                                 const rope_corr_dims corr_dims,
++                                 const float          theta_scale,
++                                 const float *        freq_factors,
++                                 const int64_t *      row_indices,
++                                 const int            set_rows_stride,
++                                 const int            row_dst,
++                                 const int            i0) {
+ 
+     if (i0 >= ne00) {
+         return;
+     }
+ 
+-    const int row_dst = blockDim.x*blockIdx.x + threadIdx.x;
+ 
+     const uint32_t i3 = row_dst / (ne01 * ne02);
+     const uint32_t i2 = (row_dst - i3 * ne01 * ne02) / ne01;
+@@ -149,7 +175,6 @@ static __global__ void rope_neox(const T *            x,
+ 
+     int       idst = i0 / 2 + i1 * s1  + i2 * s2  + i3 * s3;
+     const int ix   = i0 / 2 + i1 * s01 + i2 * s02 + i3 * s03;
+-    ggml_cuda_pdl_sync();
+ 
+     // Fusion optimization: ROPE + VIEW + SET_ROWS.
+     // The rope output is viewed as a 1D tensor and offset based on a row index in row_indices.
+@@ -181,6 +206,93 @@ static __global__ void rope_neox(const T *            x,
+     dst[idst + n_dims / 2] = ggml_cuda_cast<D>(x0 * sin_theta + x1 * cos_theta);
+ }
+ 
++template <bool forward, bool has_ff, typename T, typename D>
++static __global__ void rope_neox(const T *            x,
++                                 D *                  dst,
++                                 const int            ne00,
++                                 const int            ne01,
++                                 const int            ne02,
++                                 const int            s01,
++                                 const int            s02,
++                                 const int            s03,
++                                 const int            s1,
++                                 const int            s2,
++                                 const int            s3,
++                                 const int            n_dims,
++                                 const int32_t *      pos,
++                                 const float          freq_scale,
++                                 const float          ext_factor,
++                                 const float          attn_factor,
++                                 const rope_corr_dims corr_dims,
++                                 const float          theta_scale,
++                                 const float *        freq_factors,
++                                 const int64_t *      row_indices,
++                                 const int            set_rows_stride) {
++    ggml_cuda_pdl_lc();
++    ggml_cuda_pdl_sync();
++    rope_neox_body<forward, has_ff, T, D>(x, dst, ne00, ne01, ne02, s01, s02, s03, s1, s2, s3, n_dims, pos, freq_scale, ext_factor,
++        attn_factor, corr_dims, theta_scale, freq_factors, row_indices, set_rows_stride,
++        blockDim.x*blockIdx.x + threadIdx.x, 2*(blockDim.y*blockIdx.y + threadIdx.y));
++}
++
++// temporal, TEMPORAL_ROPE_PAIR=1: RoPE of Q (to its float output), RoPE of K written into the KV cache (the stock
++// ROPE + VIEW + SET_ROWS fusion) and V's SET_ROWS into the cache, as one launch. Blocks [0, nrq) are Q's rows,
++// [nrq, nrq + nrk) K's rows, the rest copy V. Q and K run the stock kernel bodies; V is k_set_rows' cast.
++// With nxq / nxk set, the row's RMS norm * weight (rms_norm_f32<256, true>'s arithmetic and reduction) is computed
++// first and written to the buffer RoPE then reads, as the separate norm launch would have left it.
++// Blocks are (256, 1, 1): thread t is column t of the norm and pair t of RoPE.
++template <bool is_neox, bool has_ff>
++static __global__ void rope_pair(const float * xq, float * dq, const int ne01q, const int ne02q, const int s01q, const int s02q, const int s03q,
++                                 const int s1q, const int s2q, const int s3q, const int nrq,
++                                 const float * xk, half * dk, const int ne01k, const int ne02k, const int s01k, const int s02k, const int s03k,
++                                 const int s1k, const int s2k, const int s3k, const int nrk, const int64_t * rowk, const int strk,
++                                 const float * xv, half * dv, const int64_t * rowv, const int ne00v, const int nv, const int s01v, const int s1v,
++                                 const int ne00, const int n_dims, const int32_t * pos, const float freq_scale, const float ext_factor,
++                                 const float attn_factor, const rope_corr_dims corr_dims, const float theta_scale, const float * freq_factors,
++                                 const float * nxq, const float * nwq, const float epsq, const int nsq,
++                                 const float * nxk, const float * nwk, const float epsk, const int nsk) {
++    ggml_cuda_pdl_lc();
++    ggml_cuda_pdl_sync();
++    const int bx = blockIdx.x, i0 = 2*(int) threadIdx.x;
++    if (bx < nrq + nrk && (bx < nrq ? nxq : nxk) != nullptr) {
++        const bool q = bx < nrq; const int row = q ? bx : bx - nrq, tid = threadIdx.x;
++        const float * x = (q ? nxq : nxk) + (int64_t) row * (q ? nsq : nsk);
++        const float * mul = q ? nwq : nwk;
++        float * dst = const_cast<float *>(q ? xq : xk) + (int64_t) row * ne00;
++        float tmp = 0.0f; // partial sum for thread in warp
++        for (int col = tid; col < ne00; col += 256) {
++            const float xi = x[col];
++            tmp += xi * xi;
++        }
++        extern __shared__ float s_sum[];
++        tmp = block_reduce<block_reduce_method::SUM, 256>(tmp, s_sum);
++        const float mean = tmp / ne00;
++        const float scale = rsqrtf(mean + (q ? epsq : epsk));
++        for (int col = tid; col < ne00; col += 256) {
++            dst[col] = scale * x[col] * mul[col];
++        }
++        __syncthreads();
++    }
++    if (bx < nrq) {
++        if constexpr (is_neox) rope_neox_body<true, has_ff, float, float>(xq, dq, ne00, ne01q, ne02q, s01q, s02q, s03q, s1q, s2q, s3q, n_dims, pos,
++                freq_scale, ext_factor, attn_factor, corr_dims, theta_scale, freq_factors, nullptr, 0, bx, i0);
++        else                   rope_norm_body<true, has_ff, float, float>(xq, dq, ne00, ne01q, ne02q, s01q, s02q, s03q, s1q, s2q, s3q, n_dims, pos,
++                freq_scale, ext_factor, attn_factor, corr_dims, theta_scale, freq_factors, nullptr, 0, bx, i0);
++    } else if (bx < nrq + nrk) {
++        if constexpr (is_neox) rope_neox_body<true, has_ff, float, half>(xk, dk, ne00, ne01k, ne02k, s01k, s02k, s03k, s1k, s2k, s3k, n_dims, pos,
++                freq_scale, ext_factor, attn_factor, corr_dims, theta_scale, freq_factors, rowk, strk, bx - nrq, i0);
++        else                   rope_norm_body<true, has_ff, float, half>(xk, dk, ne00, ne01k, ne02k, s01k, s02k, s03k, s1k, s2k, s3k, n_dims, pos,
++                freq_scale, ext_factor, attn_factor, corr_dims, theta_scale, freq_factors, rowk, strk, bx - nrq, i0);
++    } else {
++        const int e = (bx - nrq - nrk) * (int) blockDim.x + (int) threadIdx.x;
++        if (e >= nv) {
++            return;
++        }
++        const int i00 = e % ne00v, i01 = e / ne00v;
++        dv[rowv[i01] * (int64_t) s1v + i00] = ggml_cuda_cast<half>(xv[(int64_t) i01 * s01v + i00]);
++    }
++}
++
+ template <bool forward, bool has_ff, typename T>
+ static __global__ void rope_multi(const T *            x,
+                                   T *                  dst,
+@@ -670,3 +782,69 @@ void ggml_cuda_op_rope_back(ggml_backend_cuda_context & ctx, ggml_tensor * dst)
+ void ggml_cuda_op_rope_fused(ggml_backend_cuda_context & ctx, ggml_tensor * rope, ggml_tensor * set_rows) {
+     ggml_cuda_op_rope_impl<true>(ctx, rope, set_rows);
+ }
++
++// temporal, TEMPORAL_ROPE_PAIR=1. set_v may be null. Returns false (nothing launched) if the nodes are not ones it handles.
++bool ggml_cuda_op_rope_pair(ggml_backend_cuda_context & ctx, ggml_tensor * rq, ggml_tensor * rk, ggml_tensor * set_k, ggml_tensor * set_v,
++                            const ggml_tensor * norm_q, const ggml_tensor * norm_k) {
++    const ggml_tensor * xq = rq->src[0], * xk = rk->src[0];
++    if (xq->ne[0] > 2 * CUDA_ROPE_BLOCK_SIZE || CUDA_ROPE_BLOCK_SIZE != 256) return false;
++    // norm_q / norm_k: the RMS_NORM nodes whose products with a weight are xq / xk and have not been computed yet
++    const float * nx[2] = { nullptr, nullptr }, * nw[2] = { nullptr, nullptr }; float neps[2] = { 0.0f, 0.0f }; int ns[2] = { 0, 0 };
++    if ((norm_q == nullptr) != (norm_k == nullptr)) return false;
++    for (int t = 0; t < 2 && norm_q; ++t) {
++        const ggml_tensor * nn = t ? norm_k : norm_q, * prod = t ? xk : xq, * src = nn->src[0];
++        const ggml_tensor * w = prod->src[0] == nn ? prod->src[1] : prod->src[0];
++        if (prod->op != GGML_OP_MUL || (prod->src[0] != nn && prod->src[1] != nn) || src->type != GGML_TYPE_F32 || w->type != GGML_TYPE_F32 ||
++            !ggml_are_same_shape(src, prod) || !ggml_is_contiguous(prod) || ggml_nelements(w) != prod->ne[0] || !ggml_is_contiguous(w) ||
++            src->nb[0] != sizeof(float) || src->ne[2] != 1 || src->ne[3] != 1) return false;
++        nx[t] = (const float *) src->data; nw[t] = (const float *) w->data; ns[t] = (int) (src->nb[1] / sizeof(float));
++        memcpy(&neps[t], nn->op_params, sizeof(float));
++    }
++    const int mode = ((const int32_t *) rq->op_params)[2];
++    if (memcmp((const int32_t *) rq->op_params + 1, (const int32_t *) rk->op_params + 1, 14 * sizeof(int32_t)) != 0) return false;
++    if (mode != GGML_ROPE_TYPE_NORMAL && mode != GGML_ROPE_TYPE_NEOX) return false;
++    if (rq->src[1] != rk->src[1] || rq->src[2] != rk->src[2]) return false;
++    if (xq->type != GGML_TYPE_F32 || xk->type != GGML_TYPE_F32 || rq->type != GGML_TYPE_F32 || rk->type != GGML_TYPE_F32) return false;
++    if (set_k->type != GGML_TYPE_F16 || set_k->src[1]->type != GGML_TYPE_I64) return false;
++    if (xq->ne[0] != xk->ne[0] || xq->ne[0] % 2 != 0 || xq->ne[2] != 1 || xk->ne[2] != 1 || xq->ne[3] != 1 || xk->ne[3] != 1) return false;
++    const float * xv = nullptr; half * dv = nullptr; const int64_t * rowv = nullptr; int ne00v = 1, nv = 0, s01v = 0, s1v = 0;
++    if (set_v) {
++        const ggml_tensor * v = set_v->src[0], * iv = set_v->src[1];
++        if (set_v->type != GGML_TYPE_F16 || v->type != GGML_TYPE_F32 || iv->type != GGML_TYPE_I64 || v->ne[2] != 1 || v->ne[3] != 1 ||
++            ggml_nelements(iv) != v->ne[1] || !ggml_is_contiguous(iv) || v->nb[0] != sizeof(float) || set_v->nb[0] != sizeof(half)) return false;
++        xv = (const float *) v->data; dv = (half *) set_v->data; rowv = (const int64_t *) iv->data;
++        ne00v = (int) v->ne[0]; nv = (int) (v->ne[0] * v->ne[1]); s01v = (int) (v->nb[1] / sizeof(float)); s1v = (int) (set_v->nb[1] / sizeof(half));
++    }
++    const int ne00 = (int) xq->ne[0], n_dims = ((const int32_t *) rq->op_params)[1], n_ctx_orig = ((const int32_t *) rq->op_params)[4];
++    float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
++    memcpy(&freq_base,   (int32_t *) rq->op_params +  5, sizeof(float));
++    memcpy(&freq_scale,  (int32_t *) rq->op_params +  6, sizeof(float));
++    memcpy(&ext_factor,  (int32_t *) rq->op_params +  7, sizeof(float));
++    memcpy(&attn_factor, (int32_t *) rq->op_params +  8, sizeof(float));
++    memcpy(&beta_fast,   (int32_t *) rq->op_params +  9, sizeof(float));
++    memcpy(&beta_slow,   (int32_t *) rq->op_params + 10, sizeof(float));
++    rope_corr_dims corr_dims;
++    ggml_rope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims.v);
++    const float theta_scale = powf(freq_base, -2.0f / n_dims);                 // as rope_norm_cuda / rope_neox_cuda
++    const float * freq_factors = rq->src[2] ? (const float *) rq->src[2]->data : nullptr;
++    const int nrq = (int) ggml_nrows(xq), nrk = (int) ggml_nrows(xk);
++    const auto st = [](const ggml_tensor * t, int d) { return (int) (t->nb[d] / ggml_type_size(t->type)); };
++    const dim3 block_dims(CUDA_ROPE_BLOCK_SIZE, 1, 1);
++    const dim3 block_nums(nrq + nrk + (nv + CUDA_ROPE_BLOCK_SIZE - 1) / CUDA_ROPE_BLOCK_SIZE, 1, 1);
++    const ggml_cuda_kernel_launch_params launch_params = {block_nums, block_dims, 32 * sizeof(float), ctx.stream()};
++#define TM_ROPE_PAIR_ARGS \
++        (const float *) xq->data, (float *) rq->data, (int) xq->ne[1], (int) xq->ne[2], st(xq, 1), st(xq, 2), st(xq, 3), st(rq, 1), st(rq, 2), st(rq, 3), nrq, \
++        (const float *) xk->data, (half *) set_k->data, (int) xk->ne[1], (int) xk->ne[2], st(xk, 1), st(xk, 2), st(xk, 3), st(rk, 1), st(rk, 2), st(rk, 3), nrk, \
++        (const int64_t *) set_k->src[1]->data, (int) (set_k->nb[1] / ggml_type_size(set_k->type)), \
++        xv, dv, rowv, ne00v, nv, s01v, s1v, ne00, n_dims, (const int32_t *) rq->src[1]->data, freq_scale, ext_factor, attn_factor, corr_dims, theta_scale, freq_factors, \
++        nx[0], nw[0], neps[0], ns[0], nx[1], nw[1], neps[1], ns[1]
++    if (mode & GGML_ROPE_TYPE_NEOX) {
++        if (freq_factors) ggml_cuda_kernel_launch(rope_pair<true, true>, launch_params, TM_ROPE_PAIR_ARGS);
++        else              ggml_cuda_kernel_launch(rope_pair<true, false>, launch_params, TM_ROPE_PAIR_ARGS);
++    } else {
++        if (freq_factors) ggml_cuda_kernel_launch(rope_pair<false, true>, launch_params, TM_ROPE_PAIR_ARGS);
++        else              ggml_cuda_kernel_launch(rope_pair<false, false>, launch_params, TM_ROPE_PAIR_ARGS);
++    }
++#undef TM_ROPE_PAIR_ARGS
++    return true;
++}
+diff --git a/ggml/src/ggml-cuda/rope.cuh b/ggml/src/ggml-cuda/rope.cuh
+index 72af086c..7fde40d9 100644
+--- a/ggml/src/ggml-cuda/rope.cuh
++++ b/ggml/src/ggml-cuda/rope.cuh
+@@ -7,3 +7,8 @@ void ggml_cuda_op_rope(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
+ void ggml_cuda_op_rope_back(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
+ 
+ void ggml_cuda_op_rope_fused(ggml_backend_cuda_context & ctx, ggml_tensor * dst, ggml_tensor * set_rows);
++
++// temporal, TEMPORAL_ROPE_PAIR=1: RoPE of Q, RoPE of K into the KV cache and V's cache write (set_v may be null) in one launch
++// norm_q / norm_k (both or neither): the RMS_NORM nodes that feed the two RoPEs through a weight, computed by the same launch
++bool ggml_cuda_op_rope_pair(ggml_backend_cuda_context & ctx, ggml_tensor * rq, ggml_tensor * rk, ggml_tensor * set_k, ggml_tensor * set_v,
++                            const ggml_tensor * norm_q = nullptr, const ggml_tensor * norm_k = nullptr);
+diff --git a/src/models/qwen3moe.cpp b/src/models/qwen3moe.cpp
+index aaf658f5..f2a9f68d 100644
+--- a/src/models/qwen3moe.cpp
++++ b/src/models/qwen3moe.cpp
+@@ -116,15 +116,23 @@ llama_model_qwen3moe::graph::graph(const llama_model & model, const llm_graph_pa
+             Qcur = build_norm(Qcur, model.layers[il].attn_q_norm, NULL, LLM_NORM_RMS, il);
+             cb(Qcur, "Qcur_normed", il);
+ 
++            Kcur = build_norm(Kcur, model.layers[il].attn_k_norm, NULL, LLM_NORM_RMS, il);
++            cb(Kcur, "Kcur_normed", il);
++
++            // temporal, TEMPORAL_ROPE_PAIR=1: both norms before both RoPEs in the graph, so that the CUDA backend can run
++            // the two RoPEs and the cache writes as one launch (same values, order only)
++            static const bool tm_rpair = getenv("TEMPORAL_ROPE_PAIR") && atoi(getenv("TEMPORAL_ROPE_PAIR"));
++            if (tm_rpair) {
++                ggml_build_forward_expand(gf, Qcur);
++                ggml_build_forward_expand(gf, Kcur);
++            }
++
+             Qcur = ggml_rope_ext(
+                     ctx0, Qcur, inp_pos, nullptr,
+                     n_rot, rope_type, n_ctx_orig, freq_base, freq_scale,
+                     ext_factor, attn_factor, beta_fast, beta_slow
+                     );
+ 
+-            Kcur = build_norm(Kcur, model.layers[il].attn_k_norm, NULL, LLM_NORM_RMS, il);
+-            cb(Kcur, "Kcur_normed", il);
+-
+             Kcur = ggml_rope_ext(
+                     ctx0, Kcur, inp_pos, nullptr,
+                     n_rot, rope_type, n_ctx_orig, freq_base, freq_scale,
+-- 
+2.50.0
+

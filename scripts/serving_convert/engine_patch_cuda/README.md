@@ -76,6 +76,7 @@ drivers in `gpubench/released/`.
 | `TEMPORAL_FUSED=3` (0015) | as `TEMPORAL_FUSED=1`, with the down tensor of each expert being loaded copied by blocks at the end of the gate/up launch instead of by the down launch. `TEMPORAL_FUSED_TAIL` sets the number of those blocks (default 14; 4 to 56 measure the same). |
 | `TEMPORAL_QKV=2` (0016, engine tree `9238ff10`) | as `TEMPORAL_QKV=1`, and the RMS norm and weight that produce the projections' input are computed by the launch that quantises it. |
 | `TEMPORAL_FUSED_ADD=1` (0016) | with `TEMPORAL_FUSED`: the residual add that follows the fused MoE op is done by the op's down launch. |
+| `TEMPORAL_ROPE_PAIR=1` (0017, engine tree `660081f3`) | single-token steps: RoPE of Q, RoPE of K with its write into the KV cache, and V's write into the cache run as one launch. The stock RoPE kernels became bodies shared with the new kernel. `=2` (qwen3moe graphs): the q and k RMS norms are computed by the same launch first. |
 | `TEMPORAL_OPPROF=1` (0015, profiling) | with `GGML_CUDA_DISABLE_GRAPHS=1`: syncs around every node of single-token graphs and prints time per op kind at exit. A ranking, not a timing. |
 
 Patch 0006 also carries an earlier `TEMPORAL_SHEXP_FIRST` for `qwen35moe` that puts the shared expert before

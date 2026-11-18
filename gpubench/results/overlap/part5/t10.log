@@ -1,0 +1,34 @@
+BUILT in 47s tree-dirty=11
+ppl vram base Final estimate: PPL = 203452.6772 +/- 8384.03596
+ppl vram   Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-rope-pair: RoPE of Q and K and the cache write of V in one launch
+ppl stream Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-rope-pair: RoPE of Q and K and the cache write of V in one launch
+decode vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projections of
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1 rep 1:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projec
+decode stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1 rep 2:  Final estimate: PPL = 42.6913 +/- 2.98935 temporal-qkv: norm, quantisation and 3 projec
+skliar vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projections of
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1 rep 1:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projec
+skliar stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1 rep 2:  Final estimate: PPL = 40.0690 +/- 2.84434 temporal-qkv: norm, quantisation and 3 projec
+trained vram, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 projections o
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1 rep 1:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 proje
+trained stream, FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=1 rep 2:  Final estimate: PPL = 22.7367 +/- 1.50944 temporal-qkv: norm, quantisation and 3 proje
+GATES_DONE
+T10G_DONE
+base one    244.48 tok/s  4.0903 ms  (median 245.02, sd 1.48) loads 1.0000  wall 22s
+base sk     232.31 tok/s  4.3045 ms  (median 232.30, sd 1.04) loads 0.9938  wall 22s
+base vram   299.84 tok/s  3.3351 ms  (median 299.96, sd 1.41)  wall 13s
+base total wall 58s fill=1024 reps=16
+rp one    250.38 tok/s  3.9940 ms  (median 250.37, sd 1.27) loads 1.0000  wall 22s
+rp sk     237.79 tok/s  4.2054 ms  (median 237.87, sd 1.25) loads 0.9938  wall 22s
+rp vram   309.01 tok/s  3.2362 ms  (median 309.09, sd 1.04)  wall 13s
+rp total wall 57s fill=1024 reps=16
+rp-rev vram   307.83 tok/s  3.2485 ms  (median 308.06, sd 0.76)  wall 13s
+rp-rev sk     234.68 tok/s  4.2611 ms  (median 234.73, sd 1.00) loads 0.9938  wall 22s
+rp-rev one    247.15 tok/s  4.0461 ms  (median 247.62, sd 1.88) loads 1.0000  wall 22s
+rp-rev total wall 57s fill=1024 reps=16
+base-rev vram   297.86 tok/s  3.3573 ms  (median 298.11, sd 0.84)  wall 13s
+base-rev sk     227.69 tok/s  4.3920 ms  (median 227.94, sd 0.78) loads 0.9938  wall 22s
+base-rev one    242.59 tok/s  4.1221 ms  (median 243.03, sd 0.95) loads 1.0000  wall 22s
+base-rev total wall 57s fill=1024 reps=16
+T10_DONE
