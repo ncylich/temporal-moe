@@ -1,0 +1,30 @@
+84cd3c92f81138128c5da6282cb1c47cb30f834a3d83bea47356af8dc98491ff  qwen3moe-rand-fine-Q4_0.gguf
+fwd one    226.06 tok/s  4.4235 ms  (median 226.43, sd 1.19) loads 1.0000  wall 22s
+fwd sk     214.83 tok/s  4.6549 ms  (median 215.15, sd 0.92) loads 0.9938  wall 23s
+fwd vram   278.84 tok/s  3.5863 ms  (median 279.34, sd 1.49)  wall 13s
+fwd total wall 58s fill=1024 reps=16
+rev vram   278.48 tok/s  3.5910 ms  (median 279.05, sd 1.68)  wall 14s
+rev sk     212.66 tok/s  4.7023 ms  (median 212.84, sd 0.85) loads 0.9938  wall 23s
+rev one    223.04 tok/s  4.4836 ms  (median 223.62, sd 1.54) loads 1.0000  wall 23s
+rev total wall 60s fill=1024 reps=16
+oldfill-r8 one    218.66 tok/s  4.5733 ms  (median 218.94, sd 0.70) loads 1.0000  wall 39s
+oldfill-r8 total wall 39s fill=1 reps=8
+oldfill-r16 one    215.42 tok/s  4.6420 ms  (median 215.61, sd 0.67) loads 1.0000  wall 63s
+oldfill-r16 total wall 63s fill=1 reps=16
+newfill one    217.13 tok/s  4.6056 ms  (median 217.49, sd 1.04) loads 1.0000  wall 23s
+newfill total wall 23s fill=1024 reps=16
+0
+0
+0
+gdbg one    217.63 tok/s  4.5949 ms  (median 217.90, sd 1.81) loads 1.0000  wall 12s
+gdbg vram   268.92 tok/s  3.7186 ms  (median 269.71, sd 2.10)  wall 5s
+gdbg total wall 18s fill=1024 reps=4
+      1 [graphdbg] REPLAY #64
+      1 [graphdbg] REPLAY #448
+      1 [graphdbg] REPLAY #384
+      1 [graphdbg] REPLAY #320
+      1 [graphdbg] REPLAY #64
+      1 [graphdbg] REPLAY #448
+      1 [graphdbg] REPLAY #384
+      1 [graphdbg] REPLAY #320
+V1_DONE

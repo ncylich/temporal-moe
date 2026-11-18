@@ -1,0 +1,25 @@
+nograph one    182.09 tok/s  5.4917 ms  (median 182.34, sd 0.61) loads 1.0000  wall 13s
+nograph vram   225.76 tok/s  4.4295 ms  (median 226.12, sd 0.66)  wall 6s
+nograph total wall 18s fill=1024 reps=4
+prof one     72.95 tok/s  13.7076 ms  (median 73.43, sd 1.36) loads 1.0000  wall 17s
+prof total wall 17s fill=1024 reps=4
+opprof: 513 single-token graphs, 11734.1 us per token summed over ops
+opprof:    2563.4 us/token   45.0 launches/token  CUSTOM ffn_moe_out- [f32]
+opprof:    2008.3 us/token  180.0 launches/token  FUSED+RMS_NORM norm- [f32]
+opprof:     995.3 us/token   45.0 launches/token  FLASH_ATTN_EXT node_ [f32]
+opprof:     793.5 us/token   45.0 launches/token  CUSTOM ffn_moe_route- [f32]
+opprof:     667.5 us/token   45.0 launches/token  MUL_MAT Qcur- [q4_0]
+opprof:     658.7 us/token   44.0 launches/token  FUSED+MUL_MAT node_ [q4_0]
+opprof:     624.7 us/token   45.0 launches/token  MUL_MAT Kcur- [q4_0]
+opprof:     611.8 us/token   45.0 launches/token  MUL_MAT Vcur- [q4_0]
+opprof:     579.2 us/token   45.0 launches/token  MUL_MAT ffn_moe_logits- [f32]
+opprof:     508.2 us/token   45.0 launches/token  ADD l_out- [f32]
+opprof:     488.5 us/token   45.0 launches/token  SET_ROWS cache_v_l (view) [f32]
+opprof:     482.3 us/token   45.0 launches/token  FUSED+ROPE Kcur- [f32]
+opprof:     480.7 us/token   45.0 launches/token  ROPE Qcur- [f32]
+opprof:     214.0 us/token    1.0 launches/token  MUL_MAT result_output [q6_K]
+opprof:      21.3 us/token    2.0 launches/token  GET_ROWS node_ [f32]
+opprof:      14.4 us/token    1.0 launches/token  MUL_MAT node_ [q4_0]
+opprof:      11.4 us/token    1.0 launches/token  FUSED+RMS_NORM norm [f32]
+opprof:      10.8 us/token    1.0 launches/token  ADD ffn_inp- [f32]
+V2_DONE

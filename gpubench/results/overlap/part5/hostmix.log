@@ -1,0 +1,16 @@
+copy 442368 B in 12 blocks, read 8 MB in 204 blocks:  copy alone  20.72  read alone  14.78 (  656 GB/s)  one launch, copy first  21.04  copy last  31.99  two streams  39.61 us
+copy 442368 B in 12 blocks, read 8 MB in  84 blocks:  copy alone  20.52  read alone  14.74 (  659 GB/s)  one launch, copy first  21.06  copy last  33.54  two streams  39.84 us
+copy 442368 B in 27 blocks, read 8 MB in 204 blocks:  copy alone  20.51  read alone  14.56 (  668 GB/s)  one launch, copy first  20.82  copy last  31.66  two streams  39.52 us
+copy 442368 B in 27 blocks, read 8 MB in  84 blocks:  copy alone  20.50  read alone  14.74 (  658 GB/s)  one launch, copy first  20.82  copy last  33.49  two streams  39.84 us
+copy 442368 B in 12 blocks, read 4 MB in 204 blocks:  copy alone  20.52  read alone   8.18 (  679 GB/s)  one launch, copy first  20.59  copy last  25.63  two streams  32.44 us
+copy 442368 B in 12 blocks, read 4 MB in  84 blocks:  copy alone  20.51  read alone   8.16 (  681 GB/s)  one launch, copy first  20.57  copy last  24.76  two streams  32.40 us
+copy 442368 B in 27 blocks, read 4 MB in 204 blocks:  copy alone  20.52  read alone   8.17 (  680 GB/s)  one launch, copy first  20.57  copy last  25.59  two streams  32.40 us
+copy 442368 B in 27 blocks, read 4 MB in  84 blocks:  copy alone  20.51  read alone   8.16 (  680 GB/s)  one launch, copy first  20.57  copy last  24.66  two streams  32.39 us
+copy 172800 B in 12 blocks, read 8 MB in 204 blocks:  copy alone  10.42  read alone  14.56 (  668 GB/s)  one launch, copy first  16.39  copy last  21.46  two streams  28.70 us
+copy 172800 B in 12 blocks, read 8 MB in  84 blocks:  copy alone  10.40  read alone  14.70 (  661 GB/s)  one launch, copy first  16.26  copy last  22.99  two streams  28.87 us
+copy 172800 B in 27 blocks, read 8 MB in 204 blocks:  copy alone  10.42  read alone  14.52 (  670 GB/s)  one launch, copy first  16.02  copy last  21.41  two streams  28.66 us
+copy 172800 B in 27 blocks, read 8 MB in  84 blocks:  copy alone  10.42  read alone  14.70 (  661 GB/s)  one launch, copy first  16.35  copy last  23.00  two streams  28.88 us
+copy 172800 B in 12 blocks, read 4 MB in 204 blocks:  copy alone  10.42  read alone   8.14 (  683 GB/s)  one launch, copy first  10.43  copy last  15.49  two streams  22.01 us
+copy 172800 B in 12 blocks, read 4 MB in  84 blocks:  copy alone  10.42  read alone   8.15 (  682 GB/s)  one launch, copy first  10.44  copy last  14.39  two streams  22.00 us
+copy 172800 B in 27 blocks, read 4 MB in 204 blocks:  copy alone  10.41  read alone   8.15 (  682 GB/s)  one launch, copy first  10.44  copy last  15.51  two streams  22.02 us
+copy 172800 B in 27 blocks, read 4 MB in  84 blocks:  copy alone  10.41  read alone   8.13 (  684 GB/s)  one launch, copy first  10.43  copy last  14.39  two streams  22.01 us

@@ -1,0 +1,78 @@
+diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
+index c40b5a58..5c0fef73 100644
+--- a/ggml/src/ggml-cuda/temporal.cu
++++ b/ggml/src/ggml-cuda/temporal.cu
+@@ -1108,7 +1108,7 @@ static void tr2_route(cudaStream_t stream, ggml_tensor * dst, int L, int K, int
+     if (sl && tr_slots() == 2 && n_tokens == 1 && (tu_swap_n() >= 0 || tu_swap_hist() > 0))
+         k_force_route<<<1, K, 0, stream>>>(T->d_swp_e, T->d_swp_s, T->d_nswp, tu_swap_n(), E, K, T->remap_ids, T->split_ids,
+                                            tu_swap_hist() > 0 ? g_hist_cum : nullptr, g_hist_n);
+-    if (sl && tr_slots() == 2 && n_tokens == 1 && tr_nocopy() != 2 && ggml_cuda_temporal_fused_on() != 1) {   // copies start at the router; =1 leaves them to the expert op
++    if (sl && tr_slots() == 2 && n_tokens == 1 && tr_nocopy() != 2 && ggml_cuda_temporal_fused_on() == 2) {   // copies start at the router; 1 and 3 leave them to the expert op
+         cudaEventRecord(T->fork, stream);
+         cudaStreamWaitEvent(g_copy, T->fork, 0);
+         for (int w = 0; w < 3; ++w) {
+@@ -1174,7 +1174,7 @@ void ggml_cuda_temporal_route(cudaStream_t stream, ggml_tensor * dst) {
+     // TEMPORAL_ROUTE_SLOTS=2: the swap list exists now, so start the copies here instead of at the gate
+     // GEMM. They run on the copy stream under whatever the graph has between the router and the routed
+     // experts (gate weights, and the shared expert when the graph puts it first).
+-    if (sl && tr_slots() == 2 && n_tokens == 1 && ggml_cuda_temporal_fused_on() != 1) {
++    if (sl && tr_slots() == 2 && n_tokens == 1 && (ggml_cuda_temporal_fused_on() == 0 || ggml_cuda_temporal_fused_on() == 2)) {
+         cudaEventRecord(T->fork, stream);
+         cudaStreamWaitEvent(g_copy, T->fork, 0);
+         for (int w = 0; w < 3; ++w) {
+@@ -1266,14 +1266,27 @@ struct TFA {
+     size_t be; int D, F, FS, K;
+     const float * lg; const int * eids; float * wgt; int E, normw;        // gate weights from the router logits (lg null: not here)
+     int pass;       // -1: every position, loading ones copied here; 0: positions not being loaded; 1: only those being loaded
++    int ncb;        // TEMPORAL_FUSED=3: this many blocks at the front copy gate and up of the experts being loaded, one host read per thread
+ };
+ // One block per 32 rows of one expert: gate rows, up rows, SwiGLU, and the Q8_1 block of those 32 activations.
+ // Routed positions are taken in the order "experts being loaded first", so their blocks are scheduled first
+ // and their reads start with the launch.
+ __global__ void k_tf_a(TFA A) {
+     __shared__ block_q8_1 xq[32]; __shared__ float act[32]; __shared__ int s_c, s_e;
+-    const int lane = threadIdx.x & 31, row = threadIdx.x >> 5, blk = blockIdx.x;
++    const int lane = threadIdx.x & 31, row = threadIdx.x >> 5, blk = (int) blockIdx.x - A.ncb;
+     const int DB = A.D / 32, GR = A.F / 32, NR = A.K * GR;
++    if (blk < 0) {
++        // host pool -> slot for gate and up of every expert being loaded. A read of host memory costs a round trip
++        // however little it fetches, so each thread issues one (per loaded expert) and all of them leave with the
++        // launch; the blocks that compute those experts are in the launch after this one.
++        const int nv = (int) (A.be / 16), v = (int) blockIdx.x * 1024 + (int) threadIdx.x, ns = min(*A.nswp, A.K);
++        if (v < 2 * nv) {
++            const bool up = v >= nv; const int vi = up ? v - nv : v;
++            const uint4 * src = (const uint4 *) (up ? A.pool[1] : A.pool[0]); uint4 * dstw = (uint4 *) (up ? A.W[1] : A.W[0]);
++            for (int k = 0; k < ns; ++k) dstw[(size_t) A.swp_s[k] * nv + vi] = src[(size_t) A.swp_e[k] * nv + vi];
++        }
++        return;
++    }
+     if (A.lg && blk == NR + A.FS / 32) {
+         // the gate weights: softmax over the E router logits, gathered at the selected experts, and (normw) divided
+         // by their clamped sum. Same operations and the same summation order as the soft_max (block of 256 threads),
+@@ -1443,18 +1456,21 @@ void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst) {
+         GGML_ASSERT(wgt->type == GGML_TYPE_F32 && wgt->ne[0] > 128 && wgt->ne[0] <= 256 && K <= 32);
+         A.lg = (const float *) wgt->data; A.eids = (const int *) ids->data; A.wgt = wbuf; A.E = (int) wgt->ne[0]; A.normw = normw;
+     }
+-    const bool two = ggml_cuda_temporal_fused_on() == 2 && A.pool[0] != nullptr;      // copies run on the copy stream
++    const int fmode = ggml_cuda_temporal_fused_on();
++    const bool two = (fmode == 2 || fmode == 3) && A.pool[0] != nullptr;   // 2: copies on the copy stream; 3: copy blocks in the first launch
++    const bool inl = two && fmode == 3;
+     TU * Lp = it != g_tptr.end() ? &g_L[it->second.first] : nullptr;
+     A.pass = two ? 0 : -1;
+-    if (!(skip & 1)) k_tf_a<<<K * GR + FS / 32 + (fold ? 1 : 0), 1024, 0, stream>>>(A);
++    A.ncb = inl ? (int) ((2 * (A.be / 16) + 1023) / 1024) : 0;
++    if (!(skip & 1)) k_tf_a<<<A.ncb + K * GR + FS / 32 + (fold ? 1 : 0), 1024, 0, stream>>>(A);
+     if (two && !(skip & 1)) {
+-        TFA A1 = A; A1.pass = 1; A1.lg = nullptr;
+-        if (tr_nocopy() != 2) cudaStreamWaitEvent(stream, Lp->ev[1], 0);              // gate and up of the loaded experts are in their slots
++        TFA A1 = A; A1.pass = 1; A1.lg = nullptr; A1.ncb = 0;
++        if (!inl && tr_nocopy() != 2) cudaStreamWaitEvent(stream, Lp->ev[1], 0);              // gate and up of the loaded experts are in their slots
+         k_tf_a<<<K * GR, 1024, 0, stream>>>(A1);
+     }
+     B.aq = aq; B.wgt = fold ? wbuf : (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
+     B.SD = Sx[2] ? (const uint8_t *) Sx[2]->data : nullptr; B.y = (float *) dst->data; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K; B.cpv = cpv;
+-    if (two) { B.poolD = nullptr; if (tr_nocopy() != 2) cudaStreamWaitEvent(stream, Lp->ev[2], 0); }
++    if (two && !inl) { B.poolD = nullptr; if (tr_nocopy() != 2) cudaStreamWaitEvent(stream, Lp->ev[2], 0); }
+     if (!(skip & 2)) k_tf_b<<<D, bt, 0, stream>>>(B);
+     CUDA_CHECK(cudaGetLastError());
+ }

@@ -1,0 +1,21 @@
+BUILT in 46s tree-dirty=4
+ppl off  Final estimate: PPL = 203452.6772 +/- 8384.03596
+ppl qkv  Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-qkv: 2 projections of Kcur-0 in one launch
+base one    223.76 tok/s  4.4691 ms  (median 224.04, sd 1.21) loads 1.0000  wall 23s
+base sk     212.41 tok/s  4.7078 ms  (median 212.77, sd 1.38) loads 0.9938  wall 23s
+base vram   277.69 tok/s  3.6011 ms  (median 278.06, sd 1.47)  wall 13s
+base total wall 59s fill=1024 reps=16
+qkv one    229.47 tok/s  4.3579 ms  (median 229.56, sd 0.96) loads 1.0000  wall 22s
+qkv sk     217.89 tok/s  4.5894 ms  (median 218.12, sd 1.11) loads 0.9938  wall 23s
+qkv vram   283.23 tok/s  3.5308 ms  (median 283.31, sd 1.22)  wall 13s
+qkv total wall 58s fill=1024 reps=16
+qkv-rev vram   284.17 tok/s  3.5190 ms  (median 284.23, sd 1.27)  wall 13s
+qkv-rev sk     216.03 tok/s  4.6290 ms  (median 216.09, sd 1.13) loads 0.9938  wall 23s
+qkv-rev one    225.38 tok/s  4.4370 ms  (median 225.03, sd 1.40) loads 1.0000  wall 23s
+qkv-rev total wall 59s fill=1024 reps=16
+base-rev vram   268.12 tok/s  3.7296 ms  (median 267.95, sd 1.12)  wall 14s
+base-rev sk     207.26 tok/s  4.8250 ms  (median 207.25, sd 0.86) loads 0.9938  wall 23s
+base-rev one    217.30 tok/s  4.6019 ms  (median 217.13, sd 1.18) loads 1.0000  wall 23s
+base-rev total wall 60s fill=1024 reps=16
+T2_DONE

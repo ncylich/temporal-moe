@@ -1,0 +1,28 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 48541 MiB):
+  Device 0: NVIDIA RTX A6000, compute capability 8.6, VMM: yes, VRAM: 48541 MiB
+[temporal] UNIFIED (on-device, graph-capturable) ACTIVE: R=18 + CPU pool
+[temporal-prefill] EXPERT-MAJOR STREAMING (default): n_tokens=512 k=18 active=191/192 ring=96 slots (12 batches x 8), be=216KB
+[temporal-fused] one fused op per MoE layer on single-token steps: D=1024 F=384 FS=0 K=18 skip=0
+temporal-swap-hist: layer_tokens=23091 loads=23091 counts=0,23091
+temporal-route-cuda: trained min_logit, layers=45 layer_tokens=180787 cold_fills=135 swaps=107294 swaps_per_layer_token=0.5939
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000
+temporal-cuda: layers=45 slot swap-ins decided on single-token steps=14231
+opprof: 513 single-token graphs, 11734.1 us per token summed over ops
+opprof:    2563.4 us/token   45.0 launches/token  CUSTOM ffn_moe_out- [f32]
+opprof:    2008.3 us/token  180.0 launches/token  FUSED+RMS_NORM norm- [f32]
+opprof:     995.3 us/token   45.0 launches/token  FLASH_ATTN_EXT node_ [f32]
+opprof:     793.5 us/token   45.0 launches/token  CUSTOM ffn_moe_route- [f32]
+opprof:     667.5 us/token   45.0 launches/token  MUL_MAT Qcur- [q4_0]
+opprof:     658.7 us/token   44.0 launches/token  FUSED+MUL_MAT node_ [q4_0]
+opprof:     624.7 us/token   45.0 launches/token  MUL_MAT Kcur- [q4_0]
+opprof:     611.8 us/token   45.0 launches/token  MUL_MAT Vcur- [q4_0]
+opprof:     579.2 us/token   45.0 launches/token  MUL_MAT ffn_moe_logits- [f32]
+opprof:     508.2 us/token   45.0 launches/token  ADD l_out- [f32]
+opprof:     488.5 us/token   45.0 launches/token  SET_ROWS cache_v_l (view) [f32]
+opprof:     482.3 us/token   45.0 launches/token  FUSED+ROPE Kcur- [f32]
+opprof:     480.7 us/token   45.0 launches/token  ROPE Qcur- [f32]
+opprof:     214.0 us/token    1.0 launches/token  MUL_MAT result_output [q6_K]
+opprof:      21.3 us/token    2.0 launches/token  GET_ROWS node_ [f32]
+opprof:      14.4 us/token    1.0 launches/token  MUL_MAT node_ [q4_0]
+opprof:      11.4 us/token    1.0 launches/token  FUSED+RMS_NORM norm [f32]
+opprof:      10.8 us/token    1.0 launches/token  ADD ffn_inp- [f32]

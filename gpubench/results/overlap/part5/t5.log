@@ -1,0 +1,16 @@
+BUILT in 46s tree-dirty=5
+ppl stream f3 Final estimate: PPL = 203452.6772 +/- 8384.03596
+swaps_per_layer_token=0.7944
+f1 one    236.64 tok/s  4.2257 ms  (median 236.78, sd 1.13) loads 1.0000  wall 22s
+f1 sk     225.69 tok/s  4.4309 ms  (median 225.68, sd 1.50) loads 0.9938  wall 22s
+f1 total wall 45s fill=1024 reps=16
+f3 one    241.98 tok/s  4.1325 ms  (median 242.49, sd 1.24) loads 1.0000  wall 22s
+f3 sk     228.84 tok/s  4.3700 ms  (median 228.98, sd 0.70) loads 0.9938  wall 22s
+f3 total wall 44s fill=1024 reps=16
+f3-rev sk     227.92 tok/s  4.3875 ms  (median 228.06, sd 1.13) loads 0.9938  wall 22s
+f3-rev one    241.07 tok/s  4.1482 ms  (median 241.77, sd 1.71) loads 1.0000  wall 22s
+f3-rev total wall 44s fill=1024 reps=16
+f1-rev sk     222.67 tok/s  4.4910 ms  (median 222.82, sd 0.82) loads 0.9938  wall 22s
+f1-rev one    233.69 tok/s  4.2791 ms  (median 234.19, sd 1.03) loads 1.0000  wall 23s
+f1-rev total wall 45s fill=1024 reps=16
+T5_DONE

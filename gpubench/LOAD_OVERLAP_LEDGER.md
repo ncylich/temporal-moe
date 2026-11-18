@@ -996,3 +996,120 @@ layer against 4.1 here. Quote 8.8 % and 4.6 %.
   that the build had finished and then deleted the intermediate model, which cost one regeneration. The
   first timing rows came 51 minutes after the request, not 30.
 - Pod `8xcjjlxgekub1c`: container up 17:00, stopped 18:04 UTC, about $0.85. Disk wiped again.
+
+# Part 5 -- A fast loop, then launches outside the MoE op and the first load (2026-11-18, from 18:24 UTC)
+
+## O5-0 -- The loop
+
+Last night a kernel round took 12 to 30 minutes, almost all of it protocol. `gpubench/overlap/fast3.sh` runs
+three arms on the 11 B Q4_0 file (sha `84cd3c92`) in 58 s: ours streamed with exactly one load, Skliar
+streamed with `k_skliar` executing and imposed loads, ours with every expert resident. `fast_small.sh` does
+the same for the 1.26 B models on real text (P1-9 protocol, rows 601 and 602) and holds the perplexity gate.
+An engine rebuild after a change is 18 to 50 s (`apply.sh` on the pod: reset to patch 0014, apply a diff).
+
+- Decode is timed as in P1-12 (one token per step at depth 1,024, flash attention on). The depth fill runs as
+  one 1,024-token batch and an arm is 16 repetitions of 128 tokens (9.4 s). Check on the ours arm: batched fill
+  217.1 tok/s, batch-1 fill 215.4 (16 repetitions) and 218.7 (8), the same within drift.
+- A premise I was given turned out wrong and is recorded here so it is not repeated: `llama-bench` fills the
+  depth once per process and restores the saved state before later repetitions, so the old arm paid the fill
+  once (about 5 s), not eight times. An old arm was 39 s of wall time, a new one 22 s. The rest is model load.
+- **Drift.** The same arm reads 226 tok/s on a cold GPU and 215 to 217 a few minutes later. Every comparison
+  below is base, new, new, base in one job, and the number is the mean of each pair. Numbers from different
+  jobs are not compared.
+- CUDA graph replay is on in every arm (off: 182 against 218 tok/s), so launch cost is the replayed kind:
+  about 1.5 us per launch removed, measured three times below.
+
+Per-op profile of the ours arm (`TEMPORAL_OPPROF=1`, synced, a ranking only; `part5/opprof_one.err`). Per
+layer: 4 RMS norms, the Q, K, V and O projections (each two launches: quantise the input, then the matmul),
+2 RoPE, the cache write, flash attention, the residual add, the router matmul, the routing kernel (plus the
+imposed-load launch, which only the benchmark has), the fused op (2). About 23 launches per layer, 19 outside
+the MoE op.
+
+## O5-1 -- Kept: Q, K and V projections in one launch (`TEMPORAL_QKV=1`, patch 0015)
+
+The three projections read the same normalised vector. The graph now places them next to each other
+(`build_qkv`, order only) and the backend quantises the vector once and launches `mul_mat_vec_q` once with
+three channels, each with its own matrix, destination and row count. Six launches become two. The row
+arithmetic is the stock kernel's, so nothing about the numbers changes.
+
+| base, new, new, base (tok/s, mean of each pair) | patch 0014 | K and V fused | Q, K and V fused |
+|---|---|---|---|
+| 11 B, ours, one load | 219.6 to 220.5 | 227.4 (+3.1 %) | 233.6 (+6.4 %) |
+| 11 B, Skliar with `k_skliar` | 209.6 to 209.8 | 217.0 (+3.4 %) | 222.5 (+6.2 %) |
+| 11 B, all resident | 271.1 to 272.8 | 283.2 (+4.0 %) | 291.7 (+7.6 %) |
+
+0.27 ms per token for four launches per layer, 1.5 us per launch.
+
+What went wrong first: I passed the extra pointers to the kernel as a by-value struct indexed by block. With
+the switch off the whole token was then 26 % slower (160 against 222 tok/s), because every stock matmul
+launch copied the struct per thread. A control build of the previous tree caught it. The kernel now takes the
+pointers as scalars and the switch-off path measures the same as before (223.8 against 222.6).
+
+## O5-2 -- Dropped: copy blocks at the front of the gate/up launch, loaded experts in a second launch
+
+Idea: a read of host memory costs a round trip per thread, so issue one read per thread at launch start.
+Result: ours 233.4 to 199.5 tok/s, Skliar 222.4 to 196.4, perplexity identical. The premise was wrong, and
+two standalone programs show what is true (`gpubench/fused/hostread.cu`, `hostmix.cu`; logs in `part5/`):
+
+- A kernel copies from host-mapped memory at **24 GB/s in almost any launch shape**. Reads per thread do not
+  matter (1,024 threads doing 40 reads each: 24.8 GB/s). One expert of the 11 B model is 18.5 us of link time
+  for gate and up, 9 us for down, 27 us in all. The resident op is 27.4 us (17.9 gate/up, 9.5 down).
+- Copy blocks at the **front of a launch overlap fully** with VRAM-bound work in the same launch: 21.0 us for
+  a 442 KB copy plus an 8 MB read, against 20.7 for the copy alone and 14.8 for the read alone. At the back of
+  the launch they do not (32 us). **On a second stream the two add** (39.6 us). That is why the engine's stock
+  structure (copy kernels on a copy stream) exposes its loads, and why last night's copy-stream variant of the
+  op lost (O3-9).
+- So the op already hides the gate/up copy under the resident experts. What the first load exposes in that
+  launch is link time (18.5 us) plus the loaded expert's own gate/up rows after its bytes arrive, against
+  17.9 us of resident work: 11.8 us measured. The second launch in this variant added a launch and 216 block
+  start-ups and bought nothing. Diff kept in `part5/rejected_front_copy_blocks.diff`.
+
+## O5-3 -- Kept: the down tensor of a loaded expert copied at the end of the gate/up launch (`TEMPORAL_FUSED=3`)
+
+While the loaded expert's gate/up rows are computed the link is idle, and the down launch then waits for its
+own rows (5.0 us per layer measured). Blocks at the end of the first launch now copy the down tensor. They
+start as the resident blocks finish, when gate and up are nearly through. The down launch finds the rows in
+the slot. Same bytes, same slots, same arithmetic.
+
+| 11 B, base, new, new, base | `TEMPORAL_FUSED=1` | `TEMPORAL_FUSED=3` |
+|---|---|---|
+| ours, one load, tok/s | 235.2 | 241.5 (+2.7 %) |
+| Skliar with `k_skliar` | 224.2 | 228.4 (+1.9 %) |
+| pinned: ms per token added by the 1st / 2nd / 3rd load | 0.708 / 1.072 / 1.194 | 0.616 / 1.138 / 1.135 |
+
+The second and third loads cost 25 us per layer each. One expert is 27 us of link time, so **later loads are
+at the link's floor** and no kernel structure will make them cheaper. The first load is 13.7 us per layer.
+Its floor in this structure: the first launch cannot end before gate and up have arrived and the loaded rows
+are computed (18.5 + 2 + about 5 us against 17.9 resident), and the down bytes need 9 us more of link, which
+now mostly runs under that. About 9 to 11 us; 3 to 4 us are left. The number of tail blocks does not matter
+(4 to 56 measure the same).
+
+## O5-4 -- Both keepers against patch 0014, and the gates
+
+| tok/s, base, new, new, base | patch 0014 | 0015 (`TEMPORAL_QKV=1 TEMPORAL_FUSED=3`) |
+|---|---|---|
+| 11 B, ours, one load | 219.6 | 241.5 (+10.0 %) |
+| 11 B, Skliar with `k_skliar`, loads imposed | 209.6 | 228.4 (+9.0 %) |
+| 11 B, all resident | 271.1 | 291.7 (+7.6 %) |
+| 11 B, ours against Skliar | +4.8 % | +5.8 % |
+| 1.26 B trained model, streamed | 742.9 | 818.4 (+10.2 %) |
+| 1.26 B plain MoE, ours, streamed | 746.3 | 811.9 (+8.8 %) |
+| 1.26 B plain MoE, Skliar, streamed | 721.5 | 780.6 (+8.2 %) |
+| 1.26 B, ours against Skliar | +3.4 % | +4.0 % |
+
+The 11 B rows come from two jobs (Q/K/V, then the down copy) chained through their shared arm, so read the
+percentages, not the absolute tok/s. The 1.26 B rows are one job, rows 601 and 602, 2 runs per cell per pass.
+
+Gates, engine tree `4610bc1d`:
+- 1.26 B, batch-1 perplexity over 4 x 1,024 tokens, all in VRAM and streamed twice, against the patch 0014 op
+  all in VRAM. Equal in every digit: ours-plain 42.6913 +/- 2.98935, Skliar 40.0690 +/- 2.84434, trained
+  22.7367 +/- 1.50944.
+- 11 B (random weights, 2 x 256 tokens): 203452.6772 +/- 8384.03596 all in VRAM with the switches off, with
+  `TEMPORAL_QKV=1`, and streamed with `TEMPORAL_FUSED=1` and `=3`.
+- **Not rerun:** routing equality against the Python reference. Neither change touches a routing kernel or
+  the tensors it reads.
+
+Ground rules 1 to 8 of Part 3 hold as before: same model, weights as stored, bit-identical, 18 slots, no
+route known before the router, batch 1, the load inside the timed region, one kernel path for both rules.
+**Changes relative to the engine's computation:** none in arithmetic. Q, K and V are computed in one launch
+and in a different node order; the down tensor of a loaded expert reaches its slot one launch earlier.

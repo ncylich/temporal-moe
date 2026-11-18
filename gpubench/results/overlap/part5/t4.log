@@ -1,0 +1,24 @@
+BUILT in 48s tree-dirty=5
+ppl vram      Final estimate: PPL = 203452.6772 +/- 8384.03596
+swaps_per_layer_token=0.7944
+ppl stream f1 Final estimate: PPL = 203452.6772 +/- 8384.03596
+swaps_per_layer_token=0.7944
+ppl stream f3 Final estimate: PPL = 203452.6772 +/- 8384.03596
+swaps_per_layer_token=0.7944
+f1 one    236.91 tok/s  4.2211 ms  (median 237.19, sd 1.56) loads 1.0000  wall 22s
+f1 sk     225.25 tok/s  4.4395 ms  (median 225.31, sd 1.10) loads 0.9938  wall 22s
+f1 vram   296.86 tok/s  3.3686 ms  (median 297.22, sd 1.22)  wall 13s
+f1 total wall 57s fill=1024 reps=16
+f3 one    200.55 tok/s  4.9864 ms  (median 200.72, sd 1.07) loads 1.0000  wall 23s
+f3 sk     196.90 tok/s  5.0788 ms  (median 197.19, sd 0.81) loads 0.9938  wall 24s
+f3 vram   293.54 tok/s  3.4067 ms  (median 294.05, sd 1.32)  wall 13s
+f3 total wall 60s fill=1024 reps=16
+f3-rev vram   292.89 tok/s  3.4142 ms  (median 293.32, sd 1.27)  wall 13s
+f3-rev sk     195.82 tok/s  5.1066 ms  (median 195.94, sd 0.82) loads 0.9938  wall 24s
+f3-rev one    198.36 tok/s  5.0412 ms  (median 198.74, sd 1.26) loads 1.0000  wall 24s
+f3-rev total wall 61s fill=1024 reps=16
+f1-rev vram   289.03 tok/s  3.4599 ms  (median 289.16, sd 0.75)  wall 13s
+f1-rev sk     219.45 tok/s  4.5567 ms  (median 219.46, sd 0.99) loads 0.9938  wall 23s
+f1-rev one    229.90 tok/s  4.3497 ms  (median 229.56, sd 1.18) loads 1.0000  wall 22s
+f1-rev total wall 58s fill=1024 reps=16
+T4_DONE

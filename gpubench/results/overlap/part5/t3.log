@@ -1,0 +1,27 @@
+BUILT in 49s tree-dirty=4
+ppl qkv  Final estimate: PPL = 203452.6772 +/- 8384.03596
+temporal-qkv: 3 projections of Qcur-0 in one launch
+base one    222.59 tok/s  4.4927 ms  (median 222.88, sd 0.92) loads 1.0000  wall 23s
+base sk     212.11 tok/s  4.7146 ms  (median 212.44, sd 1.30) loads 0.9938  wall 23s
+base vram   275.10 tok/s  3.6350 ms  (median 275.51, sd 1.35)  wall 13s
+base total wall 60s fill=1024 reps=16
+qkv one    235.17 tok/s  4.2522 ms  (median 235.02, sd 1.54) loads 1.0000  wall 22s
+qkv sk     223.36 tok/s  4.4770 ms  (median 223.90, sd 1.39) loads 0.9938  wall 23s
+qkv vram   291.96 tok/s  3.4251 ms  (median 292.37, sd 1.33)  wall 13s
+qkv total wall 58s fill=1024 reps=16
+qkv-rev vram   291.37 tok/s  3.4320 ms  (median 291.74, sd 1.19)  wall 13s
+qkv-rev sk     221.66 tok/s  4.5115 ms  (median 221.96, sd 1.04) loads 0.9938  wall 22s
+qkv-rev one    232.06 tok/s  4.3092 ms  (median 232.55, sd 1.38) loads 1.0000  wall 23s
+qkv-rev total wall 58s fill=1024 reps=16
+base-rev vram   267.30 tok/s  3.7412 ms  (median 267.06, sd 0.90)  wall 14s
+base-rev sk     207.15 tok/s  4.8274 ms  (median 207.09, sd 1.09) loads 0.9938  wall 23s
+base-rev one    216.79 tok/s  4.6128 ms  (median 217.03, sd 0.84) loads 1.0000  wall 23s
+base-rev total wall 60s fill=1024 reps=16
+T3_DONE
+skip2-hist0,1 one    273.87 tok/s  3.6513 ms  (median 274.51, sd 2.00) loads 1.0000  wall 15s
+skip2-hist1 one    320.54 tok/s  3.1197 ms  (median 321.61, sd 2.35) loads 0.0000  wall 14s
+skip1-hist0,1 one    336.63 tok/s  2.9707 ms  (median 338.00, sd 3.26) loads 1.0000  wall 14s
+skip1-hist1 one    364.35 tok/s  2.7446 ms  (median 365.37, sd 5.06) loads 0.0000  wall 14s
+full-hist0,1 one    233.75 tok/s  4.2780 ms  (median 234.62, sd 1.71) loads 1.0000  wall 15s
+full-hist1 one    281.76 tok/s  3.5491 ms  (median 282.30, sd 1.73) loads 0.0000  wall 15s
+T3B_DONE

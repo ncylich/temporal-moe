@@ -1,0 +1,19 @@
+tail14 one    240.90 tok/s  4.1511 ms  (median 241.24, sd 1.86) loads 1.0000  wall 15s
+tail4 one    241.78 tok/s  4.1360 ms  (median 242.27, sd 1.68) loads 1.0000  wall 15s
+tail8 one    242.97 tok/s  4.1157 ms  (median 243.28, sd 1.31) loads 1.0000  wall 16s
+tail28 one    241.11 tok/s  4.1474 ms  (median 241.42, sd 0.98) loads 1.0000  wall 15s
+tail56 one    239.61 tok/s  4.1734 ms  (median 240.52, sd 1.82) loads 1.0000  wall 15s
+tail14 one    239.81 tok/s  4.1700 ms  (median 240.84, sd 2.05) loads 1.0000  wall 15s
+tail4 one    241.52 tok/s  4.1404 ms  (median 241.79, sd 1.39) loads 1.0000  wall 15s
+tail8 one    240.03 tok/s  4.1661 ms  (median 240.40, sd 1.46) loads 1.0000  wall 15s
+tail28 one    239.58 tok/s  4.1740 ms  (median 239.65, sd 1.23) loads 1.0000  wall 16s
+tail56 one    240.38 tok/s  4.1601 ms  (median 241.01, sd 1.42) loads 1.0000  wall 15s
+f1-pin0 one    281.37 tok/s  3.5541 ms  (median 282.07, sd 2.01)  wall 14s
+f1-pin1 one    234.63 tok/s  4.2620 ms  (median 235.05, sd 1.47)  wall 15s
+f1-pin2 one    187.48 tok/s  5.3339 ms  (median 188.01, sd 1.68)  wall 17s
+f1-pin3 one    153.20 tok/s  6.5274 ms  (median 153.49, sd 0.71)  wall 18s
+f3-pin0 one    282.93 tok/s  3.5344 ms  (median 283.76, sd 2.73)  wall 15s
+f3-pin1 one    240.93 tok/s  4.1505 ms  (median 241.48, sd 1.32)  wall 15s
+f3-pin2 one    189.09 tok/s  5.2885 ms  (median 189.67, sd 1.25)  wall 17s
+f3-pin3 one    155.69 tok/s  6.4231 ms  (median 156.01, sd 0.88)  wall 18s
+T6_DONE
