@@ -1,4 +1,4 @@
-From 90c89eb79dd7d559a51b1c2f610ee614ad352c14 Mon Sep 17 00:00:00 2001
+From 2f911b669b567110ff124d79efa82ca7af1acf00 Mon Sep 17 00:00:00 2001
 From: Noah Cylich <noahcylich@gmail.com>
 Date: Wed, 18 Nov 2026 00:45:43 -0800
 Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_FUSED, one fused op per MoE layer
@@ -11,12 +11,12 @@ copy kernels, events or second stream are involved. The router, the softmax, the
 ops stay ordinary graph nodes. Q4_0 experts with glm4moe's shapes only; other models keep the old path.
 ---
  ggml/src/ggml-cuda/ggml-cuda.cu |   7 +-
- ggml/src/ggml-cuda/temporal.cu  | 180 +++++++++++++++++++++++++++++++-
+ ggml/src/ggml-cuda/temporal.cu  | 188 +++++++++++++++++++++++++++++++-
  ggml/src/ggml-cuda/temporal.cuh |   5 +
  src/llama-graph.cpp             |  34 ++++++
  src/llama-graph.h               |   4 +
- src/models/glm4-moe.cpp         |  12 +++
- 6 files changed, 237 insertions(+), 5 deletions(-)
+ src/models/glm4-moe.cpp         |  12 ++
+ 6 files changed, 245 insertions(+), 5 deletions(-)
 
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
 index bb562d44..77d54b6c 100644
@@ -44,7 +44,7 @@ index bb562d44..77d54b6c 100644
              switch (ggml_get_unary_op(op)) {
                  case GGML_UNARY_OP_ABS:
 diff --git a/ggml/src/ggml-cuda/temporal.cu b/ggml/src/ggml-cuda/temporal.cu
-index dffd6614..197d4405 100644
+index dffd6614..7db0c21c 100644
 --- a/ggml/src/ggml-cuda/temporal.cu
 +++ b/ggml/src/ggml-cuda/temporal.cu
 @@ -49,6 +49,10 @@ static int tr_slots();
@@ -84,7 +84,7 @@ index dffd6614..197d4405 100644
          cudaEventRecord(T->fork, stream);
          cudaStreamWaitEvent(g_copy, T->fork, 0);
          for (int w = 0; w < 3; ++w) {
-@@ -1192,3 +1197,174 @@ void ggml_cuda_temporal_route_reset() {
+@@ -1192,3 +1197,182 @@ void ggml_cuda_temporal_route_reset() {
      }
      CUDA_CHECK(cudaMemset(g_tr_k, 0, TR_MAXLAYER*sizeof(int)));
  }
@@ -102,34 +102,32 @@ index dffd6614..197d4405 100644
 +//   B   down products, experts * gate weights, sum over experts in selection order, + shared: one block per
 +//       output row. The down row of an expert being loaded is moved from the pool by extra threads of the same
 +//       block while the other experts' products are computed; its own products follow.
-+// Dot products use llama.cpp's Q4_0 x Q8_1 integer arithmetic but one 32-weight block per thread and float
-+// (not half) activation scales, so sums are formed in a different order from mul_mat_vec_q: results agree
-+// with the unfused path to rounding, not bit for bit. Streamed and all-in-VRAM run the same code and are
-+// bit-identical to each other.
-+struct __attribute__((packed)) tf_q4 { uint16_t d; uint8_t qs[16]; };
-+struct tf_q8 { float d; float s; int8_t qs[32]; };                         // s = d * sum(qs)
-+static __device__ inline int tf_load4(const uint8_t * p) { int v; memcpy(&v, p, 4); return v; }
-+static __device__ inline float tf_dot(const tf_q4 * w, const tf_q8 * x) {
-+    int sumi = 0;
-+#pragma unroll
-+    for (int i = 0; i < 4; ++i) {
-+        const int v = tf_load4(w->qs + 4*i);
-+        sumi = __dp4a(v & 0x0F0F0F0F, tf_load4((const uint8_t *) x->qs + 4*i), sumi);
-+        sumi = __dp4a((v >> 4) & 0x0F0F0F0F, tf_load4((const uint8_t *) x->qs + 16 + 4*i), sumi);
-+    }
-+    return __half2float(__ushort_as_half(w->d)) * (x->d * (float) sumi - 8.0f * x->s);
++// Arithmetic is the unfused path's, operation for operation: the input and the activations are quantised as
++// quantize_q8_1 does (scale and sum stored as halves), every product is vec_dot_q4_0_q8_1 on half a Q4_0
++// block, and each row's partial sums are added in mul_mat_vec_q's order for this card (thread t = 32y + x takes
++// block t/2, half t%2; lane x adds its y = 0, 1, 2 values in that order; then the xor-shuffle reduction over
++// the 32 lanes). SwiGLU is up * silu(gate), experts * weights are summed in selection order, then + shared.
++// The result is bit-identical to the unfused path (gate: batch-1 perplexity equal in every digit).
++#include "vecdotq.cuh"
++#include "unary.cuh"
++static __device__ __forceinline__ void tf_quant_lane(float xi, block_q8_1 * q) {      // one warp = one Q8_1 block, as quantize_q8_1
++    const int lane = threadIdx.x & 31;
++    float amax = fabsf(xi), sum = xi;
++    amax = warp_reduce_max<QK8_1>(amax);
++    sum  = warp_reduce_sum<QK8_1>(sum);
++    const float  d = amax / 127.0f;
++    const int8_t v = amax == 0.0f ? 0 : roundf(xi / d);
++    q->qs[lane] = v;
++    if (lane == 0) q->ds = make_half2(d, sum);
 +}
-+static __device__ inline void tf_quant(const float * x, tf_q8 * q) {
-+    float amax = 0.0f;
-+    for (int i = 0; i < 32; ++i) amax = fmaxf(amax, fabsf(x[i]));
-+    const float d = amax / 127.0f, id = d ? 1.0f / d : 0.0f; int sum = 0;
-+    for (int i = 0; i < 32; ++i) { const int v = (int) roundf(x[i] * id); q->qs[i] = (int8_t) v; sum += v; }
-+    q->d = d; q->s = d * (float) sum;
-+}
-+static __device__ inline float tf_wsum(float a) {
++// one row of nblk Q4_0 blocks times nblk Q8_1 blocks; called by all 32 lanes of a warp; nblk <= 48
++static __device__ __forceinline__ float tf_row(const void * W, int kbx0, const block_q8_1 * y, int nblk) {
++    const int x = threadIdx.x & 31, h = 2 * (x & 1);
++    float a = 0.0f;
++    if ((x >> 1) < nblk) a = vec_dot_q4_0_q8_1(W, y + (x >> 1), kbx0 + (x >> 1), h);
 +#pragma unroll
-+    for (int o = 16; o > 0; o >>= 1) a += __shfl_xor_sync(0xFFFFFFFFu, a, o);
-+    return a;
++    for (int yy = 1; yy < 3; ++yy) { const int kb = 16 * yy + (x >> 1); if (kb < nblk) a = __fadd_rn(a, vec_dot_q4_0_q8_1(W, y + kb, kbx0 + kb, h)); }
++    return warp_reduce_sum(a);
 +}
 +struct TFA {
 +    const float * x;
@@ -140,17 +138,15 @@ index dffd6614..197d4405 100644
 +    size_t be; int D, F, FS, K;
 +};
 +__global__ void k_tf_a(TFA A) {
-+    __shared__ tf_q8 xq[28]; __shared__ float xs[896];
++    __shared__ block_q8_1 xq[32];
 +    const int lane = threadIdx.x & 31, row = threadIdx.x >> 5, blk = blockIdx.x;
 +    const int DB = A.D / 32, GR = A.F / 32, NR = A.K * GR * 2;
-+    for (int i = threadIdx.x; i < A.D; i += 1024) xs[i] = A.x[i];
-+    __syncthreads();
-+    if (threadIdx.x < DB) tf_quant(xs + 32 * threadIdx.x, xq + threadIdx.x);
++    if (row < DB) tf_quant_lane(A.x[32 * row + lane], xq + row);
 +    __syncthreads();
 +    if (blk >= NR) {                                                       // shared expert: gate or up, 32 rows
-+        const int sb = blk - NR, w = sb & 1, r = (sb >> 1) * 32 + row; float a = 0.0f;
-+        if (lane < DB) { const tf_q4 q = ((const tf_q4 *) (w ? A.SU : A.SG))[(size_t) r * DB + lane]; a = tf_dot(&q, xq + lane); }
-+        a = tf_wsum(a); if (lane == 0) (w ? A.su : A.sg)[r] = a;
++        const int sb = blk - NR, w = sb & 1, r = (sb >> 1) * 32 + row;
++        const float a = tf_row(w ? A.SU : A.SG, r * DB, xq, DB);
++        if (lane == 0) (w ? A.su : A.sg)[r] = a;
 +        return;
 +    }
 +    const int w = blk % 2, g = (blk / 2) % GR, c = blk / (2 * GR), slot = A.ids[c];
@@ -166,74 +162,86 @@ index dffd6614..197d4405 100644
 +            __syncthreads();
 +        }
 +    }
-+    const int r = g * 32 + row; float a = 0.0f;
-+    if (lane < DB) { const tf_q4 q = ((const tf_q4 *) A.W[w])[(size_t) slot * (A.be / 18) + (size_t) r * DB + lane]; a = tf_dot(&q, xq + lane); }
-+    a = tf_wsum(a);
++    const int r = g * 32 + row;
++    const float a = tf_row(A.W[w], slot * (int) (A.be / sizeof(block_q4_0)) + r * DB, xq, DB);
 +    if (lane == 0) A.gu[((size_t) w * A.K + c) * A.F + r] = a;
 +}
-+__global__ void k_tf_a2(const float * __restrict__ gu, const float * __restrict__ sg, const float * __restrict__ su, tf_q8 * __restrict__ aq, int nrouted, int KF) {
-+    __shared__ float act[32];
-+    const int q = blockIdx.x, i = threadIdx.x;
++__global__ void k_tf_a2(const float * __restrict__ gu, const float * __restrict__ sg, const float * __restrict__ su, block_q8_1 * __restrict__ aq, int nrouted, int KF) {
++    const int q = blockIdx.x, i = threadIdx.x;                             // one warp = one Q8_1 block of activations
 +    float g, u;
 +    if (q < nrouted) { g = gu[(size_t) q * 32 + i]; u = gu[(size_t) KF + (size_t) q * 32 + i]; }
 +    else             { g = sg[(q - nrouted) * 32 + i]; u = su[(q - nrouted) * 32 + i]; }
-+    act[i] = g / (1.0f + expf(-g)) * u;
-+    __syncthreads();
-+    if (i == 0) tf_quant(act, aq + q);
++    tf_quant_lane(u * ggml_cuda_op_silu_single(g), aq + q);
 +}
 +struct TFB {
-+    const tf_q8 * aq; const float * wgt;
++    const block_q8_1 * aq; const float * wgt;
 +    const uint8_t * Dn; const int * ids; const uint8_t * poolD;
 +    const int * swp_e, * swp_s, * nswp;
 +    const uint8_t * SD;
 +    float * y;
 +    size_t be; int D, F, FS, K;
 +};
-+__global__ void k_tf_b(TFB B) {                                            // one block per output row; 128 compute + 32 copy threads
-+    __shared__ float v[128]; __shared__ float part[65];
-+    const int i = threadIdx.x, r = blockIdx.x, GR = B.F / 32, NRQ = B.K * GR, NQ = NRQ + B.FS / 32, RB = GR * 18;
++constexpr int TFB_C = 160, TFB_T = TFB_C + 32;                             // compute threads, copy threads
++static __device__ float tf_tree(float * l) {                               // the 32-lane xor-shuffle reduction, done by one thread
++    for (int o = 16; o > 0; o >>= 1) for (int x = 0; x < 32; ++x) if (!(x & o)) l[x] = __fadd_rn(l[x], l[x ^ o]);
++    return l[0];
++}
++__global__ void k_tf_b(TFB B) {                                            // one block per output row, one thread per Q4_0 block
++    __shared__ float v[2 * TFB_C]; __shared__ float part[65];
++    const int i = threadIdx.x, r = blockIdx.x, GR = B.F / 32, SB = B.FS / 32, NRQ = B.K * GR, NQ = NRQ + SB, RB = GR * 18;
 +    const int ns = B.poolD ? min(*B.nswp, B.K) : 0;
-+    float a = 0.0f; bool late = false; int slot = 0, b = 0;
++    const int q4pe = (int) (B.be / sizeof(block_q4_0));
++    float a0 = 0.0f, a1 = 0.0f; bool late = false; int slot = 0, b = 0;
 +    if (i < NRQ) {
 +        b = i % GR; slot = B.ids[i / GR];
 +        for (int k = 0; k < ns; ++k) late |= B.swp_s[k] == slot;
-+        if (!late) { const tf_q4 w = ((const tf_q4 *) B.Dn)[(size_t) slot * (B.be / 18) + (size_t) r * GR + b]; a = tf_dot(&w, B.aq + i); }
++        if (!late) { a0 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 0); a1 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 2); }
 +    } else if (i < NQ) {
-+        const tf_q4 w = ((const tf_q4 *) B.SD)[(size_t) r * (B.FS / 32) + (i - NRQ)];
-+        a = tf_dot(&w, B.aq + i);
-+    } else if (i >= 128) {
++        a0 = vec_dot_q4_0_q8_1(B.SD, B.aq + i, r * SB + (i - NRQ), 0); a1 = vec_dot_q4_0_q8_1(B.SD, B.aq + i, r * SB + (i - NRQ), 2);
++    } else if (i >= TFB_C) {
 +        // the 16-byte vectors covering row r of each loaded expert's down tensor, pool -> slot, one read per
 +        // thread; vectors on a row boundary are written by both neighbouring rows with the same bytes
-+        const int j = i - 128, vi = j % 8;
++        const int j = i - TFB_C, vi = j % 8;
 +        const size_t first = (size_t) r * RB / 16, last = ((size_t) r * RB + RB - 1) / 16;
 +        for (int k = j / 8; k < ns; k += 4)
 +            if (first + vi <= last) ((uint4 *) B.Dn)[(size_t) B.swp_s[k] * (B.be / 16) + first + vi] = ((const uint4 *) B.poolD)[(size_t) B.swp_e[k] * (B.be / 16) + first + vi];
 +    }
 +    __syncthreads();
-+    if (late) { const tf_q4 w = ((const tf_q4 *) B.Dn)[(size_t) slot * (B.be / 18) + (size_t) r * GR + b]; a = tf_dot(&w, B.aq + i); }
-+    if (i < 128) v[i] = a;
++    if (late) { a0 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 0); a1 = vec_dot_q4_0_q8_1(B.Dn, B.aq + i, slot * q4pe + r * GR + b, 2); }
++    if (i < NQ) { v[2 * i] = a0; v[2 * i + 1] = a1; }
 +    __syncthreads();
-+    if (i < B.K) { float p = 0.0f; for (int q = 0; q < GR; ++q) p += v[i * GR + q]; part[i] = p; }
-+    else if (i == B.K) { float p = 0.0f; for (int q = NRQ; q < NQ; ++q) p += v[q]; part[B.K] = p; }
++    if (i <= B.K) {                                                        // thread c sums expert c's row; thread K the shared expert's
++        float l[32];
++        const float * src = v + (i < B.K ? 2 * i * GR : 2 * NRQ); const int n = 2 * (i < B.K ? GR : SB);
++        for (int x = 0; x < 32; ++x) {
++            float t = x < n ? src[x] : 0.0f;
++            if (32 + x < n) t = __fadd_rn(t, src[32 + x]);
++            if (64 + x < n) t = __fadd_rn(t, src[64 + x]);
++            l[x] = t;
++        }
++        part[i] = tf_tree(l);
++    }
 +    __syncthreads();
 +    if (i == 0) {
-+        float s2 = part[0] * B.wgt[0];
-+        for (int c = 1; c < B.K; ++c) s2 += part[c] * B.wgt[c];
-+        B.y[r] = s2 + part[B.K];
++        float s2 = __fmul_rn(part[0], B.wgt[0]);
++        for (int c = 1; c < B.K; ++c) s2 = __fadd_rn(s2, __fmul_rn(part[c], B.wgt[c]));
++        B.y[r] = __fadd_rn(s2, part[B.K]);
 +    }
 +}
 +bool ggml_cuda_temporal_fused_op(const ggml_tensor * t) {
-+    return ggml_cuda_temporal_fused_on() && ggml_cuda_temporal_route_op_on() && strncmp(t->name, "ffn_moe_fused", 13) == 0 && t->type == GGML_TYPE_F32;
++    // recognised by its inputs, not its name (the model code renames the node): nine sources, the fourth a Q4_0 table
++    return ggml_cuda_temporal_fused_on() && ggml_cuda_temporal_route_op_on() && t->type == GGML_TYPE_F32
++        && t->src[8] && t->src[3] && t->src[3]->type == GGML_TYPE_Q4_0 && t->src[1] && t->src[1]->type == GGML_TYPE_I32;
 +}
 +void ggml_cuda_temporal_fused(cudaStream_t stream, ggml_tensor * dst) {
 +    const ggml_tensor * x = dst->src[0], * ids = dst->src[1], * wgt = dst->src[2];
 +    const ggml_tensor * W[3] = { dst->src[3], dst->src[4], dst->src[5] }, * Sx[3] = { dst->src[6], dst->src[7], dst->src[8] };
 +    const int D = (int) x->ne[0], F = (int) W[0]->ne[1], FS = (int) Sx[0]->ne[1], K = (int) ids->ne[0], GR = F / 32;
-+    GGML_ASSERT(x->ne[1] == 1 && D % 32 == 0 && D <= 896 && F % 32 == 0 && F <= 192 && FS % 32 == 0 && K * GR + FS / 32 <= 128 && K <= 64);
-+    static float * gu = nullptr, * sg = nullptr, * su = nullptr; static tf_q8 * aq = nullptr; static int cap = 0;
++    GGML_ASSERT(x->ne[1] == 1 && D % 32 == 0 && D <= 896 && F % 32 == 0 && F <= 192 && FS % 32 == 0 && FS / 32 <= 48 && K * GR + FS / 32 <= TFB_C && K <= 64);
++    static float * gu = nullptr, * sg = nullptr, * su = nullptr; static block_q8_1 * aq = nullptr; static int cap = 0;
 +    if (!gu) {
 +        CUDA_CHECK(cudaMalloc(&gu, (size_t) 2 * 64 * 192 * sizeof(float))); CUDA_CHECK(cudaMalloc(&sg, 4096 * sizeof(float))); CUDA_CHECK(cudaMalloc(&su, 4096 * sizeof(float)));
-+        CUDA_CHECK(cudaMalloc(&aq, 128 * sizeof(tf_q8))); cap = 1;
++        CUDA_CHECK(cudaMalloc(&aq, TFB_C * sizeof(block_q8_1))); cap = 1;
 +        fprintf(stderr, "[temporal-fused] one fused op per MoE layer on single-token steps: D=%d F=%d FS=%d K=%d\n", D, F, FS, K);
 +    }
 +    GGML_ASSERT(FS <= 4096);
@@ -255,7 +263,7 @@ index dffd6614..197d4405 100644
 +    k_tf_a2<<<K * GR + FS / 32, 32, 0, stream>>>(gu, sg, su, aq, K * GR, K * F);
 +    B.aq = aq; B.wgt = (const float *) wgt->data; B.Dn = A.W[2]; B.ids = A.ids; B.swp_e = A.swp_e; B.swp_s = A.swp_s; B.nswp = A.nswp;
 +    B.SD = (const uint8_t *) Sx[2]->data; B.y = (float *) dst->data; B.be = A.be; B.D = D; B.F = F; B.FS = FS; B.K = K;
-+    k_tf_b<<<D, 160, 0, stream>>>(B);
++    k_tf_b<<<D, TFB_T, 0, stream>>>(B);
 +    CUDA_CHECK(cudaGetLastError());
 +    (void) cap;
 +}
@@ -276,7 +284,7 @@ index 2bb55f5f..55d9c9f2 100644
  // prefill groups ubatch rows by expert and streams each ACTIVE expert once through a deep VRAM ring, one
  // batched GEMM per expert. Decode (n_tokens==1) is untouched.
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index eb02cb59..29fcae4f 100644
+index eb02cb59..776265bf 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1798,6 +1798,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
@@ -313,7 +321,7 @@ index eb02cb59..29fcae4f 100644
 +                && !up_exps_s && !gate_exps_s && !down_exps_s && !weight_before_ffn && loras->empty()
 +                && !(hparams.swiglu_clamp_exp[il] > 1e-6f)
 +                && n_embd % 32 == 0 && n_embd <= 896 && gate_exps->ne[1] % 32 == 0 && gate_exps->ne[1] <= 256 && sh[0]->ne[1] % 32 == 0
-+                && n_expert_used * (gate_exps->ne[1] / 32) + sh[0]->ne[1] / 32 <= 128) {
++                && gate_exps->ne[1] <= 192 && n_expert_used * (gate_exps->ne[1] / 32) + sh[0]->ne[1] / 32 <= 160) {
 +            ggml_tensor * args[9] = { cur, selected_experts, weights, gate_exps, up_exps, down_exps, sh[0], sh[1], sh[2] };
 +            ggml_tensor * fused = ggml_custom_4d(ctx0, GGML_TYPE_F32, n_embd, n_tokens, 1, 1, args, 9, ggml_temporal_fused_cpu, 1, (void *)(intptr_t) il);
 +            cb(fused, "ffn_moe_fused", il);
