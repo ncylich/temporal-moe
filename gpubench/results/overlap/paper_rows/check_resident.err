@@ -1,0 +1,73 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 48541 MiB):
+  Device 0: NVIDIA RTX A6000, compute capability 8.6, VMM: yes, VRAM: 48541 MiB
+temporal-qkv: norm, quantisation and 3 projections of Qcur-0 in two launches
+temporal-rope-pair: RoPE of Q and K and the cache write of V in one launch
+[temporal-fused] one fused op per MoE layer on single-token steps: D=800 F=192 FS=1152 K=18 skip=0
+temporal-fused-add: residual add of l_out-1 done by the fused op
+temporal-route-cuda: trained min_logit, layers=13 layer_tokens=214305 cold_fills=26 swaps=214279 swaps_per_layer_token=1.0000
+temporal-attn1-check:  256 cached positions: 3598 attention calls, kernel taken in 3598 | K.Q at unmasked positions: 0 of 23027900 values differ from the stock op | attention output: 0 of 2878400 values differ
+temporal-attn1-check:  512 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 68902400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check:  768 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 114777600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1024 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 160652800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1280 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 206528000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1536 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 252403200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 1792 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 298278400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 2048 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 344153600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 2304 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 390028800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 2560 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 435904000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 2816 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 481779200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 3072 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 527654400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 3328 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 573529600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 3584 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 619404800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 3840 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 665280000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 4096 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 711155200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 4352 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 757030400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 4608 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 802905600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 4864 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 848780800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 5120 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 894656000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 5376 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 940531200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 5632 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 986406400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 5888 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1032281600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 6144 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1078156800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 6400 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1124032000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 6656 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1169907200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 6912 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1215782400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 7168 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1261657600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 7424 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1307532800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 7680 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1353408000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 7936 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1399283200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 8192 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1445158400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 8448 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1491033600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 8704 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1536908800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 8960 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1582784000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 9216 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1628659200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 9472 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1674534400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 9728 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1720409600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 9984 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1766284800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 10240 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1812160000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 10496 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1858035200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 10752 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1903910400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 11008 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1949785600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 11264 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 1995660800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 11520 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2041536000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 11776 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2087411200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 12032 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2133286400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 12288 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2179161600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 12544 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2225036800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 12800 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2270912000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 13056 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2316787200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 13312 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2362662400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 13568 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2408537600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 13824 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2454412800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 14080 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2500288000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 14336 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2546163200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 14592 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2592038400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 14848 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2637913600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 15104 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2683788800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 15360 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2729664000 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 15616 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2775539200 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 15872 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2821414400 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 16128 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2867289600 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 16384 cached positions: 3584 attention calls, kernel taken in 3584 | K.Q at unmasked positions: 0 of 2913164800 values differ from the stock op | attention output: 0 of 2867200 values differ
+temporal-attn1-check: 16640 cached positions: 1400 attention calls, kernel taken in 1400 | K.Q at unmasked positions: 0 of 1150415000 values differ from the stock op | attention output: 0 of 1120000 values differ
+temporal-route: trained min_logit, layers=0 layer_tokens=0 cold_fills=0 swaps=0 swaps_per_layer_token=0.0000

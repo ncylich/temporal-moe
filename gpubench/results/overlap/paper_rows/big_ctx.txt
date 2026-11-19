@@ -1,0 +1,43 @@
+big p1 ctx 2048 stock: 214.72633333333332
+big p1 ctx 2048 resident: 306.2483333333333
+big p1 ctx 2048 stream: 247.66466666666668
+big p1 ctx 4096 stock: 200.924
+big p1 ctx 4096 resident: 279.984
+big p1 ctx 4096 stream: 229.54299999999998
+big p1 ctx 8192 stock: 174.596
+big p1 ctx 8192 resident: 235.852
+big p1 ctx 8192 stream: 197.42433333333335
+big p1 ctx 16384 stock: 148.016
+big p1 ctx 16384 resident: 187.369
+big p1 ctx 16384 stream: 164.07333333333335
+big p2 ctx 2048 stream: 244.8083333333333
+big p2 ctx 2048 resident: 301.5156666666667
+big p2 ctx 2048 stock: 211.60466666666665
+big p2 ctx 4096 stream: 228.84333333333333
+big p2 ctx 4096 resident: 278.1376666666667
+big p2 ctx 4096 stock: 198.085
+big p2 ctx 8192 stream: 188.66266666666664
+big p2 ctx 8192 resident: 235.11466666666664
+big p2 ctx 8192 stock: 174.13333333333333
+big p2 ctx 16384 stream: 162.01133333333334
+big p2 ctx 16384 resident: 187.21033333333332
+big p2 ctx 16384 stock: 147.85799999999998
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+big  1024 stock         |    222.9 (224.9 221.8 222.1) | 4.4855 | 6130 |  | 
+big  1024 stock_fused   |    255.8 (257.3 255.3 255.0) | 3.9086 | 6128 |  | temporal-rope-pair
+big  1024 resident      |    326.2 (329.2 325.7 323.6) | 3.0659 | 6124 | 0.0000 | temporal-rope-pair
+big  1024 nobytes       |    258.8 (258.4 259.5 258.4) | 3.8645 | 1208 | 0.0000 | temporal-rope-pair
+big  1024 stream        |    259.0 (259.5 258.9 258.5) | 3.8612 | 1208 | 0.0000 | temporal-rope-pair
+big  1024 floor         |     48.1 (48.1 48.1 48.1) | 20.7781 | 1208 | 0.0000 | temporal-rope-pair
+big  2048 stock         |    213.2 (214.7 211.6) | 4.6912 | 6220 |  | 
+big  2048 resident      |    303.9 (306.2 301.5) | 3.2908 | 6214 | 0.0000 | temporal-rope-pair
+big  2048 stream        |    246.2 (247.7 244.8) | 4.0611 | 1298 | 0.0000 | temporal-rope-pair
+big  4096 stock         |    199.5 (200.9 198.1) | 5.0124 | 6400 |  | 
+big  4096 resident      |    279.1 (280.0 278.1) | 3.5834 | 6394 | 0.0000 | temporal-rope-pair
+big  4096 stream        |    229.2 (229.5 228.8) | 4.3631 | 1478 | 0.0000 | temporal-rope-pair
+big  8192 stock         |    174.4 (174.6 174.1) | 5.7351 | 6760 |  | 
+big  8192 resident      |    235.5 (235.9 235.1) | 4.2466 | 6754 | 0.0000 | temporal-rope-pair
+big  8192 stream        |    193.0 (197.4 188.7) | 5.1802 | 1838 | 0.0000 | temporal-rope-pair
+big 16384 stock         |    147.9 (148.0 147.9) | 6.7596 | 7480 |  | 
+big 16384 resident      |    187.3 (187.4 187.2) | 5.3393 | 7474 | 0.0000 | temporal-rope-pair
+big 16384 stream        |    163.0 (164.1 162.0) | 6.1334 | 2558 | 0.0000 | temporal-rope-pair

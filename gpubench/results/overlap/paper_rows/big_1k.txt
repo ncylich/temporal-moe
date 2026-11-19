@@ -1,0 +1,25 @@
+big p1 ctx 1024 stock: 224.869
+big p1 ctx 1024 stock_fused: 257.29833333333335
+big p1 ctx 1024 resident: 329.2153333333333
+big p1 ctx 1024 nobytes: 258.40433333333334
+big p1 ctx 1024 stream: 259.52
+big p1 ctx 1024 floor: 48.1341
+big p2 ctx 1024 floor: 48.13456666666667
+big p2 ctx 1024 stream: 258.9193333333333
+big p2 ctx 1024 nobytes: 259.4926666666667
+big p2 ctx 1024 resident: 325.7013333333333
+big p2 ctx 1024 stock_fused: 255.25733333333332
+big p2 ctx 1024 stock: 221.82500000000002
+big p3 ctx 1024 stock: 222.12533333333332
+big p3 ctx 1024 stock_fused: 254.98633333333336
+big p3 ctx 1024 resident: 323.594
+big p3 ctx 1024 nobytes: 258.398
+big p3 ctx 1024 stream: 258.528
+big p3 ctx 1024 floor: 48.11426666666667
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+big  1024 stock         |    222.9 (224.9 221.8 222.1) | 4.4855 | 6130 |  | 
+big  1024 stock_fused   |    255.8 (257.3 255.3 255.0) | 3.9086 | 6128 |  | temporal-rope-pair
+big  1024 resident      |    326.2 (329.2 325.7 323.6) | 3.0659 | 6124 | 0.0000 | temporal-rope-pair
+big  1024 nobytes       |    258.8 (258.4 259.5 258.4) | 3.8645 | 1208 | 0.0000 | temporal-rope-pair
+big  1024 stream        |    259.0 (259.5 258.9 258.5) | 3.8612 | 1208 | 0.0000 | temporal-rope-pair
+big  1024 floor         |     48.1 (48.1 48.1 48.1) | 20.7781 | 1208 | 0.0000 | temporal-rope-pair

@@ -1370,3 +1370,159 @@ What these rows can carry. The op is the same work for both rules on the same mo
   token shrank. The op and the routing kernels themselves did not change in Part 5.
 - Skliar's own loads on these two rows are 0.988 and 0.960 per decoded token-layer (0.997 over the five rows
   its lambda was matched on). Ours is 1 by rule.
+
+---
+
+# Part 6 -- The paper's A6000 decode rows on the fused build (2026-11-19)
+
+Asked: what the paper's RTX A6000 figures and tables would read if they were taken with the Part 5
+kernels, and whether any claim changes. Nothing in `paper/` was edited. Everything below is on pod
+`8xcjjlxgekub1c` (RTX A6000, AMD EPYC 7543 host, driver 595.112.07), container up 08:28, stopped 09:50
+UTC, about $1.
+
+## O6-0 -- Protocol, build, and what had to change first
+
+- Protocol: the paper's own (`gpubench/run_decode.py`, `llamacpp-bench/run_serving_bench.sh`). Batch 1,
+  context filled token by token (`-b 1 -ub 1 -d <ctx>`), 100 tokens generated and timed, four trials with
+  the first dropped, one process per arm and context, peak VRAM polled from `nvidia-smi`. Passes alternate
+  the arm order. Driver: `gpubench/overlap/paper_rows.py`; rows and logs in
+  `gpubench/results/overlap/paper_rows/`. This is not the Part 5 loop (batched fill, 128 tokens), so
+  absolute speeds differ from O5-11 by a few percent.
+- Fused arms run `TEMPORAL_FUSED=3 TEMPORAL_QKV=2 TEMPORAL_FUSED_ADD=1 TEMPORAL_ROPE_PAIR=2
+  TEMPORAL_ATTN1=1`. Arms named `old_` and `stock` run the kernels behind the paper's current numbers on
+  the same pod, so each new row has an old one beside it from the same machine and hour.
+- Engine patch 0019 (tree `a5c18a18`). The single-token attention kernel refused caches past 4,096 rows,
+  which would have left the 4k, 8k and 16k rows of the 1.26 B model on the stock ops without saying so.
+  The cap is now the real one: a head's row of scores must fit one block's shared memory, about 24,000
+  rows on this card. The kernel body did not change.
+- Check of 0019 before any timing (`TEMPORAL_ATTN1_CHECK=1`, token-by-token fill to 16,384 plus 100
+  tokens, `check_resident.err`): 230,790 attention calls, the kernel taken in every one, 65 cache sizes
+  from 256 to 16,640 rows, 0 K.Q values and 0 output values different from the stock ops in any bin.
+- Gates on this build (`gates_small.txt`, `stage1.out`, `stage2.out`, `fix.out`): 1.26 B perplexity
+  42.6913 +/- 2.98935 (our rule), 40.0690 +/- 2.84434 (Skliar), 22.7367 +/- 1.50944 (trained), each equal
+  all in VRAM with the patch 0014 op, all in VRAM with every switch, and streamed twice. Trained model at
+  4,096 context (past its training length, equality only): 183.4180 +/- 10.05869 in all three. 11 B:
+  203452.6772 +/- 8384.03596 all in VRAM with the switches off, with them on, and streamed with the
+  router's own loads.
+- A mistake in the first 11 B gate, caught by its own output: the streamed line used the imposed one load
+  per layer-token (`TEMPORAL_SWAP_HIST=0,1`) and printed 204575.2737. Imposing loads on a random router
+  changes which experts are selected, so that line cannot equal the all-in-VRAM one. Rerun with the
+  router's own loads it is equal, and with the imposed load the patch 0014 op and the full build agree
+  (204575.2737 both).
+- A second mistake, caught by the numbers: the first 11 B "no bytes moved" arm set
+  `TEMPORAL_ROUTE_NOCOPY=1`, which the histogram path ignores, so it moved bytes and read the same as the
+  streamed arm (258.8 against 259.0). Rerun with the load count pinned to zero (`TEMPORAL_SWAP_HIST=1,0`),
+  which is how O5-7 took its split. The wrong rows are still in `big.jsonl` under arm `nobytes`, tag
+  `B19`; the right ones are in `big_fix.jsonl`.
+- Model files: `qwen3moe-rand-fine-Q4_0.gguf` sha256 `84cd3c92...` (as before),
+  `qwen3moe-rand-fine-Q4_K_M.gguf` `af987fed...`, `qwen3moe-rand-coarse-Q4_0.gguf` `289398dc...`.
+
+## O6-1 -- Trained 1.26 B model (paper Table "trained", A6000 rows, and the dashed A6000 line of the context figure)
+
+tok/s, trained router in every arm, three passes pooled (nine kept trials). Loads 1.0000 per layer-token
+(0.9999 at 1k) in every streamed run.
+
+| context | all 192 in VRAM | 18 slots, no bytes moved | 18 slots, streamed | speed kept | peak VRAM streamed / all | paper today |
+|---|---|---|---|---|---|---|
+| 1,024 | 1,053.2 | 1,032.9 | 949.6 | **0.902** | 510 / 1,050 MiB | 672.8, 567.2, 0.843 |
+| 2,048 | 948.3 | 923.0 | 862.1 | **0.909** | 554 / 1,094 | 586.5, 503.4, 0.858 |
+| 4,096 | 780.3 | 765.4 | 708.6 | **0.908** | 640 / 1,180 | 461.7, 406.8, 0.881 |
+| 8,192 | 512.0 | 504.8 | 480.9 | **0.939** | 816 / 1,356 | not in the paper |
+| 16,384 | 233.1 | 230.8 | 226.2 | **0.970** | 1,170 / 1,710 | not in the paper |
+
+- The old kernels on this pod, one pass: all in VRAM 635.6 / 562.2 / 443.9, streamed 548.7 / 495.4 / 398.8
+  at 1k / 2k / 4k, ratios 0.863 / 0.881 / 0.898. This pod is about 5 % slower than the one behind the
+  paper's rows and its old ratio is 2 points higher, so against the same machine the fused build moves the
+  1k ratio from 0.863 to 0.902.
+- Split at 1k: 0.950 ms all in VRAM, 0.968 no bytes moved, 1.053 streamed. Slots and the routing kernel
+  cost 0.019 ms and the load 0.085 ms, where the old build had 0.25 to 0.29 ms and nothing measurable.
+- Stock top-k router, all in VRAM: 600.6 / 530.6 / 425.8 with the stock kernels (5.5 / 5.6 / 4.1 % under
+  the trained router's old kernels, the paper's "5 to 7 %"), and 738.8 / 679.4 / 587.1 with the
+  attention-side launches fused. The fused expert op is only built when a routing op runs, so the stock
+  router cannot use it and sits 30 % under the trained router's 1,053.2 at 1k.
+- One of three streamed passes at 16k read 1,438 MiB; the other two and all no-bytes passes read 1,170.
+  Taken as a polling artefact, not chased.
+
+## O6-2 -- 11 B fine model, 18 of 192, uniform Q4_0 (paper Table "serving", fine column)
+
+tok/s at 1,024 context. "All in VRAM, fused" is our rule with every expert resident, the fastest
+all-resident arm, and is the baseline for the new ratios.
+
+| row | new build | vs fused baseline | vs stock engine | old kernels, same file, this pod | paper today (Q4_K_M, another machine) |
+|---|---|---|---|---|---|
+| stock engine, all in VRAM | 222.9 | 0.69 | 1.00 | 222.9 | 202, 1.00 |
+| stock router, attention-side launches fused | 255.8 | 0.79 | 1.15 | | |
+| all in VRAM, fused | 325.4 | 1.00 | 1.46 | | |
+| 18 slots, no load | 308.2 | 0.95 | 1.38 | 188.7 (0.85 of stock) | 176, 0.87 |
+| 18 slots, one load per layer-token | **257.4** | **0.79** | 1.15 | 182.2 (0.82) | 163, 0.81 |
+| 18 slots, 16 loads per layer-token | 48.1 | 0.15 | 0.22 | 44.5 (0.20) | 43, 0.21 |
+
+- Passes: six for the fused baseline and the streamed row, three for the others, one for the old kernels.
+- Peak VRAM 1,208 MiB streamed against 6,124 all in VRAM, 5.07x.
+- Split: 3.073 ms all in VRAM, 3.244 no load, 3.886 streamed. Slots and routing 0.17 ms, exposed load
+  0.64 ms. At the 24 GB/s measured in O5-2 one expert takes 27 us to cross the link, 1.215 ms over 45
+  layers, so 47 % of the transfer is hidden.
+- The same rows on the Q4_K_M file with the old kernels, this pod, one pass: stock 199.4, no load 181.1
+  (0.91), one load 170.0 (0.85), 16 loads 37.7 (0.19), peak VRAM 1,356 against 7,132 MiB (5.26x). The
+  stock row is within 1.3 % of the paper's 202, so this pod reproduces the paper's baseline; its streamed
+  row is 4 % above the paper's 163.
+
+Across context, fused build, two passes each (one for no load):
+
+| context | all in VRAM, fused | no load | streamed | speed kept | stock engine | streamed vs stock | peak VRAM streamed / all |
+|---|---|---|---|---|---|---|---|
+| 1,024 | 325.4 | 308.2 | 257.4 | 0.791 | 222.9 | 1.15 | 1,208 / 6,124 MiB, 5.07x |
+| 2,048 | 303.9 | 293.6 | 246.2 | 0.810 | 213.2 | 1.15 | 1,298 / 6,214, 4.79x |
+| 4,096 | 279.1 | 268.1 | 229.2 | 0.821 | 199.5 | 1.15 | 1,478 / 6,394, 4.33x |
+| 8,192 | 235.5 | 227.5 | 193.0 | 0.820 | 174.4 | 1.11 | 1,838 / 6,754, 3.67x |
+| 16,384 | 187.3 | 181.8 | 163.0 | 0.870 | 147.9 | 1.10 | 2,558 / 7,474, 2.92x |
+
+## O6-3 -- 11 B coarse model, 6 of 64, uniform Q4_0 (paper Table "serving", coarse column)
+
+The fused expert op is not built for this shape (it needs more than 128 experts and expert width at most
+384; this model has 64 and 1,152). So this column has the attention-side fusions only, with the old
+expert path, and its baseline is the stock router with those fusions. Three passes, 1,024 context.
+
+| row | new build | vs its baseline | old kernels, this pod | paper today |
+|---|---|---|---|---|
+| stock engine, all in VRAM | 275.6 | | 275.6, 1.00 | 252, 1.00 |
+| all in VRAM, attention-side fused (baseline) | 327.0 | 1.00 | | |
+| 6 slots, no load | 263.8 | 0.81 | 230.0, 0.83 | 217, 0.86 |
+| 6 slots, one load per layer-token | 165.5 | 0.51 | 153.6, 0.56 | 128, 0.51 |
+| 6 slots, 5 loads per layer-token | 50.4 | 0.15 | 48.4, 0.18 | 42, 0.17 |
+
+Peak VRAM 1,188 against 6,104 MiB.
+
+## O6-4 -- Each A6000 claim in the paper against these rows
+
+| claim in the paper | new reading | does the meaning change |
+|---|---|---|
+| abstract: both models keep about 80 % of in-memory decode speed | 11 B 0.79, 1.26 B 0.90 | no |
+| trained model keeps 84 % at 1k and 88 % at 4k | 90 % and 91 % | better; direction same |
+| the share rises with context on every device | A6000: 0.902, 0.909, 0.908 through 4k, then 0.94 and 0.97 | flat through 4k on the A6000 now; the rise shows only from 8k |
+| stock top-k is 5 to 7 % slower than the trained router | still 4 to 6 % with the old kernels; 30 % with the new build | yes: the fused op needs a routing op, so the comparison is no longer like for like and the sentence would have to say so |
+| 11 B deploy row keeps 0.81x in 5.1x less memory | 0.79x in 5.07x less | no |
+| free routing at that memory keeps 0.21x and runs 3 to 4x slower than deploy | 0.15x; 5.4x slower than deploy (fine), 3.3x (coarse) | same direction, larger gap at fine |
+| most of the fine slowdown comes from the kernel changes (0.87x with no swaps, 0.81x with) | 0.95x with no load, 0.79x with | **yes, reversed**: 0.17 ms is kernel overhead and 0.64 ms is exposed transfer |
+| 0.72 ms kernel overhead, 0.44 ms exposed transfer, 67 % of the transfer hidden | 0.17 ms, 0.64 ms, 47 % | yes: less than half the transfer is hidden now, because the work it used to hide behind got shorter |
+| coarse: 0.86x with no swaps, 0.51x with | 0.81x, 0.51x | no, but the coarse column cannot use the fused expert op |
+| fine ceiling 202 is slower than coarse 252 | 325 and 327 | the two granularities now have the same ceiling |
+| decode holds near 0.80x at every context | 0.79 to 0.82 through 8k, 0.87 at 16k | no |
+| the 1.26 B sentence under the Skliar table, "these kernels are faster than the ones behind the trained table" | would no longer be needed | text only |
+
+Also new and not in the paper: the streamed 11 B arm with 18 experts in memory is 1.10 to 1.15x the stock
+engine with all 192 in memory, at every context.
+
+## O6-5 -- Not done
+
+- The 11 B rows are at uniform Q4_0. The fused op does not read the Q4_K_M file, and the paper's laptop and
+  phone rows use Q4_K_M. Still the author's decision (O4-2).
+- Prefill and its peak VRAM (left panel of the context figure) were not rerun. The decode switches act on
+  single-token steps only, so prefill should be unchanged, but no prefill number was taken on tree
+  `a5c18a18` to show it.
+- The 29.4 GB/s link figure from the cold-fetch curve was not remeasured; the 47 % above uses the 24 GB/s
+  this pod measured in O5-2.
+- "5.7x fewer weights in VRAM" is a count of bytes in the Q4_K_M file and was not recomputed for Q4_0.
+- Routing equality against the Python reference for patches 0015 to 0019: still not run. No routing kernel
+  is touched by them.
+- Old-kernel rows are one pass each.

@@ -1,0 +1,16 @@
+big p1 ctx 1024 old_nobytes: 188.65600000000003
+big p1 ctx 1024 old_stream: 182.15
+big p1 ctx 1024 old_floor: 44.47833333333333
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+big  1024 old_nobytes   |    188.7 (188.7) | 5.3007 | 1216 |  | 
+big  1024 old_stream    |    182.2 (182.2) | 5.4900 | 1216 |  | 
+big  1024 old_floor     |     44.5 (44.5) | 22.4829 | 1216 |  | 
+big p1 ctx 1024 stock: 199.40566666666666
+big p1 ctx 1024 old_nobytes: 181.09533333333334
+big p1 ctx 1024 old_stream: 169.952
+big p1 ctx 1024 old_floor: 37.66193333333333
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+big  1024 stock         |    199.4 (199.4) | 5.0149 | 7132 |  | 
+big  1024 old_nobytes   |    181.1 (181.1) | 5.5220 | 1356 |  | 
+big  1024 old_stream    |    170.0 (170.0) | 5.8840 | 1356 |  | 
+big  1024 old_floor     |     37.7 (37.7) | 26.5520 | 1356 |  | 

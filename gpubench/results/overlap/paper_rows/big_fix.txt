@@ -1,0 +1,25 @@
+big p1 ctx 1024 resident: 325.103
+big p1 ctx 1024 nobytes: 308.09933333333333
+big p1 ctx 1024 stream: 258.7583333333333
+big p2 ctx 1024 stream: 258.9203333333333
+big p2 ctx 1024 nobytes: 308.4726666666666
+big p2 ctx 1024 resident: 324.39166666666665
+big p3 ctx 1024 resident: 324.488
+big p3 ctx 1024 nobytes: 308.141
+big p3 ctx 1024 stream: 249.48233333333334
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+big  1024 resident      |    324.7 (325.1 324.4 324.5) | 3.0801 | 6124 | 0.6581 | temporal-rope-pair
+big  1024 nobytes       |    308.2 (308.1 308.5 308.1) | 3.2442 | 1208 | 0.0000 | temporal-rope-pair
+big  1024 stream        |    255.7 (258.8 258.9 249.5) | 3.9105 | 1208 | 1.0000 | temporal-rope-pair
+big p1 ctx 2048 nobytes: 293.62166666666667
+big p1 ctx 4096 nobytes: 268.109
+big p1 ctx 8192 nobytes: 227.5306666666667
+big p1 ctx 16384 nobytes: 181.82866666666666
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+big  1024 resident      |    324.7 (325.1 324.4 324.5) | 3.0801 | 6124 | 0.6581 | temporal-rope-pair
+big  1024 nobytes       |    308.2 (308.1 308.5 308.1) | 3.2442 | 1208 | 0.0000 | temporal-rope-pair
+big  1024 stream        |    255.7 (258.8 258.9 249.5) | 3.9105 | 1208 | 1.0000 | temporal-rope-pair
+big  2048 nobytes       |    293.6 (293.6) | 3.4057 | 1298 | 0.0000 | temporal-rope-pair
+big  4096 nobytes       |    268.1 (268.1) | 3.7298 | 1478 | 0.0000 | temporal-rope-pair
+big  8192 nobytes       |    227.5 (227.5) | 4.3950 | 1838 | 0.0000 | temporal-rope-pair
+big 16384 nobytes       |    181.8 (181.8) | 5.4997 | 2558 | 0.0000 | temporal-rope-pair

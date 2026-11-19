@@ -1,0 +1,61 @@
+small p1 ctx 1024 resident: 1059.4533333333334
+small p1 ctx 1024 nobytes: 1034.7299999999998
+small p1 ctx 1024 stream: 958.1883333333334
+small p1 ctx 2048 resident: 952.4866666666667
+small p1 ctx 2048 nobytes: 927.5463333333333
+small p1 ctx 2048 stream: 864.7416666666668
+small p1 ctx 4096 resident: 782.2206666666667
+small p1 ctx 4096 nobytes: 762.0266666666666
+small p1 ctx 4096 stream: 718.1276666666666
+small p1 ctx 8192 resident: 511.4283333333333
+small p1 ctx 8192 nobytes: 504.0566666666666
+small p1 ctx 8192 stream: 483.6323333333333
+small p1 ctx 16384 resident: 233.68966666666665
+small p1 ctx 16384 nobytes: 230.55100000000002
+small p1 ctx 16384 stream: 226.37033333333332
+small p2 ctx 1024 stream: 945.0293333333334
+small p2 ctx 1024 nobytes: 1034.86
+small p2 ctx 1024 resident: 1057.1599999999999
+small p2 ctx 2048 stream: 864.1456666666667
+small p2 ctx 2048 nobytes: 917.102
+small p2 ctx 2048 resident: 946.93
+small p2 ctx 4096 stream: 709.8166666666666
+small p2 ctx 4096 nobytes: 772.116
+small p2 ctx 4096 resident: 778.0236666666666
+small p2 ctx 8192 stream: 474.66499999999996
+small p2 ctx 8192 nobytes: 504.359
+small p2 ctx 8192 resident: 511.4856666666667
+small p2 ctx 16384 stream: 226.191
+small p2 ctx 16384 nobytes: 231.22866666666667
+small p2 ctx 16384 resident: 233.02700000000002
+small p3 ctx 1024 resident: 1042.8633333333335
+small p3 ctx 1024 nobytes: 1029.0666666666668
+small p3 ctx 1024 stream: 945.6086666666666
+small p3 ctx 2048 resident: 945.5853333333333
+small p3 ctx 2048 nobytes: 924.3573333333334
+small p3 ctx 2048 stream: 857.2959999999999
+small p3 ctx 4096 resident: 780.8013333333333
+small p3 ctx 4096 nobytes: 761.9926666666667
+small p3 ctx 4096 stream: 697.881
+small p3 ctx 8192 resident: 513.133
+small p3 ctx 8192 nobytes: 505.907
+small p3 ctx 8192 stream: 484.3196666666667
+small p3 ctx 16384 resident: 232.64066666666668
+small p3 ctx 16384 nobytes: 230.51566666666668
+small p3 ctx 16384 stream: 226.02033333333335
+kind ctx arm | tok/s pooled (per pass) | ms | peak VRAM MiB | loads per layer-token | notes
+small  1024 resident      |   1053.2 (1059.5 1057.2 1042.9) | 0.9495 | 1050 | 0.9999 | temporal-attn1 temporal-rope-pair
+small  1024 nobytes       |   1032.9 (1034.7 1034.9 1029.1) | 0.9682 | 510 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  1024 stream        |    949.6 (958.2 945.0 945.6) | 1.0531 | 510 | 0.9999 | temporal-attn1 temporal-rope-pair
+small  2048 resident      |    948.3 (952.5 946.9 945.6) | 1.0545 | 1094 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  2048 nobytes       |    923.0 (927.5 917.1 924.4) | 1.0834 | 554 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  2048 stream        |    862.1 (864.7 864.1 857.3) | 1.1600 | 554 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  4096 resident      |    780.3 (782.2 778.0 780.8) | 1.2815 | 1180 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  4096 nobytes       |    765.4 (762.0 772.1 762.0) | 1.3065 | 640 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  4096 stream        |    708.6 (718.1 709.8 697.9) | 1.4112 | 640 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  8192 resident      |    512.0 (511.4 511.5 513.1) | 1.9531 | 1356 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  8192 nobytes       |    504.8 (504.1 504.4 505.9) | 1.9811 | 816 | 1.0000 | temporal-attn1 temporal-rope-pair
+small  8192 stream        |    480.9 (483.6 474.7 484.3) | 2.0796 | 816 | 1.0000 | temporal-attn1 temporal-rope-pair
+small 16384 resident      |    233.1 (233.7 233.0 232.6) | 4.2897 | 1710 | 1.0000 | temporal-attn1 temporal-rope-pair
+small 16384 nobytes       |    230.8 (230.6 231.2 230.5) | 4.3334 | 1170 | 1.0000 | temporal-attn1 temporal-rope-pair
+small 16384 stream        |    226.2 (226.4 226.2 226.0) | 4.4210 | 1438 | 1.0000 | temporal-attn1 temporal-rope-pair

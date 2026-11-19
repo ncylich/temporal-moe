@@ -1,0 +1,2 @@
+Model name:                              AMD EPYC 7543 32-Core Processor
+NVIDIA RTX A6000, 595.112.07

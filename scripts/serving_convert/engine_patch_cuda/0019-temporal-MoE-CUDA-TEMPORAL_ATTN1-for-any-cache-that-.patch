@@ -1,0 +1,75 @@
+From 8bde299e8294d2d5f03bbd9e6ebc65066c8df575 Mon Sep 17 00:00:00 2001
+From: Noah Cylich <noahcylich@gmail.com>
+Date: Thu, 19 Nov 2026 00:23:08 -0800
+Subject: [PATCH] temporal-MoE CUDA: TEMPORAL_ATTN1 for any cache that fits one
+ block's shared memory
+
+The 4,096-row cap on the cache is replaced by the real limit: a head's row of scores plus the reduction
+buffers must fit the device's opt-in shared memory per block (about 24,000 rows on an RTX A6000). A longer
+cache stays on the stock ops. The kernel body is unchanged. TEMPORAL_ATTN1_CHECK reports caches up to
+24,576 rows in its 256-row bins instead of folding everything past 8,192 into the last one.
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu | 6 +++---
+ ggml/src/ggml-cuda/softmax.cu   | 9 +++++++--
+ 2 files changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index aea58cda..6dc0e1fc 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -3341,14 +3341,14 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
+ static bool tm_attn1_check(ggml_backend_cuda_context * cuda_ctx, ggml_tensor * kq, ggml_tensor * sm, ggml_tensor * kqv, ggml_tensor * cont) {
+     static const int on = [](){const char*e=getenv("TEMPORAL_ATTN1_CHECK");return e?atoi(e):0;}();
+     if (!on) return false;
+-    struct tot_t { long calls[32] = {0}, taken[32] = {0}, n_out[32] = {0}, bad_out[32] = {0}, n_kq[32] = {0}, bad_kq[32] = {0};
+-        ~tot_t() { for (int b = 0; b < 32; ++b) if (calls[b]) fprintf(stderr, "temporal-attn1-check: %4d cached positions: %ld attention calls, kernel taken in %ld | "
++    struct tot_t { long calls[96] = {0}, taken[96] = {0}, n_out[96] = {0}, bad_out[96] = {0}, n_kq[96] = {0}, bad_kq[96] = {0};
++        ~tot_t() { for (int b = 0; b < 96; ++b) if (calls[b]) fprintf(stderr, "temporal-attn1-check: %4d cached positions: %ld attention calls, kernel taken in %ld | "
+             "K.Q at unmasked positions: %ld of %ld values differ from the stock op | attention output: %ld of %ld values differ\n",
+             (b + 1) * 256, calls[b], taken[b], bad_kq[b], n_kq[b], bad_out[b], n_out[b]); } };
+     static tot_t T;
+     cudaStream_t st = cuda_ctx->stream();
+     const size_t n_kq = ggml_nelements(kq), n_out = ggml_nelements(cont), nkv = kq->ne[0];
+-    const int b = std::min<int>(31, (int) (nkv / 256) - 1);
++    const int b = std::min<int>(95, (int) (nkv / 256) - 1);
+     // the allocator may give an output Q's buffer, and SOFT_MAX works in place over K.Q, so inputs are saved and put back
+     const ggml_tensor * q = kq->src[1];
+     std::vector<char> q0(ggml_nbytes(q)); std::vector<float> raw0(n_kq), raw1(n_kq), sm0(n_kq), out0(n_out), out1(n_out), kqv0(ggml_nelements(kqv)), mk(nkv, 0.0f);
+diff --git a/ggml/src/ggml-cuda/softmax.cu b/ggml/src/ggml-cuda/softmax.cu
+index 69981b9f..4fe06710 100644
+--- a/ggml/src/ggml-cuda/softmax.cu
++++ b/ggml/src/ggml-cuda/softmax.cu
+@@ -590,8 +590,12 @@ int ggml_cuda_attn1(ggml_backend_cuda_context & ctx, ggml_tensor * kq, ggml_tens
+         kq->type != GGML_TYPE_F32 || sm->type != GGML_TYPE_F32 || kqv->type != GGML_TYPE_F32 || cont->type != GGML_TYPE_F32) return 0;
+     if (ggml_get_op_params_i32(kq, 0) != GGML_PREC_F32 || ggml_get_op_params_i32(kqv, 0) != GGML_PREC_DEFAULT ||
+         ggml_get_op_params_i32(kq, 1) != 0 || ggml_get_op_params_i32(kqv, 1) != 0) return 0;
+-    if (nd % 2 != 0 || nd > 32 || nkv % 2 != 0 || nkv < 256 || nkv > 4096 || k->ne[3] != 1 || v->ne[3] != 1) return 0;
++    if (nd % 2 != 0 || nd > 32 || nkv % 2 != 0 || nkv < 256 || k->ne[3] != 1 || v->ne[3] != 1) return 0;
+     if (q->ne[0] != nd || q->ne[1] != 1 || q->ne[2] != nh || q->ne[3] != 1) return 0;
++    // one block holds a head's whole row of scores in shared memory; a cache too long for that stays on the stock ops
++    const size_t nbytes_shared = (GGML_PAD(nkv, WARP_SIZE) + WARP_SIZE + nd * 8) * sizeof(float);
++    const size_t smpbo = ggml_cuda_info().devices[ggml_cuda_get_device()].smpbo;
++    if (nbytes_shared > smpbo) return 0;
+     if (v->ne[0] != nkv || v->ne[1] != nd || v->ne[2] != nh) return 0;
+     if (kq->ne[0] != nkv || kq->ne[1] != 1 || kq->ne[2] != nh || !ggml_is_contiguous(kq) || !ggml_is_contiguous(sm) || !ggml_are_same_shape(kq, sm)) return 0;
+     if (kqv->ne[0] != nd || kqv->ne[1] != 1 || kqv->ne[2] != nh || ggml_nelements(cont) != nd * nh || !ggml_is_contiguous(cont)) return 0;
+@@ -669,14 +673,15 @@ int ggml_cuda_attn1(ggml_backend_cuda_context & ctx, ggml_tensor * kq, ggml_tens
+     params.m0 = powf(2.0f, -(max_bias       ) / n_head_log2);
+     params.m1 = powf(2.0f, -(max_bias / 2.0f) / n_head_log2);
+ 
+-    const size_t nbytes_shared = (GGML_PAD(nkv, WARP_SIZE) + WARP_SIZE + nd * 8) * sizeof(float);
+     const dim3 block_dims(1024, 1, 1), block_nums(nh, 1, 1);
+     const auto hs = [](const ggml_tensor * t, int d) { return (int) (t->nb[d] / ggml_type_size(t->type)); };
+     if (mask && mask->type == GGML_TYPE_F16) {
++        CUDA_SET_SHARED_MEMORY_LIMIT((attn1_f32<half>), smpbo);
+         attn1_f32<half><<<block_nums, block_dims, nbytes_shared, ctx.stream()>>>((const half *) k->data, hs(k, 1), hs(k, 2), (const float *) q->data, hs(q, 2),
+             (float *) kq->data, hs(kq, 2), (const half *) mask->data, (float *) sm->data, params, (const half *) v->data, hs(v, 1), hs(v, 2),
+             (float *) kqv->data, hs(kqv, 2), with_cont ? (float *) cont->data : nullptr, (int) nd, (int) bs3, kq_order, stop);
+     } else {
++        CUDA_SET_SHARED_MEMORY_LIMIT((attn1_f32<float>), smpbo);
+         attn1_f32<float><<<block_nums, block_dims, nbytes_shared, ctx.stream()>>>((const half *) k->data, hs(k, 1), hs(k, 2), (const float *) q->data, hs(q, 2),
+             (float *) kq->data, hs(kq, 2), mask ? (const float *) mask->data : nullptr, (float *) sm->data, params, (const half *) v->data, hs(v, 1), hs(v, 2),
+             (float *) kqv->data, hs(kqv, 2), with_cont ? (float *) cont->data : nullptr, (int) nd, (int) bs3, kq_order, stop);
+-- 
+2.50.0
+
